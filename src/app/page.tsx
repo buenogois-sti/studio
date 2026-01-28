@@ -75,19 +75,19 @@ const testimonials = [
     {
         name: 'Ana Paula Santos',
         text: 'O Dr. Alan é incrível! Conseguiu recuperar todas as minhas verbas rescisórias que a empresa não queria pagar. Muito profissional e atencioso. Recomendo para todos que precisam de um advogado trabalhista de confiança!',
-        avatar: '/image/testimonial-1.jpg',
+        avatar: 'https://picsum.photos/seed/test1/100/100',
         avatarHint: 'person happy'
     },
     {
         name: 'Roberto Oliveira',
         text: 'Super recomendo! O Dr. Alan resolveu meu caso de assédio moral rapidamente. Tava sofrendo muito no trabalho e ele conseguiu uma indenização justa. Definitivamente o melhor advogado trabalhista que já conheci!',
-        avatar: '/image/testimonial-2.jpg',
+        avatar: 'https://picsum.photos/seed/test2/100/100',
         avatarHint: 'person happy'
     },
     {
         name: 'Maria Fernanda Costa',
         text: 'Nossa, o Dr. Alan salvou minha vida! Tava sendo demitida sem justa causa e ele conseguiu reverter tudo. Profissionalismo total e dedicação de verdade. Agradeço demais pelo trabalho que ele fez. Recomendo pra todo mundo!',
-        avatar: '/image/testimonial-3.jpg',
+        avatar: 'https://picsum.photos/seed/test3/100/100',
         avatarHint: 'person happy'
     },
 ]
@@ -159,9 +159,10 @@ export default function LandingPage() {
             </div>
              <div className="relative -mr-32 hidden lg:block h-[550px]">
                <Image
-                src="/image/lawyer-portrait.png"
+                src="https://picsum.photos/seed/lawyer-portrait/500/550"
                 alt="Dr. Alan Bueno De Gois - Advogado especialista em direito trabalhista"
                 fill
+                sizes="50vw"
                 className="object-contain object-bottom filter drop-shadow-[0_25px_25px_rgba(0,0,0,0.6)]"
                 data-ai-hint="man suit professional"
                 priority
@@ -201,9 +202,10 @@ export default function LandingPage() {
             <div className="container mx-auto grid lg:grid-cols-2 gap-12 items-center">
                 <div className="relative h-[500px] w-full">
                      <Image
-                        src="/image/lawyer-action.jpg"
+                        src="https://picsum.photos/seed/lawyer-action/600/500"
                         alt="Dr. Alan Bueno De Gois em seu escritório"
                         fill
+                        sizes="(max-width: 1024px) 100vw, 50vw"
                         className="object-cover rounded-lg shadow-2xl"
                         data-ai-hint="man office suit"
                       />
