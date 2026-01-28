@@ -1,8 +1,6 @@
-
 'use client';
 
 import React from 'react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Phone, MapPin, MessageCircle, Scale, Star, Briefcase, Clock, Shield, HeartHandshake, Landmark, FileText, Users, Handshake, Building, ChevronRight } from 'lucide-react';
@@ -159,13 +157,13 @@ export default function LandingPage() {
               </div>
             </div>
              <div className="relative -mr-32 hidden lg:block h-[550px]">
-               <Image
+               <img
                 src="/image/lawyer-portrait.png"
                 alt="Dr. Alan Bueno De Gois - Advogado especialista em direito trabalhista"
                 width={500}
                 height={550}
                 className="object-contain object-bottom filter drop-shadow-[0_25px_25px_rgba(0,0,0,0.6)]"
-                priority
+                loading="eager"
               />
             </div>
           </div>
@@ -205,12 +203,13 @@ export default function LandingPage() {
         <section id="sobre" className="py-24 bg-background">
             <div className="container mx-auto grid lg:grid-cols-2 gap-12 items-center">
                 <div className="relative h-[500px] w-full">
-                     <Image
+                     <img
                         src="/image/lawyer-action.jpg"
                         alt="Dr. Alan Bueno De Gois em seu escritório"
                         width={800}
                         height={500}
                         className="object-cover rounded-lg shadow-2xl"
+                        loading="lazy"
                       />
                 </div>
                  <div className="space-y-6">
@@ -260,7 +259,7 @@ export default function LandingPage() {
                          <Card key={index} className="bg-background/40 text-left p-6">
                             <div className="flex items-start gap-4">
                                <Avatar className="h-12 w-12 border-2 border-primary">
-                                    <AvatarImage src={testimonial.avatar} data-ai-hint={testimonial.avatarHint} />
+                                    <AvatarImage src={`https://picsum.photos/seed/t${index + 1}/100/100`} data-ai-hint={testimonial.avatarHint} />
                                     <AvatarFallback>{testimonial.name.charAt(0)}</AvatarFallback>
                                 </Avatar>
                                 <div>
