@@ -1,0 +1,368 @@
+{
+  "entities": {
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents a user in the LexFlow Workspace system.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the user entity."
+        },
+        "googleId": {
+          "type": "string",
+          "description": "The Google ID of the user, obtained during Google OAuth authentication."
+        },
+        "email": {
+          "type": "string",
+          "description": "The email address of the user.",
+          "format": "email"
+        },
+        "firstName": {
+          "type": "string",
+          "description": "The first name of the user."
+        },
+        "lastName": {
+          "type": "string",
+          "description": "The last name of the user."
+        },
+        "role": {
+          "type": "string",
+          "description": "The role of the user (e.g., admin, lawyer, financial).",
+          "format": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "The date and time when the user was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "The date and time when the user was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "googleId",
+        "email",
+        "firstName",
+        "lastName",
+        "role",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Client": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Client",
+      "type": "object",
+      "description": "Represents a client in the LexFlow Workspace system.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the client entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the client."
+        },
+        "document": {
+          "type": "string",
+          "description": "The client's identification document (e.g., tax ID)."
+        },
+        "driveFolderId": {
+          "type": "string",
+          "description": "The ID of the client's folder in Google Drive."
+        },
+        "sheetId": {
+          "type": "string",
+          "description": "The ID of the client's Google Sheet."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "The date and time when the client was created.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "document",
+        "driveFolderId",
+        "sheetId",
+        "createdAt"
+      ]
+    },
+    "Process": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Process",
+      "type": "object",
+      "description": "Represents a legal process in the LexFlow Workspace system.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the process entity."
+        },
+        "clientId": {
+          "type": "string",
+          "description": "Reference to Client. (Relationship: Client 1:N Process)"
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the process."
+        },
+        "driveFolderId": {
+          "type": "string",
+          "description": "The ID of the process's folder in Google Drive."
+        },
+        "description": {
+          "type": "string",
+          "description": "A description of the process."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "The date and time when the process was created.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "clientId",
+        "name",
+        "driveFolderId",
+        "description",
+        "createdAt"
+      ]
+    },
+    "Hearing": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Hearing",
+      "type": "object",
+      "description": "Represents a court hearing in the LexFlow Workspace system.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the hearing entity."
+        },
+        "processId": {
+          "type": "string",
+          "description": "Reference to Process. (Relationship: Process 1:N Hearing)"
+        },
+        "date": {
+          "type": "string",
+          "description": "The date of the hearing.",
+          "format": "date-time"
+        },
+        "location": {
+          "type": "string",
+          "description": "The location of the hearing."
+        },
+        "responsibleParty": {
+          "type": "string",
+          "description": "The party responsible for the hearing."
+        },
+        "notes": {
+          "type": "string",
+          "description": "Additional notes about the hearing."
+        }
+      },
+      "required": [
+        "id",
+        "processId",
+        "date",
+        "location",
+        "responsibleParty"
+      ]
+    },
+    "FinancialTransaction": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "FinancialTransaction",
+      "type": "object",
+      "description": "Represents a financial transaction in the LexFlow Workspace system.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the financial transaction entity."
+        },
+        "clientId": {
+          "type": "string",
+          "description": "Reference to Client. (Relationship: Client 1:N FinancialTransaction)"
+        },
+        "type": {
+          "type": "string",
+          "description": "The type of financial transaction (e.g., accounts payable, accounts receivable)."
+        },
+        "amount": {
+          "type": "number",
+          "description": "The amount of the financial transaction."
+        },
+        "description": {
+          "type": "string",
+          "description": "A description of the financial transaction."
+        },
+        "transactionDate": {
+          "type": "string",
+          "description": "The date of the financial transaction.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "clientId",
+        "type",
+        "amount",
+        "description",
+        "transactionDate"
+      ]
+    },
+    "Log": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Log",
+      "type": "object",
+      "description": "Represents an audit log entry in the LexFlow Workspace system.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the log entry."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N Log)"
+        },
+        "action": {
+          "type": "string",
+          "description": "The action that was performed (e.g., create client, update process)."
+        },
+        "description": {
+          "type": "string",
+          "description": "A description of the action that was performed."
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "The date and time when the action was performed.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "action",
+        "description",
+        "timestamp"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Stores user profiles. User documents are secured by path-based ownership.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/clients/{clientId}",
+        "definition": {
+          "entityName": "Client",
+          "schema": {
+            "$ref": "#/backend/entities/Client"
+          },
+          "description": "Stores client information.",
+          "params": [
+            {
+              "name": "clientId",
+              "description": "The unique identifier for the client."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/processes/{processId}",
+        "definition": {
+          "entityName": "Process",
+          "schema": {
+            "$ref": "#/backend/entities/Process"
+          },
+          "description": "Stores process information.",
+          "params": [
+            {
+              "name": "processId",
+              "description": "The unique identifier for the process."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/hearings/{hearingId}",
+        "definition": {
+          "entityName": "Hearing",
+          "schema": {
+            "$ref": "#/backend/entities/Hearing"
+          },
+          "description": "Stores hearing information.",
+          "params": [
+            {
+              "name": "hearingId",
+              "description": "The unique identifier for the hearing."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/financial_transactions/{financialTransactionId}",
+        "definition": {
+          "entityName": "FinancialTransaction",
+          "schema": {
+            "$ref": "#/backend/entities/FinancialTransaction"
+          },
+          "description": "Stores financial transaction information.",
+          "params": [
+            {
+              "name": "financialTransactionId",
+              "description": "The unique identifier for the financial transaction."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/logs/{logId}",
+        "definition": {
+          "entityName": "Log",
+          "schema": {
+            "$ref": "#/backend/entities/Log"
+          },
+          "description": "Stores audit logs for specific users. Secured by path-based ownership.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            },
+            {
+              "name": "logId",
+              "description": "The unique identifier for the log."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "This Firestore data structure is designed to support the LexFlow Workspace application, prioritizing security, scalability, and debuggability. It leverages path-based ownership and denormalization to ensure authorization independence and efficient data retrieval. The structure is tailored to manage users, clients, processes, hearings, financial transactions, and audit logs, while adhering to the core design principles outlined in the prompt. All data resides in PostgreSQL, the following is to create simple audit trails.\n\n**Authorization Independence (CRITICAL):**\n\n*   Path-Based Ownership: The structure uses hierarchical paths for user-owned data (e.g., `/users/{userId}/logs/{logId}`). This structure is highly secure and makes ownership-based security rules simple and efficient.\n\n**Structural Segregation:**\n\n*   Homogeneous Security Posture: All documents in a collection share the same security requirements.\n\n**Access Modeling:**\n\n*   Private Data: Path-Based ownership (`/users/{userId}/logs`).\n\n**Data Clarity and Predictability:**\n\n*   Radical Consistency: Enforce strict, semantic naming conventions."
+  }
+}

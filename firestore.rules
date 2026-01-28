@@ -1,0 +1,158 @@
+/**
+ * Core Philosophy: This ruleset enforces a strict user-ownership model for user-specific data,
+ * ensuring that users can only access and manage their own information. The primary data, such as
+ * clients and legal processes, is assumed to be managed via a trusted backend server, as Firestore's
+ * role is for user profiles and audit logging.
+ *
+ * Data Structure: The structure is divided into two main parts:
+ * 1. A top-level `/users/{userId}` collection for user profiles and their private, nested subcollections
+ *    like `/logs`. This path-based ownership is simple and performant.
+ * 2. Several top-level collections for business data (`/clients`, `/processes`, etc.).
+ *
+ * Key Security Decisions:
+ * - User Isolation: A user can only create, read, update, or delete their own user document and
+ *   subcollection documents (e.g., their own logs).
+ * - No User Enumeration: Listing documents in the top-level `/users` collection is explicitly disallowed
+ *   to protect user privacy and prevent data scraping.
+ * - Backend-Managed Data: The core business collections (`clients`, `processes`, `hearings`,
+ *   `financial_transactions`) are configured to be read-only for authenticated clients. All write
+ *   operations (create, update, delete) are denied. This is a secure-by-default posture that
+ *   presumes these sensitive operations are handled by a backend with appropriate business logic
+ *   and permissions, which is consistent with the provided context that PostgreSQL is the primary database.
+ *
+ * Denormalization for Authorization: The rules rely on path-based ownership (e.g., using the
+ * `{userId}` wildcard from the path) to authorize access. For documents within a user's data tree,
+ * such as a log entry, rules validate that a denormalized `userId` field within the document data
+ * matches the `userId` in the path. This ensures relational integrity without costly lookups.
+ *
+ * Structural Segregation: Private user data (like `logs`) is stored in a subcollection under the
+ * specific user's document (`/users/{userId}/logs`). This cleanly separates private data from
+ * other collections and makes it impossible to accidentally query or access another user's logs.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions for common authorization logic.
+    // These improve readability and reduce code duplication.
+
+    /**
+     * Checks if the current request is from an authenticated user.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * Checks if the requesting user's UID matches the provided userId.
+     * This is the foundation of the user-ownership security model.
+     * @param userId The user ID to check against the authenticated user's UID.
+     */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /**
+     * Checks if a document exists and if the requester is the owner.
+     * Used for safe update and delete operations.
+     * @param userId The owner's user ID.
+     */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
+    }
+
+    /**
+     * @description Rules for the user profile collection.
+     * @path /users/{userId}
+     * @allow (create) An authenticated user creating their own profile document for the first time.
+     * @deny (get) An authenticated user attempting to read another user's profile.
+     * @principle Restricts access to a user's own data tree and enforces self-creation.
+     */
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if false;
+      allow create: if isOwner(userId) && request.resource.data.id == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      allow delete: if isExistingOwner(userId);
+
+      /**
+       * @description Rules for a user's private audit logs.
+       * @path /users/{userId}/logs/{logId}
+       * @allow (create) An authenticated user creating a log entry under their own profile.
+       * @deny (list) An authenticated user attempting to list logs belonging to another user.
+       * @principle Enforces strict ownership for nested private data.
+       */
+      match /logs/{logId} {
+        allow get: if isOwner(userId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && request.resource.data.userId == userId;
+        allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.id;
+        allow delete: if isExistingOwner(userId);
+      }
+    }
+
+    /**
+     * @description Secures the client data collection. Access is read-only for any authenticated user.
+     * Writes are disabled to ensure data integrity is managed by a trusted backend.
+     * @path /clients/{clientId}
+     * @allow (get) Any authenticated user can read a client document.
+     * @deny (create) Any user attempting to create a new client document from the client-side.
+     * @principle Protects core business data by enforcing backend-only writes.
+     */
+    match /clients/{clientId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    /**
+     * @description Secures the legal process collection. Access is read-only for any authenticated user.
+     * Writes are disabled to ensure data integrity is managed by a trusted backend.
+     * @path /processes/{processId}
+     * @allow (list) Any authenticated user can list the documents in the processes collection.
+     * @deny (update) Any user attempting to modify a process document from the client-side.
+     * @principle Protects core business data by enforcing backend-only writes.
+     */
+    match /processes/{processId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    /**
+     * @description Secures the court hearing collection. Access is read-only for any authenticated user.
+     * Writes are disabled to ensure data integrity is managed by a trusted backend.
+     * @path /hearings/{hearingId}
+     * @allow (get) Any authenticated user can read a hearing document.
+     * @deny (delete) Any user attempting to delete a hearing document from the client-side.
+     * @principle Protects core business data by enforcing backend-only writes.
+     */
+    match /hearings/{hearingId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    /**
+     * @description Secures the financial transaction collection. Access is read-only for any authenticated user.
+     * Writes are disabled to ensure data integrity is managed by a trusted backend.
+     * @path /financial_transactions/{financialTransactionId}
+     * @allow (list) Any authenticated user can list the documents in the financial_transactions collection.
+     * @deny (create) Any user attempting to create a new financial transaction from the client-side.
+     * @principle Protects core business data by enforcing backend-only writes.
+     */
+    match /financial_transactions/{financialTransactionId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+  }
+}
