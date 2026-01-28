@@ -16,8 +16,8 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { useFirebase } from '@/firebase';
-import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { useFirebase, setDocumentNonBlocking } from '@/firebase';
+import { doc, serverTimestamp } from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
 import type { UserProfile } from '@/lib/types';
 import { useToast } from '@/components/ui/use-toast';
@@ -41,11 +41,9 @@ export default function RegisterPage() {
   });
 
   React.useEffect(() => {
-    // If user is not logged in, redirect to login page
     if (!isUserLoading && !user) {
       router.replace('/login');
     }
-    // Pre-fill form from Google display name
     if (user && user.displayName) {
         const [firstName, ...lastNameParts] = user.displayName.split(' ');
         form.setValue('firstName', firstName || '');
@@ -74,26 +72,14 @@ export default function RegisterPage() {
         updatedAt: serverTimestamp(),
     };
     
-    try {
-      // Use a blocking call to immediately see errors
-      await setDoc(userRef, dataToSet);
+    setDocumentNonBlocking(userRef, dataToSet, {});
 
-      toast({
-        title: "Conta Criada!",
-        description: "Seu perfil foi criado com sucesso.",
-      });
-      
-      // Redirect to dashboard after the save is confirmed.
-      router.replace('/dashboard');
-
-    } catch (e: any) {
-        console.error("Failed to create user profile:", e);
-        toast({
-            variant: "destructive",
-            title: "Erro ao criar perfil",
-            description: e.message || "Não foi possível salvar seu perfil. Verifique as regras de segurança do Firestore.",
-        });
-    }
+    toast({
+      title: "Conta Criada!",
+      description: "Seu perfil foi criado com sucesso.",
+    });
+    
+    router.replace('/dashboard');
   }
 
   if (isUserLoading || !user) {

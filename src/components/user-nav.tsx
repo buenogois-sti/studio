@@ -48,7 +48,7 @@ export function UserNav() {
   const handleLogout = () => {
     if (auth) {
       auth.signOut().then(() => {
-        router.push('/');
+        router.push('/login');
       });
     }
   };
