@@ -87,12 +87,6 @@ const navItems = [
     roles: ['admin', 'financial'],
   },
   {
-    href: '/dashboard/workspace',
-    label: 'Workspace',
-    icon: Briefcase,
-    roles: ['admin'],
-  },
-  {
     href: '/dashboard/configuracoes',
     label: 'Configurações',
     icon: Settings,
@@ -106,7 +100,6 @@ const BreadcrumbMap: { [key: string]: string } = {
   '/dashboard/processos': 'Processos',
   '/dashboard/audiencias': 'Audiências',
   '/dashboard/financeiro': 'Financeiro',
-  '/dashboard/workspace': 'Workspace',
   '/dashboard/configuracoes': 'Configurações',
 };
 
