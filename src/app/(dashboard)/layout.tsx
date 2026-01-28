@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import * as React from 'react';
 
 import {
   SidebarProvider,
@@ -36,6 +37,7 @@ import {
   Settings,
   Search,
   PanelLeft,
+  Briefcase,
 } from 'lucide-react';
 import type { UserRole } from '@/lib/types';
 import { user } from '@/lib/data';
@@ -73,6 +75,12 @@ const navItems = [
     roles: ['admin', 'financial'],
   },
   {
+    href: '/dashboard/workspace',
+    label: 'Workspace',
+    icon: Briefcase,
+    roles: ['admin'],
+  },
+  {
     href: '/dashboard/configuracoes',
     label: 'Configurações',
     icon: Settings,
@@ -86,6 +94,7 @@ const BreadcrumbMap: { [key: string]: string } = {
     '/dashboard/processos': 'Processos',
     '/dashboard/audiencias': 'Audiências',
     '/dashboard/financeiro': 'Financeiro',
+    '/dashboard/workspace': 'Workspace',
     '/dashboard/configuracoes': 'Configurações',
 }
 
