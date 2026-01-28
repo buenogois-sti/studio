@@ -107,7 +107,7 @@ export default function LandingPage() {
             <Link href="#contato" className="hover:text-primary transition-colors">Contato</Link>
           </nav>
           <Button asChild variant="outline" className="hidden md:flex bg-transparent border-primary text-primary hover:bg-primary hover:text-primary-foreground">
-            <Link href="/login">Área do Cliente</Link>
+            <Link href="/login">Área ADV</Link>
           </Button>
         </div>
       </header>
@@ -159,7 +159,7 @@ export default function LandingPage() {
             </div>
              <div className="relative -mr-32 hidden lg:block h-[550px]">
                <Image
-                src="/image/lawyer-portrait.jpg"
+                src="/image/lawyer-portrait.png"
                 alt="Dr. Alan Bueno De Gois - Advogado especialista em direito trabalhista"
                 fill
                 className="object-contain object-bottom filter drop-shadow-[0_25px_25px_rgba(0,0,0,0.6)]"
