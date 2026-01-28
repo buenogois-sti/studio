@@ -75,17 +75,20 @@ const testimonials = [
     {
         name: 'Ana Paula Santos',
         text: 'O Dr. Alan é incrível! Conseguiu recuperar todas as minhas verbas rescisórias que a empresa não queria pagar. Muito profissional e atencioso. Recomendo para todos que precisam de um advogado trabalhista de confiança!',
-        avatarSeed: 't1'
+        avatar: '/image/testimonial-1.jpg',
+        avatarHint: 'person happy'
     },
     {
         name: 'Roberto Oliveira',
         text: 'Super recomendo! O Dr. Alan resolveu meu caso de assédio moral rapidamente. Tava sofrendo muito no trabalho e ele conseguiu uma indenização justa. Definitivamente o melhor advogado trabalhista que já conheci!',
-        avatarSeed: 't2'
+        avatar: '/image/testimonial-2.jpg',
+        avatarHint: 'person happy'
     },
     {
         name: 'Maria Fernanda Costa',
         text: 'Nossa, o Dr. Alan salvou minha vida! Tava sendo demitida sem justa causa e ele conseguiu reverter tudo. Profissionalismo total e dedicação de verdade. Agradeço demais pelo trabalho que ele fez. Recomendo pra todo mundo!',
-        avatarSeed: 't3'
+        avatar: '/image/testimonial-3.jpg',
+        avatarHint: 'person happy'
     },
 ]
 
@@ -140,7 +143,7 @@ export default function LandingPage() {
             </div>
              <div className="relative -mr-16 hidden lg:flex justify-center items-center h-[500px]">
                <Image
-                src="https://picsum.photos/seed/lawyer-portrait/600/700"
+                src="/image/lawyer-portrait.jpg"
                 alt="Dr. Alan Bueno De Gois - Advogado especialista em direito trabalhista"
                 width={450}
                 height={600}
@@ -183,7 +186,7 @@ export default function LandingPage() {
             <div className="container mx-auto grid lg:grid-cols-2 gap-12 items-center">
                 <div className="relative h-[500px] w-full">
                      <Image
-                        src="https://picsum.photos/seed/lawyer-action/800/600"
+                        src="/image/lawyer-action.jpg"
                         alt="Dr. Alan Bueno De Gois em seu escritório"
                         fill
                         className="object-cover rounded-lg shadow-2xl"
@@ -237,7 +240,7 @@ export default function LandingPage() {
                          <Card key={index} className="bg-background/40 text-left p-6">
                             <div className="flex items-start gap-4">
                                <Avatar className="h-12 w-12 border-2 border-primary">
-                                    <AvatarImage src={`https://picsum.photos/seed/${testimonial.avatarSeed}/100/100`} data-ai-hint="person happy" />
+                                    <AvatarImage src={testimonial.avatar} data-ai-hint={testimonial.avatarHint} />
                                     <AvatarFallback>{testimonial.name.charAt(0)}</AvatarFallback>
                                 </Avatar>
                                 <div>
