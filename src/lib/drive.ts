@@ -1,0 +1,115 @@
+'use server';
+
+import { google } from 'googleapis';
+import { JWT } from 'google-auth-library';
+
+// This function creates and returns an authenticated JWT client.
+// It uses environment variables for the service account credentials.
+// IMPORTANT: Ensure these environment variables are set in your deployment environment
+// and in a .env.local file for local development.
+function getAuthClient() {
+  const privateKey = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+
+  if (!process.env.GOOGLE_CLIENT_EMAIL || !privateKey) {
+    throw new Error('Missing Google Service Account credentials in environment variables.');
+  }
+
+  const auth = new JWT({
+    email: process.env.GOOGLE_CLIENT_EMAIL,
+    key: privateKey,
+    scopes: [
+      'https://www.googleapis.com/auth/drive',
+      'https://www.googleapis.com/auth/spreadsheets',
+    ],
+  });
+
+  return auth;
+}
+
+// Creates a new folder within a specified parent folder in Google Drive.
+async function createClientFolder(clientName: string) {
+  const auth = getAuthClient();
+  const drive = google.drive({ version: 'v3', auth });
+
+  const rootFolderId = process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID;
+  if (!rootFolderId) {
+    throw new Error('GOOGLE_DRIVE_ROOT_FOLDER_ID environment variable is not set.');
+  }
+  
+  const fileMetadata = {
+    name: clientName,
+    mimeType: 'application/vnd.google-apps.folder',
+    parents: [rootFolderId],
+  };
+
+  try {
+    const file = await drive.files.create({
+      requestBody: fileMetadata,
+      fields: 'id',
+    });
+    console.log('Folder created with ID:', file.data.id);
+    return file.data.id;
+  } catch (error) {
+    console.error('Error creating Google Drive folder:', error);
+    throw new Error('Failed to create Google Drive folder.');
+  }
+}
+
+// Creates a new Google Sheet for the client.
+async function createClientSheet(clientName: string) {
+    const auth = getAuthClient();
+    const sheets = google.sheets({ version: 'v4', auth });
+
+    const spreadsheet = {
+        properties: {
+            title: `Financeiro - ${clientName}`,
+        },
+    };
+    try {
+        const response = await sheets.spreadsheets.create({
+            requestBody: spreadsheet,
+            fields: 'spreadsheetId',
+        });
+        console.log('Spreadsheet created with ID:', response.data.spreadsheetId);
+        return response.data.spreadsheetId;
+    } catch (error) {
+        console.error('Error creating Google Sheet:', error);
+        throw new Error('Failed to create Google Sheet.');
+    }
+}
+
+// Orchestrates the creation of both the folder and the sheet.
+export async function createClientFolderAndSheet(clientName: string): Promise<{ folderId: string | null | undefined, sheetId: string | null | undefined }> {
+    try {
+        const folderId = await createClientFolder(clientName);
+        const sheetId = await createClientSheet(clientName);
+        
+        // Optionally, move the sheet into the newly created folder
+        if (folderId && sheetId) {
+            const auth = getAuthClient();
+            const drive = google.drive({ version: 'v3', auth });
+            
+            // Retrieve the file to update its parents
+            const file = await drive.files.get({
+                fileId: sheetId,
+                fields: 'parents'
+            });
+            const previousParents = file.data.parents ? file.data.parents.join(',') : '';
+
+            await drive.files.update({
+                fileId: sheetId,
+                addParents: folderId,
+                removeParents: previousParents,
+                fields: 'id, parents'
+            });
+             console.log('Moved Sheet into Client Folder.');
+        }
+
+        return { folderId, sheetId };
+    } catch (error) {
+        console.error("Error in createClientFolderAndSheet:", error);
+        // In a real app, you might want to implement cleanup logic here
+        // (e.g., delete the folder if sheet creation fails).
+        throw error;
+    }
+}

@@ -6,6 +6,7 @@ import {
   Search,
   File,
   ListFilter,
+  Loader2,
 } from 'lucide-react';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
@@ -45,14 +46,6 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
   Form,
   FormControl,
   FormField,
@@ -75,6 +68,8 @@ import { useFirebase, useCollection, useMemoFirebase, addDocumentNonBlocking, up
 import { collection, serverTimestamp, Timestamp, doc } from 'firebase/firestore';
 import type { Client } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/components/ui/use-toast';
+import { createClientFolderAndSheet } from '@/lib/drive';
 
 const clientSchema = z.object({
   name: z.string().min(2, { message: 'O nome deve ter pelo menos 2 caracteres.' }),
@@ -91,6 +86,9 @@ function ClientForm({
   client?: Client | null;
 }) {
   const { firestore } = useFirebase();
+  const { toast } = useToast();
+  const [isSaving, setIsSaving] = React.useState(false);
+
   const form = useForm<z.infer<typeof clientSchema>>({
     resolver: zodResolver(clientSchema),
     defaultValues: {
@@ -105,95 +103,112 @@ function ClientForm({
     if (client) {
       form.reset(client);
     } else {
-      // Ensure form is cleared for new entries
       form.reset({ name: '', email: '', document: '', phone: '' });
     }
   }, [client, form]);
 
-  function onSubmit(values: z.infer<typeof clientSchema>) {
+  async function onSubmit(values: z.infer<typeof clientSchema>) {
     if (!firestore) return;
+    setIsSaving(true);
     
-    if (client?.id) {
-      // Update existing client
-      const clientRef = doc(firestore, 'clients', client.id);
-      updateDocumentNonBlocking(clientRef, { ...values, updatedAt: serverTimestamp() });
-    } else {
-      // Add new client
-      const clientsCollection = collection(firestore, 'clients');
-      addDocumentNonBlocking(clientsCollection, {
-        ...values,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        avatar: `https://picsum.photos/seed/c${Math.random()}/40/40`,
-        driveFolderId: '', // Should be created by another process
-        sheetId: '', // Should be created by another process
-      });
+    try {
+      if (client?.id) {
+        // Update existing client
+        const clientRef = doc(firestore, 'clients', client.id);
+        updateDocumentNonBlocking(clientRef, { ...values, updatedAt: serverTimestamp() });
+        toast({ title: 'Cliente atualizado!', description: `Os dados de ${values.name} foram salvos.` });
+      } else {
+        // Add new client with Drive/Sheet automation
+        const { folderId, sheetId } = await createClientFolderAndSheet(values.name);
+
+        if (!folderId || !sheetId) {
+            throw new Error('Falha ao criar pasta ou planilha no Google Drive.');
+        }
+
+        const clientsCollection = collection(firestore, 'clients');
+        addDocumentNonBlocking(clientsCollection, {
+          ...values,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          avatar: `https://picsum.photos/seed/c${Math.random()}/40/40`,
+          driveFolderId: folderId,
+          sheetId: sheetId,
+        });
+        toast({ title: 'Cliente cadastrado!', description: `${values.name} foi adicionado e os arquivos no Drive foram criados.` });
+      }
+      onSave();
+    } catch (error) {
+        console.error("Failed to save client or create drive assets:", error);
+        toast({ variant: 'destructive', title: 'Erro ao salvar', description: 'Não foi possível salvar o cliente ou criar os arquivos no Drive.'});
+    } finally {
+        setIsSaving(false);
     }
-    
-    onSave();
   }
 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 p-4">
-        <FormField
-          control={form.control}
-          name="name"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Nome Completo / Razão Social</FormLabel>
-              <FormControl>
-                <Input placeholder="Ex: Innovatech Soluções" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="email"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Email</FormLabel>
-              <FormControl>
-                <Input placeholder="Ex: contato@innovatech.com" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="document"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>CPF / CNPJ</FormLabel>
-              <FormControl>
-                <Input placeholder="Ex: 12.345.678/0001-99" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="phone"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Telefone (Opcional)</FormLabel>
-              <FormControl>
-                <Input placeholder="Ex: (11) 99999-9999" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        <fieldset disabled={isSaving} className="space-y-4">
+            <FormField
+            control={form.control}
+            name="name"
+            render={({ field }) => (
+                <FormItem>
+                <FormLabel>Nome Completo / Razão Social</FormLabel>
+                <FormControl>
+                    <Input placeholder="Ex: Innovatech Soluções" {...field} />
+                </FormControl>
+                <FormMessage />
+                </FormItem>
+            )}
+            />
+            <FormField
+            control={form.control}
+            name="email"
+            render={({ field }) => (
+                <FormItem>
+                <FormLabel>Email</FormLabel>
+                <FormControl>
+                    <Input placeholder="Ex: contato@innovatech.com" {...field} />
+                </FormControl>
+                <FormMessage />
+                </FormItem>
+            )}
+            />
+            <FormField
+            control={form.control}
+            name="document"
+            render={({ field }) => (
+                <FormItem>
+                <FormLabel>CPF / CNPJ</FormLabel>
+                <FormControl>
+                    <Input placeholder="Ex: 12.345.678/0001-99" {...field} />
+                </FormControl>
+                <FormMessage />
+                </FormItem>
+            )}
+            />
+            <FormField
+            control={form.control}
+            name="phone"
+            render={({ field }) => (
+                <FormItem>
+                <FormLabel>Telefone (Opcional)</FormLabel>
+                <FormControl>
+                    <Input placeholder="Ex: (11) 99999-9999" {...field} />
+                </FormControl>
+                <FormMessage />
+                </FormItem>
+            )}
+            />
+        </fieldset>
         <div className="pt-4 flex justify-end gap-2">
-           <Button type="button" variant="outline" onClick={onSave}>
+           <Button type="button" variant="outline" onClick={onSave} disabled={isSaving}>
               Cancelar
             </Button>
-            <Button type="submit">
-                {client ? 'Salvar Alterações' : 'Salvar Cliente'}
+            <Button type="submit" disabled={isSaving}>
+                {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {isSaving ? 'Salvando...' : (client ? 'Salvar Alterações' : 'Salvar Cliente')}
             </Button>
         </div>
       </form>

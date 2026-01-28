@@ -20,6 +20,8 @@ export type Client = {
   document: string;
   email: string;
   phone?: string;
+  driveFolderId: string;
+  sheetId: string;
   createdAt: Timestamp | string;
   updatedAt?: Timestamp;
 };
