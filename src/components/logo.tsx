@@ -1,6 +1,10 @@
-import { Hexagon } from 'lucide-react';
+import { Scale } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export function Logo({ className }: { className?: string }) {
-  return <Hexagon className={cn('text-primary', className)} size={24} />;
+  return (
+    <div className={cn("bg-primary text-primary-foreground h-8 w-8 flex items-center justify-center rounded-md", className)}>
+        <Scale size={20} />
+    </div>
+  );
 }

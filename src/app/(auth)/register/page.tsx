@@ -43,7 +43,7 @@ export default function RegisterPage() {
   React.useEffect(() => {
     // If user is not logged in, redirect to login page
     if (!isUserLoading && !user) {
-      router.replace('/');
+      router.replace('/login');
     }
     // Pre-fill form from Google display name
     if (user && user.displayName) {
