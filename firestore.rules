@@ -12,7 +12,6 @@
  * Key Security Decisions:
  * - User Isolation: A user can only create, read, update, or delete their own user document and
  *   subcollection documents (e.g., their own logs).
- * - Domain Restriction: Access is restricted to users with an email from the 'buenogoisadvogado.com.br' domain.
  * - No User Enumeration: Listing documents in the top-level `/users` collection is explicitly disallowed
  *   to protect user privacy and prevent data scraping.
  * - Backend-Managed Data: The core business collections (`processes`, `hearings`,
@@ -45,19 +44,12 @@ service cloud.firestore {
     }
     
     /**
-     * Checks if the authenticated user's email is from the allowed domain.
-     */
-    function isFromAllowedDomain() {
-      return isSignedIn() && request.auth.token.email.matches('.*@buenogoisadvogado.com.br$');
-    }
-
-    /**
-     * Checks if the requesting user's UID matches the provided userId and is from the allowed domain.
+     * Checks if the requesting user's UID matches the provided userId.
      * This is the foundation of the user-ownership security model.
      * @param userId The user ID to check against the authenticated user's UID.
      */
     function isOwner(userId) {
-      return isFromAllowedDomain() && request.auth.uid == userId;
+      return isSignedIn() && request.auth.uid == userId;
     }
 
     /**
@@ -93,13 +85,13 @@ service cloud.firestore {
     }
 
     /**
-     * @description Secures the client data collection. Authenticated users from the allowed domain can manage client data.
+     * @description Secures the client data collection. Authenticated users can manage client data.
      * @path /clients/{clientId}
-     * @allow (read, write) Any authenticated user from the allowed domain can manage client documents.
+     * @allow (read, write) Any authenticated user can manage client documents.
      * @principle Allows client-side management of core business data for authorized users.
      */
     match /clients/{clientId} {
-      allow read, write: if isFromAllowedDomain();
+      allow read, write: if isSignedIn();
     }
 
     /**
@@ -111,8 +103,8 @@ service cloud.firestore {
      * @principle Protects core business data by enforcing backend-only writes.
      */
     match /processes/{processId} {
-      allow get: if isFromAllowedDomain();
-      allow list: if isFromAllowedDomain();
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
       allow create: if false;
       allow update: if false;
       allow delete: if false;
@@ -127,8 +119,8 @@ service cloud.firestore {
      * @principle Protects core business data by enforcing backend-only writes.
      */
     match /hearings/{hearingId} {
-      allow get: if isFromAllowedDomain();
-      allow list: if isFromAllowedDomain();
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
       allow create: if false;
       allow update: if false;
       allow delete: if false;
@@ -143,8 +135,8 @@ service cloud.firestore {
      * @principle Protects core business data by enforcing backend-only writes.
      */
     match /financial_transactions/{financialTransactionId} {
-      allow get: if isFromAllowedDomain();
-      allow list: if isFromAllowedDomain();
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
       allow create: if false;
       allow update: if false;
       allow delete: if false;
