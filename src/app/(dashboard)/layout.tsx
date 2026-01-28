@@ -151,14 +151,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         const [firstName, ...lastNameParts] = user.displayName?.split(' ') || ['', ''];
         const lastName = lastNameParts.join(' ');
         
-        // Default new users to 'lawyer'. The role can be changed in the user menu.
+        // Default new users to 'admin'. The role can be changed in the user menu.
         const newUserProfile: Omit<UserProfile, 'createdAt' | 'updatedAt' | 'role'> & {role: UserRole} = {
           id: user.uid,
           googleId: user.providerData.find(p => p.providerId === 'google.com')?.uid || '',
           email: user.email || '',
           firstName: firstName,
           lastName: lastName,
-          role: 'lawyer',
+          role: 'admin',
         };
 
         const dataToSet = {
