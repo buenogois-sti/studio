@@ -97,6 +97,11 @@
           "type": "string",
           "description": "The date and time when the client was created.",
           "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "The date and time when the client was last updated.",
+          "format": "date-time"
         }
       },
       "required": [

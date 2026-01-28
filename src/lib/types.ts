@@ -21,6 +21,7 @@ export type Client = {
   email: string;
   phone?: string;
   createdAt: Timestamp | string;
+  updatedAt?: Timestamp;
 };
 
 export type Process = {
