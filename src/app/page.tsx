@@ -166,6 +166,7 @@ export default function LandingPage() {
                 sizes="50vw"
                 className="object-contain object-bottom filter drop-shadow-[0_25px_25px_rgba(0,0,0,0.6)]"
                 priority
+                unoptimized={true}
               />
             </div>
           </div>
@@ -207,6 +208,7 @@ export default function LandingPage() {
                         fill
                         sizes="(max-width: 1024px) 100vw, 50vw"
                         className="object-cover rounded-lg shadow-2xl"
+                        unoptimized={true}
                       />
                 </div>
                  <div className="space-y-6">
