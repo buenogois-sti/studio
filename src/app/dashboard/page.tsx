@@ -35,13 +35,14 @@ import {
   Tooltip,
 } from 'recharts';
 import Link from 'next/link';
-import { chartData, recentActivities } from '@/lib/data';
+import { chartData } from '@/lib/data';
 import { ChartContainer, ChartTooltipContent } from '@/components/ui/chart';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
-import { collection } from 'firebase/firestore';
-import type { Client, FinancialTransaction } from '@/lib/types';
+import { collection, query, orderBy, limit } from 'firebase/firestore';
+import type { Client, FinancialTransaction, Process, Hearing, Log } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
-
+import { formatDistanceToNow } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 const chartConfig = {
   newCases: {
@@ -51,7 +52,7 @@ const chartConfig = {
 };
 
 export default function Dashboard() {
-  const { firestore, isUserLoading } = useFirebase();
+  const { firestore, isUserLoading, user } = useFirebase();
 
   const transactionsQuery = useMemoFirebase(
     () => (firestore ? collection(firestore, 'financial_transactions') : null),
@@ -64,8 +65,26 @@ export default function Dashboard() {
     [firestore]
   );
   const { data: clientsData, isLoading: isLoadingClients } = useCollection<Client>(clientsQuery);
+  
+  const processesQuery = useMemoFirebase(
+    () => (firestore ? collection(firestore, 'processes') : null),
+    [firestore]
+  );
+  const { data: processesData, isLoading: isLoadingProcesses } = useCollection<Process>(processesQuery);
 
-  const isLoading = isUserLoading || isLoadingTransactions || isLoadingClients;
+  const hearingsQuery = useMemoFirebase(
+    () => (firestore ? collection(firestore, 'hearings') : null),
+    [firestore]
+  );
+  const { data: hearingsData, isLoading: isLoadingHearings } = useCollection<Hearing>(hearingsQuery);
+
+  const logsQuery = useMemoFirebase(
+    () => (firestore && user ? query(collection(firestore, `users/${user.uid}/logs`), orderBy('timestamp', 'desc'), limit(5)) : null),
+    [firestore, user]
+  );
+  const { data: logsData, isLoading: isLoadingLogs } = useCollection<Log>(logsQuery);
+
+  const isLoading = isUserLoading || isLoadingTransactions || isLoadingClients || isLoadingProcesses || isLoadingHearings || isLoadingLogs;
 
   const totalRevenue = React.useMemo(() => {
     if (!transactionsData) return 0;
@@ -75,7 +94,14 @@ export default function Dashboard() {
   }, [transactionsData]);
   
   const clientCount = clientsData?.length || 0;
+  const processCount = processesData?.length || 0;
+  const hearingCount = hearingsData?.length || 0;
 
+  const formatLogTime = (timestamp: any) => {
+    if (!timestamp) return '';
+    const date = timestamp.toDate();
+    return formatDistanceToNow(date, { addSuffix: true, locale: ptBR });
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -116,7 +142,11 @@ export default function Dashboard() {
             <FolderKanban className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">+128</div>
+            {isLoading ? (
+                <Skeleton className="h-8 w-1/4" />
+            ) : (
+                <div className="text-2xl font-bold">+{processCount}</div>
+            )}
             <p className="text-xs text-muted-foreground">+10 no último mês</p>
           </CardContent>
         </Card>
@@ -126,7 +156,11 @@ export default function Dashboard() {
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">+5</div>
+             {isLoading ? (
+                <Skeleton className="h-8 w-1/4" />
+            ) : (
+                <div className="text-2xl font-bold">+{hearingCount}</div>
+            )}
             <p className="text-xs text-muted-foreground">2 na próxima semana</p>
           </CardContent>
         </Card>
@@ -172,24 +206,40 @@ export default function Dashboard() {
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-6">
-            {recentActivities.map((activity) => (
-                <div key={activity.id} className="flex items-center gap-4">
-                <Avatar className="hidden h-9 w-9 sm:flex">
-                    <AvatarImage src={`https://picsum.photos/seed/act${activity.id}/100/100`} alt="Avatar" data-ai-hint="abstract pattern" />
-                    <AvatarFallback>
-                        <Activity className="h-4 w-4"/>
-                    </AvatarFallback>
-                </Avatar>
-                <div className="grid gap-1">
-                    <p className="text-sm font-medium leading-none">
-                    {activity.description}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                    {activity.time}
-                    </p>
+            {isLoading ? (
+              Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-4">
+                  <Skeleton className="h-9 w-9 rounded-full" />
+                  <div className="grid gap-1 w-full">
+                    <Skeleton className="h-4 w-4/5" />
+                    <Skeleton className="h-3 w-1/4" />
+                  </div>
                 </div>
-                </div>
-            ))}
+              ))
+            ) : (
+              logsData && logsData.length > 0 ? (
+                logsData.map((activity) => (
+                    <div key={activity.id} className="flex items-center gap-4">
+                    <Avatar className="hidden h-9 w-9 sm:flex">
+                        <AvatarImage src={`https://picsum.photos/seed/act${activity.id}/100/100`} alt="Avatar" data-ai-hint="abstract pattern" />
+                        <AvatarFallback>
+                            <Activity className="h-4 w-4"/>
+                        </AvatarFallback>
+                    </Avatar>
+                    <div className="grid gap-1">
+                        <p className="text-sm font-medium leading-none">
+                        {activity.description}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                        {formatLogTime(activity.timestamp)}
+                        </p>
+                    </div>
+                    </div>
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground text-center">Nenhuma atividade recente.</p>
+              )
+            )}
           </CardContent>
         </Card>
       </div>

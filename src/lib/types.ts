@@ -25,19 +25,20 @@ export type Client = {
 
 export type Process = {
   id: string;
-  number: string;
-  clientName: string;
-  status: 'active' | 'archived' | 'suspended';
-  lastUpdate: string;
+  clientId: string;
+  name: string;
+  driveFolderId: string;
+  description: string;
+  createdAt: Timestamp;
 };
 
 export type Hearing = {
   id: string;
-  processNumber: string;
-  date: string;
-  time: string;
+  processId: string;
+  date: Timestamp;
   location: string;
-  responsible: string;
+  responsibleParty: string;
+  notes?: string;
 };
 
 export type FinancialTransaction = {
@@ -47,4 +48,12 @@ export type FinancialTransaction = {
   amount: number;
   type: 'receita' | 'despesa';
   transactionDate: Timestamp;
+};
+
+export type Log = {
+    id: string;
+    userId: string;
+    action: string;
+    description: string;
+    timestamp: Timestamp;
 };
