@@ -44,7 +44,7 @@ import {
 import type { UserProfile, UserRole } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { useFirebase, useDoc, useMemoFirebase } from '@/firebase';
+import { useFirebase, useDoc, useMemoFirebase, FirestorePermissionError, errorEmitter } from '@/firebase';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 
@@ -134,8 +134,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const userRef = doc(firestore, 'users', user.uid);
 
     const createUserProfileIfNeeded = async () => {
-      const docSnap = await getDoc(userRef);
-      if (!docSnap.exists()) {
+      let docSnap;
+      try {
+        docSnap = await getDoc(userRef);
+      } catch (error) {
+        console.error("Error getting user profile:", error);
+        const permissionError = new FirestorePermissionError({
+            path: userRef.path,
+            operation: 'get',
+        });
+        errorEmitter.emit('permission-error', permissionError);
+        return; // Stop execution if we can't even check for the doc
+      }
+
+      if (docSnap && !docSnap.exists()) {
         const [firstName, ...lastNameParts] = user.displayName?.split(' ') || ['', ''];
         const lastName = lastNameParts.join(' ');
         
@@ -149,15 +161,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           role: 'lawyer',
         };
 
-        try {
-          await setDoc(userRef, {
+        const dataToSet = {
             ...newUserProfile,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
-          });
-        } catch (error) {
-          console.error("Error creating user profile:", error);
-        }
+        };
+
+        setDoc(userRef, dataToSet)
+            .catch((error) => {
+                console.error("Error creating user profile:", error);
+                const permissionError = new FirestorePermissionError({
+                    path: userRef.path,
+                    operation: 'create',
+                    requestResourceData: dataToSet,
+                });
+                errorEmitter.emit('permission-error', permissionError);
+            });
       }
     };
 
