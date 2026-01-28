@@ -8,10 +8,12 @@ import { Logo } from '@/components/logo';
 import { useFirebase } from '@/firebase';
 import { GoogleAuthProvider, signInWithRedirect } from 'firebase/auth';
 import { Loader2 } from 'lucide-react';
+import { doc, getDoc } from 'firebase/firestore';
 
 export default function LoginPage() {
-  const { auth, user, isUserLoading } = useFirebase();
+  const { auth, user, isUserLoading, firestore } = useFirebase();
   const router = useRouter();
+  const [isCheckingProfile, setIsCheckingProfile] = React.useState(false);
 
   const handleGoogleSignIn = () => {
     if (!auth) return;
@@ -23,18 +25,40 @@ export default function LoginPage() {
   };
 
   React.useEffect(() => {
-    if (!isUserLoading && user) {
-        if (user.email?.endsWith('@buenogoisadvogado.com.br')) {
-            router.replace('/dashboard');
-        } else if (auth) {
-            // If user exists but is from the wrong domain, sign them out.
-            auth.signOut();
-            // Optionally, show a message to the user.
-        }
-    }
-  }, [user, isUserLoading, router, auth]);
+    if (isUserLoading || !firestore) return;
 
-  if (isUserLoading || user) {
+    if (user) {
+      // User is authenticated, check if they have a profile
+      if (user.email?.endsWith('@buenogoisadvogado.com.br')) {
+        setIsCheckingProfile(true);
+        const userRef = doc(firestore, 'users', user.uid);
+        getDoc(userRef)
+          .then((docSnap) => {
+            if (docSnap.exists()) {
+              // Profile exists, go to dashboard
+              router.replace('/dashboard');
+            } else {
+              // No profile, go to registration
+              router.replace('/auth/register');
+            }
+          })
+          .catch((err) => {
+            console.error("Error checking user profile:", err);
+            // On error, sign out and stay on login page
+            auth?.signOut();
+            setIsCheckingProfile(false);
+          });
+      } else if (auth) {
+        // If user exists but is from the wrong domain, sign them out.
+        auth.signOut();
+      }
+    } else {
+        // No user, do nothing, stay on login page
+        setIsCheckingProfile(false);
+    }
+  }, [user, isUserLoading, router, auth, firestore]);
+
+  if (isUserLoading || isCheckingProfile || user) {
     return (
         <div className="flex h-screen w-full items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -63,9 +87,9 @@ export default function LoginPage() {
       <div className="flex items-center justify-center py-12 h-full bg-background">
         <Card className="mx-auto max-w-sm">
           <CardHeader>
-            <CardTitle className="text-2xl font-headline">Acesse sua conta</CardTitle>
+            <CardTitle className="text-2xl font-headline">Acessar ou Criar Conta</CardTitle>
             <CardDescription>
-              Use sua conta Google Workspace para criar seu acesso ou entrar.
+              Use sua conta Google para criar seu acesso ou entrar na plataforma.
             </CardDescription>
           </CardHeader>
           <CardContent>

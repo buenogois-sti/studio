@@ -132,56 +132,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router = useRouter();
   const { user, isUserLoading, auth, firestore } = useFirebase();
 
-  // Create user profile in Firestore on first login
-  React.useEffect(() => {
-    if (!user || !firestore) return;
-
-    const userRef = doc(firestore, 'users', user.uid);
-
-    const createUserProfileIfNeeded = async () => {
-      try {
-        const docSnap = await getDoc(userRef);
-
-        if (!docSnap.exists()) {
-          const [firstName, ...lastNameParts] = user.displayName?.split(' ') || ['', ''];
-          const lastName = lastNameParts.join(' ');
-
-          // Default new users to 'lawyer'. The user can then change their own role to 'admin'
-          // using the UI, as the security rules permit a user to update their own profile.
-          // This avoids needing a collection list permission, which is disabled for security.
-          const newUserProfile: Omit<UserProfile, 'createdAt' | 'updatedAt'> = {
-            id: user.uid,
-            googleId: user.providerData.find((p) => p.providerId === 'google.com')?.uid || '',
-            email: user.email || '',
-            firstName: firstName,
-            lastName: lastName,
-            role: 'lawyer', 
-          };
-
-          const dataToSet = {
-            ...newUserProfile,
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp(),
-          };
-          
-          // Use the non-blocking helper to ensure errors are surfaced correctly
-          setDocumentNonBlocking(userRef, dataToSet, { merge: false });
-        }
-      } catch (error) {
-        // This will catch errors from getDoc if it fails due to permissions
-        console.error('Error checking for user profile:', error);
-        const permissionError = new FirestorePermissionError({
-          path: userRef.path,
-          operation: 'get',
-        });
-        errorEmitter.emit('permission-error', permissionError);
-      }
-    };
-
-    createUserProfileIfNeeded();
-  }, [user, firestore]);
-
-
   const userProfileRef = useMemoFirebase(
     () => (firestore && user ? doc(firestore, 'users', user.uid) : null),
     [firestore, user]
