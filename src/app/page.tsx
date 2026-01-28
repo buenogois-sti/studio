@@ -26,47 +26,47 @@ function LandingLogo({ className }: { className?: string }) {
 
 const services = [
     {
-      icon: <Briefcase />,
+      icon: Briefcase,
       title: 'Rescisão de Contrato',
       description: 'Defendo casos de demissão sem justa causa, demissão por justa causa, pedido de demissão e rescisão indireta. Garanto o pagamento correto de todas as verbas.',
     },
     {
-      icon: <Clock />,
+      icon: Clock,
       title: 'Horas Extras',
       description: 'Reivindico horas extras não pagas, adicional noturno, trabalho em feriados e domingos. Calculo corretamente todos os valores devidos.',
     },
     {
-      icon: <Shield />,
+      icon: Shield,
       title: 'Assédio Moral',
       description: 'Defendo casos de assédio moral, assédio sexual, discriminação e danos morais no trabalho. Protejo sua dignidade e garanto indenizações justas.',
     },
     {
-      icon: <HeartHandshake />,
+      icon: HeartHandshake,
       title: 'Acidentes de Trabalho',
       description: 'Atuo em casos de acidentes de trabalho, doenças ocupacionais e responsabilidade do empregador. Garanto todos os benefícios previdenciários.',
     },
     {
-      icon: <Landmark />,
+      icon: Landmark,
       title: 'FGTS e Benefícios',
       description: 'Reivindico depósitos FGTS não realizados, correção de valores e benefícios previdenciários. Garanto que você receba todos os direitos devidos.',
     },
     {
-      icon: <FileText />,
+      icon: FileText,
       title: 'Verbas Rescisórias',
       description: 'Garanto o pagamento correto de férias, 13º salário, aviso prévio, multa do FGTS e outras verbas. Calculo todos os valores devidos.',
     },
     {
-      icon: <Users />,
+      icon: Users,
       title: 'Reconhecimento de Vínculo',
       description: 'Defendo reconhecimento de vínculo empregatício em casos de trabalho informal, terceirização irregular e falsa cooperativa.',
     },
     {
-      icon: <Handshake />,
+      icon: Handshake,
       title: 'Adicionais e Benefícios',
       description: 'Reivindico adicionais de insalubridade, periculosidade, transferência, gratificações e outros benefícios trabalhistas.',
     },
     {
-      icon: <Building />,
+      icon: Building,
       title: 'Direito Coletivo',
       description: 'Atuo em ações coletivas, dissídios coletivos, negociações sindicais e acordos coletivos. Defendo os interesses dos trabalhadores.',
     },
@@ -183,9 +183,11 @@ export default function LandingPage() {
               Especializado em Direito do Trabalho, ofereço serviços completos para proteger seus direitos trabalhistas.
             </p>
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {services.map((service, index) => (
+                {services.map((service, index) => {
+                    const Icon = service.icon;
+                    return (
                     <Card key={index} className="bg-background/40 text-left p-6 flex flex-col">
-                        <div className="text-primary mb-4">{React.cloneElement(service.icon as React.ReactElement, { size: 32 })}</div>
+                        <div className="text-primary mb-4"><Icon size={32} /></div>
                         <h3 className="font-headline text-xl font-bold text-white mb-2">{service.title}</h3>
                         <p className="text-muted-foreground flex-grow">{service.description}</p>
                         <Button variant="link" className="p-0 mt-4 text-primary justify-start h-auto">
@@ -193,7 +195,7 @@ export default function LandingPage() {
                             <ChevronRight className="ml-1 h-4 w-4" />
                         </Button>
                     </Card>
-                ))}
+                )})}
             </div>
           </div>
         </section>

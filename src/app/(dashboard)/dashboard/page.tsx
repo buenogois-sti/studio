@@ -34,7 +34,7 @@ import {
   Tooltip,
 } from 'recharts';
 import Link from 'next/link';
-import { user, chartData, recentActivities, transactions, clients } from '@/lib/data';
+import { chartData, recentActivities, transactions, clients } from '@/lib/data';
 import { ChartContainer, ChartTooltipContent } from '@/components/ui/chart';
 
 const chartConfig = {

@@ -41,6 +41,8 @@ import {
   Pagination,
   PaginationContent,
   PaginationItem,
+  PaginationNext,
+  PaginationPrevious,
 } from '@/components/ui/pagination';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -330,19 +332,13 @@ export default function ClientsPage() {
           <div className="text-xs text-muted-foreground">
             Mostrando <strong>1-{clients.length}</strong> de <strong>{clients.length}</strong> clientes
           </div>
-          <Pagination className="ml-auto">
+          <Pagination className="ml-auto mr-0 w-auto">
             <PaginationContent>
               <PaginationItem>
-                <Button size="icon" variant="outline" className="h-8 w-8">
-                  <ChevronLeft className="h-3.5 w-3.5" />
-                  <span className="sr-only">Página Anterior</span>
-                </Button>
+                <PaginationPrevious />
               </PaginationItem>
               <PaginationItem>
-                <Button size="icon" variant="outline" className="h-8 w-8">
-                  <ChevronRight className="h-3.5 w-3.5" />
-                  <span className="sr-only">Próxima Página</span>
-                </Button>
+                <PaginationNext />
               </PaginationItem>
             </PaginationContent>
           </Pagination>
