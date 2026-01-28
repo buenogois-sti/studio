@@ -76,19 +76,19 @@ const testimonials = [
     {
         name: 'Ana Paula Santos',
         text: 'O Dr. Alan é incrível! Conseguiu recuperar todas as minhas verbas rescisórias que a empresa não queria pagar. Muito profissional e atencioso. Recomendo para todos que precisam de um advogado trabalhista de confiança!',
-        avatar: 'https://picsum.photos/seed/test1/100/100',
+        avatar: '/image/testimonial-1.jpg',
         avatarHint: 'person happy'
     },
     {
         name: 'Roberto Oliveira',
         text: 'Super recomendo! O Dr. Alan resolveu meu caso de assédio moral rapidamente. Tava sofrendo muito no trabalho e ele conseguiu uma indenização justa. Definitivamente o melhor advogado trabalhista que já conheci!',
-        avatar: 'https://picsum.photos/seed/test2/100/100',
+        avatar: '/image/testimonial-2.jpg',
         avatarHint: 'person happy'
     },
     {
         name: 'Maria Fernanda Costa',
         text: 'Nossa, o Dr. Alan salvou minha vida! Tava sendo demitida sem justa causa e ele conseguiu reverter tudo. Profissionalismo total e dedicação de verdade. Agradeço demais pelo trabalho que ele fez. Recomendo pra todo mundo!',
-        avatar: 'https://picsum.photos/seed/test3/100/100',
+        avatar: '/image/testimonial-3.jpg',
         avatarHint: 'person happy'
     },
 ]
@@ -162,11 +162,10 @@ export default function LandingPage() {
                <Image
                 src="/image/lawyer-portrait.png"
                 alt="Dr. Alan Bueno De Gois - Advogado especialista em direito trabalhista"
-                fill
-                sizes="50vw"
+                width={500}
+                height={550}
                 className="object-contain object-bottom filter drop-shadow-[0_25px_25px_rgba(0,0,0,0.6)]"
                 priority
-                unoptimized={true}
               />
             </div>
           </div>
@@ -187,7 +186,9 @@ export default function LandingPage() {
                     const Icon = service.icon;
                     return (
                     <Card key={index} className="bg-background/40 text-left p-6 flex flex-col">
-                        <div className="text-primary mb-4"><Icon size={32} /></div>
+                        <div className="text-primary mb-4">
+                            <Icon size={32} />
+                        </div>
                         <h3 className="font-headline text-xl font-bold text-white mb-2">{service.title}</h3>
                         <p className="text-muted-foreground flex-grow">{service.description}</p>
                         <Button variant="link" className="p-0 mt-4 text-primary justify-start h-auto">
@@ -207,10 +208,9 @@ export default function LandingPage() {
                      <Image
                         src="/image/lawyer-action.jpg"
                         alt="Dr. Alan Bueno De Gois em seu escritório"
-                        fill
-                        sizes="(max-width: 1024px) 100vw, 50vw"
+                        width={800}
+                        height={500}
                         className="object-cover rounded-lg shadow-2xl"
-                        unoptimized={true}
                       />
                 </div>
                  <div className="space-y-6">
