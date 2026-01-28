@@ -50,7 +50,7 @@ import {
   useMemoFirebase,
   FirestorePermissionError,
   errorEmitter,
-  setDocumentNonBlocking,
+  updateDocumentNonBlocking,
 } from '@/firebase';
 import { doc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
