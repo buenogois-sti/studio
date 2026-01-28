@@ -38,10 +38,12 @@ import {
   Search,
   PanelLeft,
   Briefcase,
+  AlertCircle,
 } from 'lucide-react';
 import type { UserRole } from '@/lib/types';
 import { user } from '@/lib/data';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 
 const navItems = [
   {
@@ -98,9 +100,36 @@ const BreadcrumbMap: { [key: string]: string } = {
     '/dashboard/configuracoes': 'Configurações',
 }
 
+function AccessDenied() {
+  return (
+      <div className="flex flex-1 h-full items-center justify-center rounded-lg border border-dashed shadow-sm">
+          <div className="flex flex-col items-center gap-2 text-center">
+              <AlertCircle className="h-16 w-16 text-destructive" />
+              <h1 className="text-2xl font-bold tracking-tight font-headline mt-4">
+              Acesso Negado
+              </h1>
+              <p className="text-sm text-muted-foreground max-w-sm">
+              Você não tem permissão para visualizar esta página. Por favor, selecione um perfil com acesso ou contate um administrador.
+              </p>
+              <Button asChild className="mt-4">
+                  <Link href="/dashboard">Voltar para o Dashboard</Link>
+              </Button>
+          </div>
+      </div>
+  )
+}
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const userRole: UserRole = user.role;
+  const [userRole, setUserRole] = React.useState<UserRole>(user.role);
+
+  React.useEffect(() => {
+    const storedRole = localStorage.getItem('user-role') as UserRole | null;
+    const allRoles: UserRole[] = ['admin', 'lawyer', 'financial'];
+    if (storedRole && allRoles.includes(storedRole)) {
+      setUserRole(storedRole);
+    }
+  }, []);
   
   const getBreadcrumb = () => {
     const pathParts = pathname.split('/').filter(part => part);
@@ -135,6 +164,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     )
   }
 
+  const getBestNavItemForPath = (path: string) => {
+    let bestMatch: typeof navItems[0] | undefined = undefined;
+    for (const item of navItems) {
+        if (path.startsWith(item.href)) {
+            if (!bestMatch || item.href.length > bestMatch.href.length) {
+                bestMatch = item;
+            }
+        }
+    }
+    return bestMatch;
+  }
+
+  const currentNavItem = getBestNavItemForPath(pathname);
+  const hasAccess = currentNavItem ? currentNavItem.roles.includes(userRole) : true;
+
   return (
     <SidebarProvider>
       <Sidebar variant="sidebar" collapsible="icon">
@@ -154,7 +198,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <SidebarMenuItem key={item.label}>
                     <SidebarMenuButton
                       asChild
-                      isActive={pathname === item.href}
+                      isActive={currentNavItem?.href === item.href}
                       tooltip={{ children: item.label }}
                     >
                       <Link href={item.href}>
@@ -191,7 +235,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <UserNav />
           </div>
         </header>
-        <main className="flex-1 p-4 sm:p-6">{children}</main>
+        <main className="flex-1 p-4 sm:p-6">{hasAccess ? children : <AccessDenied />}</main>
       </SidebarInset>
     </SidebarProvider>
   );
