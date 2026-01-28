@@ -41,10 +41,12 @@ import {
   AlertCircle,
   Loader2
 } from 'lucide-react';
-import type { UserRole } from '@/lib/types';
+import type { UserProfile, UserRole } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { useFirebase } from '@/firebase';
+import { useFirebase, useDoc, useMemoFirebase } from '@/firebase';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+
 
 const navItems = [
   {
@@ -123,11 +125,51 @@ function AccessDenied() {
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, isUserLoading, auth } = useFirebase();
+  const { user, isUserLoading, auth, firestore } = useFirebase();
 
-  // Use a default role and update from localStorage.
-  const [userRole, setUserRole] = React.useState<UserRole>('lawyer');
+  // Create user profile in Firestore on first login
+  React.useEffect(() => {
+    if (!user || !firestore) return;
 
+    const userRef = doc(firestore, 'users', user.uid);
+
+    const createUserProfileIfNeeded = async () => {
+      const docSnap = await getDoc(userRef);
+      if (!docSnap.exists()) {
+        const [firstName, ...lastNameParts] = user.displayName?.split(' ') || ['', ''];
+        const lastName = lastNameParts.join(' ');
+        
+        // Default new users to 'lawyer'. The role can be changed in the user menu.
+        const newUserProfile: Omit<UserProfile, 'createdAt' | 'updatedAt' | 'role'> & {role: UserRole} = {
+          id: user.uid,
+          googleId: user.providerData.find(p => p.providerId === 'google.com')?.uid || '',
+          email: user.email || '',
+          firstName: firstName,
+          lastName: lastName,
+          role: 'lawyer',
+        };
+
+        try {
+          await setDoc(userRef, {
+            ...newUserProfile,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          });
+        } catch (error) {
+          console.error("Error creating user profile:", error);
+        }
+      }
+    };
+
+    createUserProfileIfNeeded();
+  }, [user, firestore]);
+  
+  const userProfileRef = useMemoFirebase(
+    () => (firestore && user ? doc(firestore, 'users', user.uid) : null),
+    [firestore, user]
+  );
+  const { data: userProfile, isLoading: isUserProfileLoading } = useDoc<UserProfile>(userProfileRef);
+  
   React.useEffect(() => {
     if (!isUserLoading && !user) {
       router.replace('/');
@@ -142,17 +184,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   }, [user, auth, router]);
 
-  React.useEffect(() => {
-    const storedRole = localStorage.getItem('user-role') as UserRole | null;
-    const allRoles: UserRole[] = ['admin', 'lawyer', 'financial'];
-    if (storedRole && allRoles.includes(storedRole)) {
-      setUserRole(storedRole);
-    } else {
-        localStorage.setItem('user-role', 'lawyer');
-        setUserRole('lawyer');
-    }
-  }, []);
-  
+  const userRole = userProfile?.role || 'lawyer';
+
   const getBreadcrumb = () => {
     const pathParts = pathname.split('/').filter(part => part);
     return (
@@ -198,7 +231,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return bestMatch;
   }
   
-  if (isUserLoading || !user) {
+  if (isUserLoading || !user || isUserProfileLoading) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />

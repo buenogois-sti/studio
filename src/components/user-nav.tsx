@@ -15,9 +15,10 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
 } from '@/components/ui/dropdown-menu';
-import type { UserRole } from '@/lib/types';
-import { useFirebase } from '@/firebase';
+import type { UserProfile, UserRole } from '@/lib/types';
+import { useFirebase, useDoc, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
 import { Skeleton } from './ui/skeleton';
+import { doc } from 'firebase/firestore';
 
 const roles: { role: UserRole; label: string }[] = [
   { role: 'admin', label: 'Administrador' },
@@ -26,26 +27,21 @@ const roles: { role: UserRole; label: string }[] = [
 ];
 
 export function UserNav() {
-  const { user, auth, isUserLoading } = useFirebase();
+  const { user, auth, isUserLoading, firestore } = useFirebase();
   const router = useRouter();
-  const [currentRole, setCurrentRole] = React.useState<UserRole>('lawyer'); // Default role
 
-  React.useEffect(() => {
-    const storedRole = localStorage.getItem('user-role') as UserRole | null;
-    if (storedRole && roles.some(r => r.role === storedRole)) {
-      setCurrentRole(storedRole);
-    } else {
-        // Set a default role if nothing is stored or invalid
-        const defaultRole = 'lawyer';
-        localStorage.setItem('user-role', defaultRole);
-        setCurrentRole(defaultRole);
-    }
-  }, []);
+  const userProfileRef = useMemoFirebase(
+    () => (firestore && user ? doc(firestore, 'users', user.uid) : null),
+    [firestore, user]
+  );
+  const { data: userProfile, isLoading: isUserProfileLoading } = useDoc<UserProfile>(userProfileRef);
+
+  const currentRole = userProfile?.role;
 
   const handleRoleChange = (role: string) => {
-    if (role !== currentRole) {
-      localStorage.setItem('user-role', role as UserRole);
-      window.location.reload(); // Reload to apply role changes throughout the app
+    if (role !== currentRole && userProfileRef) {
+      // The UI will reactively update due to the onSnapshot listener in useDoc
+      updateDocumentNonBlocking(userProfileRef, { role });
     }
   };
   
@@ -57,12 +53,12 @@ export function UserNav() {
     }
   };
 
-  if (isUserLoading) {
+  if (isUserLoading || isUserProfileLoading) {
     return <Skeleton className="h-9 w-9 rounded-full" />;
   }
   
-  if (!user) {
-    return null; // Or a login button
+  if (!user || !userProfile) {
+    return null;
   }
 
 
@@ -72,7 +68,7 @@ export function UserNav() {
         <Button variant="ghost" className="relative h-8 w-8 rounded-full">
           <Avatar className="h-9 w-9">
             <AvatarImage src={user.photoURL || ''} alt={user.displayName || ''} data-ai-hint="person portrait" />
-            <AvatarFallback>{user.displayName ? user.displayName.charAt(0) : user.email?.charAt(0).toUpperCase()}</AvatarFallback>
+            <AvatarFallback>{userProfile.firstName ? userProfile.firstName.charAt(0) : 'U'}</AvatarFallback>
           </Avatar>
         </Button>
       </DropdownMenuTrigger>

@@ -274,108 +274,41 @@
     ]
   },
   "firestore": {
-    "structure": [
-      {
-        "path": "/users/{userId}",
-        "definition": {
-          "entityName": "User",
-          "schema": {
-            "$ref": "#/backend/entities/User"
-          },
-          "description": "Stores user profiles. User documents are secured by path-based ownership.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The unique identifier for the user."
-            }
-          ]
-        }
+    "/users/{userId}": {
+      "schema": {
+        "$ref": "#/backend/entities/User"
       },
-      {
-        "path": "/clients/{clientId}",
-        "definition": {
-          "entityName": "Client",
-          "schema": {
-            "$ref": "#/backend/entities/Client"
-          },
-          "description": "Stores client information.",
-          "params": [
-            {
-              "name": "clientId",
-              "description": "The unique identifier for the client."
-            }
-          ]
-        }
+      "description": "Stores user profiles. User documents are secured by path-based ownership."
+    },
+    "/clients/{clientId}": {
+      "schema": {
+        "$ref": "#/backend/entities/Client"
       },
-      {
-        "path": "/processes/{processId}",
-        "definition": {
-          "entityName": "Process",
-          "schema": {
-            "$ref": "#/backend/entities/Process"
-          },
-          "description": "Stores process information.",
-          "params": [
-            {
-              "name": "processId",
-              "description": "The unique identifier for the process."
-            }
-          ]
-        }
+      "description": "Stores client information."
+    },
+    "/processes/{processId}": {
+      "schema": {
+        "$ref": "#/backend/entities/Process"
       },
-      {
-        "path": "/hearings/{hearingId}",
-        "definition": {
-          "entityName": "Hearing",
-          "schema": {
-            "$ref": "#/backend/entities/Hearing"
-          },
-          "description": "Stores hearing information.",
-          "params": [
-            {
-              "name": "hearingId",
-              "description": "The unique identifier for the hearing."
-            }
-          ]
-        }
+      "description": "Stores process information."
+    },
+    "/hearings/{hearingId}": {
+      "schema": {
+        "$ref": "#/backend/entities/Hearing"
       },
-      {
-        "path": "/financial_transactions/{financialTransactionId}",
-        "definition": {
-          "entityName": "FinancialTransaction",
-          "schema": {
-            "$ref": "#/backend/entities/FinancialTransaction"
-          },
-          "description": "Stores financial transaction information.",
-          "params": [
-            {
-              "name": "financialTransactionId",
-              "description": "The unique identifier for the financial transaction."
-            }
-          ]
-        }
+      "description": "Stores hearing information."
+    },
+    "/financial_transactions/{financialTransactionId}": {
+      "schema": {
+        "$ref": "#/backend/entities/FinancialTransaction"
       },
-      {
-        "path": "/users/{userId}/logs/{logId}",
-        "definition": {
-          "entityName": "Log",
-          "schema": {
-            "$ref": "#/backend/entities/Log"
-          },
-          "description": "Stores audit logs for specific users. Secured by path-based ownership.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The unique identifier for the user."
-            },
-            {
-              "name": "logId",
-              "description": "The unique identifier for the log."
-            }
-          ]
-        }
-      }
-    ],
-    "reasoning": "This Firestore data structure is designed to support the LexFlow Workspace application, prioritizing security, scalability, and debuggability. It leverages path-based ownership and denormalization to ensure authorization independence and efficient data retrieval. The structure is tailored to manage users, clients, processes, hearings, financial transactions, and audit logs, while adhering to the core design principles outlined in the prompt. All data resides in PostgreSQL, the following is to create simple audit trails.\n\n**Authorization Independence (CRITICAL):**\n\n*   Path-Based Ownership: The structure uses hierarchical paths for user-owned data (e.g., `/users/{userId}/logs/{logId}`). This structure is highly secure and makes ownership-based security rules simple and efficient.\n\n**Structural Segregation:**\n\n*   Homogeneous Security Posture: All documents in a collection share the same security requirements.\n\n**Access Modeling:**\n\n*   Private Data: Path-Based ownership (`/users/{userId}/logs`).\n\n**Data Clarity and Predictability:**\n\n*   Radical Consistency: Enforce strict, semantic naming conventions."
+      "description": "Stores financial transaction information."
+    },
+    "/users/{userId}/logs/{logId}": {
+      "schema": {
+        "$ref": "#/backend/entities/Log"
+      },
+      "description": "Stores audit logs for specific users. Secured by path-based ownership."
+    }
   }
 }

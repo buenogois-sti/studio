@@ -61,15 +61,6 @@ service cloud.firestore {
     }
 
     /**
-     * Checks if a document exists and if the requester is the owner.
-     * Used for safe update and delete operations.
-     * @param userId The owner's user ID.
-     */
-    function isExistingOwner(userId) {
-      return isOwner(userId) && resource != null;
-    }
-
-    /**
      * @description Rules for the user profile collection.
      * @path /users/{userId}
      * @allow (create) An authenticated user creating their own profile document for the first time.
@@ -80,8 +71,10 @@ service cloud.firestore {
       allow get: if isOwner(userId);
       allow list: if false;
       allow create: if isOwner(userId) && request.resource.data.id == userId;
-      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
-      allow delete: if isExistingOwner(userId);
+      // Allow users to update their own profile, e.g. to change their role.
+      // In a more complex app, role changes would be restricted to admins.
+      allow update: if isOwner(userId);
+      allow delete: if isOwner(userId);
 
       /**
        * @description Rules for a user's private audit logs.
@@ -94,8 +87,8 @@ service cloud.firestore {
         allow get: if isOwner(userId);
         allow list: if isOwner(userId);
         allow create: if isOwner(userId) && request.resource.data.userId == userId;
-        allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.id;
-        allow delete: if isExistingOwner(userId);
+        allow update: if isOwner(userId) && request.resource.data.userId == resource.data.id;
+        allow delete: if isOwner(userId);
       }
     }
 

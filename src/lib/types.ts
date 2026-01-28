@@ -2,6 +2,17 @@ import type { Timestamp } from 'firebase/firestore';
 
 export type UserRole = 'admin' | 'lawyer' | 'financial';
 
+export type UserProfile = {
+  id: string;
+  googleId: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: UserRole;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+};
+
 export type Client = {
   id: string;
   name: string;
