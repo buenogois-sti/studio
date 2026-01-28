@@ -65,7 +65,7 @@ export default function LoginPage() {
           <CardHeader>
             <CardTitle className="text-2xl font-headline">Acesse sua conta</CardTitle>
             <CardDescription>
-              Use sua conta Google Workspace para entrar.
+              Use sua conta Google Workspace para criar seu acesso ou entrar.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -77,7 +77,7 @@ export default function LoginPage() {
                     d="M12.48 10.92v3.28h7.84c-.24 1.84-.85 3.18-1.73 4.1-1.02 1.02-2.62 1.62-4.88 1.62-4.27 0-7.75-3.5-7.75-7.75s3.48-7.75 7.75-7.75c2.44 0 4.03.92 4.9 1.84l2.43-2.42C19.64 3.45 16.71 2 12.48 2 7.1 2 3.1 6.02 3.1 11.25s4.01 9.25 9.38 9.25c2.86 0 5.1-1.02 6.7-2.62 1.67-1.67 2.2-4.01 2.2-6.17 0-.52-.04-1.03-.12-1.52H12.48z"
                   />
                 </svg>
-                Entrar com Google
+                Acessar com Google
               </Button>
             </div>
             <div className="mt-4 text-center text-sm text-muted-foreground">

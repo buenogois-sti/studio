@@ -39,14 +39,13 @@ import {
   PanelLeft,
   Briefcase,
   AlertCircle,
-  Loader2
+  Loader2,
 } from 'lucide-react';
 import type { UserProfile, UserRole } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useFirebase, useDoc, useMemoFirebase, FirestorePermissionError, errorEmitter } from '@/firebase';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
-
 
 const navItems = [
   {
@@ -94,32 +93,31 @@ const navItems = [
 ];
 
 const BreadcrumbMap: { [key: string]: string } = {
-    '/dashboard': 'Dashboard',
-    '/dashboard/clientes': 'Clientes',
-    '/dashboard/processos': 'Processos',
-    '/dashboard/audiencias': 'Audiências',
-    '/dashboard/financeiro': 'Financeiro',
-    '/dashboard/workspace': 'Workspace',
-    '/dashboard/configuracoes': 'Configurações',
-}
+  '/dashboard': 'Dashboard',
+  '/dashboard/clientes': 'Clientes',
+  '/dashboard/processos': 'Processos',
+  '/dashboard/audiencias': 'Audiências',
+  '/dashboard/financeiro': 'Financeiro',
+  '/dashboard/workspace': 'Workspace',
+  '/dashboard/configuracoes': 'Configurações',
+};
 
 function AccessDenied() {
   return (
-      <div className="flex flex-1 h-full items-center justify-center rounded-lg border border-dashed shadow-sm">
-          <div className="flex flex-col items-center gap-2 text-center">
-              <AlertCircle className="h-16 w-16 text-destructive" />
-              <h1 className="text-2xl font-bold tracking-tight font-headline mt-4">
-              Acesso Negado
-              </h1>
-              <p className="text-sm text-muted-foreground max-w-sm">
-              Você não tem permissão para visualizar esta página. Por favor, selecione um perfil com acesso ou contate um administrador.
-              </p>
-              <Button asChild className="mt-4">
-                  <Link href="/dashboard">Voltar para o Dashboard</Link>
-              </Button>
-          </div>
+    <div className="flex flex-1 h-full items-center justify-center rounded-lg border border-dashed shadow-sm">
+      <div className="flex flex-col items-center gap-2 text-center">
+        <AlertCircle className="h-16 w-16 text-destructive" />
+        <h1 className="text-2xl font-bold tracking-tight font-headline mt-4">Acesso Negado</h1>
+        <p className="text-sm text-muted-foreground max-w-sm">
+          Você não tem permissão para visualizar esta página. Por favor, selecione um perfil com acesso ou
+          contate um administrador.
+        </p>
+        <Button asChild className="mt-4">
+          <Link href="/dashboard">Voltar para o Dashboard</Link>
+        </Button>
       </div>
-  )
+    </div>
+  );
 }
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -134,27 +132,28 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const userRef = doc(firestore, 'users', user.uid);
 
     const createUserProfileIfNeeded = async () => {
-      let docSnap;
-      try {
-        docSnap = await getDoc(userRef);
-      } catch (error) {
-        console.error("Error getting user profile:", error);
+      const docSnap = await getDoc(userRef).catch((error) => {
+        console.error('Error checking for user profile:', error);
         const permissionError = new FirestorePermissionError({
-            path: userRef.path,
-            operation: 'get',
+          path: userRef.path,
+          operation: 'get',
         });
         errorEmitter.emit('permission-error', permissionError);
-        return; // Stop execution if we can't even check for the doc
-      }
+        return null; // Return null to indicate failure
+      });
 
       if (docSnap && !docSnap.exists()) {
         const [firstName, ...lastNameParts] = user.displayName?.split(' ') || ['', ''];
         const lastName = lastNameParts.join(' ');
-        
-        // Default new users to 'admin'. The role can be changed in the user menu.
-        const newUserProfile: Omit<UserProfile, 'createdAt' | 'updatedAt' | 'role'> & {role: UserRole} = {
+
+        // Default new users to 'admin'. In a real-world scenario,
+        // this might be 'lawyer' and an admin would be created manually
+        // or through a separate process.
+        const newUserProfile: Omit<UserProfile, 'createdAt' | 'updatedAt' | 'role'> & {
+          role: UserRole;
+        } = {
           id: user.uid,
-          googleId: user.providerData.find(p => p.providerId === 'google.com')?.uid || '',
+          googleId: user.providerData.find((p) => p.providerId === 'google.com')?.uid || '',
           email: user.email || '',
           firstName: firstName,
           lastName: lastName,
@@ -162,33 +161,32 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         };
 
         const dataToSet = {
-            ...newUserProfile,
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp(),
+          ...newUserProfile,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
         };
 
-        setDoc(userRef, dataToSet)
-            .catch((error) => {
-                console.error("Error creating user profile:", error);
-                const permissionError = new FirestorePermissionError({
-                    path: userRef.path,
-                    operation: 'create',
-                    requestResourceData: dataToSet,
-                });
-                errorEmitter.emit('permission-error', permissionError);
-            });
+        setDoc(userRef, dataToSet).catch((error) => {
+          console.error('Error creating user profile:', error);
+          const permissionError = new FirestorePermissionError({
+            path: userRef.path,
+            operation: 'create',
+            requestResourceData: dataToSet,
+          });
+          errorEmitter.emit('permission-error', permissionError);
+        });
       }
     };
 
     createUserProfileIfNeeded();
   }, [user, firestore]);
-  
+
   const userProfileRef = useMemoFirebase(
     () => (firestore && user ? doc(firestore, 'users', user.uid) : null),
     [firestore, user]
   );
   const { data: userProfile, isLoading: isUserProfileLoading } = useDoc<UserProfile>(userProfileRef);
-  
+
   React.useEffect(() => {
     if (!isUserLoading && !user) {
       router.replace('/');
@@ -197,59 +195,59 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   React.useEffect(() => {
     if (user && user.email && !user.email.endsWith('@buenogoisadvogado.com.br')) {
-        auth?.signOut().then(() => {
-            router.replace('/');
-        });
+      auth?.signOut().then(() => {
+        router.replace('/');
+      });
     }
   }, [user, auth, router]);
 
   const userRole = userProfile?.role || 'lawyer';
 
   const getBreadcrumb = () => {
-    const pathParts = pathname.split('/').filter(part => part);
+    const pathParts = pathname.split('/').filter((part) => part);
     return (
-        <Breadcrumb className="hidden md:flex">
-            <BreadcrumbList>
+      <Breadcrumb className="hidden md:flex">
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbLink asChild>
+              <Link href="/dashboard">LexFlow</Link>
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          {pathParts.map((part, index) => {
+            const href = `/${pathParts.slice(0, index + 1).join('/')}`;
+            const isLast = index === pathParts.length - 1;
+            return (
+              <React.Fragment key={href}>
+                <BreadcrumbSeparator />
                 <BreadcrumbItem>
+                  {isLast ? (
+                    <BreadcrumbPage>{BreadcrumbMap[href] || part}</BreadcrumbPage>
+                  ) : (
                     <BreadcrumbLink asChild>
-                        <Link href="/dashboard">LexFlow</Link>
+                      <Link href={href}>{BreadcrumbMap[href] || part}</Link>
                     </BreadcrumbLink>
+                  )}
                 </BreadcrumbItem>
-                {pathParts.map((part, index) => {
-                    const href = `/${pathParts.slice(0, index + 1).join('/')}`;
-                    const isLast = index === pathParts.length - 1;
-                    return (
-                        <React.Fragment key={href}>
-                            <BreadcrumbSeparator />
-                            <BreadcrumbItem>
-                                {isLast ? (
-                                    <BreadcrumbPage>{BreadcrumbMap[href] || part}</BreadcrumbPage>
-                                ) : (
-                                    <BreadcrumbLink asChild>
-                                        <Link href={href}>{BreadcrumbMap[href] || part}</Link>
-                                    </BreadcrumbLink>
-                                )}
-                            </BreadcrumbItem>
-                        </React.Fragment>
-                    )
-                })}
-            </BreadcrumbList>
-        </Breadcrumb>
-    )
-  }
+              </React.Fragment>
+            );
+          })}
+        </BreadcrumbList>
+      </Breadcrumb>
+    );
+  };
 
   const getBestNavItemForPath = (path: string) => {
-    let bestMatch: typeof navItems[0] | undefined = undefined;
+    let bestMatch: (typeof navItems)[0] | undefined = undefined;
     for (const item of navItems) {
-        if (path.startsWith(item.href)) {
-            if (!bestMatch || item.href.length > bestMatch.href.length) {
-                bestMatch = item;
-            }
+      if (path.startsWith(item.href)) {
+        if (!bestMatch || item.href.length > bestMatch.href.length) {
+          bestMatch = item;
         }
+      }
     }
     return bestMatch;
-  }
-  
+  };
+
   if (isUserLoading || !user || isUserProfileLoading) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
