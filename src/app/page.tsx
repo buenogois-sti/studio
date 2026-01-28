@@ -1,6 +1,6 @@
 'use client';
 
-import * as React from 'react';
+import React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -116,24 +116,40 @@ export default function LandingPage() {
       <main>
         {/* Hero Section */}
         <section id="inicio" className="relative overflow-hidden">
-          <div className="absolute inset-0 bg-background z-0" />
-          <div className="container mx-auto grid lg:grid-cols-2 gap-12 items-center pt-20 pb-20 relative z-10">
+          <div className="absolute inset-0 bg-background z-0">
+             <div className="absolute bottom-0 left-1/4 w-1/2 h-1/2 bg-primary/5 rounded-full blur-[100px]" />
+          </div>
+          <div className="container mx-auto grid lg:grid-cols-2 gap-12 items-center pt-20 pb-28 relative z-10">
             <div className="space-y-6">
               <h1 className="font-headline text-4xl md:text-5xl xl:text-5xl font-bold leading-tight text-white">
-                Dr. Alan Bueno De Gois - <br />
-                <span className="text-primary">Advogado Trabalhista</span>
+                Advogado Trabalhista em São Bernardo do Campo - Defenda Seus Direitos com <span className="relative inline-block">Especialista<span className="absolute -bottom-2 left-0 w-full h-1 bg-primary" /></span>
               </h1>
               <p className="text-lg text-muted-foreground max-w-xl">
-                Advogado trabalhista com mais de 10 anos de experiência. Atendo casos de rescisão de contrato, horas extras, assédio moral e todos os seus direitos trabalhistas.
+                Advogado trabalhista com mais de 10 anos de experiência em{' '}
+                <a href="#servicos" className="text-primary/80 hover:text-primary transition-colors underline">
+                    direitos trabalhistas
+                </a>
+                . Atendo casos de {' '}
+                <a href="#servicos" className="text-primary/80 hover:text-primary transition-colors underline">
+                    rescisão de contrato
+                </a>
+                , {' '}
+                <a href="#servicos" className="text-primary/80 hover:text-primary transition-colors underline">
+                    horas extras
+                </a>
+                , {' '}
+                <a href="#servicos" className="text-primary/80 hover:text-primary transition-colors underline">
+                    assédio moral
+                </a> e todos os seus direitos trabalhistas em São Bernardo do Campo.
               </p>
-              <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-base py-7 px-8 rounded-full shadow-lg shadow-primary/20 transition-transform transform hover:scale-105">
+              <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-base py-7 px-8 rounded-lg shadow-[0_8px_30px_rgb(245_208_48_/_30%)] transition-transform transform hover:scale-105">
                 <MessageCircle className="mr-3 h-5 w-5" />
                 Consultar Gratuitamente
               </Button>
               <div className="flex flex-wrap items-center gap-x-6 gap-y-4 pt-6 text-sm text-muted-foreground">
                 <div className="flex items-center gap-2">
                   <MapPin className="h-4 w-4 text-primary" />
-                  <span>Rua Marechal Deodoro, 1594 - Sala 2, SBC/SP</span>
+                  <span>Rua Marechal Deodoro, 1594 - Sala 2, São Bernardo do Campo / SP</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Phone className="h-4 w-4 text-primary" />
@@ -141,13 +157,12 @@ export default function LandingPage() {
                 </div>
               </div>
             </div>
-             <div className="relative -mr-16 hidden lg:flex justify-center items-center h-[500px]">
+             <div className="relative -mr-32 hidden lg:block h-[550px]">
                <Image
                 src="/image/lawyer-portrait.jpg"
                 alt="Dr. Alan Bueno De Gois - Advogado especialista em direito trabalhista"
-                width={450}
-                height={600}
-                className="object-cover rounded-lg shadow-2xl object-top"
+                fill
+                className="object-contain object-bottom filter drop-shadow-[0_25px_25px_rgba(0,0,0,0.6)]"
                 data-ai-hint="man suit professional"
                 priority
               />
@@ -195,7 +210,7 @@ export default function LandingPage() {
                 </div>
                  <div className="space-y-6">
                   <h2 className="font-headline text-3xl md:text-4xl font-bold text-white">
-                    Dr. Alan Bueno De Gois - <br/> Advogado Trabalhista
+                    Dr. Alan Bueno De Gois <br/> Advogado Trabalhista
                   </h2>
                   <p className="italic text-primary">
                     &ldquo;Contra iniuriam, pro iustitia operarii&rdquo; <br/>
