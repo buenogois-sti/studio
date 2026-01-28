@@ -48,7 +48,7 @@ const fileIcons = {
 
 
 function IntegrationsTab() {
-    const [isConnected, setIsConnected] = useState(false);
+    const [isConnected, setIsConnected] = useState(true);
     const userEmail = 'sofia.mendes@lexflow.com';
 
     return (
@@ -76,12 +76,12 @@ function IntegrationsTab() {
                     </CardHeader>
                      <CardContent>
                         {isConnected ? (
-                            <div className="flex items-center justify-between p-3 rounded-md bg-green-50 border border-green-200 dark:bg-green-950 dark:border-green-800">
+                            <div className="flex items-center justify-between p-3 rounded-md bg-emerald-50 text-emerald-900">
                                 <div className="flex flex-col">
-                                    <span className="text-sm font-medium text-green-800 dark:text-green-200">Conectado</span>
-                                    <span className="text-xs text-muted-foreground">{userEmail}</span>
+                                    <span className="text-sm font-semibold">Conectado</span>
+                                    <span className="text-xs">{userEmail}</span>
                                 </div>
-                                <Badge variant="outline" className="text-green-700 border-green-300 dark:text-green-300 dark:border-green-700">Ativo</Badge>
+                                <Badge variant="default" className="bg-emerald-100 text-emerald-900 hover:bg-emerald-100 pointer-events-none">Ativo</Badge>
                             </div>
                         ) : (
                             <div className="flex items-center justify-between p-3 rounded-md bg-yellow-50 border border-yellow-200 dark:bg-yellow-950 dark:border-yellow-800">
@@ -123,7 +123,7 @@ export default function ConfiguracoesPage() {
             </h1>
       </div>
         
-      <Tabs defaultValue="geral" className="w-full">
+      <Tabs defaultValue="integracoes" className="w-full">
             <TabsList className="grid w-full grid-cols-2 md:grid-cols-6 mb-6">
                 <TabsTrigger value="geral">Geral</TabsTrigger>
                 <TabsTrigger value="integracoes">Integrações</TabsTrigger>
