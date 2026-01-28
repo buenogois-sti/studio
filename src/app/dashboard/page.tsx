@@ -1,4 +1,5 @@
 'use client';
+import * as React from 'react';
 import {
   Activity,
   ArrowUpRight,
@@ -34,8 +35,13 @@ import {
   Tooltip,
 } from 'recharts';
 import Link from 'next/link';
-import { chartData, recentActivities, transactions, clients } from '@/lib/data';
+import { chartData, recentActivities } from '@/lib/data';
 import { ChartContainer, ChartTooltipContent } from '@/components/ui/chart';
+import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
+import { collection } from 'firebase/firestore';
+import type { Client, FinancialTransaction } from '@/lib/types';
+import { Skeleton } from '@/components/ui/skeleton';
+
 
 const chartConfig = {
   newCases: {
@@ -45,12 +51,31 @@ const chartConfig = {
 };
 
 export default function Dashboard() {
-  const totalRevenue = transactions
-    .filter((t) => t.type === 'receita')
-    .reduce((sum, t) => sum + t.amount, 0);
-  const totalExpenses = transactions
-    .filter((t) => t.type === 'despesa')
-    .reduce((sum, t) => sum + t.amount, 0);
+  const { firestore, isUserLoading } = useFirebase();
+
+  const transactionsQuery = useMemoFirebase(
+    () => (firestore ? collection(firestore, 'financial_transactions') : null),
+    [firestore]
+  );
+  const { data: transactionsData, isLoading: isLoadingTransactions } = useCollection<FinancialTransaction>(transactionsQuery);
+
+  const clientsQuery = useMemoFirebase(
+    () => (firestore ? collection(firestore, 'clients') : null),
+    [firestore]
+  );
+  const { data: clientsData, isLoading: isLoadingClients } = useCollection<Client>(clientsQuery);
+
+  const isLoading = isUserLoading || isLoadingTransactions || isLoadingClients;
+
+  const totalRevenue = React.useMemo(() => {
+    if (!transactionsData) return 0;
+    return transactionsData
+      .filter((t) => t.type === 'receita')
+      .reduce((sum, t) => sum + t.amount, 0);
+  }, [transactionsData]);
+  
+  const clientCount = clientsData?.length || 0;
+
 
   return (
     <div className="flex flex-col gap-4">
@@ -61,9 +86,13 @@ export default function Dashboard() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            {isLoading ? (
+                <Skeleton className="h-8 w-3/4" />
+            ) : (
+                <div className="text-2xl font-bold">
               {totalRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
             </div>
+            )}
             <p className="text-xs text-muted-foreground">+20.1% em relação ao mês passado</p>
           </CardContent>
         </Card>
@@ -73,7 +102,11 @@ export default function Dashboard() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">+{clients.length}</div>
+             {isLoading ? (
+                <Skeleton className="h-8 w-1/4" />
+            ) : (
+                <div className="text-2xl font-bold">+{clientCount}</div>
+            )}
             <p className="text-xs text-muted-foreground">+3 no último mês</p>
           </CardContent>
         </Card>

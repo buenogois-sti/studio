@@ -40,11 +40,11 @@ export type Hearing = {
   responsible: string;
 };
 
-export type Transaction = {
+export type FinancialTransaction = {
   id: string;
+  clientId: string;
   description: string;
   amount: number;
   type: 'receita' | 'despesa';
-  date: string;
-  clientName: string;
+  transactionDate: Timestamp;
 };
