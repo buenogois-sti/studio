@@ -138,14 +138,6 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
         }
     }, [user, isUserLoading, router]);
 
-    React.useEffect(() => {
-        if (user && user.email && !user.email.endsWith('@buenogoisadvogado.com.br')) {
-        auth?.signOut().then(() => {
-            router.replace('/login');
-        });
-        }
-    }, [user, auth, router]);
-
     const userRole = userProfile?.role || 'lawyer';
 
     const getBreadcrumb = () => {
