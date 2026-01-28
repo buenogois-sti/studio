@@ -44,8 +44,15 @@ import {
 import type { UserProfile, UserRole } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { useFirebase, useDoc, useMemoFirebase, FirestorePermissionError, errorEmitter } from '@/firebase';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import {
+  useFirebase,
+  useDoc,
+  useMemoFirebase,
+  FirestorePermissionError,
+  errorEmitter,
+  setDocumentNonBlocking,
+} from '@/firebase';
+import { doc, getDoc, serverTimestamp } from 'firebase/firestore';
 
 const navItems = [
   {
@@ -132,54 +139,48 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const userRef = doc(firestore, 'users', user.uid);
 
     const createUserProfileIfNeeded = async () => {
-      const docSnap = await getDoc(userRef).catch((error) => {
+      try {
+        const docSnap = await getDoc(userRef);
+
+        if (!docSnap.exists()) {
+          const [firstName, ...lastNameParts] = user.displayName?.split(' ') || ['', ''];
+          const lastName = lastNameParts.join(' ');
+
+          // Default new users to 'lawyer'. The user can then change their own role to 'admin'
+          // using the UI, as the security rules permit a user to update their own profile.
+          // This avoids needing a collection list permission, which is disabled for security.
+          const newUserProfile: Omit<UserProfile, 'createdAt' | 'updatedAt'> = {
+            id: user.uid,
+            googleId: user.providerData.find((p) => p.providerId === 'google.com')?.uid || '',
+            email: user.email || '',
+            firstName: firstName,
+            lastName: lastName,
+            role: 'lawyer', 
+          };
+
+          const dataToSet = {
+            ...newUserProfile,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          };
+          
+          // Use the non-blocking helper to ensure errors are surfaced correctly
+          setDocumentNonBlocking(userRef, dataToSet, { merge: false });
+        }
+      } catch (error) {
+        // This will catch errors from getDoc if it fails due to permissions
         console.error('Error checking for user profile:', error);
         const permissionError = new FirestorePermissionError({
           path: userRef.path,
           operation: 'get',
         });
         errorEmitter.emit('permission-error', permissionError);
-        return null; // Return null to indicate failure
-      });
-
-      if (docSnap && !docSnap.exists()) {
-        const [firstName, ...lastNameParts] = user.displayName?.split(' ') || ['', ''];
-        const lastName = lastNameParts.join(' ');
-
-        // Default new users to 'admin'. In a real-world scenario,
-        // this might be 'lawyer' and an admin would be created manually
-        // or through a separate process.
-        const newUserProfile: Omit<UserProfile, 'createdAt' | 'updatedAt' | 'role'> & {
-          role: UserRole;
-        } = {
-          id: user.uid,
-          googleId: user.providerData.find((p) => p.providerId === 'google.com')?.uid || '',
-          email: user.email || '',
-          firstName: firstName,
-          lastName: lastName,
-          role: 'admin',
-        };
-
-        const dataToSet = {
-          ...newUserProfile,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        };
-
-        setDoc(userRef, dataToSet).catch((error) => {
-          console.error('Error creating user profile:', error);
-          const permissionError = new FirestorePermissionError({
-            path: userRef.path,
-            operation: 'create',
-            requestResourceData: dataToSet,
-          });
-          errorEmitter.emit('permission-error', permissionError);
-        });
       }
     };
 
     createUserProfileIfNeeded();
   }, [user, firestore]);
+
 
   const userProfileRef = useMemoFirebase(
     () => (firestore && user ? doc(firestore, 'users', user.uid) : null),
