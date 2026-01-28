@@ -1,3 +1,5 @@
+import type { Timestamp } from 'firebase/firestore';
+
 export type UserRole = 'admin' | 'lawyer' | 'financial';
 
 export type User = {
@@ -13,7 +15,8 @@ export type Client = {
   avatar: string;
   document: string;
   email: string;
-  createdAt: string;
+  phone?: string;
+  createdAt: Timestamp | string;
 };
 
 export type Process = {

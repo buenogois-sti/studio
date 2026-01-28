@@ -68,9 +68,22 @@
           "type": "string",
           "description": "The name of the client."
         },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "The email of the client."
+        },
         "document": {
           "type": "string",
           "description": "The client's identification document (e.g., tax ID)."
+        },
+        "phone": {
+          "type": "string",
+          "description": "The client's phone number."
+        },
+        "avatar": {
+          "type": "string",
+          "description": "The URL of the client's avatar."
         },
         "driveFolderId": {
           "type": "string",
@@ -92,7 +105,8 @@
         "document",
         "driveFolderId",
         "sheetId",
-        "createdAt"
+        "createdAt",
+        "email"
       ]
     },
     "Process": {

@@ -92,19 +92,17 @@ service cloud.firestore {
     }
 
     /**
-     * @description Secures the client data collection. Access is read-only for any authenticated user.
-     * Writes are disabled to ensure data integrity is managed by a trusted backend.
+     * @description Secures the client data collection. Authenticated users can read and write client data.
      * @path /clients/{clientId}
-     * @allow (get) Any authenticated user can read a client document.
-     * @deny (create) Any user attempting to create a new client document from the client-side.
-     * @principle Protects core business data by enforcing backend-only writes.
+     * @allow (read, write) Any authenticated user can manage client documents.
+     * @principle Allows client-side management of core business data.
      */
     match /clients/{clientId} {
       allow get: if isSignedIn();
       allow list: if isSignedIn();
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
 
     /**
