@@ -1,28 +1,21 @@
 'use server';
 
 import { google } from 'googleapis';
-import { JWT } from 'google-auth-library';
+import { GoogleAuth } from 'google-auth-library';
 
-// This function creates and returns an authenticated JWT client.
-// It uses environment variables for the service account credentials.
-// IMPORTANT: Ensure these environment variables are set in your deployment environment
-// and in a .env.local file for local development.
+// This function creates and returns an authenticated client that will
+// automatically use Application Default Credentials (ADC).
 function getAuthClient() {
-  const privateKey = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n');
-
-  if (!process.env.GOOGLE_CLIENT_EMAIL || !privateKey) {
-    throw new Error('Missing Google Service Account credentials in environment variables.');
-  }
-
-  const auth = new JWT({
-    email: process.env.GOOGLE_CLIENT_EMAIL,
-    key: privateKey,
+  const auth = new GoogleAuth({
     scopes: [
       'https://www.googleapis.com/auth/drive',
       'https://www.googleapis.com/auth/spreadsheets',
     ],
   });
-
+  
+  // The `auth.getClient()` method will automatically find and use the credentials
+  // set up by `gcloud auth application-default login` in a local environment,
+  // or the runtime's service account in a deployed Google Cloud environment.
   return auth;
 }
 
