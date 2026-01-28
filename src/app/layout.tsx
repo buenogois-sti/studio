@@ -5,8 +5,8 @@ import { FirebaseClientProvider } from '@/firebase/client-provider';
 
 
 export const metadata: Metadata = {
-  title: 'LexFlow Workspace',
-  description: 'Sistema jurídico integrado ao Google Workspace.',
+  title: 'Dr. Alan Bueno De Gois - Advogado Trabalhista',
+  description: 'Advogado trabalhista especialista em São Bernardo do Campo. Defesa de direitos trabalhistas, rescisão, horas extras, assédio e mais.',
 };
 
 export default function RootLayout({

@@ -162,7 +162,7 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
             <BreadcrumbList>
             <BreadcrumbItem>
                 <BreadcrumbLink asChild>
-                <Link href="/dashboard">LexFlow</Link>
+                <Link href="/dashboard">Início</Link>
                 </BreadcrumbLink>
             </BreadcrumbItem>
             {pathParts.map((part, index) => {
@@ -218,7 +218,7 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
             <Link href="/dashboard" className="flex items-center gap-2">
                 <Logo />
                 <span className="font-bold text-lg text-primary group-data-[collapsible=icon]:hidden">
-                LexFlow
+                Dr. Alan
                 </span>
             </Link>
             </SidebarHeader>

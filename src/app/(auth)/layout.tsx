@@ -13,15 +13,14 @@ export default function AuthLayout({
         <div className="absolute inset-0 bg-primary" />
         <div className="relative z-20 flex items-center text-lg font-medium">
           <Logo className="mr-2" />
-          LexFlow Workspace
+          Dr. Alan Bueno De Gois
         </div>
         <div className="relative z-20 mt-auto">
           <blockquote className="space-y-2">
             <p className="text-lg">
-              &ldquo;Inteligência Jurídica, integrada ao seu fluxo de trabalho.
-              Esta plataforma transformou a gestão de nossos casos.&rdquo;
+              &ldquo;A plataforma de gestão que centraliza nossas operações e otimiza o atendimento ao cliente.&rdquo;
             </p>
-            <footer className="text-sm">Sofia Mendes</footer>
+            <footer className="text-sm">Equipe Jurídica</footer>
           </blockquote>
         </div>
       </div>
