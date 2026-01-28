@@ -37,6 +37,7 @@ export function UserNav() {
   const { data: userProfile, isLoading: isUserProfileLoading } = useDoc<UserProfile>(userProfileRef);
 
   const currentRole = userProfile?.role;
+  const currentRoleLabel = roles.find((r) => r.role === currentRole)?.label;
 
   const handleRoleChange = (role: string) => {
     if (role !== currentRole && userProfileRef) {
@@ -77,6 +78,7 @@ export function UserNav() {
           <div className="flex flex-col space-y-1">
             <p className="text-sm font-medium leading-none">{user.displayName}</p>
             <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
+            {currentRoleLabel && <p className="text-xs leading-none text-muted-foreground pt-1">({currentRoleLabel})</p>}
           </div>
         </DropdownMenuLabel>
         
@@ -94,8 +96,12 @@ export function UserNav() {
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
           <DropdownMenuItem>Perfil</DropdownMenuItem>
-          <DropdownMenuItem>Faturamento</DropdownMenuItem>
-          <DropdownMenuItem>Configurações</DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => router.push('/dashboard/financeiro')} className="cursor-pointer">
+            Faturamento
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => router.push('/dashboard/configuracoes')} className="cursor-pointer">
+            Configurações
+          </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
