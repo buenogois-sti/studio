@@ -2,6 +2,8 @@ import type {Metadata} from 'next';
 import {Toaster} from '@/components/ui/toaster';
 import './globals.css';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
+import { useToast } from "@/components/ui/use-toast"
+
 
 export const metadata: Metadata = {
   title: 'LexFlow Workspace',
@@ -31,6 +33,7 @@ export default function RootLayout({
         <FirebaseClientProvider>
           {children}
         </FirebaseClientProvider>
+        <Toaster />
         </body>
     </html>
   );

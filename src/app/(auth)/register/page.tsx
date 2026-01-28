@@ -16,10 +16,11 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { useFirebase, setDocumentNonBlocking } from '@/firebase';
-import { doc, serverTimestamp } from 'firebase/firestore';
+import { useFirebase } from '@/firebase';
+import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
 import type { UserProfile } from '@/lib/types';
+import { useToast } from '@/components/ui/use-toast';
 
 const registerSchema = z.object({
   firstName: z.string().min(2, { message: 'O nome deve ter pelo menos 2 caracteres.' }),
@@ -29,6 +30,7 @@ const registerSchema = z.object({
 export default function RegisterPage() {
   const { user, isUserLoading, firestore } = useFirebase();
   const router = useRouter();
+  const { toast } = useToast();
 
   const form = useForm<z.infer<typeof registerSchema>>({
     resolver: zodResolver(registerSchema),
@@ -52,7 +54,7 @@ export default function RegisterPage() {
   }, [user, isUserLoading, router, form]);
 
 
-  function onSubmit(values: z.infer<typeof registerSchema>) {
+  async function onSubmit(values: z.infer<typeof registerSchema>) {
     if (!firestore || !user) return;
     
     const userRef = doc(firestore, 'users', user.uid);
@@ -65,19 +67,33 @@ export default function RegisterPage() {
         lastName: values.lastName,
     };
 
-    // To ensure the first user can manage the system, we assign the 'admin' role upon registration.
     const dataToSet = {
         ...newUserProfile,
-        role: 'admin',
+        role: 'admin', // First user is always an admin
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
     };
-      
-    // Use the non-blocking helper to create the document.
-    setDocumentNonBlocking(userRef, dataToSet, {});
     
-    // Redirect to dashboard after initiating the save.
-    router.replace('/dashboard');
+    try {
+      // Use a blocking call to immediately see errors
+      await setDoc(userRef, dataToSet);
+
+      toast({
+        title: "Conta Criada!",
+        description: "Seu perfil foi criado com sucesso.",
+      });
+      
+      // Redirect to dashboard after the save is confirmed.
+      router.replace('/dashboard');
+
+    } catch (e: any) {
+        console.error("Failed to create user profile:", e);
+        toast({
+            variant: "destructive",
+            title: "Erro ao criar perfil",
+            description: e.message || "Não foi possível salvar seu perfil. Verifique as regras de segurança do Firestore.",
+        });
+    }
   }
 
   if (isUserLoading || !user) {
