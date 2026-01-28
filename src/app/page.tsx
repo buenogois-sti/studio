@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -159,12 +160,11 @@ export default function LandingPage() {
             </div>
              <div className="relative -mr-32 hidden lg:block h-[550px]">
                <Image
-                src="https://picsum.photos/seed/lawyer-portrait/500/550"
+                src="/image/lawyer-portrait.png"
                 alt="Dr. Alan Bueno De Gois - Advogado especialista em direito trabalhista"
                 fill
                 sizes="50vw"
                 className="object-contain object-bottom filter drop-shadow-[0_25px_25px_rgba(0,0,0,0.6)]"
-                data-ai-hint="man suit professional"
                 priority
               />
             </div>
@@ -202,12 +202,11 @@ export default function LandingPage() {
             <div className="container mx-auto grid lg:grid-cols-2 gap-12 items-center">
                 <div className="relative h-[500px] w-full">
                      <Image
-                        src="https://picsum.photos/seed/lawyer-action/600/500"
+                        src="/image/lawyer-action.jpg"
                         alt="Dr. Alan Bueno De Gois em seu escritório"
                         fill
                         sizes="(max-width: 1024px) 100vw, 50vw"
                         className="object-cover rounded-lg shadow-2xl"
-                        data-ai-hint="man office suit"
                       />
                 </div>
                  <div className="space-y-6">
