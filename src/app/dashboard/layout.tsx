@@ -138,8 +138,6 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
         }
     }, [user, isUserLoading, router]);
 
-    const userRole = userProfile?.role || 'lawyer';
-
     const getBreadcrumb = () => {
         const pathParts = pathname.split('/').filter((part) => part);
         return (
@@ -194,7 +192,6 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
     }
 
     const currentNavItem = getBestNavItemForPath(pathname);
-    const hasAccess = currentNavItem ? currentNavItem.roles.includes(userRole) : true;
 
     return (
         <SidebarProvider>
@@ -210,8 +207,7 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
             <SidebarContent>
             <SidebarMenu>
                 {navItems.map(
-                (item) =>
-                    item.roles.includes(userRole) && (
+                (item) => (
                     <SidebarMenuItem key={item.label}>
                         <SidebarMenuButton
                         asChild
@@ -252,7 +248,7 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
                 <UserNav />
             </div>
             </header>
-            <main className="flex-1 p-4 sm:p-6">{hasAccess ? children : <AccessDenied />}</main>
+            <main className="flex-1 p-4 sm:p-6">{children}</main>
         </SidebarInset>
         </SidebarProvider>
     );
