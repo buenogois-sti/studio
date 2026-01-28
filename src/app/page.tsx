@@ -1,10 +1,47 @@
-import Link from 'next/link';
-import Image from 'next/image';
+'use client';
+
+import React from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Logo } from '@/components/logo';
+import { useFirebase } from '@/firebase';
+import { GoogleAuthProvider, signInWithRedirect } from 'firebase/auth';
+import { Loader2 } from 'lucide-react';
 
 export default function LoginPage() {
+  const { auth, user, isUserLoading } = useFirebase();
+  const router = useRouter();
+
+  const handleGoogleSignIn = () => {
+    if (!auth) return;
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({
+      hd: 'buenogoisadvogado.com.br',
+    });
+    signInWithRedirect(auth, provider);
+  };
+
+  React.useEffect(() => {
+    if (!isUserLoading && user) {
+        if (user.email?.endsWith('@buenogoisadvogado.com.br')) {
+            router.replace('/dashboard');
+        } else if (auth) {
+            // If user exists but is from the wrong domain, sign them out.
+            auth.signOut();
+            // Optionally, show a message to the user.
+        }
+    }
+  }, [user, isUserLoading, router, auth]);
+
+  if (isUserLoading || user) {
+    return (
+        <div className="flex h-screen w-full items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+    );
+  }
+
   return (
     <div className="w-full h-screen lg:grid lg:grid-cols-2">
       <div className="relative hidden h-full flex-col bg-muted p-10 text-white lg:flex dark:border-r">
@@ -33,20 +70,18 @@ export default function LoginPage() {
           </CardHeader>
           <CardContent>
             <div className="grid gap-4">
-              <Button variant="outline" asChild>
-                <Link href="/dashboard">
-                  <svg role="img" viewBox="0 0 24 24" className="mr-2 h-4 w-4">
-                    <path
-                      fill="currentColor"
-                      d="M12.48 10.92v3.28h7.84c-.24 1.84-.85 3.18-1.73 4.1-1.02 1.02-2.62 1.62-4.88 1.62-4.27 0-7.75-3.5-7.75-7.75s3.48-7.75 7.75-7.75c2.44 0 4.03.92 4.9 1.84l2.43-2.42C19.64 3.45 16.71 2 12.48 2 7.1 2 3.1 6.02 3.1 11.25s4.01 9.25 9.38 9.25c2.86 0 5.1-1.02 6.7-2.62 1.67-1.67 2.2-4.01 2.2-6.17 0-.52-.04-1.03-.12-1.52H12.48z"
-                    />
-                  </svg>
-                  Entrar com Google
-                </Link>
+              <Button variant="outline" onClick={handleGoogleSignIn}>
+                <svg role="img" viewBox="0 0 24 24" className="mr-2 h-4 w-4">
+                  <path
+                    fill="currentColor"
+                    d="M12.48 10.92v3.28h7.84c-.24 1.84-.85 3.18-1.73 4.1-1.02 1.02-2.62 1.62-4.88 1.62-4.27 0-7.75-3.5-7.75-7.75s3.48-7.75 7.75-7.75c2.44 0 4.03.92 4.9 1.84l2.43-2.42C19.64 3.45 16.71 2 12.48 2 7.1 2 3.1 6.02 3.1 11.25s4.01 9.25 9.38 9.25c2.86 0 5.1-1.02 6.7-2.62 1.67-1.67 2.2-4.01 2.2-6.17 0-.52-.04-1.03-.12-1.52H12.48z"
+                  />
+                </svg>
+                Entrar com Google
               </Button>
             </div>
-            <div className="mt-4 text-center text-sm">
-              Acesso restrito ao domínio corporativo.
+            <div className="mt-4 text-center text-sm text-muted-foreground">
+              Acesso restrito ao domínio: buenogoisadvogado.com.br
             </div>
           </CardContent>
         </Card>

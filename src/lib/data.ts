@@ -1,11 +1,6 @@
-import type { Client, User, Transaction } from '@/lib/types';
+import type { Client, Transaction } from '@/lib/types';
+import type { UserRole } from '@/lib/types';
 
-export const user: User = {
-  name: 'Sofia Mendes',
-  email: 'sofia.mendes@lexflow.com',
-  avatarUrl: 'https://picsum.photos/seed/1/100/100',
-  role: 'admin',
-};
 
 export const clients: Client[] = [
   {

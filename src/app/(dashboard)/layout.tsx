@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import * as React from 'react';
 
 import {
@@ -39,11 +39,12 @@ import {
   PanelLeft,
   Briefcase,
   AlertCircle,
+  Loader2
 } from 'lucide-react';
 import type { UserRole } from '@/lib/types';
-import { user } from '@/lib/data';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { useFirebase } from '@/firebase';
 
 const navItems = [
   {
@@ -121,13 +122,34 @@ function AccessDenied() {
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const [userRole, setUserRole] = React.useState<UserRole>(user.role);
+  const router = useRouter();
+  const { user, isUserLoading, auth } = useFirebase();
+
+  // Use a default role and update from localStorage.
+  const [userRole, setUserRole] = React.useState<UserRole>('lawyer');
+
+  React.useEffect(() => {
+    if (!isUserLoading && !user) {
+      router.replace('/');
+    }
+  }, [user, isUserLoading, router]);
+
+  React.useEffect(() => {
+    if (user && user.email && !user.email.endsWith('@buenogoisadvogado.com.br')) {
+        auth?.signOut().then(() => {
+            router.replace('/');
+        });
+    }
+  }, [user, auth, router]);
 
   React.useEffect(() => {
     const storedRole = localStorage.getItem('user-role') as UserRole | null;
     const allRoles: UserRole[] = ['admin', 'lawyer', 'financial'];
     if (storedRole && allRoles.includes(storedRole)) {
       setUserRole(storedRole);
+    } else {
+        localStorage.setItem('user-role', 'lawyer');
+        setUserRole('lawyer');
     }
   }, []);
   
@@ -174,6 +196,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         }
     }
     return bestMatch;
+  }
+  
+  if (isUserLoading || !user) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
   }
 
   const currentNavItem = getBestNavItemForPath(pathname);

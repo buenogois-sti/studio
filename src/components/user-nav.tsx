@@ -1,7 +1,7 @@
 'use client';
 
-import Link from 'next/link';
 import React from 'react';
+import { useRouter } from 'next/navigation';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -15,8 +15,9 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
 } from '@/components/ui/dropdown-menu';
-import { user } from '@/lib/data';
 import type { UserRole } from '@/lib/types';
+import { useFirebase } from '@/firebase';
+import { Skeleton } from './ui/skeleton';
 
 const roles: { role: UserRole; label: string }[] = [
   { role: 'admin', label: 'Administrador' },
@@ -25,39 +26,60 @@ const roles: { role: UserRole; label: string }[] = [
 ];
 
 export function UserNav() {
-  const [currentRole, setCurrentRole] = React.useState<UserRole>(user.role);
+  const { user, auth, isUserLoading } = useFirebase();
+  const router = useRouter();
+  const [currentRole, setCurrentRole] = React.useState<UserRole>('lawyer'); // Default role
 
   React.useEffect(() => {
     const storedRole = localStorage.getItem('user-role') as UserRole | null;
     if (storedRole && roles.some(r => r.role === storedRole)) {
       setCurrentRole(storedRole);
     } else {
-        localStorage.setItem('user-role', user.role);
-        setCurrentRole(user.role);
+        // Set a default role if nothing is stored or invalid
+        const defaultRole = 'lawyer';
+        localStorage.setItem('user-role', defaultRole);
+        setCurrentRole(defaultRole);
     }
   }, []);
 
   const handleRoleChange = (role: string) => {
     if (role !== currentRole) {
       localStorage.setItem('user-role', role as UserRole);
-      window.location.reload();
+      window.location.reload(); // Reload to apply role changes throughout the app
     }
   };
+  
+  const handleLogout = () => {
+    if (auth) {
+      auth.signOut().then(() => {
+        router.push('/');
+      });
+    }
+  };
+
+  if (isUserLoading) {
+    return <Skeleton className="h-9 w-9 rounded-full" />;
+  }
+  
+  if (!user) {
+    return null; // Or a login button
+  }
+
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-8 w-8 rounded-full">
           <Avatar className="h-9 w-9">
-            <AvatarImage src={user.avatarUrl} alt={user.name} data-ai-hint="person portrait" />
-            <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
+            <AvatarImage src={user.photoURL || ''} alt={user.displayName || ''} data-ai-hint="person portrait" />
+            <AvatarFallback>{user.displayName ? user.displayName.charAt(0) : user.email?.charAt(0).toUpperCase()}</AvatarFallback>
           </Avatar>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56" align="end" forceMount>
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">{user.name}</p>
+            <p className="text-sm font-medium leading-none">{user.displayName}</p>
             <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
           </div>
         </DropdownMenuLabel>
@@ -80,8 +102,8 @@ export function UserNav() {
           <DropdownMenuItem>Configurações</DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <Link href="/">Sair</Link>
+        <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
+          Sair
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

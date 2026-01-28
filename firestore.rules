@@ -12,13 +12,14 @@
  * Key Security Decisions:
  * - User Isolation: A user can only create, read, update, or delete their own user document and
  *   subcollection documents (e.g., their own logs).
+ * - Domain Restriction: Access is restricted to users with an email from the 'buenogoisadvogado.com.br' domain.
  * - No User Enumeration: Listing documents in the top-level `/users` collection is explicitly disallowed
  *   to protect user privacy and prevent data scraping.
- * - Backend-Managed Data: The core business collections (`clients`, `processes`, `hearings`,
+ * - Backend-Managed Data: The core business collections (`processes`, `hearings`,
  *   `financial_transactions`) are configured to be read-only for authenticated clients. All write
  *   operations (create, update, delete) are denied. This is a secure-by-default posture that
  *   presumes these sensitive operations are handled by a backend with appropriate business logic
- *   and permissions, which is consistent with the provided context that PostgreSQL is the primary database.
+ *   and permissions.
  *
  * Denormalization for Authorization: The rules rely on path-based ownership (e.g., using the
  * `{userId}` wildcard from the path) to authorize access. For documents within a user's data tree,
@@ -42,14 +43,21 @@ service cloud.firestore {
     function isSignedIn() {
       return request.auth != null;
     }
+    
+    /**
+     * Checks if the authenticated user's email is from the allowed domain.
+     */
+    function isFromAllowedDomain() {
+      return isSignedIn() && request.auth.token.email.matches('.*@buenogoisadvogado.com.br$');
+    }
 
     /**
-     * Checks if the requesting user's UID matches the provided userId.
+     * Checks if the requesting user's UID matches the provided userId and is from the allowed domain.
      * This is the foundation of the user-ownership security model.
      * @param userId The user ID to check against the authenticated user's UID.
      */
     function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
+      return isFromAllowedDomain() && request.auth.uid == userId;
     }
 
     /**
@@ -92,17 +100,13 @@ service cloud.firestore {
     }
 
     /**
-     * @description Secures the client data collection. Authenticated users can read and write client data.
+     * @description Secures the client data collection. Authenticated users from the allowed domain can manage client data.
      * @path /clients/{clientId}
-     * @allow (read, write) Any authenticated user can manage client documents.
-     * @principle Allows client-side management of core business data.
+     * @allow (read, write) Any authenticated user from the allowed domain can manage client documents.
+     * @principle Allows client-side management of core business data for authorized users.
      */
     match /clients/{clientId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow read, write: if isFromAllowedDomain();
     }
 
     /**
@@ -114,8 +118,8 @@ service cloud.firestore {
      * @principle Protects core business data by enforcing backend-only writes.
      */
     match /processes/{processId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
+      allow get: if isFromAllowedDomain();
+      allow list: if isFromAllowedDomain();
       allow create: if false;
       allow update: if false;
       allow delete: if false;
@@ -130,8 +134,8 @@ service cloud.firestore {
      * @principle Protects core business data by enforcing backend-only writes.
      */
     match /hearings/{hearingId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
+      allow get: if isFromAllowedDomain();
+      allow list: if isFromAllowedDomain();
       allow create: if false;
       allow update: if false;
       allow delete: if false;
@@ -146,8 +150,8 @@ service cloud.firestore {
      * @principle Protects core business data by enforcing backend-only writes.
      */
     match /financial_transactions/{financialTransactionId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
+      allow get: if isFromAllowedDomain();
+      allow list: if isFromAllowedDomain();
       allow create: if false;
       allow update: if false;
       allow delete: if false;
