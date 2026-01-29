@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -65,12 +64,16 @@ export default function LoginPage() {
                 router.push('/register');
             }
         } catch (error: any) {
-            console.error("Google Sign-In Error:", error);
-            toast({
-                variant: 'destructive',
-                title: 'Erro no Login',
-                description: error.message || 'Não foi possível fazer login com o Google.',
-            });
+            if (error.code === 'auth/popup-closed-by-user') {
+                console.log("Google Sign-In popup closed by user.");
+            } else {
+                console.error("Google Sign-In Error:", error);
+                toast({
+                    variant: 'destructive',
+                    title: 'Erro no Login',
+                    description: error.message || 'Não foi possível fazer login com o Google.',
+                });
+            }
         } finally {
             setIsLoading(false);
         }
