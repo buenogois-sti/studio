@@ -145,9 +145,13 @@ function ClientForm({
         toast({ title: 'Cliente cadastrado!', description: `${values.name} foi adicionado e os arquivos no Drive foram criados.` });
       }
       onSave();
-    } catch (error) {
+    } catch (error: any) {
         console.error("Failed to save client or create drive assets:", error);
-        toast({ variant: 'destructive', title: 'Erro ao salvar', description: 'Não foi possível salvar o cliente ou criar os arquivos no Drive.'});
+        toast({ 
+          variant: 'destructive', 
+          title: 'Erro na automação do Drive', 
+          description: error.message || 'Não foi possível criar os arquivos no Google Drive. Verifique as permissões e configurações.'
+        });
     } finally {
         setIsSaving(false);
     }

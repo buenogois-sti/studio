@@ -26,7 +26,7 @@ async function createClientFolder(clientName: string) {
 
   const rootFolderId = process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID;
   if (!rootFolderId) {
-    throw new Error('GOOGLE_DRIVE_ROOT_FOLDER_ID environment variable is not set.');
+    throw new Error('A variável de ambiente GOOGLE_DRIVE_ROOT_FOLDER_ID não está definida.');
   }
   
   const fileMetadata = {
@@ -42,9 +42,9 @@ async function createClientFolder(clientName: string) {
     });
     console.log('Folder created with ID:', file.data.id);
     return file.data.id;
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error creating Google Drive folder:', error);
-    throw new Error('Failed to create Google Drive folder.');
+    throw new Error(`Falha ao criar pasta no Google Drive: ${error.message}`);
   }
 }
 
@@ -65,9 +65,9 @@ async function createClientSheet(clientName: string) {
         });
         console.log('Spreadsheet created with ID:', response.data.spreadsheetId);
         return response.data.spreadsheetId;
-    } catch (error) {
+    } catch (error: any) {
         console.error('Error creating Google Sheet:', error);
-        throw new Error('Failed to create Google Sheet.');
+        throw new Error(`Falha ao criar planilha no Google Sheets: ${error.message}`);
     }
 }
 
