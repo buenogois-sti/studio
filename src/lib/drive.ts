@@ -44,6 +44,9 @@ async function createClientFolder(clientName: string) {
     return file.data.id;
   } catch (error: any) {
     console.error('Error creating Google Drive folder:', error);
+    if (error.message && (error.message.includes('Insufficient Permission') || error.message.includes('permission'))) {
+        throw new Error(`Permissão insuficiente para criar a pasta. Verifique se o e-mail autenticado tem permissão de "Editor" na pasta raiz do Google Drive (ID: ${rootFolderId}).`);
+    }
     throw new Error(`Falha ao criar pasta no Google Drive: ${error.message}`);
   }
 }
