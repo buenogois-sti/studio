@@ -37,6 +37,7 @@ async function createClientFolder(clientName: string) {
     const response = await drive.files.get({
       fileId: rootFolderId,
       fields: 'name, capabilities',
+      supportsAllDrives: true, // Required for Shared Drives
     });
     rootFolder = response.data;
   } catch (e: any) {
@@ -62,6 +63,7 @@ async function createClientFolder(clientName: string) {
     const file = await drive.files.create({
       requestBody: fileMetadata,
       fields: 'id',
+      supportsAllDrives: true, // Required for Shared Drives
     });
     console.log('Folder created with ID:', file.data.id);
     return file.data.id;
@@ -109,7 +111,8 @@ export async function createClientFolderAndSheet(clientName: string): Promise<{ 
             // Retrieve the file to update its parents
             const file = await drive.files.get({
                 fileId: sheetId,
-                fields: 'parents'
+                fields: 'parents',
+                supportsAllDrives: true, // Required for Shared Drives
             });
             const previousParents = file.data.parents ? file.data.parents.join(',') : '';
 
@@ -117,7 +120,8 @@ export async function createClientFolderAndSheet(clientName: string): Promise<{ 
                 fileId: sheetId,
                 addParents: folderId,
                 removeParents: previousParents,
-                fields: 'id, parents'
+                fields: 'id, parents',
+                supportsAllDrives: true, // Required for Shared Drives
             });
              console.log('Moved Sheet into Client Folder.');
         }
