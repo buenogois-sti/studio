@@ -43,16 +43,15 @@ async function createClientFolder(clientName: string) {
     const file = await drive.files.create({
       requestBody: fileMetadata,
       fields: 'id',
-      // Both are required for creating content inside a Shared Drive.
+      // This is required for creating content inside a Shared Drive.
       supportsAllDrives: true,
-      driveId: rootFolderId,
     });
     console.log('Folder created with ID:', file.data.id);
     return file.data.id;
   } catch (error: any) {
     console.error('Error creating Google Drive folder:', error);
-    // Pass the original error message up, as it's the most specific clue we have.
-    throw new Error(`Falha ao criar pasta no Google Drive. A API retornou: ${error.message}`);
+    // The problem is external (Workspace policy, etc.) so we show the raw error from the API.
+    throw new Error(`Falha ao criar pasta no Google Drive. A API do Google retornou: ${error.message}`);
   }
 }
 
@@ -75,7 +74,7 @@ async function createClientSheet(clientName: string) {
         return response.data.spreadsheetId;
     } catch (error: any) {
         console.error('Error creating Google Sheet:', error);
-        throw new Error(`Falha ao criar planilha no Google Sheets. A API retornou: ${error.message}`);
+        throw new Error(`Falha ao criar planilha no Google Sheets. A API do Google retornou: ${error.message}`);
     }
 }
 
@@ -111,8 +110,7 @@ export async function createClientFolderAndSheet(clientName: string): Promise<{ 
         return { folderId, sheetId };
     } catch (error) {
         console.error("Error in createClientFolderAndSheet:", error);
-        // In a real app, you might want to implement cleanup logic here
-        // (e.g., delete the folder if sheet creation fails).
+        // Re-throw the specific error from the failing function (createClientFolder or createClientSheet)
         throw error;
     }
 }
