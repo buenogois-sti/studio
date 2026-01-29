@@ -29,30 +29,6 @@ async function createClientFolder(clientName: string) {
     throw new Error('A variável de ambiente GOOGLE_DRIVE_ROOT_FOLDER_ID não está definida.');
   }
 
-  // --- Diagnostic Step ---
-  // Before trying to create a folder, let's get information about the root folder
-  // to provide a more specific error message if permissions are incorrect.
-  let rootFolder;
-  try {
-    const response = await drive.files.get({
-      fileId: rootFolderId,
-      fields: 'name, capabilities',
-      supportsAllDrives: true, // Required for Shared Drives
-    });
-    rootFolder = response.data;
-  } catch (e: any) {
-    // This error happens if the folder doesn't exist or the user has NO access at all (not even viewer).
-    console.error(`Error accessing root folder (ID: ${rootFolderId}):`, e);
-    throw new Error(`Erro ao acessar a pasta raiz (ID: ${rootFolderId}). Verifique se o ID está correto e se o usuário autenticado tem permissão. Erro original: ${e.message}`);
-  }
-
-  if (!rootFolder.capabilities?.canAddChildren) {
-    // This is the most likely cause of the "Insufficient Permission" error.
-    // The user can see the folder but cannot create content inside it.
-    throw new Error(`Permissão negada. O usuário autenticado não pode criar pastas dentro da pasta raiz "${rootFolder.name}" (ID: ${rootFolderId}). Por favor, garanta que o usuário tenha a permissão de "Colaborador" (Editor) nesta pasta/Drive Compartilhado.`);
-  }
-  // --- End of Diagnostic Step ---
-  
   const fileMetadata = {
     name: clientName,
     mimeType: 'application/vnd.google-apps.folder',
@@ -68,9 +44,9 @@ async function createClientFolder(clientName: string) {
     console.log('Folder created with ID:', file.data.id);
     return file.data.id;
   } catch (error: any) {
-    // This catch block now serves as a fallback for other unexpected errors.
     console.error('Error creating Google Drive folder:', error);
-    throw new Error(`Falha ao criar pasta no Google Drive após a verificação de permissões. Erro: ${error.message}`);
+    // Pass the original error message up, as it's the most specific clue we have.
+    throw new Error(`Falha ao criar pasta no Google Drive. Erro da API: ${error.message}`);
   }
 }
 
@@ -93,7 +69,7 @@ async function createClientSheet(clientName: string) {
         return response.data.spreadsheetId;
     } catch (error: any) {
         console.error('Error creating Google Sheet:', error);
-        throw new Error(`Falha ao criar planilha no Google Sheets. Erro original: ${error.message}`);
+        throw new Error(`Falha ao criar planilha no Google Sheets. Erro da API: ${error.message}`);
     }
 }
 
