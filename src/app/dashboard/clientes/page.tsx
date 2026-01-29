@@ -63,6 +63,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
 import { useFirebase, useCollection, useMemoFirebase, addDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
 import { collection, serverTimestamp, Timestamp, doc } from 'firebase/firestore';
@@ -366,8 +374,20 @@ export default function ClientsPage() {
                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Ações</DropdownMenuLabel>
                             <DropdownMenuItem onClick={() => handleEdit(client)}>Editar</DropdownMenuItem>
-                            <DropdownMenuItem>Ver Processos</DropdownMenuItem>
-                            <DropdownMenuItem>Abrir no Drive</DropdownMenuItem>
+                            <DropdownMenuItem disabled>Ver Processos</DropdownMenuItem>
+                            <DropdownMenuItem
+                              onSelect={() => {
+                                if (client.driveFolderId) {
+                                  window.open(
+                                    `https://drive.google.com/drive/folders/${client.driveFolderId}`,
+                                    '_blank'
+                                  );
+                                }
+                              }}
+                              disabled={!client.driveFolderId}
+                            >
+                              Abrir no Drive
+                            </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteTrigger(client)}>
                               Excluir
