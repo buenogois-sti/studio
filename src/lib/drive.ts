@@ -39,12 +39,15 @@ async function createClientFolder(clientName: string) {
     const file = await drive.files.create({
       requestBody: fileMetadata,
       fields: 'id',
-      supportsAllDrives: true, // Required for Shared Drives
+      supportsAllDrives: true,
     });
     console.log('Folder created with ID:', file.data.id);
     return file.data.id;
   } catch (error: any) {
     console.error('Error creating Google Drive folder:', error);
+    if (error.message && error.message.includes('Insufficient Permission')) {
+        throw new Error(`Falha de permissão na API do Google Drive. Isso geralmente indica que a API do Google Drive não está ativada no seu projeto Google Cloud. Por favor, acesse o Console do Google Cloud, verifique se está no projeto correto e ative a 'Google Drive API'. Erro original: ${error.message}`);
+    }
     // Pass the original error message up, as it's the most specific clue we have.
     throw new Error(`Falha ao criar pasta no Google Drive. Erro da API: ${error.message}`);
   }
@@ -69,6 +72,9 @@ async function createClientSheet(clientName: string) {
         return response.data.spreadsheetId;
     } catch (error: any) {
         console.error('Error creating Google Sheet:', error);
+        if (error.message && error.message.includes('Insufficient Permission')) {
+            throw new Error(`Falha de permissão na API do Google Sheets. Verifique se a 'Google Sheets API' está ativada em seu projeto no Google Cloud. Erro original: ${error.message}`);
+        }
         throw new Error(`Falha ao criar planilha no Google Sheets. Erro da API: ${error.message}`);
     }
 }
@@ -88,7 +94,7 @@ export async function createClientFolderAndSheet(clientName: string): Promise<{ 
             const file = await drive.files.get({
                 fileId: sheetId,
                 fields: 'parents',
-                supportsAllDrives: true, // Required for Shared Drives
+                supportsAllDrives: true, 
             });
             const previousParents = file.data.parents ? file.data.parents.join(',') : '';
 
@@ -97,7 +103,7 @@ export async function createClientFolderAndSheet(clientName: string): Promise<{ 
                 addParents: folderId,
                 removeParents: previousParents,
                 fields: 'id, parents',
-                supportsAllDrives: true, // Required for Shared Drives
+                supportsAllDrives: true,
             });
              console.log('Moved Sheet into Client Folder.');
         }
