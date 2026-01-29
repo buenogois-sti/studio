@@ -43,13 +43,13 @@ async function createClientFolder(clientName: string) {
   } catch (e: any) {
     // This error happens if the folder doesn't exist or the user has NO access at all (not even viewer).
     console.error(`Error accessing root folder (ID: ${rootFolderId}):`, e);
-    throw new Error(`Não foi possível acessar a pasta raiz (ID: ${rootFolderId}). Verifique se o ID está correto e se o usuário autenticado tem pelo menos permissão de "Leitor" para esta pasta.`);
+    throw new Error(`Erro ao acessar a pasta raiz (ID: ${rootFolderId}). Verifique se o ID está correto e se o usuário autenticado tem permissão. Erro original: ${e.message}`);
   }
 
   if (!rootFolder.capabilities?.canAddChildren) {
     // This is the most likely cause of the "Insufficient Permission" error.
     // The user can see the folder but cannot create content inside it.
-    throw new Error(`Permissão negada. O usuário autenticado não pode criar pastas dentro da pasta raiz "${rootFolder.name}" (ID: ${rootFolderId}). Por favor, garanta que o usuário tenha a permissão de "Colaborador" (Editor) nesta pasta.`);
+    throw new Error(`Permissão negada. O usuário autenticado não pode criar pastas dentro da pasta raiz "${rootFolder.name}" (ID: ${rootFolderId}). Por favor, garanta que o usuário tenha a permissão de "Colaborador" (Editor) nesta pasta/Drive Compartilhado.`);
   }
   // --- End of Diagnostic Step ---
   
@@ -93,7 +93,7 @@ async function createClientSheet(clientName: string) {
         return response.data.spreadsheetId;
     } catch (error: any) {
         console.error('Error creating Google Sheet:', error);
-        throw new Error(`Falha ao criar planilha no Google Sheets: ${error.message}`);
+        throw new Error(`Falha ao criar planilha no Google Sheets. Erro original: ${error.message}`);
     }
 }
 
