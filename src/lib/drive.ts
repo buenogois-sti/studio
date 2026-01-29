@@ -3,10 +3,14 @@
 import { google } from 'googleapis';
 import { GoogleAuth } from 'google-auth-library';
 
+const PROJECT_ID = 'studio-7080106838-23904';
+
 // This function creates and returns an authenticated client that will
 // automatically use Application Default Credentials (ADC).
 function getAuthClient() {
   const auth = new GoogleAuth({
+    // Explicitly setting the project ID to resolve any ambiguity for ADC.
+    projectId: PROJECT_ID,
     scopes: [
       'https://www.googleapis.com/auth/drive',
       'https://www.googleapis.com/auth/spreadsheets',
@@ -46,7 +50,7 @@ async function createClientFolder(clientName: string) {
   } catch (error: any) {
     console.error('Error creating Google Drive folder:', error);
     if (error.message && error.message.includes('Insufficient Permission')) {
-        throw new Error(`Falha de permissão na API do Google Drive. Isso geralmente indica que a API do Google Drive não está ativada no seu projeto Google Cloud. Por favor, acesse o Console do Google Cloud, verifique se está no projeto correto e ative a 'Google Drive API'. Erro original: ${error.message}`);
+        throw new Error(`Falha de permissão na API do Google Drive. Isso geralmente indica que a API do Google Drive não está ativada no seu projeto Google Cloud. Por favor, acesse o Console do Google Cloud, verifique se está no projeto correto ('${PROJECT_ID}') e ative a 'Google Drive API'. Erro original: ${error.message}`);
     }
     // Pass the original error message up, as it's the most specific clue we have.
     throw new Error(`Falha ao criar pasta no Google Drive. Erro da API: ${error.message}`);
@@ -73,7 +77,7 @@ async function createClientSheet(clientName: string) {
     } catch (error: any) {
         console.error('Error creating Google Sheet:', error);
         if (error.message && error.message.includes('Insufficient Permission')) {
-            throw new Error(`Falha de permissão na API do Google Sheets. Verifique se a 'Google Sheets API' está ativada em seu projeto no Google Cloud. Erro original: ${error.message}`);
+            throw new Error(`Falha de permissão na API do Google Sheets. Verifique se a 'Google Sheets API' está ativada em seu projeto ('${PROJECT_ID}') no Google Cloud. Erro original: ${error.message}`);
         }
         throw new Error(`Falha ao criar planilha no Google Sheets. Erro da API: ${error.message}`);
     }
