@@ -33,6 +33,9 @@ async function createClientFolder(clientName: string) {
     throw new Error('A variável de ambiente GOOGLE_DRIVE_ROOT_FOLDER_ID não está definida.');
   }
 
+  // To create a folder in a Shared Drive, the `parents` field must contain
+  // the ID of the Shared Drive (or a folder within it), and `supportsAllDrives`
+  // must be true in the request.
   const fileMetadata = {
     name: clientName,
     mimeType: 'application/vnd.google-apps.folder',
@@ -43,7 +46,6 @@ async function createClientFolder(clientName: string) {
     const file = await drive.files.create({
       requestBody: fileMetadata,
       fields: 'id',
-      // This is required for creating content inside a Shared Drive.
       supportsAllDrives: true,
     });
     console.log('Folder created with ID:', file.data.id);
