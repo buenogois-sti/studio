@@ -9,6 +9,7 @@ declare module 'next-auth' {
       id: string;
       role?: UserRole;
     } & DefaultSession['user'];
+    customToken?: string;
   }
 }
 
@@ -20,5 +21,6 @@ declare module 'next-auth/jwt' {
     id: string;
     error?: string;
     role?: UserRole;
+    customToken?: string;
   }
 }

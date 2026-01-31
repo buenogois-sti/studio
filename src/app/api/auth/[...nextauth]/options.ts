@@ -2,7 +2,7 @@
 import type { NextAuthOptions, User, Account, Session } from 'next-auth';
 import type { JWT } from 'next-auth/jwt';
 import GoogleProvider from 'next-auth/providers/google';
-import { firebaseAdmin, firestoreAdmin } from '@/firebase/admin';
+import { firebaseAdmin, firestoreAdmin, authAdmin } from '@/firebase/admin';
 import type { UserProfile, UserRole } from '@/lib/types';
 
 // --- Environment Variable Validation ---
@@ -109,8 +109,8 @@ export const authOptions: NextAuthOptions = {
 
         async jwt({ token, user, account }) {
             // Guard clause to ensure Firebase Admin is initialized
-            if (!firestoreAdmin) {
-                console.error("CRITICAL_ERROR: Firebase Admin SDK is not initialized. Cannot access Firestore.");
+            if (!firestoreAdmin || !authAdmin) {
+                console.error("CRITICAL_ERROR: Firebase Admin SDK is not initialized. Cannot access Firestore or Auth.");
                 token.error = "DatabaseError";
                 return token;
             }
@@ -160,6 +160,7 @@ export const authOptions: NextAuthOptions = {
                     token.role = role;
                     token.accessToken = account.access_token;
                     token.accessTokenExpires = account.expires_at ? account.expires_at * 1000 : Date.now() + (account.expires_in ?? 3600) * 1000;
+                    token.customToken = await authAdmin.createCustomToken(user.id, { role });
 
                 } catch (error) {
                     console.error("JWT Callback Firestore Error:", error);
@@ -187,6 +188,7 @@ export const authOptions: NextAuthOptions = {
                 }
                 session.accessToken = token.accessToken;
                 session.error = token.error;
+                session.customToken = token.customToken;
             }
             return session;
         },

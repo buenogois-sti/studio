@@ -3,7 +3,8 @@
 import React, { DependencyList, createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
 import { FirebaseApp } from 'firebase/app';
 import { Firestore } from 'firebase/firestore';
-import { Auth, User, onAuthStateChanged } from 'firebase/auth';
+import { Auth, User, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
+import { useSession } from 'next-auth/react';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener'
 
 interface FirebaseProviderProps {
@@ -61,35 +62,45 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
   firestore,
   auth,
 }) => {
+  const { data: session, status: sessionStatus } = useSession();
   const [userAuthState, setUserAuthState] = useState<UserAuthState>({
     user: null,
-    isUserLoading: true, // Start loading until first auth event
+    isUserLoading: true,
     userError: null,
   });
 
-  // Effect to subscribe to Firebase auth state changes
+  // Effect to handle sign-in with custom token from NextAuth session
   useEffect(() => {
-    if (!auth) { // If no Auth service instance, cannot determine user state
-      setUserAuthState({ user: null, isUserLoading: false, userError: new Error("Auth service not provided.") });
+    if (sessionStatus === 'authenticated' && session?.customToken && auth) {
+      signInWithCustomToken(auth, session.customToken).catch((error) => {
+        console.error('Firebase signInWithCustomToken error:', error);
+        setUserAuthState((state) => ({ ...state, userError: error }));
+      });
+    }
+  }, [session, sessionStatus, auth]);
+
+  // Effect to subscribe to Firebase auth state changes. This remains the single source of truth for the Firebase user.
+  useEffect(() => {
+    if (!auth) {
+      setUserAuthState({ user: null, isUserLoading: false, userError: new Error('Auth service not provided.') });
       return;
     }
 
-    setUserAuthState({ user: null, isUserLoading: true, userError: null }); // Reset on auth instance change
-
     const unsubscribe = onAuthStateChanged(
       auth,
-      (firebaseUser) => { // Auth state determined
+      (firebaseUser) => {
         setUserAuthState({ user: firebaseUser, isUserLoading: false, userError: null });
       },
-      (error) => { // Auth listener error
-        console.error("FirebaseProvider: onAuthStateChanged error:", error);
+      (error) => {
+        console.error('FirebaseProvider: onAuthStateChanged error:', error);
         setUserAuthState({ user: null, isUserLoading: false, userError: error });
       }
     );
-    return () => unsubscribe(); // Cleanup
-  }, [auth]); // Depends on the auth instance
 
-  // Memoize the context value
+    return () => unsubscribe();
+  }, [auth]);
+
+  // Memoize the context value, considering both NextAuth and Firebase auth loading states.
   const contextValue = useMemo((): FirebaseContextState => {
     const servicesAvailable = !!(firebaseApp && firestore && auth);
     return {
@@ -98,10 +109,10 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
       firestore: servicesAvailable ? firestore : null,
       auth: servicesAvailable ? auth : null,
       user: userAuthState.user,
-      isUserLoading: userAuthState.isUserLoading,
+      isUserLoading: userAuthState.isUserLoading || sessionStatus === 'loading',
       userError: userAuthState.userError,
     };
-  }, [firebaseApp, firestore, auth, userAuthState]);
+  }, [firebaseApp, firestore, auth, userAuthState, sessionStatus]);
 
   return (
     <FirebaseContext.Provider value={contextValue}>
