@@ -1,6 +1,7 @@
 'use server';
 import { firestoreAdmin } from '@/firebase/admin';
 import type { Client } from './types';
+import { Timestamp } from 'firebase-admin/firestore';
 
 export async function searchClients(query: string): Promise<Client[]> {
     if (!query) return [];
@@ -12,12 +13,18 @@ export async function searchClients(query: string): Promise<Client[]> {
         
         const allClientsData = clientsSnapshot.docs.map(doc => {
             const data = doc.data();
-            return {
-                id: doc.id,
-                // Ensure all fields are correctly typed, especially timestamps
+
+            // Safely convert timestamps to ISO strings for serialization
+            const createdAt = data.createdAt as Timestamp;
+            const updatedAt = data.updatedAt as Timestamp | undefined;
+            
+            const serializableData = {
                 ...data,
-                createdAt: data.createdAt, // Assuming it's already a serializable format
-            } as Client;
+                id: doc.id,
+                createdAt: createdAt.toDate().toISOString(),
+                updatedAt: updatedAt ? updatedAt.toDate().toISOString() : undefined,
+            };
+            return serializableData as Client;
         });
 
         const lowerCaseQuery = query.toLowerCase();

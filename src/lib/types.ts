@@ -48,7 +48,7 @@ export type Client = {
   driveFolderId?: string;
   sheetId?: string;
   createdAt: Timestamp | string;
-  updatedAt?: Timestamp;
+  updatedAt?: Timestamp | string;
 };
 
 export type Process = {
