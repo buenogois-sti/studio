@@ -1,12 +1,31 @@
+'use client';
+
 import admin from 'firebase-admin';
 
 // This file initializes the Firebase Admin SDK.
-// It checks if an app is already initialized to prevent errors during hot-reloading
-// in development. It relies on Application Default Credentials (ADC) for authentication,
-// which is the standard for Google Cloud environments like App Hosting.
+// It handles different environments (Vercel, App Hosting, local) gracefully.
 
 if (!admin.apps.length) {
-  admin.initializeApp();
+  try {
+    const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+
+    if (serviceAccountJson) {
+      // Environment with service account JSON (e.g., Vercel)
+      const serviceAccount = JSON.parse(serviceAccountJson);
+      admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount),
+      });
+    } else {
+      // Environment with Application Default Credentials (e.g., App Hosting, local gcloud)
+      admin.initializeApp();
+    }
+  } catch (error: any) {
+    console.error('Firebase Admin SDK initialization error:', error.message);
+    // Fallback for safety, might work in some environments
+    if (!admin.apps.length) {
+      admin.initializeApp();
+    }
+  }
 }
 
 export const firebaseAdmin = admin;
