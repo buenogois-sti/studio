@@ -103,8 +103,8 @@ export const authOptions: NextAuthOptions = {
                         firstName: firstName,
                         lastName: lastNameParts.join(' '),
                         role: role, // Use the dynamically determined role
-                        createdAt: firebaseAdmin.firestore.FieldValue.serverTimestamp(),
-                        updatedAt: firebaseAdmin.firestore.FieldValue.serverTimestamp(),
+                        createdAt: firebaseAdmin.firestore.Timestamp.now(),
+                        updatedAt: firebaseAdmin.firestore.Timestamp.now(),
                     };
                     await userRef.set(newUserProfile);
                 }
