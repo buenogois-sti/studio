@@ -1,7 +1,7 @@
 'use server';
 
 import { google, type drive_v3, type sheets_v4 } from 'googleapis';
-import { firebaseAdmin } from '@/firebase/admin';
+import { firestoreAdmin } from '@/firebase/admin';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/options';
 import type { Session } from 'next-auth';
@@ -90,6 +90,12 @@ async function createClientSheet(sheets: sheets_v4.Sheets, clientName: string): 
  * @param clientName The name of the client, used for folder/sheet titles.
  */
 export async function syncClientToDrive(clientId: string, clientName: string): Promise<void> {
+    // Guard clause to handle failed Firebase Admin initialization
+    if (!firestoreAdmin) {
+        console.error("Firebase Admin not initialized, cannot sync client to Drive.");
+        throw new Error("A conexão com o servidor de dados falhou. Verifique a configuração do servidor.");
+    }
+    
     try {
         const { drive, sheets } = await getGoogleApiClientsForUser();
 
@@ -121,7 +127,7 @@ export async function syncClientToDrive(clientId: string, clientName: string): P
         console.log('Moved Sheet into Client Folder.');
         
         // Update the client document in Firestore with the new IDs
-        const clientRef = firebaseAdmin.firestore().collection('clients').doc(clientId);
+        const clientRef = firestoreAdmin.collection('clients').doc(clientId);
         await clientRef.update({
             driveFolderId: folderId,
             sheetId: sheetId,

@@ -6,6 +6,12 @@ import { Timestamp } from 'firebase-admin/firestore';
 export async function searchClients(query: string): Promise<Client[]> {
     if (!query) return [];
     
+    // Guard clause to handle failed Firebase Admin initialization
+    if (!firestoreAdmin) {
+        console.error("Firebase Admin not initialized, cannot search clients.");
+        throw new Error("A conexão com o servidor de dados falhou. Verifique a configuração do servidor.");
+    }
+    
     try {
         const clientsSnapshot = await firestoreAdmin.collection('clients').get();
         
