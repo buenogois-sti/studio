@@ -1,23 +1,19 @@
-import type { NextAuthOptions, User, Account } from 'next-auth';
+import type { NextAuthOptions, User, Account, Session } from 'next-auth';
 import type { JWT } from 'next-auth/jwt';
 import GoogleProvider from 'next-auth/providers/google';
 import { firestoreAdmin } from '@/firebase/admin';
 
-interface Token extends JWT {
-  accessToken?: string;
-  refreshToken?: string;
-  accessTokenExpires?: number;
-  id?: string;
-  error?: string;
-}
-
-async function refreshAccessToken(token: Token): Promise<Token> {
+async function refreshAccessToken(token: JWT): Promise<JWT> {
     try {
+        if (!token.refreshToken) {
+            throw new Error("Missing refresh token");
+        }
+
         const url = "https://oauth2.googleapis.com/token?" + new URLSearchParams({
             client_id: process.env.GOOGLE_CLIENT_ID!,
             client_secret: process.env.GOOGLE_CLIENT_SECRET!,
             grant_type: "refresh_token",
-            refresh_token: token.refreshToken!,
+            refresh_token: token.refreshToken,
         });
 
         const response = await fetch(url, {
@@ -39,7 +35,10 @@ async function refreshAccessToken(token: Token): Promise<Token> {
         };
     } catch (error) {
         console.error("Error refreshing access token", error);
-        return { ...token, error: "RefreshAccessTokenError" };
+        return { 
+            ...token, 
+            error: "RefreshAccessTokenError" 
+        };
     }
 }
 
@@ -67,50 +66,57 @@ export const authOptions: NextAuthOptions = {
             if (!user.email || !user.id) {
                 return false;
             }
+            try {
+                const userRef = firestoreAdmin.collection('users').doc(user.id);
+                const userDoc = await userRef.get();
 
-            const userRef = firestoreAdmin.collection('users').doc(user.id);
-            const userDoc = await userRef.get();
-
-            if (!userDoc.exists) {
-                const [firstName, ...lastNameParts] = user.name?.split(' ') ?? ['', ''];
-                const newUserProfile = {
-                    id: user.id,
-                    googleId: user.id,
-                    email: user.email,
-                    firstName: firstName,
-                    lastName: lastNameParts.join(' '),
-                    role: 'admin', // First user is always an admin
-                    createdAt: firestoreAdmin.FieldValue.serverTimestamp(),
-                    updatedAt: firestoreAdmin.FieldValue.serverTimestamp(),
-                };
-                await userRef.set(newUserProfile);
+                if (!userDoc.exists) {
+                    const [firstName, ...lastNameParts] = user.name?.split(' ') ?? ['', ''];
+                    const newUserProfile = {
+                        id: user.id,
+                        googleId: user.id,
+                        email: user.email,
+                        firstName: firstName,
+                        lastName: lastNameParts.join(' '),
+                        role: 'admin', // First user is always an admin
+                        createdAt: firestoreAdmin.FieldValue.serverTimestamp(),
+                        updatedAt: firestoreAdmin.FieldValue.serverTimestamp(),
+                    };
+                    await userRef.set(newUserProfile);
+                }
+            } catch(error) {
+                console.error("SignIn Callback Firestore Error:", error);
+                return false; // Prevent sign in on DB error
             }
 
             return true;
         },
         async jwt({ token, user, account }: { token: JWT, user?: User, account?: Account | null }): Promise<JWT> {
-            const tokenAsToken = token as Token;
-            
+            // Initial sign in
             if (account && user) {
-                tokenAsToken.accessToken = account.access_token;
-                tokenAsToken.refreshToken = account.refresh_token;
-                tokenAsToken.accessTokenExpires = Date.now() + (account.expires_in as number) * 1000;
-                tokenAsToken.id = user.id;
-                return tokenAsToken;
+                return {
+                    id: user.id,
+                    accessToken: account.access_token,
+                    refreshToken: account.refresh_token,
+                    accessTokenExpires: account.expires_at ? account.expires_at * 1000 : undefined,
+                    name: user.name,
+                    email: user.email,
+                    picture: user.image,
+                }
             }
 
-            if (Date.now() < (tokenAsToken.accessTokenExpires ?? 0)) {
-                return tokenAsToken;
+            // Return previous token if the access token has not expired yet
+            if (Date.now() < (token.accessTokenExpires ?? 0)) {
+                return token;
             }
 
-            return refreshAccessToken(tokenAsToken);
+            // Access token has expired, try to update it.
+            return refreshAccessToken(token);
         },
-        async session({ session, token }: { session: any, token: JWT }) {
-            if (session.user) {
-                session.user.id = token.sub;
-            }
-            session.accessToken = (token as Token).accessToken;
-            session.error = (token as Token).error;
+        async session({ session, token }: { session: Session, token: JWT }) {
+            session.user.id = token.id;
+            session.accessToken = token.accessToken;
+            session.error = token.error;
             return session;
         },
     },
