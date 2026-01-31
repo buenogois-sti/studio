@@ -232,6 +232,8 @@ export default function ClientsPage() {
   const [isSheetOpen, setIsSheetOpen] = React.useState(false);
   const [editingClient, setEditingClient] = React.useState<Client | null>(null);
   const [clientToDelete, setClientToDelete] = React.useState<Client | null>(null);
+  const alertDialogTitleId = React.useId();
+  const alertDialogDescriptionId = React.useId();
   
   const { firestore, isUserLoading } = useFirebase();
 
@@ -436,10 +438,10 @@ export default function ClientsPage() {
       </Sheet>
 
       <AlertDialog open={!!clientToDelete} onOpenChange={(open) => !open && setClientToDelete(null)}>
-        <AlertDialogContent>
+        <AlertDialogContent aria-labelledby={alertDialogTitleId} aria-describedby={alertDialogDescriptionId}>
           <AlertDialogHeader>
-            <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogTitle id={alertDialogTitleId}>Você tem certeza?</AlertDialogTitle>
+            <AlertDialogDescription id={alertDialogDescriptionId}>
               Esta ação não pode ser desfeita. Isso excluirá permanentemente o cliente
               &quot;{clientToDelete?.name}&quot; e removerá seus dados de nossos servidores.
             </AlertDialogDescription>
