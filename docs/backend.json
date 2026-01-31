@@ -168,23 +168,56 @@
         },
         "clientId": {
           "type": "string",
-          "description": "Reference to Client. (Relationship: Client 1:N Process)"
+          "description": "Reference to the primary client associated with the process."
         },
         "name": {
           "type": "string",
-          "description": "The name of the process."
+          "description": "The title or internal name for the process, for easy identification."
         },
-        "driveFolderId": {
+        "processNumber": {
           "type": "string",
-          "description": "The ID of the process's folder in Google Drive."
+          "description": "The official number of the legal process, if distributed."
+        },
+        "court": {
+          "type": "string",
+          "description": "The court where the process is being handled (e.g., 'TRT-2')."
+        },
+        "courtBranch": {
+          "type": "string",
+          "description": "The specific branch or division of the court (Vara)."
+        },
+        "caseValue": {
+          "type": "number",
+          "description": "The monetary value of the case."
+        },
+        "opposingParties": {
+          "type": "array",
+          "description": "A list of names of the opposing parties (people or companies).",
+          "items": {
+            "type": "string"
+          }
         },
         "description": {
           "type": "string",
-          "description": "A description of the process."
+          "description": "Detailed notes and observations about the process."
+        },
+        "status": {
+          "type": "string",
+          "description": "Current status of the process.",
+          "enum": [
+            "Ativo",
+            "Arquivado",
+            "Pendente"
+          ]
         },
         "createdAt": {
           "type": "string",
           "description": "The date and time when the process was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "The date and time when the process was last updated.",
           "format": "date-time"
         }
       },
@@ -192,8 +225,6 @@
         "id",
         "clientId",
         "name",
-        "driveFolderId",
-        "description",
         "createdAt"
       ]
     },
@@ -337,7 +368,7 @@
       "schema": {
         "$ref": "#/backend/entities/Process"
       },
-      "description": "Stores process information."
+      "description": "Stores legal process information, linked to a client."
     },
     "/hearings/{hearingId}": {
       "schema": {

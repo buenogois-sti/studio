@@ -22,8 +22,13 @@ export type Client = {
   avatar: string;
   document: string;
   email: string;
+  motherName?: string;
+  rg?: string;
+  ctps?: string;
+  pis?: string;
   phone?: string;
   mobile?: string;
+  emergencyContact?: string;
   legalArea?: string;
   address?: {
     street?: string;
@@ -33,6 +38,12 @@ export type Client = {
     neighborhood?: string;
     city?: string;
     state?: string;
+  };
+   bankInfo?: {
+    bankName?: string;
+    agency?: string;
+    account?: string;
+    pixKey?: string;
   };
   driveFolderId?: string;
   sheetId?: string;
@@ -44,9 +55,15 @@ export type Process = {
   id: string;
   clientId: string;
   name: string;
-  driveFolderId: string;
-  description: string;
+  processNumber?: string;
+  court?: string;
+  courtBranch?: string;
+  caseValue?: number;
+  opposingParties?: string[];
+  description?: string;
+  status: 'Ativo' | 'Arquivado' | 'Pendente';
   createdAt: Timestamp;
+  updatedAt?: Timestamp;
 };
 
 export type Hearing = {
