@@ -2,6 +2,7 @@ import type { NextAuthOptions, User, Account, Session } from 'next-auth';
 import type { JWT } from 'next-auth/jwt';
 import GoogleProvider from 'next-auth/providers/google';
 import { firebaseAdmin } from '@/firebase/admin';
+import { firestore } from 'firebase-admin';
 
 // --- Environment Variable Validation ---
 // Ensure that the required environment variables are set.
@@ -88,6 +89,12 @@ export const authOptions: NextAuthOptions = {
                 const userDoc = await userRef.get();
 
                 if (!userDoc.exists) {
+                    const usersCollection = firebaseAdmin.firestore().collection('users');
+                    const existingUsersSnapshot = await usersCollection.limit(1).get();
+                    
+                    // If no users exist in the collection, this is the first user. Make them an admin.
+                    const role = existingUsersSnapshot.empty ? 'admin' : 'lawyer';
+
                     const [firstName, ...lastNameParts] = user.name?.split(' ') ?? ['', ''];
                     const newUserProfile = {
                         id: user.id,
@@ -95,9 +102,9 @@ export const authOptions: NextAuthOptions = {
                         email: user.email,
                         firstName: firstName,
                         lastName: lastNameParts.join(' '),
-                        role: 'admin', // First user is always an admin
-                        createdAt: firebaseAdmin.firestore.FieldValue.serverTimestamp(),
-                        updatedAt: firebaseAdmin.firestore.FieldValue.serverTimestamp(),
+                        role: role, // Use the dynamically determined role
+                        createdAt: firestore.FieldValue.serverTimestamp(),
+                        updatedAt: firestore.FieldValue.serverTimestamp(),
                     };
                     await userRef.set(newUserProfile);
                 }

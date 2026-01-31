@@ -189,7 +189,12 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
         );
     }
 
+    const accessibleNavItems = userProfile
+      ? navItems.filter(item => item.roles.includes(userProfile.role))
+      : [];
+
     const currentNavItem = getBestNavItemForPath(pathname);
+    const hasPermission = userProfile && currentNavItem && currentNavItem.roles.includes(userProfile.role);
 
     return (
         <SidebarProvider>
@@ -204,7 +209,7 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
             </SidebarHeader>
             <SidebarContent>
             <SidebarMenu>
-                {navItems.map(
+                {accessibleNavItems.map(
                 (item) => (
                     <SidebarMenuItem key={item.label}>
                         <SidebarMenuButton
@@ -246,7 +251,9 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
                 <UserNav />
             </div>
             </header>
-            <main className="flex-1 p-4 sm:p-6">{children}</main>
+            <main className="flex-1 p-4 sm:p-6">
+              {hasPermission ? children : <AccessDenied />}
+            </main>
         </SidebarInset>
         </SidebarProvider>
     );
