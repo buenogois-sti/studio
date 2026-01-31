@@ -46,44 +46,34 @@ function IntegrationsTab() {
 
   useEffect(() => {
     const error = searchParams.get('error');
+    const success = searchParams.get('success');
+    
     if (error) {
       toast({
         variant: 'destructive',
         title: 'Falha na Conexão com Google',
         description: `Ocorreu um erro: ${error}. Tente novamente.`,
       });
+    } else if (success === 'google_connected') {
+        toast({
+            title: 'Google Conectado',
+            description: 'Sua conta foi conectada com sucesso.'
+        });
+    } else if (success === 'google_disconnected') {
+        toast({
+            title: 'Google Desconectado',
+            description: 'A integração com o Google Workspace foi removida.'
+        });
     }
   }, [searchParams, toast]);
 
   const isConnected = !!userProfile?.googleRefreshToken;
 
-  const handleDisconnect = async () => {
-    if (!userProfileRef) return;
+  const handleDisconnect = () => {
     setIsDisconnecting(true);
-    try {
-      // In a real app, you would also call an API route to revoke the token on Google's side.
-      // For simplicity here, we're just removing it from our database.
-      await fetch('/api/auth/google/disconnect');
-
-      updateDocumentNonBlocking(userProfileRef, {
-        googleRefreshToken: null,
-      });
-
-      toast({
-        title: 'Google Desconectado',
-        description: 'A integração com o Google Workspace foi removida.',
-      });
-
-    } catch (error: any) {
-      toast({
-        variant: 'destructive',
-        title: 'Erro ao Desconectar',
-        description: error.message || 'Não foi possível remover a integração.',
-      });
-    } finally {
-      setIsDisconnecting(false);
-    }
-  }
+    // Navigate to the disconnect endpoint. It handles the logic and redirects back.
+    window.location.href = '/api/auth/google/disconnect';
+  };
 
 
   return (
