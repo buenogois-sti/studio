@@ -85,6 +85,12 @@ const navItems = [
     roles: ['admin', 'financial'],
   },
   {
+    href: '/dashboard/staff',
+    label: 'Equipe',
+    icon: Briefcase,
+    roles: ['admin'],
+  },
+  {
     href: '/dashboard/configuracoes',
     label: 'Configurações',
     icon: Settings,
@@ -98,6 +104,7 @@ const BreadcrumbMap: { [key: string]: string } = {
   '/dashboard/processos': 'Processos',
   '/dashboard/audiencias': 'Audiências',
   '/dashboard/financeiro': 'Financeiro',
+  '/dashboard/staff': 'Equipe',
   '/dashboard/configuracoes': 'Configurações',
 };
 
@@ -285,3 +292,5 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <InnerLayout>{children}</InnerLayout>
     )
 }
+
+    

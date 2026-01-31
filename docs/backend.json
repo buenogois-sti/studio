@@ -344,6 +344,116 @@
         "description",
         "timestamp"
       ]
+    },
+    "Staff": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Staff",
+      "type": "object",
+      "description": "Represents a staff member in the LexFlow Workspace system (employee, lawyer, or intern).",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the staff member."
+        },
+        "role": {
+          "type": "string",
+          "description": "The role of the staff member.",
+          "enum": [
+            "employee",
+            "lawyer",
+            "intern"
+          ]
+        },
+        "firstName": {
+          "type": "string"
+        },
+        "lastName": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string",
+          "format": "email"
+        },
+        "phone": {
+          "type": "string"
+        },
+        "whatsapp": {
+          "type": "string"
+        },
+        "address": {
+          "type": "object",
+          "properties": {
+            "street": {
+              "type": "string"
+            },
+            "number": {
+              "type": "string"
+            },
+            "complement": {
+              "type": "string"
+            },
+            "zipCode": {
+              "type": "string"
+            },
+            "neighborhood": {
+              "type": "string"
+            },
+            "city": {
+              "type": "string"
+            },
+            "state": {
+              "type": "string"
+            }
+          }
+        },
+        "oabNumber": {
+          "type": "string",
+          "description": "OAB number for lawyers and interns."
+        },
+        "oabStatus": {
+          "type": "string",
+          "description": "OAB status (e.g., Ativa, Suspensa).",
+          "enum": [
+            "Ativa",
+            "Suspensa",
+            "Inativa",
+            "Pendente"
+          ]
+        },
+        "bankInfo": {
+          "type": "object",
+          "properties": {
+            "bankName": {
+              "type": "string"
+            },
+            "agency": {
+              "type": "string"
+            },
+            "account": {
+              "type": "string"
+            },
+            "pixKey": {
+              "type": "string"
+            }
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "role",
+        "firstName",
+        "lastName",
+        "email",
+        "createdAt"
+      ]
     }
   },
   "auth": {
@@ -387,6 +497,14 @@
         "$ref": "#/backend/entities/Log"
       },
       "description": "Stores audit logs for specific users. Secured by path-based ownership."
+    },
+    "/staff/{staffId}": {
+      "schema": {
+        "$ref": "#/backend/entities/Staff"
+      },
+      "description": "Stores staff member information."
     }
   }
 }
+
+    

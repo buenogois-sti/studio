@@ -39,5 +39,12 @@ service cloud.firestore {
     match /financial_transactions/{financialTransactionId} {
       allow read, write: if true; // Temporarily allow all access
     }
+
+    // Secures the staff data collection.
+    match /staff/{staffId} {
+      allow read, write: if true; // Temporarily allow all access
+    }
   }
 }
+
+    

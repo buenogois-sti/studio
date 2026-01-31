@@ -91,3 +91,37 @@ export type Log = {
     description: string;
     timestamp: Timestamp;
 };
+
+export type StaffRole = 'employee' | 'lawyer' | 'intern';
+export type OABStatus = 'Ativa' | 'Suspensa' | 'Inativa' | 'Pendente';
+
+export type Staff = {
+  id: string;
+  role: StaffRole;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone?: string;
+  whatsapp?: string;
+  address?: {
+    street?: string;
+    number?: string;
+    complement?: string;
+    zipCode?: string;
+    neighborhood?: string;
+    city?: string;
+    state?: string;
+  };
+  oabNumber?: string;
+  oabStatus?: OABStatus;
+  bankInfo?: {
+    bankName?: string;
+    agency?: string;
+    account?: string;
+    pixKey?: string;
+  };
+  createdAt: Timestamp;
+  updatedAt?: Timestamp;
+};
+
+    
