@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -141,10 +140,10 @@ function IntegrationsTab() {
               </Button>
             ) : (
               <Button asChild className="w-full">
-                <Link href="/api/auth/google/redirect">
+                <a href="/api/auth/google/redirect">
                   <Power className="mr-2 h-4 w-4" />
                   Conectar com Google
-                </Link>
+                </a>
               </Button>
             )}
           </CardFooter>
