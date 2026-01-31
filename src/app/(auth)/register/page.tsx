@@ -25,7 +25,7 @@ const GoogleIcon = (props: React.SVGProps<SVGSVGElement>) => (
 );
 
 
-export default function LoginPage() {
+export default function RegisterPage() {
     const { data: session, status } = useSession();
     const router = useRouter();
     const { toast } = useToast();
@@ -37,7 +37,7 @@ export default function LoginPage() {
         }
     }, [status, router]);
 
-    const handleGoogleSignIn = async () => {
+    const handleGoogleSignUp = async () => {
         setIsLoading(true);
         try {
             const result = await signIn('google', { redirect: false, callbackUrl: '/dashboard' });
@@ -46,11 +46,11 @@ export default function LoginPage() {
             }
             // The useEffect will handle the redirect on session status change
         } catch (error: any) {
-            console.error("Google Sign-In Error:", error);
+            console.error("Google Sign-Up Error:", error);
             toast({
                 variant: 'destructive',
-                title: 'Erro no Login',
-                description: error.message || 'Não foi possível fazer login com o Google.',
+                title: 'Erro no Cadastro',
+                description: error.message || 'Não foi possível criar sua conta com o Google.',
             });
             setIsLoading(false);
         }
@@ -67,25 +67,25 @@ export default function LoginPage() {
     return (
         <Card className="mx-auto max-w-sm">
             <CardHeader>
-                <CardTitle className="text-2xl font-headline">Acessar Plataforma</CardTitle>
+                <CardTitle className="text-2xl font-headline">Criar Conta</CardTitle>
                 <CardDescription>
-                    Use sua conta do Google para entrar.
+                    Use sua conta do Google para criar seu acesso e começar a gerenciar seus clientes e processos.
                 </CardDescription>
             </CardHeader>
             <CardContent>
                 <div className="space-y-4">
-                     <Button onClick={handleGoogleSignIn} disabled={isLoading} className="w-full">
+                     <Button onClick={handleGoogleSignUp} disabled={isLoading} className="w-full">
                         {isLoading ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
                         ) : (
                            <GoogleIcon className="h-5 w-5" />
                         )}
-                        {isLoading ? 'Aguarde...' : 'Entrar com Google' }
+                        {isLoading ? 'Aguarde...' : 'Registrar com Google' }
                     </Button>
                     <div className="mt-4 text-center text-sm">
-                        Não tem uma conta?{' '}
-                        <Link href="/register" className="underline">
-                            Registre-se
+                        Já tem uma conta?{' '}
+                        <Link href="/login" className="underline">
+                            Faça login
                         </Link>
                     </div>
                 </div>
