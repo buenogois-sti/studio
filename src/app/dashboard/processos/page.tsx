@@ -140,6 +140,7 @@ function ClientSearchCombobox({
   const [search, setSearch] = React.useState('');
   const [results, setResults] = React.useState<Client[]>([]);
   const [isLoading, setIsLoading] = React.useState(false);
+  const { toast } = useToast();
 
   React.useEffect(() => {
     if (search.length < 2) {
@@ -148,12 +149,22 @@ function ClientSearchCombobox({
     }
     const timer = setTimeout(async () => {
       setIsLoading(true);
-      const clients = await searchClients(search);
-      setResults(clients);
-      setIsLoading(false);
+      try {
+        const clients = await searchClients(search);
+        setResults(clients);
+      } catch (error: any) {
+        console.error('Failed to search for clients:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Erro ao Buscar Clientes',
+          description: error.message || 'Não foi possível completar a busca. Tente novamente.',
+        });
+      } finally {
+        setIsLoading(false);
+      }
     }, 500);
     return () => clearTimeout(timer);
-  }, [search]);
+  }, [search, toast]);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>

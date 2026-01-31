@@ -1,12 +1,10 @@
 'use server';
 import { firestoreAdmin } from '@/firebase/admin';
 import type { Client } from './types';
-import { Timestamp } from 'firebase-admin/firestore';
 
 export async function searchClients(query: string): Promise<Client[]> {
     if (!query) return [];
     
-    // Guard clause to handle failed Firebase Admin initialization
     if (!firestoreAdmin) {
         console.error("Firebase Admin not initialized, cannot search clients.");
         throw new Error("A conexão com o servidor de dados falhou. Verifique a configuração do servidor.");
@@ -20,16 +18,31 @@ export async function searchClients(query: string): Promise<Client[]> {
                 const data = doc.data();
                 const id = doc.id;
 
-                const createdAt = data.createdAt;
-                const updatedAt = data.updatedAt;
-
-                // Skip documents that are missing the required createdAt field or if it's not a Timestamp
-                if (!(createdAt instanceof Timestamp)) {
-                    console.warn(`Skipping document ${id} due to invalid 'createdAt' field.`);
+                if (!data) {
                     return null;
                 }
 
-                // Create a serializable client object, explicitly casting to avoid type issues with raw data.
+                // --- Robust Date Handling ---
+                let createdAtString: string;
+                if (data.createdAt && typeof data.createdAt.toDate === 'function') {
+                    createdAtString = data.createdAt.toDate().toISOString();
+                } else if (typeof data.createdAt === 'string') {
+                    createdAtString = data.createdAt;
+                } else {
+                    console.warn(`Document ${id} is missing a valid 'createdAt' field. Skipping.`);
+                    return null;
+                }
+
+                let updatedAtString: string | undefined = undefined;
+                if (data.updatedAt) {
+                    if (typeof data.updatedAt.toDate === 'function') {
+                        updatedAtString = data.updatedAt.toDate().toISOString();
+                    } else if (typeof data.updatedAt === 'string') {
+                        updatedAtString = data.updatedAt;
+                    }
+                }
+                // --- End Robust Date Handling ---
+
                 const serializableClient: Client = {
                     id: id,
                     firstName: data.firstName || '',
@@ -37,8 +50,8 @@ export async function searchClients(query: string): Promise<Client[]> {
                     document: data.document || '',
                     email: data.email || '',
                     avatar: data.avatar || '',
-                    createdAt: createdAt.toDate().toISOString(),
-                    updatedAt: (updatedAt instanceof Timestamp) ? updatedAt.toDate().toISOString() : undefined,
+                    createdAt: createdAtString,
+                    updatedAt: updatedAtString,
                     clientType: data.clientType,
                     motherName: data.motherName,
                     rg: data.rg,
@@ -56,7 +69,7 @@ export async function searchClients(query: string): Promise<Client[]> {
                 
                 return serializableClient;
             })
-            .filter((client): client is Client => client !== null); // Filter out any skipped (null) documents
+            .filter((client): client is Client => client !== null);
 
         const lowerCaseQuery = query.toLowerCase();
 
@@ -66,10 +79,9 @@ export async function searchClients(query: string): Promise<Client[]> {
             return fullName.includes(lowerCaseQuery) || document.includes(lowerCaseQuery);
         });
 
-        return filteredClients.slice(0, 10); // Limit results for performance
+        return filteredClients.slice(0, 10);
     } catch (error) {
         console.error("Error searching clients:", error);
-        // Throw a generic, serializable error to the client.
-        throw new Error('An error occurred while searching for clients.');
+        throw new Error('Ocorreu um erro ao buscar os clientes.');
     }
 }
