@@ -10,12 +10,14 @@ if (!admin.apps.length) {
 
     if (serviceAccountJson) {
       // Environment with service account JSON (e.g., Vercel)
+      console.log("Initializing Firebase Admin with Service Account JSON.");
       const serviceAccount = JSON.parse(serviceAccountJson);
       admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
       });
     } else {
       // Environment with Application Default Credentials (e.g., App Hosting, local gcloud)
+      console.log("Initializing Firebase Admin with Application Default Credentials.");
       admin.initializeApp();
     }
   } catch (error: any) {
