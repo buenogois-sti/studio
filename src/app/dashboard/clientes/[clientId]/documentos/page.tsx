@@ -9,6 +9,7 @@ import {
   AlertCircle,
   ArrowLeft,
 } from 'lucide-react';
+import { useSession } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -36,7 +37,7 @@ import type { drive_v3 } from 'googleapis';
 
 type DriveFile = drive_v3.Schema$File;
 
-function UploadFileDialog({ folderId, userId, onUploadSuccess }: { folderId: string; userId: string; onUploadSuccess: () => void }) {
+function UploadFileDialog({ folderId, onUploadSuccess }: { folderId: string; onUploadSuccess: () => void }) {
     const [file, setFile] = React.useState<File | null>(null);
     const [isUploading, setIsUploading] = React.useState(false);
     const { toast } = useToast();
@@ -53,8 +54,6 @@ function UploadFileDialog({ folderId, userId, onUploadSuccess }: { folderId: str
         reader.readAsDataURL(file);
         reader.onload = () => {
             const result = reader.result as string;
-            // The result includes the full data URI, e.g., "data:image/png;base64,iVBORw0KGgo...".
-            // We need to extract only the Base64 part.
             const base64Content = result.split(',')[1];
             if (base64Content) {
                  resolve(base64Content);
@@ -66,12 +65,12 @@ function UploadFileDialog({ folderId, userId, onUploadSuccess }: { folderId: str
     });
 
     const handleUpload = async () => {
-        if (!file || !folderId || !userId) return;
+        if (!file || !folderId) return;
 
         setIsUploading(true);
         try {
             const fileContentBase64 = await toBase64(file);
-            await uploadFile(folderId, file.name, file.type, fileContentBase64, userId);
+            await uploadFile(folderId, file.name, file.type, fileContentBase64);
             
             toast({
                 title: 'Upload Concluído',
@@ -127,7 +126,8 @@ function UploadFileDialog({ folderId, userId, onUploadSuccess }: { folderId: str
 
 export default function ClientDocumentsPage({ params }: { params: { clientId: string } }) {
     const { clientId } = params;
-    const { firestore, user } = useFirebase();
+    const { firestore } = useFirebase();
+    const { data: session } = useSession();
     const { toast } = useToast();
     
     const [files, setFiles] = React.useState<DriveFile[]>([]);
@@ -143,11 +143,11 @@ export default function ClientDocumentsPage({ params }: { params: { clientId: st
     const clientName = clientData ? `${clientData.firstName} ${clientData.lastName}` : '';
 
     const fetchFiles = React.useCallback(async () => {
-        if (!clientData?.driveFolderId || !user?.uid) return;
+        if (!clientData?.driveFolderId || !session) return;
         setIsLoading(true);
         setError(null);
         try {
-            const fileList = await listFiles(clientData.driveFolderId, user.uid);
+            const fileList = await listFiles(clientData.driveFolderId);
             setFiles(fileList);
         } catch (e: any) {
             setError(e.message);
@@ -159,18 +159,18 @@ export default function ClientDocumentsPage({ params }: { params: { clientId: st
         } finally {
             setIsLoading(false);
         }
-    }, [clientData?.driveFolderId, user?.uid, toast]);
+    }, [clientData?.driveFolderId, session, toast]);
 
     React.useEffect(() => {
-        if (clientData && user) {
+        if (clientData && session) {
             fetchFiles();
         }
-    }, [clientData, user, fetchFiles]);
+    }, [clientData, session, fetchFiles]);
 
     const handleDelete = async () => {
-        if (!fileToDelete?.id || !user?.uid) return;
+        if (!fileToDelete?.id) return;
         try {
-            await deleteFile(fileToDelete.id, user.uid);
+            await deleteFile(fileToDelete.id);
             toast({
                 title: 'Arquivo Excluído',
                 description: `O arquivo "${fileToDelete.name}" foi removido com sucesso.`,
@@ -209,8 +209,8 @@ export default function ClientDocumentsPage({ params }: { params: { clientId: st
                         Documentos de: {clientName}
                     </h1>
                     <div className="ml-auto">
-                        {user && clientData.driveFolderId && (
-                           <UploadFileDialog folderId={clientData.driveFolderId} userId={user.uid} onUploadSuccess={fetchFiles} />
+                        {session && clientData.driveFolderId && (
+                           <UploadFileDialog folderId={clientData.driveFolderId} onUploadSuccess={fetchFiles} />
                         )}
                     </div>
                 </div>
@@ -296,7 +296,7 @@ export default function ClientDocumentsPage({ params }: { params: { clientId: st
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleDelete}>Excluir</AlertDialogAction>
+                        <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">Excluir</AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>

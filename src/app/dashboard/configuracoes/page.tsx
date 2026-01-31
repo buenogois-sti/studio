@@ -1,86 +1,67 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import React from 'react';
+import { useSession, signOut } from 'next-auth/react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Settings,
-  Briefcase,
-  DollarSign,
   Palette,
   Users,
   Save,
-  Power,
   PowerOff,
-  Folder,
-  FileText,
-  FileSpreadsheet,
-  Link as LinkIcon,
-  ChevronRight,
-  PlusCircle,
+  Briefcase,
   AlertCircle,
   Loader2
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { useFirebase, useDoc, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
+import { useToast } from '@/components/ui/use-toast';
+import { useDoc, useFirebase, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import type { UserProfile } from '@/lib/types';
-import { useToast } from '@/components/ui/use-toast';
+
 
 function IntegrationsTab() {
-  const { user, isUserLoading, firestore } = useFirebase();
+  const { data: session, status } = useSession();
   const { toast } = useToast();
-  const searchParams = useSearchParams();
-
+  const [isDisconnecting, setIsDisconnecting] = React.useState(false);
+  
+  const { firestore } = useFirebase();
   const userProfileRef = useMemoFirebase(
-    () => (firestore && user ? doc(firestore, 'users', user.uid) : null),
-    [firestore, user]
+    () => (firestore && session?.user?.id ? doc(firestore, 'users', session.user.id) : null),
+    [firestore, session]
   );
-  const { data: userProfile, isLoading: isUserProfileLoading } = useDoc<UserProfile>(userProfileRef);
-  const [isDisconnecting, setIsDisconnecting] = useState(false);
-  const [isConnecting, setIsConnecting] = useState(false);
+  const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
 
-  useEffect(() => {
-    const error = searchParams.get('error');
-    const success = searchParams.get('success');
-    
-    if (error) {
-      toast({
-        variant: 'destructive',
-        title: 'Falha na Conexão com Google',
-        description: `Ocorreu um erro: ${error}. Tente novamente.`,
-      });
-    } else if (success === 'google_connected') {
-        toast({
-            title: 'Google Conectado',
-            description: 'Sua conta foi conectada com sucesso.'
-        });
-    } else if (success === 'google_disconnected') {
-        toast({
-            title: 'Google Desconectado',
-            description: 'A integração com o Google Workspace foi removida.'
-        });
-    }
-  }, [searchParams, toast]);
-
-  const isConnected = !!userProfile?.googleRefreshToken;
-
-  const handleDisconnect = () => {
+  const handleDisconnect = async () => {
     setIsDisconnecting(true);
-    // Navigate to the disconnect endpoint. It handles the logic and redirects back.
-    window.location.href = '/api/auth/google/disconnect';
+    // This will just sign the user out of the application.
+    // A true "disconnect" would involve revoking the Google token, which is more complex.
+    try {
+        if (userProfile?.googleRefreshToken) {
+             // Ideally, you'd call an API route here to revoke the token on Google's side
+             // For now, we'll just sign out.
+            console.log("Revoke token logic would go here.");
+        }
+        await signOut({ callbackUrl: '/login' });
+        toast({
+            title: 'Desconectado',
+            description: 'Você foi desconectado com sucesso.'
+        });
+    } catch (error: any) {
+        toast({
+            variant: 'destructive',
+            title: 'Erro ao Desconectar',
+            description: error.message,
+        });
+        setIsDisconnecting(false);
+    }
   };
 
-  const handleConnect = () => {
-    setIsConnecting(true);
-    window.location.href = '/api/auth/google/redirect';
-  };
-
+  const isConnected = status === 'authenticated';
 
   return (
     <Card>
@@ -93,9 +74,9 @@ function IntegrationsTab() {
       <CardContent className="space-y-6">
         <Alert>
           <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Guia de Configuração</AlertTitle>
+          <AlertTitle>Como Funciona a Integração</AlertTitle>
           <AlertDescription>
-            Para integrar seu Google Workspace, clique em &quot;Conectar com Google&quot; e autorize o acesso à sua conta. Isso permitirá que o LexFlow gerencie pastas e leia documentos do seu Google Drive em seu nome.
+            Sua conta do Google é conectada quando você faz login. Isso permite que o LexFlow gerencie pastas e arquivos no seu Google Drive em seu nome, de forma segura.
           </AlertDescription>
         </Alert>
         <Card>
@@ -106,7 +87,7 @@ function IntegrationsTab() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {(isUserLoading || isUserProfileLoading) ? (
+            {status === 'loading' ? (
               <div className="flex items-center justify-center p-3">
                 <Loader2 className="h-6 w-6 animate-spin" />
               </div>
@@ -114,7 +95,7 @@ function IntegrationsTab() {
               <div className="flex items-center justify-between p-3 rounded-md bg-emerald-50 text-emerald-900 dark:bg-emerald-900/50 dark:text-emerald-200">
                 <div className="flex flex-col">
                   <span className="text-sm font-semibold">Conectado</span>
-                  <span className="text-xs">{user?.email}</span>
+                  <span className="text-xs">{session?.user?.email}</span>
                 </div>
                 <Badge variant="default" className="bg-emerald-100 text-emerald-900 hover:bg-emerald-100 pointer-events-none">Ativo</Badge>
               </div>
@@ -122,26 +103,17 @@ function IntegrationsTab() {
               <div className="flex items-center justify-between p-3 rounded-md bg-yellow-50 border border-yellow-200 dark:bg-yellow-950 dark:border-yellow-800">
                 <div className="flex flex-col">
                   <span className="text-sm font-medium text-yellow-800 dark:text-yellow-200">Não Conectado</span>
-                  <span className="text-xs text-muted-foreground">Autorize o acesso à sua conta.</span>
+                  <span className="text-xs text-muted-foreground">Faça login para conectar sua conta.</span>
                 </div>
                 <Badge variant="outline" className="text-yellow-700 border-yellow-300 dark:text-yellow-300 dark:border-yellow-700">Inativo</Badge>
               </div>
             )}
           </CardContent>
           <CardFooter>
-            {isConnected ? (
+            {isConnected && (
               <Button variant="destructive" className="w-full" onClick={handleDisconnect} disabled={isDisconnecting}>
                 {isDisconnecting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PowerOff className="mr-2 h-4 w-4" />}
-                {isDisconnecting ? 'Desconectando...' : 'Desconectar'}
-              </Button>
-            ) : (
-              <Button className="w-full" onClick={handleConnect} disabled={isConnecting}>
-                {isConnecting ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Power className="mr-2 h-4 w-4" />
-                )}
-                {isConnecting ? 'Conectando...' : 'Conectar com Google'}
+                {isDisconnecting ? 'Desconectando...' : 'Sair e Desconectar do Google'}
               </Button>
             )}
           </CardFooter>
@@ -152,8 +124,6 @@ function IntegrationsTab() {
 }
 
 export default function ConfiguracoesPage() {
-  const tabs = ["geral", "integracoes", "financeiro", "usuarios", "aparencia", "backup"];
-
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
@@ -212,31 +182,13 @@ export default function ConfiguracoesPage() {
               <CardTitle>Parâmetros Financeiros</CardTitle>
               <CardDescription>Defina padrões para honorários, vencimentos, moeda e alertas financeiros.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="defaultFee">Percentual Padrão de Honorários (%)</Label>
-                  <Input id="defaultFee" type="number" defaultValue="20" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="dueDays">Dias de Vencimento Padrão</Label>
-                  <Input id="dueDays" type="number" defaultValue="10" />
-                </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="currency">Moeda</Label>
-                  <Input id="currency" defaultValue="BRL" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="dateFormat">Formato de Data</Label>
-                  <Input id="dateFormat" defaultValue="dd/MM/yyyy" />
-                </div>
+            <CardContent className="flex flex-1 items-center justify-center rounded-lg border border-dashed shadow-sm py-16">
+              <div className="flex flex-col items-center gap-1 text-center">
+                <Loader2 className="h-12 w-12 text-muted-foreground animate-spin" />
+                <h3 className="text-lg font-bold tracking-tight">Em construção</h3>
+                <p className="text-sm text-muted-foreground">O módulo de finanças está sendo desenvolvido.</p>
               </div>
             </CardContent>
-            <CardFooter>
-              <Button>Salvar Parâmetros</Button>
-            </CardFooter>
           </Card>
         </TabsContent>
 

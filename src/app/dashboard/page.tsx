@@ -8,6 +8,7 @@ import {
   FolderKanban,
   Users,
 } from 'lucide-react';
+import { useSession } from 'next-auth/react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -52,7 +53,8 @@ const chartConfig = {
 };
 
 export default function Dashboard() {
-  const { firestore, isUserLoading, user } = useFirebase();
+  const { firestore } = useFirebase();
+  const { data: session, status } = useSession();
 
   const transactionsQuery = useMemoFirebase(
     () => (firestore ? collection(firestore, 'financial_transactions') : null),
@@ -79,12 +81,12 @@ export default function Dashboard() {
   const { data: hearingsData, isLoading: isLoadingHearings } = useCollection<Hearing>(hearingsQuery);
 
   const logsQuery = useMemoFirebase(
-    () => (firestore && user ? query(collection(firestore, `users/${user.uid}/logs`), orderBy('timestamp', 'desc'), limit(5)) : null),
-    [firestore, user]
+    () => (firestore && session?.user?.id ? query(collection(firestore, `users/${session.user.id}/logs`), orderBy('timestamp', 'desc'), limit(5)) : null),
+    [firestore, session]
   );
   const { data: logsData, isLoading: isLoadingLogs } = useCollection<Log>(logsQuery);
 
-  const isLoading = isUserLoading || isLoadingTransactions || isLoadingClients || isLoadingProcesses || isLoadingHearings || isLoadingLogs;
+  const isLoading = status === 'loading' || isLoadingTransactions || isLoadingClients || isLoadingProcesses || isLoadingHearings || isLoadingLogs;
 
   const totalRevenue = React.useMemo(() => {
     if (!transactionsData) return 0;

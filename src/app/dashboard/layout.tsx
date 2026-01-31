@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import * as React from 'react';
+import { useSession } from 'next-auth/react';
 
 import {
   SidebarProvider,
@@ -41,19 +42,14 @@ import {
   AlertCircle,
   Loader2,
 } from 'lucide-react';
-import type { UserProfile, UserRole } from '@/lib/types';
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
+import type { UserProfile } from '@/lib/types';
 import {
   useFirebase,
   useDoc,
   useMemoFirebase,
-  FirestorePermissionError,
-  errorEmitter,
-  updateDocumentNonBlocking,
 } from '@/firebase';
-import { doc, getDoc, serverTimestamp } from 'firebase/firestore';
-import { FirebaseClientProvider } from '@/firebase/client-provider';
+import { doc } from 'firebase/firestore';
+
 
 const navItems = [
   {
@@ -124,19 +120,20 @@ function AccessDenied() {
 function InnerLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const router = useRouter();
-    const { user, isUserLoading, auth, firestore } = useFirebase();
+    const { data: session, status } = useSession();
+    const { firestore } = useFirebase();
 
     const userProfileRef = useMemoFirebase(
-        () => (firestore && user ? doc(firestore, 'users', user.uid) : null),
-        [firestore, user]
+        () => (firestore && session?.user?.id ? doc(firestore, 'users', session.user.id) : null),
+        [firestore, session?.user?.id]
     );
     const { data: userProfile, isLoading: isUserProfileLoading } = useDoc<UserProfile>(userProfileRef);
 
     React.useEffect(() => {
-        if (!isUserLoading && !user) {
-        router.replace('/login');
+        if (status === 'unauthenticated') {
+            router.replace('/login');
         }
-    }, [user, isUserLoading, router]);
+    }, [status, router]);
 
     const getBreadcrumb = () => {
         const pathParts = pathname.split('/').filter((part) => part);
@@ -183,7 +180,7 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
         return bestMatch;
     };
 
-    if (isUserLoading || !user || isUserProfileLoading) {
+    if (status === 'loading' || !session || isUserProfileLoading) {
         return (
         <div className="flex h-screen w-full items-center justify-center bg-background">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -256,8 +253,6 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
     return (
-        <FirebaseClientProvider>
-            <InnerLayout>{children}</InnerLayout>
-        </FirebaseClientProvider>
+        <InnerLayout>{children}</InnerLayout>
     )
 }

@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { useRouter } from 'next/navigation';
+import { useSession, signOut } from 'next-auth/react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -27,12 +28,13 @@ const roles: { role: UserRole; label: string }[] = [
 ];
 
 export function UserNav() {
-  const { user, auth, isUserLoading, firestore } = useFirebase();
+  const { data: session, status } = useSession();
+  const { firestore } = useFirebase();
   const router = useRouter();
 
   const userProfileRef = useMemoFirebase(
-    () => (firestore && user ? doc(firestore, 'users', user.uid) : null),
-    [firestore, user]
+    () => (firestore && session?.user?.id ? doc(firestore, 'users', session.user.id) : null),
+    [firestore, session?.user?.id]
   );
   const { data: userProfile, isLoading: isUserProfileLoading } = useDoc<UserProfile>(userProfileRef);
 
@@ -41,27 +43,19 @@ export function UserNav() {
 
   const handleRoleChange = (role: string) => {
     if (role !== currentRole && userProfileRef) {
-      // The UI will reactively update due to the onSnapshot listener in useDoc
       updateDocumentNonBlocking(userProfileRef, { role });
     }
   };
   
   const handleLogout = async () => {
-    if (auth) {
-      // Clear the server-side session cookie first
-      await fetch('/api/auth/session', { method: 'DELETE' });
-      // Then sign out the client
-      await auth.signOut();
-      // Redirect to login page
-      router.push('/login');
-    }
+    await signOut({ callbackUrl: '/login' });
   };
 
-  if (isUserLoading || isUserProfileLoading) {
+  if (status === 'loading' || isUserProfileLoading) {
     return <Skeleton className="h-9 w-9 rounded-full" />;
   }
   
-  if (!user || !userProfile) {
+  if (!session || !session.user || !userProfile) {
     return null;
   }
 
@@ -71,7 +65,7 @@ export function UserNav() {
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-8 w-8 rounded-full">
           <Avatar className="h-9 w-9">
-            <AvatarImage src={user.photoURL || ''} alt={user.displayName || ''} data-ai-hint="person portrait" />
+            <AvatarImage src={session.user.image || ''} alt={session.user.name || ''} data-ai-hint="person portrait" />
             <AvatarFallback>{userProfile.firstName ? userProfile.firstName.charAt(0) : 'U'}</AvatarFallback>
           </Avatar>
         </Button>
@@ -79,8 +73,8 @@ export function UserNav() {
       <DropdownMenuContent className="w-56" align="end" forceMount>
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">{user.displayName}</p>
-            <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
+            <p className="text-sm font-medium leading-none">{session.user.name}</p>
+            <p className="text-xs leading-none text-muted-foreground">{session.user.email}</p>
             {currentRoleLabel && <p className="text-xs leading-none text-muted-foreground pt-1">({currentRoleLabel})</p>}
           </div>
         </DropdownMenuLabel>

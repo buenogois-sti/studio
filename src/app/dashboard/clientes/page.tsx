@@ -8,11 +8,11 @@ import {
   File,
   ListFilter,
   Loader2,
-  FolderSync,
 } from 'lucide-react';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useSession } from 'next-auth/react';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -82,6 +82,7 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { H2 } from '@/components/ui/typography';
 
 import { useFirebase, useCollection, useMemoFirebase, addDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
 import { collection, serverTimestamp, Timestamp, doc } from 'firebase/firestore';
@@ -96,8 +97,13 @@ const clientSchema = z.object({
   lastName: z.string().min(2, { message: 'O sobrenome deve ter pelo menos 2 caracteres.' }),
   email: z.string().email({ message: 'Por favor, insira um email válido.' }),
   document: z.string().min(11, { message: 'O documento deve ser um CPF ou CNPJ válido.' }),
+  motherName: z.string().optional(),
+  rg: z.string().optional(),
+  ctps: z.string().optional(),
+  pis: z.string().optional(),
   phone: z.string().optional(),
   mobile: z.string().optional(),
+  emergencyContact: z.string().optional(),
   legalArea: z.string().optional(),
   address_street: z.string().optional(),
   address_number: z.string().optional(),
@@ -106,6 +112,10 @@ const clientSchema = z.object({
   address_neighborhood: z.string().optional(),
   address_city: z.string().optional(),
   address_state: z.string().optional(),
+  bankName: z.string().optional(),
+  agency: z.string().optional(),
+  account: z.string().optional(),
+  pixKey: z.string().optional(),
 });
 
 
@@ -126,14 +136,19 @@ function ClientForm({
   const form = useForm<z.infer<typeof clientSchema>>({
     resolver: zodResolver(clientSchema),
     defaultValues: {
-      clientType: undefined,
+      clientType: '',
       firstName: '',
       lastName: '',
       email: '',
       document: '',
+      motherName: '',
+      rg: '',
+      ctps: '',
+      pis: '',
       phone: '',
       mobile: '',
-      legalArea: undefined,
+      emergencyContact: '',
+      legalArea: '',
       address_street: '',
       address_number: '',
       address_complement: '',
@@ -141,6 +156,10 @@ function ClientForm({
       address_neighborhood: '',
       address_city: '',
       address_state: '',
+      bankName: '',
+      agency: '',
+      account: '',
+      pixKey: '',
     },
   });
 
@@ -192,19 +211,29 @@ function ClientForm({
         address_neighborhood: client.address?.neighborhood,
         address_city: client.address?.city,
         address_state: client.address?.state,
+        bankName: client.bankInfo?.bankName,
+        agency: client.bankInfo?.agency,
+        account: client.bankInfo?.account,
+        pixKey: client.bankInfo?.pixKey,
       };
       delete flatClientData.address;
+      delete flatClientData.bankInfo;
       form.reset(flatClientData);
     } else {
       form.reset({
-        clientType: undefined,
+        clientType: '',
         firstName: '',
         lastName: '',
         email: '',
         document: '',
+        motherName: '',
+        rg: '',
+        ctps: '',
+        pis: '',
         phone: '',
         mobile: '',
-        legalArea: undefined,
+        emergencyContact: '',
+        legalArea: '',
         address_street: '',
         address_number: '',
         address_complement: '',
@@ -212,6 +241,10 @@ function ClientForm({
         address_neighborhood: '',
         address_city: '',
         address_state: '',
+        bankName: '',
+        agency: '',
+        account: '',
+        pixKey: '',
       });
     }
   }, [client, form]);
@@ -222,20 +255,14 @@ function ClientForm({
     
     try {
       const { 
-        firstName, lastName, clientType, email, document, phone, mobile, legalArea,
         address_street, address_number, address_complement, address_zipCode, 
-        address_neighborhood, address_city, address_state 
+        address_neighborhood, address_city, address_state,
+        bankName, agency, account, pixKey,
+        ...restOfValues
       } = values;
 
       const clientData = {
-        firstName,
-        lastName,
-        clientType,
-        email,
-        document,
-        phone,
-        mobile,
-        legalArea,
+        ...restOfValues,
         address: {
           street: address_street,
           number: address_number,
@@ -244,10 +271,16 @@ function ClientForm({
           neighborhood: address_neighborhood,
           city: address_city,
           state: address_state,
+        },
+        bankInfo: {
+          bankName,
+          agency,
+          account,
+          pixKey,
         }
       };
 
-      const displayName = `${firstName} ${lastName}`;
+      const displayName = `${clientData.firstName} ${clientData.lastName}`;
 
       if (client?.id) {
         const clientRef = doc(firestore, 'clients', client.id);
@@ -278,231 +311,352 @@ function ClientForm({
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 px-1 py-4">
-        <fieldset disabled={isSaving} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <FormField
-              control={form.control}
-              name="clientType"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Tipo de Cliente *</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8 px-1 py-4">
+        <fieldset disabled={isSaving} className="space-y-6">
+          
+          <section>
+            <H2>Dados Pessoais</H2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+              <FormField
+                control={form.control}
+                name="clientType"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Tipo de Cliente *</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecionar tipo..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {clientTypes.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="document"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>CPF / CNPJ *</FormLabel>
                     <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecionar tipo..." />
-                      </SelectTrigger>
+                      <Input placeholder="00.000.000/0000-00" {...field} />
                     </FormControl>
-                    <SelectContent>
-                      {clientTypes.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="document"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>CPF / CNPJ *</FormLabel>
-                  <FormControl>
-                    <Input placeholder="00.000.000/0000-00" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="firstName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Nome *</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Primeiro nome" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="lastName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Sobrenome</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Sobrenome completo" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <div className="md:col-span-2">
-                <FormField
-                    control={form.control}
-                    name="email"
-                    render={({ field }) => (
-                        <FormItem>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="firstName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nome *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Primeiro nome" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="lastName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Sobrenome *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Sobrenome completo" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="motherName"
+                render={({ field }) => (
+                  <FormItem className="md:col-span-2">
+                    <FormLabel>Nome da Mãe</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Nome completo da mãe" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="rg"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>RG</FormLabel>
+                    <FormControl>
+                      <Input placeholder="00.000.000-0" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="ctps"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>CTPS</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Nº da Carteira de Trabalho" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+               <FormField
+                control={form.control}
+                name="pis"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>PIS/PASEP</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Nº do PIS/PASEP" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="legalArea"
+                render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Área Jurídica</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Selecionar..." />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                              {legalAreas.map(area => <SelectItem key={area} value={area}>{area}</SelectItem>)}
+                          </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                )}
+                />
+            </div>
+          </section>
+
+          <section>
+            <H2>Contato & Endereço</H2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+              <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                      <FormItem className="md:col-span-2">
                         <FormLabel>Email *</FormLabel>
                         <FormControl>
                             <Input placeholder="contato@email.com" {...field} />
                         </FormControl>
                         <FormMessage />
-                        </FormItem>
-                    )}
-                />
-            </div>
-            <FormField
-              control={form.control}
-              name="phone"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Telefone</FormLabel>
-                  <FormControl>
-                    <Input placeholder="(00) 0000-0000" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="mobile"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Celular</FormLabel>
-                  <FormControl>
-                    <Input placeholder="(00) 00000-0000" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-             <div className="md:col-span-2">
-                <FormField
+                      </FormItem>
+                  )}
+              />
+              <FormField
                 control={form.control}
-                name="legalArea"
+                name="mobile"
                 render={({ field }) => (
-                    <FormItem>
-                    <FormLabel>Área Jurídica</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
-                        <FormControl>
-                        <SelectTrigger>
-                            <SelectValue placeholder="Selecionar..." />
-                        </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                            {legalAreas.map(area => <SelectItem key={area} value={area}>{area}</SelectItem>)}
-                        </SelectContent>
-                    </Select>
+                  <FormItem>
+                    <FormLabel>Celular / WhatsApp *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="(00) 00000-0000" {...field} />
+                    </FormControl>
                     <FormMessage />
-                    </FormItem>
+                  </FormItem>
                 )}
-                />
-            </div>
-            
-            <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4 items-end">
+              />
+              <FormField
+                control={form.control}
+                name="phone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Telefone Fixo</FormLabel>
+                    <FormControl>
+                      <Input placeholder="(00) 0000-0000" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="emergencyContact"
+                render={({ field }) => (
+                  <FormItem className="md:col-span-2">
+                    <FormLabel>Contato de Emergência (Recado)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Nome e telefone" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4 items-end">
                 <FormField
                     control={form.control}
                     name="address_zipCode"
                     render={({ field }) => (
                         <FormItem>
                             <FormLabel>CEP</FormLabel>
-                            <div className="flex items-center gap-2">
-                                <FormControl>
-                                    <Input placeholder="00000-000" {...field} />
-                                </FormControl>
-                                <Button type="button" onClick={handleCepSearch} disabled={isSaving}>Buscar</Button>
-                            </div>
+                            <FormControl>
+                                <Input placeholder="00000-000" {...field} />
+                            </FormControl>
                             <FormMessage />
                         </FormItem>
                     )}
                 />
-            </div>
+                <Button type="button" onClick={handleCepSearch} disabled={isSaving}>Buscar</Button>
+              </div>
 
-            <div className="md:col-span-2">
-                <FormField
-                    control={form.control}
-                    name="address_street"
-                    render={({ field }) => (
-                        <FormItem>
-                        <FormLabel>Endereço</FormLabel>
-                        <FormControl>
-                            <Input placeholder="Rua, avenida, etc" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                />
+              <FormField
+                  control={form.control}
+                  name="address_street"
+                  render={({ field }) => (
+                      <FormItem className="md:col-span-2">
+                      <FormLabel>Endereço</FormLabel>
+                      <FormControl>
+                          <Input placeholder="Rua, avenida, etc" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                      </FormItem>
+                  )}
+              />
+               <FormField
+                control={form.control}
+                name="address_number"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Número</FormLabel>
+                    <FormControl>
+                      <Input placeholder="123" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="address_complement"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Complemento</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Apto, sala, etc" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="address_neighborhood"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Bairro</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Centro" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="address_city"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Cidade</FormLabel>
+                    <FormControl>
+                      <Input placeholder="São Paulo" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="address_state"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Estado</FormLabel>
+                    <FormControl>
+                      <Input placeholder="SP" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
-             <FormField
-              control={form.control}
-              name="address_number"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Número</FormLabel>
-                  <FormControl>
-                    <Input placeholder="123" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="address_complement"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Complemento</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Apto, sala, etc" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="address_neighborhood"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Bairro</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Centro" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="address_city"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Cidade</FormLabel>
-                  <FormControl>
-                    <Input placeholder="São Paulo" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="address_state"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Estado</FormLabel>
-                  <FormControl>
-                    <Input placeholder="SP" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+          </section>
+
+          <section>
+              <H2>Dados Bancários</H2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                  <FormField
+                      control={form.control}
+                      name="bankName"
+                      render={({ field }) => (
+                          <FormItem>
+                              <FormLabel>Banco</FormLabel>
+                              <FormControl><Input placeholder="Nome do banco" {...field} /></FormControl>
+                              <FormMessage />
+                          </FormItem>
+                      )}
+                  />
+                  <FormField
+                      control={form.control}
+                      name="agency"
+                      render={({ field }) => (
+                          <FormItem>
+                              <FormLabel>Agência</FormLabel>
+                              <FormControl><Input placeholder="0000" {...field} /></FormControl>
+                              <FormMessage />
+                          </FormItem>
+                      )}
+                  />
+                  <FormField
+                      control={form.control}
+                      name="account"
+                      render={({ field }) => (
+                          <FormItem>
+                              <FormLabel>Conta Corrente</FormLabel>
+                              <FormControl><Input placeholder="00000-0" {...field} /></FormControl>
+                              <FormMessage />
+                          </FormItem>
+                      )}
+                  />
+                  <FormField
+                      control={form.control}
+                      name="pixKey"
+                      render={({ field }) => (
+                          <FormItem>
+                              <FormLabel>Chave PIX</FormLabel>
+                              <FormControl><Input placeholder="CPF, e-mail, telefone, etc." {...field} /></FormControl>
+                              <FormMessage />
+                          </FormItem>
+                      )}
+                  />
+              </div>
+          </section>
+
         </fieldset>
+
         <SheetFooter className="pt-4">
            <Button type="button" variant="outline" onClick={onSave} disabled={isSaving}>
               Cancelar
@@ -521,12 +675,11 @@ export default function ClientsPage() {
   const [isSheetOpen, setIsSheetOpen] = React.useState(false);
   const [editingClient, setEditingClient] = React.useState<Client | null>(null);
   const [clientToDelete, setClientToDelete] = React.useState<Client | null>(null);
-  const [isSyncing, setIsSyncing] = React.useState<string | null>(null); // Store syncing client ID
-  const alertDialogTitleId = React.useId();
-  const alertDialogDescriptionId = React.useId();
+  const [isSyncing, setIsSyncing] = React.useState<string | null>(null);
   const { toast } = useToast();
   
-  const { firestore, isUserLoading, user } = useFirebase();
+  const { firestore } = useFirebase();
+  const { data: session, status } = useSession();
 
   const clientsQuery = useMemoFirebase(
     () => (firestore ? collection(firestore, 'clients') : null),
@@ -540,13 +693,13 @@ export default function ClientsPage() {
     if (typeof date === 'string') {
         return new Date(date).toLocaleDateString('pt-BR');
     }
-    if (date.toDate) { // It's a Firestore Timestamp
+    if (date.toDate) {
         return date.toDate().toLocaleDateString('pt-BR');
     }
     return '';
   }
   
-  const isLoading = isUserLoading || isLoadingClients;
+  const isLoading = status === 'loading' || isLoadingClients;
 
   const handleAddNew = () => {
     setEditingClient(null);
@@ -566,6 +719,7 @@ export default function ClientsPage() {
     if (!firestore || !clientToDelete) return;
     const clientRef = doc(firestore, 'clients', clientToDelete.id);
     deleteDocumentNonBlocking(clientRef);
+    toast({ title: 'Cliente excluído!', description: `O cliente ${clientToDelete.firstName} foi removido.` });
     setClientToDelete(null);
   };
 
@@ -575,14 +729,14 @@ export default function ClientsPage() {
   }
   
   const handleSyncClient = async (client: Client) => {
-    if (!user) {
-        toast({ variant: 'destructive', title: 'Erro de Autenticação', description: 'Usuário não encontrado.' });
+    if (!session) {
+        toast({ variant: 'destructive', title: 'Erro de Autenticação', description: 'Sessão de usuário não encontrada.' });
         return;
     }
     const clientName = `${client.firstName} ${client.lastName}`;
     setIsSyncing(client.id);
     try {
-        await syncClientToDrive(client.id, clientName, user.uid);
+        await syncClientToDrive(client.id, clientName);
         toast({
             title: "Sincronização Concluída!",
             description: `Pasta e planilha para ${clientName} foram criadas com sucesso no Google Drive.`
@@ -755,7 +909,7 @@ export default function ClientsPage() {
       </div>
 
       <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-        <SheetContent className="sm:max-w-lg w-full">
+        <SheetContent className="sm:max-w-2xl w-full">
           <SheetHeader>
             <SheetTitle>{editingClient ? 'Editar Cliente' : 'Adicionar Novo Cliente'}</SheetTitle>
             <SheetDescription>
@@ -769,17 +923,17 @@ export default function ClientsPage() {
       </Sheet>
 
       <AlertDialog open={!!clientToDelete} onOpenChange={(open) => !open && setClientToDelete(null)}>
-        <AlertDialogContent aria-labelledby={alertDialogTitleId} aria-describedby={alertDialogDescriptionId}>
+        <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle id={alertDialogTitleId}>Você tem certeza?</AlertDialogTitle>
-            <AlertDialogDescription id={alertDialogDescriptionId}>
+            <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+            <AlertDialogDescription>
               Esta ação não pode ser desfeita. Isso excluirá permanentemente o cliente
               &quot;{clientToDelete?.firstName} {clientToDelete?.lastName}&quot; e removerá seus dados de nossos servidores.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setClientToDelete(null)}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete}>Excluir</AlertDialogAction>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">Excluir</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

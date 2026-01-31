@@ -2,7 +2,9 @@
 
 import { google, type drive_v3, type sheets_v4 } from 'googleapis';
 import { firestoreAdmin } from '@/firebase/admin';
-import { oauth2Client } from '@/lib/google-auth';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/app/api/auth/[...nextauth]/options';
+import type { Session } from 'next-auth';
 
 const ROOT_FOLDER_ID = process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID;
 
@@ -12,47 +14,23 @@ interface GoogleApiClients {
 }
 
 /**
- * Creates authenticated Google API clients for a specific user.
- * It fetches the user's refresh token, validates it by getting a new access token,
- * and handles invalid tokens by deleting them and throwing a user-friendly error.
- * @param userId The UID of the user to authenticate as.
+ * Creates authenticated Google API clients using the user's session.
+ * This function is for use in SERVER-SIDE code (Server Actions, API routes).
+ * It retrieves the access token from the NextAuth session.
  * @returns An object containing authenticated Drive and Sheets clients.
  */
-export async function getGoogleApiClientsForUser(userId: string): Promise<GoogleApiClients> {
-    const userDocRef = firestoreAdmin.collection('users').doc(userId);
-    const userDoc = await userDocRef.get();
-    const userData = userDoc.data();
-    const refreshToken = userData?.googleRefreshToken;
+export async function getGoogleApiClientsForUser(): Promise<GoogleApiClients> {
+    const session: Session | null = await getServerSession(authOptions);
 
-    if (!refreshToken) {
-        throw new Error('Usuário não conectado ao Google. Por favor, vá para a página de Configurações e conecte sua conta.');
+    if (!session?.accessToken) {
+        throw new Error('Usuário não autenticado ou token de acesso indisponível. Faça login novamente.');
     }
     
-    oauth2Client.setCredentials({ refresh_token: refreshToken });
+    const auth = new google.auth.OAuth2();
+    auth.setCredentials({ access_token: session.accessToken });
 
-    try {
-        // Proactively refresh the access token to validate the refresh token.
-        // This will throw an 'invalid_grant' error if the refresh token is bad.
-        const { token } = await oauth2Client.getAccessToken();
-        if (!token) {
-            // This case is unlikely if getAccessToken() succeeds, but it's a safe check.
-            throw new Error('Failed to obtain a new access token from Google.');
-        }
-    } catch (error: any) {
-        console.error("Failed to refresh access token, likely due to an invalid refresh token:", error.message);
-        
-        // The token is invalid, so we remove it from the database to force re-authentication.
-        // This is a self-healing mechanism.
-        await userDocRef.update({
-            googleRefreshToken: firestoreAdmin.FieldValue.delete(),
-        });
-        
-        // Inform the user what happened and how to fix it.
-        throw new Error('Sua conexão com o Google expirou ou se tornou inválida. Por favor, vá para Configurações e conecte sua conta novamente.');
-    }
-
-    const drive = google.drive({ version: 'v3', auth: oauth2Client });
-    const sheets = google.sheets({ version: 'v4', auth: oauth2Client });
+    const drive = google.drive({ version: 'v3', auth });
+    const sheets = google.sheets({ version: 'v4', auth });
     
     return { drive, sheets };
 }
@@ -110,11 +88,10 @@ async function createClientSheet(sheets: sheets_v4.Sheets, clientName: string): 
  * This is designed to be called as a server action from the client-side.
  * @param clientId The ID of the client document in Firestore.
  * @param clientName The name of the client, used for folder/sheet titles.
- * @param userId The UID of the acting user, for authentication.
  */
-export async function syncClientToDrive(clientId: string, clientName: string, userId: string): Promise<void> {
+export async function syncClientToDrive(clientId: string, clientName: string): Promise<void> {
     try {
-        const { drive, sheets } = await getGoogleApiClientsForUser(userId);
+        const { drive, sheets } = await getGoogleApiClientsForUser();
 
         const folderId = await createClientFolder(drive, clientName);
         if (!folderId) {

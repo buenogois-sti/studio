@@ -2,8 +2,7 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { signIn, useSession } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -12,7 +11,6 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { useFirebase } from '@/firebase';
 import { useToast } from '@/components/ui/use-toast';
 import { Loader2 } from 'lucide-react';
 
@@ -27,67 +25,37 @@ const GoogleIcon = (props: React.SVGProps<SVGSVGElement>) => (
 
 
 export default function LoginPage() {
-    const { auth, firestore, isUserLoading, user } = useFirebase();
+    const { data: session, status } = useSession();
     const router = useRouter();
     const { toast } = useToast();
     const [isLoading, setIsLoading] = React.useState(false);
 
     React.useEffect(() => {
-        if (!isUserLoading && user) {
+        if (status === 'authenticated') {
             router.replace('/dashboard');
         }
-    }, [user, isUserLoading, router]);
+    }, [status, router]);
 
     const handleGoogleSignIn = async () => {
-        if (!auth || !firestore) return;
-
         setIsLoading(true);
-        const provider = new GoogleAuthProvider();
-        provider.setCustomParameters({
-            prompt: 'select_account'
-        });
-
         try {
-            const result = await signInWithPopup(auth, provider);
-            const loggedInUser = result.user;
-            
-            // Create a server-side session cookie for backend access
-            const idToken = await loggedInUser.getIdToken();
-            await fetch('/api/auth/session', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ idToken }),
-            });
-
-            const userDocRef = doc(firestore, 'users', loggedInUser.uid);
-            const userDoc = await getDoc(userDocRef);
-
-            if (userDoc.exists()) {
-                toast({
-                    title: 'Login bem-sucedido!',
-                    description: `Bem-vindo de volta, ${loggedInUser.displayName}.`,
-                });
-                router.push('/dashboard');
-            } else {
-                router.push('/register');
+            const result = await signIn('google', { redirect: false, callbackUrl: '/dashboard' });
+            if (result?.error) {
+                throw new Error(result.error);
             }
+            // The useEffect will handle the redirect on session status change
         } catch (error: any) {
-            if (error.code === 'auth/popup-closed-by-user') {
-                console.log("Google Sign-In popup closed by user.");
-            } else {
-                console.error("Google Sign-In Error:", error);
-                toast({
-                    variant: 'destructive',
-                    title: 'Erro no Login',
-                    description: error.message || 'Não foi possível fazer login com o Google.',
-                });
-            }
-        } finally {
+            console.error("Google Sign-In Error:", error);
+            toast({
+                variant: 'destructive',
+                title: 'Erro no Login',
+                description: error.message || 'Não foi possível fazer login com o Google.',
+            });
             setIsLoading(false);
         }
     };
     
-    if (isUserLoading || user) {
+    if (status === 'loading' || status === 'authenticated') {
         return (
             <div className="flex h-screen w-full items-center justify-center bg-background">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -100,7 +68,7 @@ export default function LoginPage() {
             <CardHeader>
                 <CardTitle className="text-2xl font-headline">Acessar Plataforma</CardTitle>
                 <CardDescription>
-                    Use sua conta do Google para entrar. Se for seu primeiro acesso, você será direcionado para completar seu cadastro.
+                    Use sua conta do Google para entrar. Se for seu primeiro acesso, sua conta será criada automaticamente.
                 </CardDescription>
             </CardHeader>
             <CardContent>
