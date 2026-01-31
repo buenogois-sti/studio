@@ -13,24 +13,43 @@ interface GoogleApiClients {
 
 /**
  * Creates authenticated Google API clients for a specific user.
- * It fetches the user's refresh token from Firestore, sets it on the OAuth2 client,
- * and then returns initialized clients for Drive and Sheets.
- * The google-auth-library will automatically handle refreshing the access token.
+ * It fetches the user's refresh token, validates it by getting a new access token,
+ * and handles invalid tokens by deleting them and throwing a user-friendly error.
  * @param userId The UID of the user to authenticate as.
  * @returns An object containing authenticated Drive and Sheets clients.
  */
 async function getGoogleApiClientsForUser(userId: string): Promise<GoogleApiClients> {
-    const userDoc = await firestoreAdmin.collection('users').doc(userId).get();
+    const userDocRef = firestoreAdmin.collection('users').doc(userId);
+    const userDoc = await userDocRef.get();
     const userData = userDoc.data();
     const refreshToken = userData?.googleRefreshToken;
 
     if (!refreshToken) {
-        throw new Error('Usuário não conectado ao Google ou token de atualização ausente. Por favor, conecte sua conta na página de Configurações.');
+        throw new Error('Usuário não conectado ao Google. Por favor, vá para a página de Configurações e conecte sua conta.');
     }
     
-    // Set the refresh token on the shared OAuth2 client instance.
-    // The library will handle access token refreshing automatically.
     oauth2Client.setCredentials({ refresh_token: refreshToken });
+
+    try {
+        // Proactively refresh the access token to validate the refresh token.
+        // This will throw an 'invalid_grant' error if the refresh token is bad.
+        const { token } = await oauth2Client.getAccessToken();
+        if (!token) {
+            // This case is unlikely if getAccessToken() succeeds, but it's a safe check.
+            throw new Error('Failed to obtain a new access token from Google.');
+        }
+    } catch (error: any) {
+        console.error("Failed to refresh access token, likely due to an invalid refresh token:", error.message);
+        
+        // The token is invalid, so we remove it from the database to force re-authentication.
+        // This is a self-healing mechanism.
+        await userDocRef.update({
+            googleRefreshToken: firestoreAdmin.FieldValue.delete(),
+        });
+        
+        // Inform the user what happened and how to fix it.
+        throw new Error('Sua conexão com o Google expirou ou se tornou inválida. Por favor, vá para Configurações e conecte sua conta novamente.');
+    }
 
     const drive = google.drive({ version: 'v3', auth: oauth2Client });
     const sheets = google.sheets({ version: 'v4', auth: oauth2Client });
