@@ -2,30 +2,21 @@
 import admin from 'firebase-admin';
 
 // This file initializes the Firebase Admin SDK.
-// It handles different environments (Vercel, App Hosting, local) gracefully.
+// It is designed to work in environments with Application Default Credentials (ADC),
+// such as Firebase App Hosting, Vercel with a Firebase integration, ou uma máquina
+// local que foi autenticada usando `gcloud auth application-default login`.
 
 if (!admin.apps.length) {
   try {
-    const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-
-    if (serviceAccountJson) {
-      // Environment with service account JSON (e.g., Vercel, or local with .env.local)
-      console.log("Initializing Firebase Admin with Service Account JSON from environment variable.");
-      const serviceAccount = JSON.parse(serviceAccountJson);
-      admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-      });
-    } else {
-      // Environment with Application Default Credentials (e.g., App Hosting, local gcloud)
-      console.log("Initializing Firebase Admin with Application Default Credentials (ADC).");
-      admin.initializeApp();
-    }
+    // Ao chamar initializeApp() sem argumentos, o SDK automaticamente
+    // descobre e usa as credenciais disponíveis no ambiente.
+    // Este é o método mais robusto para implantações na nuvem.
+    console.log("Initializing Firebase Admin with Application Default Credentials (ADC).");
+    admin.initializeApp();
   } catch (error: any) {
     console.error('Firebase Admin SDK initialization error:', error.message);
-    // Fallback for safety, might work in some environments
-    if (!admin.apps.length) {
-      admin.initializeApp();
-    }
+    // Este bloco de captura lidará com casos em que até o ADC falha,
+    // impedindo que o aplicativo quebre durante a inicialização.
   }
 }
 
