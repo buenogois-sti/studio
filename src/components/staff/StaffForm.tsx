@@ -112,6 +112,21 @@ export function StaffForm({
         firstName: '',
         lastName: '',
         email: '',
+        phone: '',
+        whatsapp: '',
+        address_street: '',
+        address_number: '',
+        address_complement: '',
+        address_zipCode: '',
+        address_neighborhood: '',
+        address_city: '',
+        address_state: '',
+        oabNumber: '',
+        oabStatus: undefined,
+        bankName: '',
+        agency: '',
+        account: '',
+        pixKey: '',
     },
   });
   
@@ -129,30 +144,41 @@ export function StaffForm({
         ...restOfValues
       } = values;
 
-      const staffData: Partial<Staff> = {
-        ...restOfValues,
-        address: {
-          street: address_street,
-          number: address_number,
-          complement: address_complement,
-          zipCode: address_zipCode,
-          neighborhood: address_neighborhood,
-          city: address_city,
-          state: address_state,
-        },
-      };
+      const staffData: { [key: string]: any } = { ...restOfValues };
+
+      // Sanitize the object to remove undefined or empty string values.
+      Object.keys(staffData).forEach(key => {
+        if (staffData[key] === undefined || staffData[key] === '') {
+          delete staffData[key];
+        }
+      });
+      
+      const address: { [key: string]: any } = {};
+      if (address_street) address.street = address_street;
+      if (address_number) address.number = address_number;
+      if (address_complement) address.complement = address_complement;
+      if (address_zipCode) address.zipCode = address_zipCode;
+      if (address_neighborhood) address.neighborhood = address_neighborhood;
+      if (address_city) address.city = address_city;
+      if (address_state) address.state = address_state;
+      if (Object.keys(address).length > 0) {
+        staffData.address = address;
+      }
 
       if (values.role === 'lawyer' || values.role === 'intern') {
-        staffData.bankInfo = {
-          bankName,
-          agency,
-          account,
-          pixKey,
-        };
+        const bankInfo: { [key: string]: any } = {};
+        if (bankName) bankInfo.bankName = bankName;
+        if (agency) bankInfo.agency = agency;
+        if (account) bankInfo.account = account;
+        if (pixKey) bankInfo.pixKey = pixKey;
+        if (Object.keys(bankInfo).length > 0) {
+          staffData.bankInfo = bankInfo;
+        }
       } else {
-        staffData.oabNumber = undefined;
-        staffData.oabStatus = undefined;
-        staffData.bankInfo = undefined;
+        // For non-lawyers/interns, ensure these fields are not present in the final object
+        delete staffData.oabNumber;
+        delete staffData.oabStatus;
+        delete staffData.bankInfo;
       }
 
       const displayName = `${staffData.firstName} ${staffData.lastName}`;
@@ -402,5 +428,3 @@ export function StaffForm({
     </Form>
   );
 }
-
-    
