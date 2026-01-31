@@ -67,3 +67,30 @@ export async function deleteFile(fileId: string): Promise<void> {
         throw new Error(error.message || 'Ocorreu um erro desconhecido ao excluir o arquivo do Google Drive.');
     }
 }
+
+
+export async function renameFile(fileId: string, newName: string): Promise<drive_v3.Schema$File> {
+    if (!newName) {
+        throw new Error('O novo nome não pode ser vazio.');
+    }
+    try {
+        const { drive } = await getGoogleApiClientsForUser();
+        const response = await drive.files.update({
+            fileId: fileId,
+            requestBody: {
+                name: newName,
+            },
+            fields: 'id, name, mimeType, webViewLink, iconLink, createdTime',
+            supportsAllDrives: true,
+        });
+        
+        if (!response.data) {
+             throw new Error('A API do Google não retornou dados do arquivo após a renomeação.');
+        }
+
+        return response.data;
+    } catch (error: any) {
+        console.error('Error renaming file in Google Drive:', error);
+        throw new Error(error.message || 'Ocorreu um erro desconhecido ao renomear o arquivo.');
+    }
+}

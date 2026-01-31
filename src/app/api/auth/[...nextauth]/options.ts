@@ -22,15 +22,20 @@ if (!nextAuthSecret) {
 
 async function refreshAccessToken(token: JWT): Promise<JWT> {
     try {
-        if (!token.refreshToken) {
-            throw new Error("Missing refresh token");
+        const userDoc = await firebaseAdmin.firestore().collection('users').doc(token.id).get();
+        if (!userDoc.exists) throw new Error("User not found in database.");
+
+        const userProfile = userDoc.data();
+        if (!userProfile?.googleRefreshToken) {
+            throw new Error("Missing refresh token in database.");
         }
+
 
         const url = "https://oauth2.googleapis.com/token?" + new URLSearchParams({
             client_id: googleClientId!,
             client_secret: googleClientSecret!,
             grant_type: "refresh_token",
-            refresh_token: token.refreshToken,
+            refresh_token: userProfile.googleRefreshToken,
         });
 
         const response = await fetch(url, {
@@ -41,6 +46,11 @@ async function refreshAccessToken(token: JWT): Promise<JWT> {
         const refreshedTokens = await response.json();
 
         if (!response.ok) {
+            console.error("Failed to refresh access token.", refreshedTokens);
+            // Potentially the refresh token was revoked. Clear it from DB.
+             await firebaseAdmin.firestore().collection('users').doc(token.id).update({
+                googleRefreshToken: firebaseAdmin.firestore.FieldValue.delete()
+            });
             throw refreshedTokens;
         }
 
@@ -48,8 +58,6 @@ async function refreshAccessToken(token: JWT): Promise<JWT> {
             ...token,
             accessToken: refreshedTokens.access_token,
             accessTokenExpires: Date.now() + refreshedTokens.expires_in * 1000,
-            // The refresh token might be updated by Google, so we persist the new one if it exists.
-            refreshToken: refreshedTokens.refresh_token ?? token.refreshToken,
         };
     } catch (error) {
         console.error("Error refreshing access token", error);
@@ -121,14 +129,20 @@ export const authOptions: NextAuthOptions = {
                 token.id = user.id;
                 token.accessToken = account.access_token;
                 token.accessTokenExpires = account.expires_at ? account.expires_at * 1000 : 0;
-                // A refresh token is only sent on the first authorization. We must persist it.
-                if (account.refresh_token) {
-                    token.refreshToken = account.refresh_token;
-                }
-                // Also persist user details for convenience
                 token.name = user.name;
                 token.email = user.email;
                 token.picture = user.image;
+
+                if (account.refresh_token) {
+                    try {
+                        await firebaseAdmin.firestore().collection('users').doc(user.id).update({
+                            googleRefreshToken: account.refresh_token,
+                        });
+                    } catch (error) {
+                        console.error("Error saving refresh token to DB:", error);
+                        token.error = "SaveRefreshTokenError";
+                    }
+                }
                 return token;
             }
 

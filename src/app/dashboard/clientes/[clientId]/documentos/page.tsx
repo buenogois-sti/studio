@@ -8,6 +8,8 @@ import {
   Loader2,
   AlertCircle,
   ArrowLeft,
+  FilePenLine,
+  MoreVertical,
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
@@ -29,13 +31,86 @@ import { useToast } from '@/components/ui/use-toast';
 import { useFirebase, useDoc, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import type { Client } from '@/lib/types';
-import { listFiles, uploadFile, deleteFile } from '@/lib/drive-actions';
+import { listFiles, uploadFile, deleteFile, renameFile } from '@/lib/drive-actions';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import type { drive_v3 } from 'googleapis';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 type DriveFile = drive_v3.Schema$File;
+
+function RenameFileDialog({ file, onRenameSuccess, open, onOpenChange }: { file: DriveFile | null; onRenameSuccess: () => void; open: boolean; onOpenChange: (open: boolean) => void; }) {
+    const [newName, setNewName] = React.useState('');
+    const [isRenaming, setIsRenaming] = React.useState(false);
+    const { toast } = useToast();
+
+    React.useEffect(() => {
+        if (file) {
+            setNewName(file.name || '');
+        }
+    }, [file]);
+
+    const handleRename = async () => {
+        if (!newName || !file?.id) return;
+
+        setIsRenaming(true);
+        try {
+            await renameFile(file.id, newName);
+            toast({
+                title: 'Arquivo Renomeado',
+                description: `O arquivo foi renomeado para "${newName}".`,
+            });
+            onRenameSuccess();
+            onOpenChange(false);
+        } catch (error: any) {
+            console.error('Rename failed:', error);
+            toast({
+                variant: 'destructive',
+                title: 'Erro ao Renomear',
+                description: error.message || 'Não foi possível renomear o arquivo.',
+            });
+        } finally {
+            setIsRenaming(false);
+        }
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={(isOpen) => {
+            if (!isRenaming) onOpenChange(isOpen);
+        }}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Renomear Arquivo</DialogTitle>
+                    <DialogDescription>
+                        Digite o novo nome para o arquivo &quot;{file?.name}&quot;.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                    <Input
+                        value={newName}
+                        onChange={(e) => setNewName(e.target.value)}
+                        disabled={isRenaming}
+                    />
+                </div>
+                <div className="flex justify-end gap-2">
+                    <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isRenaming}>Cancelar</Button>
+                    <Button onClick={handleRename} disabled={!newName || isRenaming}>
+                        {isRenaming ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FilePenLine className="mr-2 h-4 w-4" />}
+                        {isRenaming ? 'Salvando...' : 'Salvar Novo Nome'}
+                    </Button>
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+}
 
 function UploadFileDialog({ folderId, onUploadSuccess }: { folderId: string; onUploadSuccess: () => void }) {
     const [file, setFile] = React.useState<File | null>(null);
@@ -134,6 +209,7 @@ export default function ClientDocumentsPage({ params }: { params: { clientId: st
     const [isLoading, setIsLoading] = React.useState(true);
     const [error, setError] = React.useState<string | null>(null);
     const [fileToDelete, setFileToDelete] = React.useState<DriveFile | null>(null);
+    const [fileToRename, setFileToRename] = React.useState<DriveFile | null>(null);
 
     const clientRef = useMemoFirebase(
         () => (firestore && clientId ? doc(firestore, 'clients', clientId) : null),
@@ -266,10 +342,26 @@ export default function ClientDocumentsPage({ params }: { params: { clientId: st
                                                 {file.createdTime && format(new Date(file.createdTime), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
                                             </TableCell>
                                             <TableCell className="text-right">
-                                                <Button variant="ghost" size="icon" onClick={() => setFileToDelete(file)}>
-                                                    <Trash2 className="h-4 w-4 text-destructive" />
-                                                    <span className="sr-only">Excluir</span>
-                                                </Button>
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button variant="ghost" size="icon">
+                                                            <MoreVertical className="h-4 w-4" />
+                                                            <span className="sr-only">Abrir menu</span>
+                                                        </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end">
+                                                        <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                                                        <DropdownMenuItem onSelect={() => setFileToRename(file)}>
+                                                            <FilePenLine className="mr-2 h-4 w-4" />
+                                                            <span>Renomear</span>
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuSeparator />
+                                                        <DropdownMenuItem onSelect={() => setFileToDelete(file)} className="text-destructive">
+                                                            <Trash2 className="mr-2 h-4 w-4" />
+                                                            <span>Excluir</span>
+                                                        </DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
                                             </TableCell>
                                         </TableRow>
                                     ))
@@ -300,6 +392,12 @@ export default function ClientDocumentsPage({ params }: { params: { clientId: st
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+            <RenameFileDialog 
+                file={fileToRename} 
+                onRenameSuccess={fetchFiles} 
+                open={!!fileToRename} 
+                onOpenChange={(open) => !open && setFileToRename(null)}
+            />
         </>
     );
 }
