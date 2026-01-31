@@ -7,40 +7,37 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // WARNING: Rules are temporarily open for debugging authentication issues.
+    // This is insecure and should be reverted once the issue is resolved.
+
     // Rules for the user profile collection.
-    // Temporarily allowing any authenticated user to read/write for development.
     match /users/{userId} {
-      allow read, write: if isSignedIn();
+      allow read, write: if true; // Temporarily allow all access
 
       // Rules for a user's private audit logs.
-      // Temporarily allowing any authenticated user to read/write for development.
       match /logs/{logId} {
-        allow read, write: if isSignedIn();
+        allow read, write: if true; // Temporarily allow all access
       }
     }
 
     // Secures the client data collection.
-    // Temporarily allowing any authenticated user to read/write for development.
     match /clients/{clientId} {
-      allow read, write: if isSignedIn();
+      allow read, write: if true; // Temporarily allow all access
     }
 
     // Secures the legal process collection.
-    // Temporarily allowing any authenticated user to read/write for development.
     match /processes/{processId} {
-      allow read, write: if isSignedIn();
+      allow read, write: if true; // Temporarily allow all access
     }
 
     // Secures the court hearing collection.
-    // Temporarily allowing any authenticated user to read/write for development.
     match /hearings/{hearingId} {
-      allow read, write: if isSignedIn();
+      allow read, write: if true; // Temporarily allow all access
     }
 
     // Secures the financial transaction collection.
-    // Temporarily allowing any authenticated user to read/write for development.
     match /financial_transactions/{financialTransactionId} {
-      allow read, write: if isSignedIn();
+      allow read, write: if true; // Temporarily allow all access
     }
   }
 }
