@@ -1,7 +1,7 @@
 import type { NextAuthOptions, User, Account, Session } from 'next-auth';
 import type { JWT } from 'next-auth/jwt';
 import GoogleProvider from 'next-auth/providers/google';
-import { firestoreAdmin } from '@/firebase/admin';
+import { firebaseAdmin } from '@/firebase/admin';
 
 // --- Environment Variable Validation ---
 // Ensure that the required environment variables are set.
@@ -26,8 +26,8 @@ async function refreshAccessToken(token: JWT): Promise<JWT> {
         }
 
         const url = "https://oauth2.googleapis.com/token?" + new URLSearchParams({
-            client_id: googleClientId,
-            client_secret: googleClientSecret,
+            client_id: googleClientId!,
+            client_secret: googleClientSecret!,
             grant_type: "refresh_token",
             refresh_token: token.refreshToken,
         });
@@ -84,7 +84,7 @@ export const authOptions: NextAuthOptions = {
                 return false;
             }
             try {
-                const userRef = firestoreAdmin.collection('users').doc(user.id);
+                const userRef = firebaseAdmin.firestore().collection('users').doc(user.id);
                 const userDoc = await userRef.get();
 
                 if (!userDoc.exists) {
@@ -96,8 +96,8 @@ export const authOptions: NextAuthOptions = {
                         firstName: firstName,
                         lastName: lastNameParts.join(' '),
                         role: 'admin', // First user is always an admin
-                        createdAt: firestoreAdmin.FieldValue.serverTimestamp(),
-                        updatedAt: firestoreAdmin.FieldValue.serverTimestamp(),
+                        createdAt: firebaseAdmin.firestore.FieldValue.serverTimestamp(),
+                        updatedAt: firebaseAdmin.firestore.FieldValue.serverTimestamp(),
                     };
                     await userRef.set(newUserProfile);
                 }

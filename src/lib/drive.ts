@@ -1,7 +1,7 @@
 'use server';
 
 import { google, type drive_v3, type sheets_v4 } from 'googleapis';
-import { firestoreAdmin } from '@/firebase/admin';
+import { firebaseAdmin } from '@/firebase/admin';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/options';
 import type { Session } from 'next-auth';
@@ -121,11 +121,11 @@ export async function syncClientToDrive(clientId: string, clientName: string): P
         console.log('Moved Sheet into Client Folder.');
         
         // Update the client document in Firestore with the new IDs
-        const clientRef = firestoreAdmin.collection('clients').doc(clientId);
+        const clientRef = firebaseAdmin.firestore().collection('clients').doc(clientId);
         await clientRef.update({
             driveFolderId: folderId,
             sheetId: sheetId,
-            updatedAt: firestoreAdmin.FieldValue.serverTimestamp(),
+            updatedAt: firebaseAdmin.firestore.FieldValue.serverTimestamp(),
         });
 
     } catch (error: any) {
