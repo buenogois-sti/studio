@@ -133,9 +133,9 @@ export async function createClientFolderAndSheet(clientName: string, userId: str
         }
 
         return { folderId, sheetId };
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error in createClientFolderAndSheet:", error);
-        // Re-throw the specific error from the failing function.
-        throw error;
+        // Re-throw with a clean error message to avoid Next.js redacting it in production.
+        throw new Error(error.message || 'Ocorreu um erro desconhecido durante a automação do Google Drive.');
     }
 }
