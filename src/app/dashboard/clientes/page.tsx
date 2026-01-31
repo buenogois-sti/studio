@@ -8,6 +8,7 @@ import {
   File,
   ListFilter,
   Loader2,
+  FolderSync,
 } from 'lucide-react';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
@@ -78,7 +79,7 @@ import { collection, serverTimestamp, Timestamp, doc } from 'firebase/firestore'
 import type { Client } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/use-toast';
-import { createClientFolderAndSheet } from '@/lib/drive';
+import { syncClientToDrive } from '@/lib/drive';
 
 const clientSchema = z.object({
   name: z.string().min(2, { message: 'O nome deve ter pelo menos 2 caracteres.' }),
@@ -94,7 +95,7 @@ function ClientForm({
   onSave: () => void;
   client?: Client | null;
 }) {
-  const { firestore, user } = useFirebase();
+  const { firestore } = useFirebase();
   const { toast } = useToast();
   const [isSaving, setIsSaving] = React.useState(false);
 
@@ -117,7 +118,7 @@ function ClientForm({
   }, [client, form]);
 
   async function onSubmit(values: z.infer<typeof clientSchema>) {
-    if (!firestore || !user) return;
+    if (!firestore) return;
     setIsSaving(true);
     
     try {
@@ -127,31 +128,23 @@ function ClientForm({
         updateDocumentNonBlocking(clientRef, { ...values, updatedAt: serverTimestamp() });
         toast({ title: 'Cliente atualizado!', description: `Os dados de ${values.name} foram salvos.` });
       } else {
-        // Add new client with Drive/Sheet automation, passing the user ID for auth
-        const { folderId, sheetId } = await createClientFolderAndSheet(values.name, user.uid);
-
-        if (!folderId || !sheetId) {
-            throw new Error('Falha ao criar pasta ou planilha no Google Drive.');
-        }
-
+        // Add new client without Drive/Sheet automation
         const clientsCollection = collection(firestore, 'clients');
         addDocumentNonBlocking(clientsCollection, {
           ...values,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
           avatar: `https://picsum.photos/seed/c${Math.random()}/40/40`,
-          driveFolderId: folderId,
-          sheetId: sheetId,
         });
-        toast({ title: 'Cliente cadastrado!', description: `${values.name} foi adicionado e os arquivos no Drive foram criados.` });
+        toast({ title: 'Cliente cadastrado!', description: `${values.name} foi adicionado com sucesso.` });
       }
       onSave();
     } catch (error: any) {
-        console.error("Failed to save client or create drive assets:", error);
+        console.error("Failed to save client:", error);
         toast({ 
           variant: 'destructive', 
-          title: 'Erro na automação do Drive', 
-          description: error.message || 'Não foi possível criar os arquivos no Google Drive. Verifique as permissões e configurações.'
+          title: 'Erro ao Salvar', 
+          description: error.message || 'Não foi possível salvar os dados do cliente.'
         });
     } finally {
         setIsSaving(false);
@@ -233,10 +226,12 @@ export default function ClientsPage() {
   const [isSheetOpen, setIsSheetOpen] = React.useState(false);
   const [editingClient, setEditingClient] = React.useState<Client | null>(null);
   const [clientToDelete, setClientToDelete] = React.useState<Client | null>(null);
+  const [isSyncing, setIsSyncing] = React.useState<string | null>(null); // Store syncing client ID
   const alertDialogTitleId = React.useId();
   const alertDialogDescriptionId = React.useId();
+  const { toast } = useToast();
   
-  const { firestore, isUserLoading } = useFirebase();
+  const { firestore, isUserLoading, user } = useFirebase();
 
   const clientsQuery = useMemoFirebase(
     () => (firestore ? collection(firestore, 'clients') : null),
@@ -283,6 +278,30 @@ export default function ClientsPage() {
     setIsSheetOpen(false);
     setEditingClient(null);
   }
+  
+  const handleSyncClient = async (client: Client) => {
+    if (!user) {
+        toast({ variant: 'destructive', title: 'Erro de Autenticação', description: 'Usuário não encontrado.' });
+        return;
+    }
+    setIsSyncing(client.id);
+    try {
+        await syncClientToDrive(client.id, client.name, user.uid);
+        toast({
+            title: "Sincronização Concluída!",
+            description: `Pasta e planilha para ${client.name} foram criadas com sucesso no Google Drive.`
+        });
+    } catch (error: any) {
+        toast({
+            variant: 'destructive',
+            title: 'Erro na Sincronização',
+            description: error.message || 'Não foi possível criar os arquivos no Google Drive.'
+        });
+    } finally {
+        setIsSyncing(null);
+    }
+};
+
 
   return (
     <>
@@ -332,7 +351,7 @@ export default function ClientsPage() {
                   </TableHead>
                   <TableHead>Cliente</TableHead>
                   <TableHead>CPF/CNPJ</TableHead>
-                  <TableHead className="hidden md:table-cell">Email</TableHead>
+                  <TableHead className="hidden md:table-cell">Status do Drive</TableHead>
                   <TableHead className="hidden md:table-cell">Data de Cadastro</TableHead>
                   <TableHead>
                     <span className="sr-only">Ações</span>
@@ -348,7 +367,7 @@ export default function ClientsPage() {
                           </TableCell>
                           <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                           <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                          <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-40" /></TableCell>
+                          <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-28" /></TableCell>
                           <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-20" /></TableCell>
                           <TableCell><Skeleton className="h-8 w-8" /></TableCell>
                       </TableRow>
@@ -366,7 +385,13 @@ export default function ClientsPage() {
                       <TableCell>
                         <Badge variant="outline">{client.document}</Badge>
                       </TableCell>
-                      <TableCell className="hidden md:table-cell">{client.email}</TableCell>
+                      <TableCell className="hidden md:table-cell">
+                        {client.driveFolderId ? (
+                            <Badge variant="secondary" className='bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300'>Sincronizado</Badge>
+                        ) : (
+                            <Badge variant="outline">Não Sincronizado</Badge>
+                        )}
+                      </TableCell>
                       <TableCell className="hidden md:table-cell">
                         {formatDate(client.createdAt)}
                       </TableCell>
@@ -381,23 +406,27 @@ export default function ClientsPage() {
                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Ações</DropdownMenuLabel>
                             <DropdownMenuItem onClick={() => handleEdit(client)}>Editar</DropdownMenuItem>
-                             <DropdownMenuItem asChild>
-                                <Link href={`/dashboard/clientes/${client.id}/documentos`}>Gerenciar Documentos</Link>
-                            </DropdownMenuItem>
                             <DropdownMenuItem disabled>Ver Processos</DropdownMenuItem>
-                            <DropdownMenuItem
-                              onSelect={() => {
-                                if (client.driveFolderId) {
-                                  window.open(
-                                    `https://drive.google.com/drive/folders/${client.driveFolderId}`,
-                                    '_blank'
-                                  );
-                                }
-                              }}
-                              disabled={!client.driveFolderId}
-                            >
-                              Abrir no Drive
-                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+
+                            {client.driveFolderId ? (
+                                <>
+                                <DropdownMenuItem asChild>
+                                    <Link href={`/dashboard/clientes/${client.id}/documentos`}>Gerenciar Documentos</Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                    onSelect={() => window.open(`https://drive.google.com/drive/folders/${client.driveFolderId}`, '_blank')}
+                                >
+                                    Abrir no Drive
+                                </DropdownMenuItem>
+                                </>
+                            ) : (
+                                <DropdownMenuItem onClick={() => handleSyncClient(client)} disabled={isSyncing === client.id}>
+                                    {isSyncing === client.id && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                    Sincronizar com Drive
+                                </DropdownMenuItem>
+                            )}
+
                             <DropdownMenuSeparator />
                             <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteTrigger(client)}>
                               Excluir

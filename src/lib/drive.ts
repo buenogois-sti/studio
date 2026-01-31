@@ -18,7 +18,7 @@ interface GoogleApiClients {
  * @param userId The UID of the user to authenticate as.
  * @returns An object containing authenticated Drive and Sheets clients.
  */
-async function getGoogleApiClientsForUser(userId: string): Promise<GoogleApiClients> {
+export async function getGoogleApiClientsForUser(userId: string): Promise<GoogleApiClients> {
     const userDocRef = firestoreAdmin.collection('users').doc(userId);
     const userDoc = await userDocRef.get();
     const userData = userDoc.data();
@@ -105,37 +105,55 @@ async function createClientSheet(sheets: sheets_v4.Sheets, clientName: string): 
     }
 }
 
-// Orchestrates the creation of both the folder and the sheet, using user-specific auth.
-export async function createClientFolderAndSheet(clientName: string, userId: string): Promise<{ folderId: string | null | undefined, sheetId: string | null | undefined }> {
+/**
+ * Orchestrates the creation of a client folder and sheet, then updates the client's record in Firestore.
+ * This is designed to be called as a server action from the client-side.
+ * @param clientId The ID of the client document in Firestore.
+ * @param clientName The name of the client, used for folder/sheet titles.
+ * @param userId The UID of the acting user, for authentication.
+ */
+export async function syncClientToDrive(clientId: string, clientName: string, userId: string): Promise<void> {
     try {
         const { drive, sheets } = await getGoogleApiClientsForUser(userId);
 
         const folderId = await createClientFolder(drive, clientName);
-        const sheetId = await createClientSheet(sheets, clientName);
-        
-        // Move the sheet into the newly created folder
-        if (folderId && sheetId) {
-            const file = await drive.files.get({
-                fileId: sheetId,
-                fields: 'parents',
-                supportsAllDrives: true, 
-            });
-            const previousParents = file.data.parents ? file.data.parents.join(',') : '';
-
-            await drive.files.update({
-                fileId: sheetId,
-                addParents: folderId,
-                removeParents: previousParents,
-                fields: 'id, parents',
-                supportsAllDrives: true,
-            });
-             console.log('Moved Sheet into Client Folder.');
+        if (!folderId) {
+            throw new Error('Falha ao criar pasta no Google Drive.');
         }
 
-        return { folderId, sheetId };
+        const sheetId = await createClientSheet(sheets, clientName);
+        if (!sheetId) {
+            throw new Error('Falha ao criar planilha no Google Sheets.');
+        }
+        
+        // Move the sheet into the newly created folder
+        const file = await drive.files.get({
+            fileId: sheetId,
+            fields: 'parents',
+            supportsAllDrives: true, 
+        });
+        const previousParents = file.data.parents ? file.data.parents.join(',') : '';
+
+        await drive.files.update({
+            fileId: sheetId,
+            addParents: folderId,
+            removeParents: previousParents,
+            fields: 'id, parents',
+            supportsAllDrives: true,
+        });
+        console.log('Moved Sheet into Client Folder.');
+        
+        // Update the client document in Firestore with the new IDs
+        const clientRef = firestoreAdmin.collection('clients').doc(clientId);
+        await clientRef.update({
+            driveFolderId: folderId,
+            sheetId: sheetId,
+            updatedAt: firestoreAdmin.FieldValue.serverTimestamp(),
+        });
+
     } catch (error: any) {
-        console.error("Error in createClientFolderAndSheet:", error);
+        console.error("Error in syncClientToDrive:", error);
         // Re-throw with a clean error message to avoid Next.js redacting it in production.
-        throw new Error(error.message || 'Ocorreu um erro desconhecido durante a automação do Google Drive.');
+        throw new Error(error.message || 'Ocorreu um erro desconhecido durante a sincronização com o Google Drive.');
     }
 }
