@@ -1,5 +1,6 @@
 'use client';
 import * as React from 'react';
+import Link from 'next/link';
 import {
   MoreVertical,
   PlusCircle,
@@ -380,6 +381,9 @@ export default function ClientsPage() {
                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Ações</DropdownMenuLabel>
                             <DropdownMenuItem onClick={() => handleEdit(client)}>Editar</DropdownMenuItem>
+                             <DropdownMenuItem asChild>
+                                <Link href={`/dashboard/clientes/${client.id}/documentos`}>Gerenciar Documentos</Link>
+                            </DropdownMenuItem>
                             <DropdownMenuItem disabled>Ver Processos</DropdownMenuItem>
                             <DropdownMenuItem
                               onSelect={() => {

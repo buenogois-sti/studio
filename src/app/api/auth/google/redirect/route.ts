@@ -1,3 +1,5 @@
+'use server';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { oauth2Client, GOOGLE_DRIVE_SCOPES } from '@/lib/google-auth';
 
