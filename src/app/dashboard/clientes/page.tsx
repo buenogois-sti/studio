@@ -77,6 +77,7 @@ export default function ClientsPage() {
   const [isSheetOpen, setIsSheetOpen] = React.useState(false);
   const [editingClient, setEditingClient] = React.useState<Client | null>(null);
   const [clientToDelete, setClientToDelete] = React.useState<Client | null>(null);
+  const [isDeleting, setIsDeleting] = React.useState(false);
   const [isSyncing, setIsSyncing] = React.useState<string | null>(null);
   const { toast } = useToast();
   
@@ -119,6 +120,7 @@ export default function ClientsPage() {
 
   const confirmDelete = async () => {
     if (!firestore || !clientToDelete) return;
+    setIsDeleting(true);
     const clientRef = doc(firestore, 'clients', clientToDelete.id);
     try {
         await deleteDoc(clientRef);
@@ -127,6 +129,7 @@ export default function ClientsPage() {
         toast({ variant: 'destructive', title: 'Erro ao excluir', description: error.message });
     } finally {
         setClientToDelete(null);
+        setIsDeleting(false);
     }
   };
 
@@ -331,7 +334,7 @@ export default function ClientsPage() {
         </SheetContent>
       </Sheet>
 
-      <AlertDialog open={!!clientToDelete} onOpenChange={(open) => !open && setClientToDelete(null)}>
+      <AlertDialog open={!!clientToDelete} onOpenChange={(open) => !isDeleting && !open && setClientToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
@@ -341,8 +344,11 @@ export default function ClientsPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setClientToDelete(null)}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">Excluir</AlertDialogAction>
+            <AlertDialogCancel onClick={() => setClientToDelete(null)} disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
+                {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {isDeleting ? 'Excluindo...' : 'Excluir'}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

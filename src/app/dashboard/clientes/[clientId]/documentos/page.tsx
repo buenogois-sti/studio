@@ -209,6 +209,7 @@ export default function ClientDocumentsPage({ params }: { params: { clientId: st
     const [isLoading, setIsLoading] = React.useState(true);
     const [error, setError] = React.useState<string | null>(null);
     const [fileToDelete, setFileToDelete] = React.useState<DriveFile | null>(null);
+    const [isDeleting, setIsDeleting] = React.useState(false);
     const [fileToRename, setFileToRename] = React.useState<DriveFile | null>(null);
 
     const clientRef = useMemoFirebase(
@@ -245,6 +246,7 @@ export default function ClientDocumentsPage({ params }: { params: { clientId: st
 
     const handleDelete = async () => {
         if (!fileToDelete?.id) return;
+        setIsDeleting(true);
         try {
             await deleteFile(fileToDelete.id);
             toast({
@@ -260,6 +262,7 @@ export default function ClientDocumentsPage({ params }: { params: { clientId: st
             });
         } finally {
             setFileToDelete(null);
+            setIsDeleting(false);
         }
     };
     
@@ -378,7 +381,7 @@ export default function ClientDocumentsPage({ params }: { params: { clientId: st
                 </Card>
             </div>
             
-            <AlertDialog open={!!fileToDelete} onOpenChange={(open) => !open && setFileToDelete(null)}>
+            <AlertDialog open={!!fileToDelete} onOpenChange={(open) => !isDeleting && !open && setFileToDelete(null)}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
@@ -387,8 +390,11 @@ export default function ClientDocumentsPage({ params }: { params: { clientId: st
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">Excluir</AlertDialogAction>
+                        <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDelete} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
+                            {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            {isDeleting ? 'Excluindo...' : 'Excluir'}
+                        </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
