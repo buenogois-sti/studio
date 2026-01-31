@@ -3,6 +3,22 @@ import type { JWT } from 'next-auth/jwt';
 import GoogleProvider from 'next-auth/providers/google';
 import { firestoreAdmin } from '@/firebase/admin';
 
+// --- Environment Variable Validation ---
+// Ensure that the required environment variables are set.
+// If not, throw an error at server start-up for clear debugging.
+const googleClientId = process.env.GOOGLE_CLIENT_ID;
+const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
+const nextAuthSecret = process.env.NEXTAUTH_SECRET;
+
+if (!googleClientId || !googleClientSecret) {
+  throw new Error('CRITICAL_ERROR: Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET environment variables. Please check your .env.local or deployment settings.');
+}
+
+if (!nextAuthSecret) {
+    throw new Error('CRITICAL_ERROR: Missing NEXTAUTH_SECRET environment variable. Please check your .env.local or deployment settings.');
+}
+// --- End Validation ---
+
 async function refreshAccessToken(token: JWT): Promise<JWT> {
     try {
         if (!token.refreshToken) {
@@ -10,8 +26,8 @@ async function refreshAccessToken(token: JWT): Promise<JWT> {
         }
 
         const url = "https://oauth2.googleapis.com/token?" + new URLSearchParams({
-            client_id: process.env.GOOGLE_CLIENT_ID!,
-            client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+            client_id: googleClientId,
+            client_secret: googleClientSecret,
             grant_type: "refresh_token",
             refresh_token: token.refreshToken,
         });
@@ -31,6 +47,7 @@ async function refreshAccessToken(token: JWT): Promise<JWT> {
             ...token,
             accessToken: refreshedTokens.access_token,
             accessTokenExpires: Date.now() + refreshedTokens.expires_in * 1000,
+            // The refresh token might be updated by Google, so we persist the new one if it exists.
             refreshToken: refreshedTokens.refresh_token ?? token.refreshToken,
         };
     } catch (error) {
@@ -45,8 +62,8 @@ async function refreshAccessToken(token: JWT): Promise<JWT> {
 export const authOptions: NextAuthOptions = {
     providers: [
         GoogleProvider({
-            clientId: process.env.GOOGLE_CLIENT_ID!,
-            clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+            clientId: googleClientId,
+            clientSecret: googleClientSecret,
             authorization: {
                 params: {
                     prompt: 'consent',
@@ -57,7 +74,7 @@ export const authOptions: NextAuthOptions = {
             },
         }),
     ],
-    secret: process.env.NEXTAUTH_SECRET,
+    secret: nextAuthSecret,
     session: {
         strategy: 'jwt',
     },
@@ -92,25 +109,29 @@ export const authOptions: NextAuthOptions = {
             return true;
         },
         async jwt({ token, user, account }: { token: JWT, user?: User, account?: Account | null }): Promise<JWT> {
-            // Initial sign in
+            // Initial sign in: Persist account details to the JWT.
             if (account && user) {
-                return {
-                    id: user.id,
-                    accessToken: account.access_token,
-                    refreshToken: account.refresh_token,
-                    accessTokenExpires: account.expires_at ? account.expires_at * 1000 : undefined,
-                    name: user.name,
-                    email: user.email,
-                    picture: user.image,
+                token.id = user.id;
+                token.accessToken = account.access_token;
+                token.accessTokenExpires = account.expires_at ? account.expires_at * 1000 : 0;
+                // A refresh token is only sent on the first authorization. We must persist it.
+                if (account.refresh_token) {
+                    token.refreshToken = account.refresh_token;
                 }
+                // Also persist user details for convenience
+                token.name = user.name;
+                token.email = user.email;
+                token.picture = user.image;
+                return token;
             }
 
-            // Return previous token if the access token has not expired yet
+            // On subsequent requests, the token from the cookie is passed in.
+            // If the access token has not expired yet, return it.
             if (Date.now() < (token.accessTokenExpires ?? 0)) {
                 return token;
             }
 
-            // Access token has expired, try to update it.
+            // Access token has expired, try to refresh it using the refresh token.
             return refreshAccessToken(token);
         },
         async session({ session, token }: { session: Session, token: JWT }) {
