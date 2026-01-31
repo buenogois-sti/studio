@@ -7,25 +7,50 @@ export async function searchClients(query: string): Promise<Client[]> {
     if (!query) return [];
     
     try {
-        // This search is not optimized for large datasets as it fetches all clients.
-        // For production with many clients, a dedicated search service like Algolia is recommended.
         const clientsSnapshot = await firestoreAdmin.collection('clients').get();
         
-        const allClientsData = clientsSnapshot.docs.map(doc => {
-            const data = doc.data();
+        const allClientsData = clientsSnapshot.docs
+            .map(doc => {
+                const data = doc.data();
+                const id = doc.id;
 
-            // Safely convert timestamps to ISO strings for serialization
-            const createdAt = data.createdAt as Timestamp;
-            const updatedAt = data.updatedAt as Timestamp | undefined;
-            
-            const serializableData = {
-                ...data,
-                id: doc.id,
-                createdAt: createdAt.toDate().toISOString(),
-                updatedAt: updatedAt ? updatedAt.toDate().toISOString() : undefined,
-            };
-            return serializableData as Client;
-        });
+                const createdAt = data.createdAt;
+                const updatedAt = data.updatedAt;
+
+                // Skip documents that are missing the required createdAt field or if it's not a Timestamp
+                if (!(createdAt instanceof Timestamp)) {
+                    console.warn(`Skipping document ${id} due to invalid 'createdAt' field.`);
+                    return null;
+                }
+
+                // Create a serializable client object, explicitly casting to avoid type issues with raw data.
+                const serializableClient: Client = {
+                    id: id,
+                    firstName: data.firstName || '',
+                    lastName: data.lastName || '',
+                    document: data.document || '',
+                    email: data.email || '',
+                    avatar: data.avatar || '',
+                    createdAt: createdAt.toDate().toISOString(),
+                    updatedAt: (updatedAt instanceof Timestamp) ? updatedAt.toDate().toISOString() : undefined,
+                    clientType: data.clientType,
+                    motherName: data.motherName,
+                    rg: data.rg,
+                    ctps: data.ctps,
+                    pis: data.pis,
+                    phone: data.phone,
+                    mobile: data.mobile,
+                    emergencyContact: data.emergencyContact,
+                    legalArea: data.legalArea,
+                    address: data.address,
+                    bankInfo: data.bankInfo,
+                    driveFolderId: data.driveFolderId,
+                    sheetId: data.sheetId,
+                };
+                
+                return serializableClient;
+            })
+            .filter((client): client is Client => client !== null); // Filter out any skipped (null) documents
 
         const lowerCaseQuery = query.toLowerCase();
 
@@ -38,7 +63,7 @@ export async function searchClients(query: string): Promise<Client[]> {
         return filteredClients.slice(0, 10); // Limit results for performance
     } catch (error) {
         console.error("Error searching clients:", error);
-        // In a real app, you might want to handle this more gracefully
-        return [];
+        // Throw a generic, serializable error to the client.
+        throw new Error('An error occurred while searching for clients.');
     }
 }
