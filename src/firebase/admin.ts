@@ -21,5 +21,5 @@ if (!admin.apps.length) {
 }
 
 export const firebaseAdmin = admin;
-export const firestoreAdmin = admin.firestore();
-export const authAdmin = admin.auth();
+export const firestoreAdmin = admin.apps.length ? admin.firestore() : undefined;
+export const authAdmin = admin.apps.length ? admin.auth() : undefined;

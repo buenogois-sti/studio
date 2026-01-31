@@ -2,7 +2,7 @@
 import type { NextAuthOptions, User, Account, Session } from 'next-auth';
 import type { JWT } from 'next-auth/jwt';
 import GoogleProvider from 'next-auth/providers/google';
-import { firebaseAdmin } from '@/firebase/admin';
+import { firebaseAdmin, firestoreAdmin } from '@/firebase/admin';
 import type { UserProfile, UserRole } from '@/lib/types';
 
 // --- Environment Variable Validation ---
@@ -27,8 +27,8 @@ async function refreshAccessToken(token: JWT): Promise<JWT> {
     try {
         if (!token.id) throw new Error("Token is missing user ID.");
 
-        const userDoc = await firebaseAdmin.firestore().collection('users').doc(token.id).get();
-        if (!userDoc.exists) throw new Error("User not found in database for token refresh.");
+        const userDoc = await firestoreAdmin?.collection('users').doc(token.id).get();
+        if (!userDoc?.exists) throw new Error("User not found in database for token refresh.");
 
         const userProfile = userDoc.data();
         if (!userProfile?.googleRefreshToken) {
@@ -54,7 +54,7 @@ async function refreshAccessToken(token: JWT): Promise<JWT> {
         if (!response.ok) {
             console.error("Failed to refresh access token, Google API responded with:", refreshedTokens);
             // If refresh fails (e.g., token revoked), clear it from our DB to prevent retries.
-            await firebaseAdmin.firestore().collection('users').doc(token.id).update({
+            await firestoreAdmin?.collection('users').doc(token.id).update({
                 googleRefreshToken: firebaseAdmin.firestore.FieldValue.delete()
             });
             throw new Error("RefreshAccessTokenError");
@@ -108,7 +108,13 @@ export const authOptions: NextAuthOptions = {
         },
 
         async jwt({ token, user, account }) {
-            const db = firebaseAdmin.firestore();
+            // Guard clause to ensure Firebase Admin is initialized
+            if (!firestoreAdmin) {
+                console.error("CRITICAL_ERROR: Firebase Admin SDK is not initialized. Cannot access Firestore.");
+                token.error = "DatabaseError";
+                return token;
+            }
+            const db = firestoreAdmin;
 
             // This block runs only on initial sign-in
             if (account && user) {

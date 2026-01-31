@@ -3,7 +3,8 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import * as React from 'react';
-import { useSession } from 'next-auth/react';
+import { useSession, signOut } from 'next-auth/react';
+import { useToast } from '@/components/ui/use-toast';
 
 import {
   SidebarProvider,
@@ -123,6 +124,26 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
     const router = useRouter();
     const { data: session, status } = useSession();
     const { firestore } = useFirebase();
+    const { toast } = useToast();
+
+    React.useEffect(() => {
+        if (session?.error) {
+            let description = 'Ocorreu um erro inesperado na sua sessão.';
+            if (session.error === 'RefreshAccessTokenError') {
+                description = 'Sua sessão expirou e não foi possível renová-la. Por favor, faça login novamente.';
+            } else if (session.error === 'DatabaseError') {
+                description = 'Não foi possível acessar seus dados de perfil. Verifique a configuração do servidor e tente novamente.';
+            }
+            toast({
+                variant: 'destructive',
+                title: 'Erro de Sessão',
+                description: description,
+                duration: 5000,
+            });
+            // Log out the user to force a clean login flow
+            signOut({ callbackUrl: '/login' });
+        }
+    }, [session, toast]);
 
     const userProfileRef = useMemoFirebase(
         () => (firestore && session?.user?.id ? doc(firestore, 'users', session.user.id) : null),
