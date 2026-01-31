@@ -149,7 +149,7 @@ export default function ClientsPage() {
         await syncClientToDrive(client.id, clientName);
         toast({
             title: "Sincronização Concluída!",
-            description: `Pasta e planilha para ${clientName} foram criadas com sucesso no Google Drive.`
+            description: `Pasta, planilha e kit de documentos para ${clientName} foram criados no Google Drive.`
         });
     } catch (error: any) {
         toast({

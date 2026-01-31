@@ -62,6 +62,7 @@ export type Process = {
   opposingParties?: string[];
   description?: string;
   status: 'Ativo' | 'Arquivado' | 'Pendente';
+  driveFolderId?: string;
   createdAt: Timestamp;
   updatedAt?: Timestamp;
 };
@@ -123,5 +124,3 @@ export type Staff = {
   createdAt: Timestamp;
   updatedAt?: Timestamp;
 };
-
-    

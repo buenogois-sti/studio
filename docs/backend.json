@@ -210,6 +210,10 @@
             "Pendente"
           ]
         },
+        "driveFolderId": {
+          "type": "string",
+          "description": "The ID of the process's subfolder in Google Drive."
+        },
         "createdAt": {
           "type": "string",
           "description": "The date and time when the process was created.",
@@ -506,5 +510,3 @@
     }
   }
 }
-
-    

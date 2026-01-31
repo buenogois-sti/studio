@@ -111,6 +111,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { searchClients } from '@/lib/client-actions';
 import { ClientForm } from '@/components/client/ClientForm';
 import { cn } from '@/lib/utils';
+import { syncProcessToDrive } from '@/lib/drive';
 
 const processSchema = z.object({
   clientId: z.string().min(1, { message: 'Selecione um cliente.' }),
@@ -581,6 +582,7 @@ export default function ProcessosPage() {
   );
   const [processToDelete, setProcessToDelete] = React.useState<Process | null>(null);
   const [isDeleting, setIsDeleting] = React.useState(false);
+  const [isSyncing, setIsSyncing] = React.useState<string | null>(null);
 
   const { firestore, isUserLoading } = useFirebase();
   const { data: session } = useSession();
@@ -647,6 +649,29 @@ export default function ProcessosPage() {
     setEditingProcess(null);
   };
 
+  const handleSyncProcess = async (process: Process) => {
+    if (!session) {
+        toast({ variant: 'destructive', title: 'Erro de Autenticação', description: 'Sessão de usuário não encontrada.' });
+        return;
+    }
+    setIsSyncing(process.id);
+    try {
+        await syncProcessToDrive(process.id);
+        toast({
+            title: "Sincronização Concluída!",
+            description: `A pasta para o processo "${process.name}" foi criada no Google Drive.`
+        });
+    } catch (error: any) {
+        toast({
+            variant: 'destructive',
+            title: 'Erro na Sincronização',
+            description: error.message || 'Não foi possível criar a pasta do processo no Google Drive.'
+        });
+    } finally {
+        setIsSyncing(null);
+    }
+  };
+
   const formatDate = (date: Timestamp | undefined) => {
     if (!date) return 'N/A';
     return date.toDate().toLocaleDateString('pt-BR');
@@ -691,6 +716,7 @@ export default function ProcessosPage() {
                     Nº do Processo
                   </TableHead>
                   <TableHead className="hidden md:table-cell">Status</TableHead>
+                  <TableHead className="hidden md:table-cell">Status do Drive</TableHead>
                   <TableHead>
                     <span className="sr-only">Ações</span>
                   </TableHead>
@@ -711,6 +737,9 @@ export default function ProcessosPage() {
                       </TableCell>
                       <TableCell className="hidden md:table-cell">
                         <Skeleton className="h-6 w-20" />
+                      </TableCell>
+                       <TableCell className="hidden md:table-cell">
+                        <Skeleton className="h-6 w-28" />
                       </TableCell>
                       <TableCell>
                         <Skeleton className="h-8 w-8 ml-auto" />
@@ -749,6 +778,13 @@ export default function ProcessosPage() {
                           {process.status}
                         </Badge>
                       </TableCell>
+                      <TableCell className="hidden md:table-cell">
+                        {process.driveFolderId ? (
+                            <Badge variant="secondary" className='bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300'>Sincronizado</Badge>
+                        ) : (
+                            <Badge variant="outline">Não Sincronizado</Badge>
+                        )}
+                      </TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -762,6 +798,19 @@ export default function ProcessosPage() {
                               Editar
                             </DropdownMenuItem>
                             <DropdownMenuItem>Ver Audiências</DropdownMenuItem>
+                             <DropdownMenuSeparator />
+                             {process.driveFolderId ? (
+                                <DropdownMenuItem
+                                    onSelect={() => window.open(`https://drive.google.com/drive/folders/${process.driveFolderId}`, '_blank')}
+                                >
+                                    Abrir Pasta no Drive
+                                </DropdownMenuItem>
+                            ) : (
+                                <DropdownMenuItem onClick={() => handleSyncProcess(process)} disabled={isSyncing === process.id}>
+                                    {isSyncing === process.id && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                    Sincronizar com Drive
+                                </DropdownMenuItem>
+                            )}
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                               className="text-destructive"
@@ -776,7 +825,7 @@ export default function ProcessosPage() {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={5} className="h-24 text-center">
+                    <TableCell colSpan={6} className="h-24 text-center">
                       Nenhum processo encontrado. Comece adicionando um novo.
                     </TableCell>
                   </TableRow>
