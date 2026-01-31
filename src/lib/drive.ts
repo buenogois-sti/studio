@@ -125,7 +125,7 @@ export async function syncClientToDrive(clientId: string, clientName: string): P
         await clientRef.update({
             driveFolderId: folderId,
             sheetId: sheetId,
-            updatedAt: firebaseAdmin.firestore.Timestamp.now(),
+            updatedAt: new Date(),
         });
 
     } catch (error: any) {
