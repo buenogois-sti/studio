@@ -1,8 +1,8 @@
+
 import type { NextAuthOptions, User, Account, Session } from 'next-auth';
 import type { JWT } from 'next-auth/jwt';
 import GoogleProvider from 'next-auth/providers/google';
 import { firebaseAdmin } from '@/firebase/admin';
-import { firestore } from 'firebase-admin';
 
 // --- Environment Variable Validation ---
 // Ensure that the required environment variables are set.
@@ -103,8 +103,8 @@ export const authOptions: NextAuthOptions = {
                         firstName: firstName,
                         lastName: lastNameParts.join(' '),
                         role: role, // Use the dynamically determined role
-                        createdAt: firestore.FieldValue.serverTimestamp(),
-                        updatedAt: firestore.FieldValue.serverTimestamp(),
+                        createdAt: firebaseAdmin.firestore.FieldValue.serverTimestamp(),
+                        updatedAt: firebaseAdmin.firestore.FieldValue.serverTimestamp(),
                     };
                     await userRef.set(newUserProfile);
                 }
