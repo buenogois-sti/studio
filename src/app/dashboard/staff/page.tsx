@@ -3,12 +3,17 @@ import * as React from 'react';
 import {
   MoreVertical,
   PlusCircle,
-  Search,
   Loader2,
   Briefcase,
+  Mail,
+  Phone,
+  MessageSquare,
+  Copy,
+  FolderKanban,
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -17,6 +22,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  CardFooter,
 } from '@/components/ui/card';
 import {
   DropdownMenu,
@@ -26,7 +32,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Input } from '@/components/ui/input';
 import {
   Sheet,
   SheetContent,
@@ -44,23 +49,17 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { StaffForm } from '@/components/staff/StaffForm';
+import { Separator } from '@/components/ui/separator';
 
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, doc, deleteDoc } from 'firebase/firestore';
-import type { Staff } from '@/lib/types';
+import type { Staff, Process } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
+import Link from 'next/link';
 
 const roleLabels: { [key: string]: string } = {
   employee: 'Funcionário',
@@ -85,7 +84,14 @@ export default function StaffPage() {
   const { data: staffData, isLoading: isLoadingStaff } = useCollection<Staff>(staffQuery);
   const staff = staffData || [];
   
-  const isLoading = status === 'loading' || isLoadingStaff;
+  const processesQuery = useMemoFirebase(
+    () => (firestore ? collection(firestore, 'processes') : null),
+    [firestore]
+  );
+  const { data: processesData, isLoading: isLoadingProcesses } = useCollection<Process>(processesQuery);
+  const processes = processesData || [];
+
+  const isLoading = status === 'loading' || isLoadingStaff || isLoadingProcesses;
 
   const handleAddNew = () => {
     setEditingStaff(null);
@@ -121,77 +127,94 @@ export default function StaffPage() {
     setEditingStaff(null);
   }
 
+  const handleCopy = (text: string | undefined) => {
+    if (!text) return;
+    navigator.clipboard.writeText(text).then(() => {
+        toast({
+            title: 'Chave PIX copiada!',
+            description: 'A chave foi copiada para a área de transferência.',
+        });
+    }).catch(err => {
+        toast({
+            variant: 'destructive',
+            title: 'Falha ao copiar',
+            description: 'Não foi possível copiar a chave PIX.',
+        });
+    });
+  };
+
   return (
     <>
-      <div className="grid flex-1 items-start gap-4 auto-rows-max">
+      <div className="grid flex-1 items-start gap-6 auto-rows-max">
         <div className="flex items-center gap-4">
-          <h1 className="flex-1 shrink-0 whitespace-nowrap text-xl font-semibold tracking-tight sm:grow-0 font-headline">
-            Gerenciamento de Equipe
-          </h1>
+          <div className='flex items-center gap-2'>
+            <h1 className="flex-1 shrink-0 whitespace-nowrap text-xl font-semibold tracking-tight sm:grow-0 font-headline">
+              Equipe
+            </h1>
+            {!isLoading && <Badge variant="secondary">{staff.length}</Badge>}
+          </div>
           <div className="hidden items-center gap-2 md:ml-auto md:flex">
-            <Button size="sm" className="h-8 gap-1" onClick={handleAddNew}>
+            <Button size="sm" className="h-9 gap-1" onClick={handleAddNew}>
               <PlusCircle className="h-3.5 w-3.5" />
               <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">Adicionar Membro</span>
             </Button>
           </div>
         </div>
-        <Card>
-          <CardHeader>
-             <CardTitle>Membros da Equipe</CardTitle>
-            <CardDescription>
-              Visualize e gerencie os funcionários, advogados e estagiários do escritório.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Perfil</TableHead>
-                  <TableHead>E-mail</TableHead>
-                  <TableHead className="hidden md:table-cell">OAB</TableHead>
-                  <TableHead>
-                    <span className="sr-only">Ações</span>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  Array.from({ length: 3 }).map((_, i) => (
-                      <TableRow key={i}>
-                          <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                          <TableCell><Skeleton className="h-6 w-24" /></TableCell>
-                          <TableCell><Skeleton className="h-4 w-40" /></TableCell>
-                          <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-28" /></TableCell>
-                          <TableCell><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
-                      </TableRow>
-                  ))
-                ) : staff.length > 0 ? (
-                  staff.map((member) => (
-                    <TableRow key={member.id}>
-                      <TableCell className="font-medium">{`${member.firstName} ${member.lastName}`}</TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={
-                            member.role === 'lawyer' ? 'secondary'
-                            : member.role === 'intern' ? 'default'
-                            : 'outline'
-                          }
-                          className={cn({
-                            'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300':
-                              member.role === 'lawyer',
-                            'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300':
-                              member.role === 'intern',
-                          })}
-                        >
-                          {roleLabels[member.role] || member.role}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{member.email}</TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        {member.oabNumber || 'N/A'}
-                      </TableCell>
-                      <TableCell className="text-right">
+
+        {isLoading ? (
+          <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Card key={i}>
+                <CardHeader>
+                  <div className="flex items-center gap-4">
+                    <Skeleton className="h-16 w-16 rounded-full" />
+                    <div className="w-full space-y-2">
+                      <Skeleton className="h-5 w-3/4" />
+                      <Skeleton className="h-5 w-1/2" />
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                   <Skeleton className="h-10 w-full" />
+                   <Separator />
+                   <Skeleton className="h-8 w-full" />
+                   <Skeleton className="h-8 w-full" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : staff.length > 0 ? (
+          <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6">
+            {staff.map((member) => {
+              const memberProcesses = processes.filter(p => p.responsibleStaffIds?.includes(member.id));
+              return (
+                <Card key={member.id} className="flex flex-col">
+                  <CardHeader>
+                    <div className="flex items-start justify-between gap-4">
+                        <div className="flex items-center gap-4">
+                            <Avatar className="h-16 w-16 border-2 border-primary">
+                                <AvatarImage src={`https://picsum.photos/seed/staff${member.id}/100/100`} alt={`${member.firstName} ${member.lastName}`} data-ai-hint="person portrait" />
+                                <AvatarFallback>{member.firstName?.charAt(0) ?? 'S'}</AvatarFallback>
+                            </Avatar>
+                            <div>
+                                <h3 className="font-semibold text-xl">{`${member.firstName} ${member.lastName}`}</h3>
+                                <Badge
+                                  variant={
+                                    member.role === 'lawyer' ? 'secondary'
+                                    : member.role === 'intern' ? 'default'
+                                    : 'outline'
+                                  }
+                                  className={cn('mt-1', {
+                                    'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300 border-blue-200 dark:border-blue-700':
+                                      member.role === 'lawyer',
+                                    'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300 border-purple-200 dark:border-purple-700':
+                                      member.role === 'intern',
+                                  })}
+                                >
+                                  {roleLabels[member.role] || member.role}
+                                </Badge>
+                            </div>
+                        </div>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button aria-haspopup="true" size="icon" variant="ghost">
@@ -208,24 +231,92 @@ export default function StaffPage() {
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : (
-                    <TableRow>
-                        <TableCell colSpan={5} className="h-24 text-center">
-                            <div className="flex flex-col items-center gap-2">
-                                <Briefcase className="h-8 w-8 text-muted-foreground" />
-                                <p>Nenhum membro na equipe ainda.</p>
-                                <Button size="sm" variant="outline" onClick={handleAddNew}>Adicionar Membro</Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="flex-grow space-y-4">
+                    <div className="flex items-center justify-around rounded-lg bg-muted/50 p-1">
+                        <Button variant="ghost" size="icon" asChild disabled={!member.email}>
+                            <a href={`mailto:${member.email}`} title={member.email}><Mail /></a>
+                        </Button>
+                        <Button variant="ghost" size="icon" asChild disabled={!member.whatsapp}>
+                            <a href={`https://wa.me/${member.whatsapp}`} target="_blank" title="Abrir no WhatsApp"><MessageSquare /></a>
+                        </Button>
+                        <Button variant="ghost" size="icon" asChild disabled={!member.phone}>
+                            <a href={`tel:${member.phone}`} title="Ligar"><Phone /></a>
+                        </Button>
+                    </div>
+
+                    {(member.role === 'lawyer' || member.role === 'intern') && (
+                      <>
+                        <Separator />
+                        <div>
+                          <h4 className="font-semibold text-sm mb-2">Dados da OAB</h4>
+                          <div className="text-sm space-y-1 text-muted-foreground">
+                            <p><strong>Nº OAB:</strong> {member.oabNumber || 'N/A'}</p>
+                            <p><strong>Situação:</strong> {member.oabStatus || 'N/A'}</p>
+                          </div>
+                        </div>
+
+                        <Separator />
+                        <div>
+                          <h4 className="font-semibold text-sm mb-2">Dados Financeiros</h4>
+                          <div className="text-sm space-y-1 text-muted-foreground">
+                            <p><strong>Banco:</strong> {member.bankInfo?.bankName || 'N/A'}</p>
+                            <p><strong>Agência:</strong> {member.bankInfo?.agency || 'N/A'} / <strong>Conta:</strong> {member.bankInfo?.account || 'N/A'}</p>
+                            <div className="flex items-center gap-2">
+                              <span><strong>Chave PIX:</strong> {member.bankInfo?.pixKey || 'N/A'}</span>
+                              {member.bankInfo?.pixKey && <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleCopy(member.bankInfo?.pixKey)}><Copy className="h-4 w-4"/></Button>}
                             </div>
-                        </TableCell>
-                    </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                    
+                    <Separator />
+                    
+                    <div>
+                      <h4 className="font-semibold text-sm mb-2">Processos Atuantes ({memberProcesses.length})</h4>
+                      <div className="space-y-2">
+                          {memberProcesses.length > 0 ? (
+                              memberProcesses.slice(0, 3).map(proc => (
+                                  <div key={proc.id} className="flex items-center gap-3 text-sm p-2 rounded-lg bg-muted/50">
+                                      <FolderKanban className="h-4 w-4 text-muted-foreground shrink-0" />
+                                      <span className="flex-1 truncate font-medium">{proc.name}</span>
+                                      <Badge variant={
+                                          proc.status === 'Ativo' ? 'secondary' : proc.status === 'Arquivado' ? 'outline' : 'default'
+                                      } className={cn('shrink-0', {
+                                          'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300 border-green-200 dark:border-green-700': proc.status === 'Ativo',
+                                          'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300 border-yellow-200 dark:border-yellow-700': proc.status === 'Pendente',
+                                      })}>
+                                          {proc.status}
+                                      </Badge>
+                                  </div>
+                              ))
+                          ) : (
+                              <div className="text-sm text-muted-foreground text-center py-4 px-2 border border-dashed rounded-lg">Nenhum processo atribuído.</div>
+                          )}
+                          {memberProcesses.length > 3 && (
+                              <Button variant="link" size="sm" asChild className="p-0 h-auto text-xs mt-2">
+                                <Link href={`/dashboard/processos?staffId=${member.id}`}>Ver todos os {memberProcesses.length} processos</Link>
+                              </Button>
+                          )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+        ) : (
+           <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed shadow-sm h-96">
+                <div className="flex flex-col items-center gap-2 text-center">
+                    <Briefcase className="h-12 w-12 text-muted-foreground" />
+                    <h3 className="text-2xl font-bold tracking-tight">Nenhum membro na equipe</h3>
+                    <p className="text-sm text-muted-foreground">Comece adicionando um novo funcionário, advogado ou estagiário.</p>
+                    <Button className="mt-4" onClick={handleAddNew}>Adicionar Membro</Button>
+                </div>
+            </div>
+        )}
       </div>
 
       <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
@@ -263,5 +354,3 @@ export default function StaffPage() {
     </>
   );
 }
-
-    

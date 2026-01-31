@@ -210,6 +210,13 @@
             "Pendente"
           ]
         },
+        "responsibleStaffIds": {
+          "type": "array",
+          "description": "A list of staff IDs responsible for the process.",
+          "items": {
+            "type": "string"
+          }
+        },
         "driveFolderId": {
           "type": "string",
           "description": "The ID of the process's subfolder in Google Drive."
