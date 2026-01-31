@@ -46,6 +46,7 @@ import {
   SheetDescription,
   SheetHeader,
   SheetTitle,
+  SheetFooter
 } from '@/components/ui/sheet';
 import {
   Form,
@@ -73,6 +74,14 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select"
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 import { useFirebase, useCollection, useMemoFirebase, addDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
 import { collection, serverTimestamp, Timestamp, doc } from 'firebase/firestore';
@@ -82,11 +91,26 @@ import { useToast } from '@/components/ui/use-toast';
 import { syncClientToDrive } from '@/lib/drive';
 
 const clientSchema = z.object({
-  name: z.string().min(2, { message: 'O nome deve ter pelo menos 2 caracteres.' }),
+  clientType: z.string().min(1, { message: 'Selecione o tipo de cliente.' }),
+  firstName: z.string().min(2, { message: 'O nome deve ter pelo menos 2 caracteres.' }),
+  lastName: z.string().min(2, { message: 'O sobrenome deve ter pelo menos 2 caracteres.' }),
   email: z.string().email({ message: 'Por favor, insira um email válido.' }),
   document: z.string().min(11, { message: 'O documento deve ser um CPF ou CNPJ válido.' }),
   phone: z.string().optional(),
+  mobile: z.string().optional(),
+  legalArea: z.string().optional(),
+  address_street: z.string().optional(),
+  address_number: z.string().optional(),
+  address_complement: z.string().optional(),
+  address_zipCode: z.string().optional(),
+  address_neighborhood: z.string().optional(),
+  address_city: z.string().optional(),
+  address_state: z.string().optional(),
 });
+
+
+const legalAreas = ['Trabalhista', 'Cível', 'Criminal', 'Família', 'Previdenciário', 'Tributário', 'Outro'];
+const clientTypes = ['Pessoa Física', 'Pessoa Jurídica'];
 
 function ClientForm({
   onSave,
@@ -102,18 +126,93 @@ function ClientForm({
   const form = useForm<z.infer<typeof clientSchema>>({
     resolver: zodResolver(clientSchema),
     defaultValues: {
-      name: '',
+      clientType: undefined,
+      firstName: '',
+      lastName: '',
       email: '',
       document: '',
       phone: '',
+      mobile: '',
+      legalArea: undefined,
+      address_street: '',
+      address_number: '',
+      address_complement: '',
+      address_zipCode: '',
+      address_neighborhood: '',
+      address_city: '',
+      address_state: '',
     },
   });
 
+  const handleCepSearch = React.useCallback(async () => {
+    const cep = form.getValues('address_zipCode');
+    if (!cep || cep.replace(/\D/g, '').length !== 8) {
+        toast({
+            variant: 'destructive',
+            title: 'CEP Inválido',
+            description: 'Por favor, insira um CEP com 8 dígitos.',
+        });
+        return;
+    }
+
+    try {
+        const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+        if (!response.ok) throw new Error('Falha na resposta da API');
+        const data = await response.json();
+        if (data.erro) {
+            toast({
+                variant: 'destructive',
+                title: 'CEP não encontrado',
+            });
+        } else {
+            form.setValue('address_street', data.logradouro, { shouldValidate: true });
+            form.setValue('address_neighborhood', data.bairro, { shouldValidate: true });
+            form.setValue('address_city', data.localidade, { shouldValidate: true });
+            form.setValue('address_state', data.uf, { shouldValidate: true });
+            toast({ title: 'Endereço encontrado!' });
+        }
+    } catch (error) {
+        toast({
+            variant: 'destructive',
+            title: 'Erro ao buscar CEP',
+            description: 'Não foi possível conectar à API de CEP.',
+        });
+    }
+  }, [form, toast]);
+
+
   React.useEffect(() => {
     if (client) {
-      form.reset(client);
+      const flatClientData: any = {
+        ...client,
+        address_street: client.address?.street,
+        address_number: client.address?.number,
+        address_complement: client.address?.complement,
+        address_zipCode: client.address?.zipCode,
+        address_neighborhood: client.address?.neighborhood,
+        address_city: client.address?.city,
+        address_state: client.address?.state,
+      };
+      delete flatClientData.address;
+      form.reset(flatClientData);
     } else {
-      form.reset({ name: '', email: '', document: '', phone: '' });
+      form.reset({
+        clientType: undefined,
+        firstName: '',
+        lastName: '',
+        email: '',
+        document: '',
+        phone: '',
+        mobile: '',
+        legalArea: undefined,
+        address_street: '',
+        address_number: '',
+        address_complement: '',
+        address_zipCode: '',
+        address_neighborhood: '',
+        address_city: '',
+        address_state: '',
+      });
     }
   }, [client, form]);
 
@@ -122,21 +221,47 @@ function ClientForm({
     setIsSaving(true);
     
     try {
+      const { 
+        firstName, lastName, clientType, email, document, phone, mobile, legalArea,
+        address_street, address_number, address_complement, address_zipCode, 
+        address_neighborhood, address_city, address_state 
+      } = values;
+
+      const clientData = {
+        firstName,
+        lastName,
+        clientType,
+        email,
+        document,
+        phone,
+        mobile,
+        legalArea,
+        address: {
+          street: address_street,
+          number: address_number,
+          complement: address_complement,
+          zipCode: address_zipCode,
+          neighborhood: address_neighborhood,
+          city: address_city,
+          state: address_state,
+        }
+      };
+
+      const displayName = `${firstName} ${lastName}`;
+
       if (client?.id) {
-        // Update existing client
         const clientRef = doc(firestore, 'clients', client.id);
-        updateDocumentNonBlocking(clientRef, { ...values, updatedAt: serverTimestamp() });
-        toast({ title: 'Cliente atualizado!', description: `Os dados de ${values.name} foram salvos.` });
+        updateDocumentNonBlocking(clientRef, { ...clientData, updatedAt: serverTimestamp() });
+        toast({ title: 'Cliente atualizado!', description: `Os dados de ${displayName} foram salvos.` });
       } else {
-        // Add new client without Drive/Sheet automation
         const clientsCollection = collection(firestore, 'clients');
         addDocumentNonBlocking(clientsCollection, {
-          ...values,
+          ...clientData,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
           avatar: `https://picsum.photos/seed/c${Math.random()}/40/40`,
         });
-        toast({ title: 'Cliente cadastrado!', description: `${values.name} foi adicionado com sucesso.` });
+        toast({ title: 'Cliente cadastrado!', description: `${displayName} foi adicionado com sucesso.` });
       }
       onSave();
     } catch (error: any) {
@@ -153,62 +278,232 @@ function ClientForm({
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 p-4">
-        <fieldset disabled={isSaving} className="space-y-4">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 px-1 py-4">
+        <fieldset disabled={isSaving} className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField
-            control={form.control}
-            name="name"
-            render={({ field }) => (
+              control={form.control}
+              name="clientType"
+              render={({ field }) => (
                 <FormItem>
-                <FormLabel>Nome Completo / Razão Social</FormLabel>
-                <FormControl>
-                    <Input placeholder="Ex: Innovatech Soluções" {...field} />
-                </FormControl>
-                <FormMessage />
+                  <FormLabel>Tipo de Cliente *</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecionar tipo..." />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {clientTypes.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
                 </FormItem>
-            )}
+              )}
             />
             <FormField
-            control={form.control}
-            name="email"
-            render={({ field }) => (
+              control={form.control}
+              name="document"
+              render={({ field }) => (
                 <FormItem>
-                <FormLabel>Email</FormLabel>
-                <FormControl>
-                    <Input placeholder="Ex: contato@innovatech.com" {...field} />
-                </FormControl>
-                <FormMessage />
+                  <FormLabel>CPF / CNPJ *</FormLabel>
+                  <FormControl>
+                    <Input placeholder="00.000.000/0000-00" {...field} />
+                  </FormControl>
+                  <FormMessage />
                 </FormItem>
-            )}
+              )}
             />
             <FormField
-            control={form.control}
-            name="document"
-            render={({ field }) => (
+              control={form.control}
+              name="firstName"
+              render={({ field }) => (
                 <FormItem>
-                <FormLabel>CPF / CNPJ</FormLabel>
-                <FormControl>
-                    <Input placeholder="Ex: 12.345.678/0001-99" {...field} />
-                </FormControl>
-                <FormMessage />
+                  <FormLabel>Nome *</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Primeiro nome" {...field} />
+                  </FormControl>
+                  <FormMessage />
                 </FormItem>
-            )}
+              )}
             />
             <FormField
-            control={form.control}
-            name="phone"
-            render={({ field }) => (
+              control={form.control}
+              name="lastName"
+              render={({ field }) => (
                 <FormItem>
-                <FormLabel>Telefone (Opcional)</FormLabel>
-                <FormControl>
-                    <Input placeholder="Ex: (11) 99999-9999" {...field} />
-                </FormControl>
-                <FormMessage />
+                  <FormLabel>Sobrenome</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Sobrenome completo" {...field} />
+                  </FormControl>
+                  <FormMessage />
                 </FormItem>
-            )}
+              )}
+            />
+            <div className="md:col-span-2">
+                <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Email *</FormLabel>
+                        <FormControl>
+                            <Input placeholder="contato@email.com" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                />
+            </div>
+            <FormField
+              control={form.control}
+              name="phone"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Telefone</FormLabel>
+                  <FormControl>
+                    <Input placeholder="(00) 0000-0000" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="mobile"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Celular</FormLabel>
+                  <FormControl>
+                    <Input placeholder="(00) 00000-0000" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+             <div className="md:col-span-2">
+                <FormField
+                control={form.control}
+                name="legalArea"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Área Jurídica</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                        <FormControl>
+                        <SelectTrigger>
+                            <SelectValue placeholder="Selecionar..." />
+                        </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                            {legalAreas.map(area => <SelectItem key={area} value={area}>{area}</SelectItem>)}
+                        </SelectContent>
+                    </Select>
+                    <FormMessage />
+                    </FormItem>
+                )}
+                />
+            </div>
+            
+            <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4 items-end">
+                <FormField
+                    control={form.control}
+                    name="address_zipCode"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>CEP</FormLabel>
+                            <div className="flex items-center gap-2">
+                                <FormControl>
+                                    <Input placeholder="00000-000" {...field} />
+                                </FormControl>
+                                <Button type="button" onClick={handleCepSearch} disabled={isSaving}>Buscar</Button>
+                            </div>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+            </div>
+
+            <div className="md:col-span-2">
+                <FormField
+                    control={form.control}
+                    name="address_street"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Endereço</FormLabel>
+                        <FormControl>
+                            <Input placeholder="Rua, avenida, etc" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                />
+            </div>
+             <FormField
+              control={form.control}
+              name="address_number"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Número</FormLabel>
+                  <FormControl>
+                    <Input placeholder="123" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="address_complement"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Complemento</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Apto, sala, etc" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="address_neighborhood"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Bairro</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Centro" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="address_city"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Cidade</FormLabel>
+                  <FormControl>
+                    <Input placeholder="São Paulo" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="address_state"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Estado</FormLabel>
+                  <FormControl>
+                    <Input placeholder="SP" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
         </fieldset>
-        <div className="pt-4 flex justify-end gap-2">
+        <SheetFooter className="pt-4">
            <Button type="button" variant="outline" onClick={onSave} disabled={isSaving}>
               Cancelar
             </Button>
@@ -216,7 +511,7 @@ function ClientForm({
                 {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {isSaving ? 'Salvando...' : (client ? 'Salvar Alterações' : 'Salvar Cliente')}
             </Button>
-        </div>
+        </SheetFooter>
       </form>
     </Form>
   );
@@ -284,12 +579,13 @@ export default function ClientsPage() {
         toast({ variant: 'destructive', title: 'Erro de Autenticação', description: 'Usuário não encontrado.' });
         return;
     }
+    const clientName = `${client.firstName} ${client.lastName}`;
     setIsSyncing(client.id);
     try {
-        await syncClientToDrive(client.id, client.name, user.uid);
+        await syncClientToDrive(client.id, clientName, user.uid);
         toast({
             title: "Sincronização Concluída!",
-            description: `Pasta e planilha para ${client.name} foram criadas com sucesso no Google Drive.`
+            description: `Pasta e planilha para ${clientName} foram criadas com sucesso no Google Drive.`
         });
     } catch (error: any) {
         toast({
@@ -377,11 +673,11 @@ export default function ClientsPage() {
                     <TableRow key={client.id}>
                       <TableCell className="hidden sm:table-cell">
                         <Avatar className="h-10 w-10">
-                          <AvatarImage src={client.avatar} alt={client.name} data-ai-hint="company logo" />
-                          <AvatarFallback>{client.name.charAt(0)}</AvatarFallback>
+                          <AvatarImage src={client.avatar} alt={`${client.firstName} ${client.lastName}`} data-ai-hint="company logo" />
+                          <AvatarFallback>{client.firstName?.charAt(0) ?? 'C'}</AvatarFallback>
                         </Avatar>
                       </TableCell>
-                      <TableCell className="font-medium">{client.name}</TableCell>
+                      <TableCell className="font-medium">{`${client.firstName} ${client.lastName}`}</TableCell>
                       <TableCell>
                         <Badge variant="outline">{client.document}</Badge>
                       </TableCell>
@@ -459,14 +755,16 @@ export default function ClientsPage() {
       </div>
 
       <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-        <SheetContent className="sm:max-w-[480px]">
+        <SheetContent className="sm:max-w-lg w-full">
           <SheetHeader>
             <SheetTitle>{editingClient ? 'Editar Cliente' : 'Adicionar Novo Cliente'}</SheetTitle>
             <SheetDescription>
               {editingClient ? 'Altere os dados do cliente abaixo.' : 'Preencha os dados para cadastrar um novo cliente.'}
             </SheetDescription>
           </SheetHeader>
-          <ClientForm onSave={onFormSave} client={editingClient} />
+          <ScrollArea className="h-[calc(100vh-8rem)]">
+            <ClientForm onSave={onFormSave} client={editingClient} />
+          </ScrollArea>
         </SheetContent>
       </Sheet>
 
@@ -476,7 +774,7 @@ export default function ClientsPage() {
             <AlertDialogTitle id={alertDialogTitleId}>Você tem certeza?</AlertDialogTitle>
             <AlertDialogDescription id={alertDialogDescriptionId}>
               Esta ação não pode ser desfeita. Isso excluirá permanentemente o cliente
-              &quot;{clientToDelete?.name}&quot; e removerá seus dados de nossos servidores.
+              &quot;{clientToDelete?.firstName} {clientToDelete?.lastName}&quot; e removerá seus dados de nossos servidores.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

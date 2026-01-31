@@ -44,7 +44,7 @@ function TransactionsTable({
   type: 'receita' | 'despesa';
 }) {
   const clientsMap = React.useMemo(() => {
-    return new Map(clients.map((c) => [c.id, c.name]));
+    return new Map(clients.map((c) => [c.id, `${c.firstName} ${c.lastName}`]));
   }, [clients]);
 
   const textColor = type === 'receita' ? 'text-green-600' : 'text-red-600';

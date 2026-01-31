@@ -140,6 +140,7 @@ export default function ClientDocumentsPage({ params }: { params: { clientId: st
         [firestore, clientId]
     );
     const { data: clientData, isLoading: isClientLoading } = useDoc<Client>(clientRef);
+    const clientName = clientData ? `${clientData.firstName} ${clientData.lastName}` : '';
 
     const fetchFiles = React.useCallback(async () => {
         if (!clientData?.driveFolderId || !user?.uid) return;
@@ -205,7 +206,7 @@ export default function ClientDocumentsPage({ params }: { params: { clientId: st
                         </Link>
                     </Button>
                     <h1 className="text-xl font-semibold font-headline">
-                        Documentos de: {clientData.name}
+                        Documentos de: {clientName}
                     </h1>
                     <div className="ml-auto">
                         {user && clientData.driveFolderId && (

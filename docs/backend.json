@@ -64,9 +64,17 @@
           "type": "string",
           "description": "Unique identifier for the client entity."
         },
-        "name": {
+        "firstName": {
           "type": "string",
-          "description": "The name of the client."
+          "description": "The first name of the client."
+        },
+        "lastName": {
+          "type": "string",
+          "description": "The last name of the client."
+        },
+        "clientType": {
+          "type": "string",
+          "description": "Type of client (e.g., 'Pessoa Física', 'Pessoa Jurídica')."
         },
         "email": {
           "type": "string",
@@ -75,15 +83,50 @@
         },
         "document": {
           "type": "string",
-          "description": "The client's identification document (e.g., tax ID)."
+          "description": "The client's identification document (e.g., CPF, CNPJ)."
         },
         "phone": {
           "type": "string",
           "description": "The client's phone number."
         },
+        "mobile": {
+          "type": "string",
+          "description": "The client's mobile phone number."
+        },
         "avatar": {
           "type": "string",
           "description": "The URL of the client's avatar."
+        },
+        "legalArea": {
+          "type": "string",
+          "description": "The legal area of the case associated with the client."
+        },
+        "address": {
+          "type": "object",
+          "description": "The client's address.",
+          "properties": {
+            "street": {
+              "type": "string"
+            },
+            "number": {
+              "type": "string"
+            },
+            "complement": {
+              "type": "string"
+            },
+            "zipCode": {
+              "type": "string"
+            },
+            "neighborhood": {
+              "type": "string"
+            },
+            "city": {
+              "type": "string"
+            },
+            "state": {
+              "type": "string"
+            }
+          }
         },
         "driveFolderId": {
           "type": "string",
@@ -106,10 +149,9 @@
       },
       "required": [
         "id",
-        "name",
+        "firstName",
+        "lastName",
         "document",
-        "driveFolderId",
-        "sheetId",
         "createdAt",
         "email"
       ]
