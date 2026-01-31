@@ -1,16 +1,15 @@
 import { OAuth2Client } from 'google-auth-library';
 
-// Hardcoding credentials to resolve environment variable loading issues.
-// This is for debugging and development only. For production, use environment variables.
-const GOOGLE_CLIENT_ID = "1052927104977-t77npqdjgl938qgcrmnmih626gqrkrpa.apps.googleusercontent.com";
-const GOOGLE_CLIENT_SECRET = "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";
-const GOOGLE_REDIRECT_URI = "http://localhost:9002/api/auth/google/callback";
+// These variables are loaded from the environment.
+// In local development, they come from .env.local.
+// In Vercel, they are set in the project's Environment Variables settings.
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
+const GOOGLE_REDIRECT_URI = `${process.env.NEXT_PUBLIC_BASE_URL}/api/auth/google/callback`;
 
 if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
-  // This check is now redundant but safe to keep.
-  console.error("FATAL: GOOGLE_CLIENT_ID ou GOOGLE_CLIENT_SECRET não estão definidos no código. Isso é um erro crítico.");
-} else {
-    console.log("google-auth.ts: Usando credenciais definidas no código. Client ID:", GOOGLE_CLIENT_ID ? 'CONFIGURADO' : 'NÃO DEFINIDO');
+  // This is a critical error for production builds or server-side rendering.
+  console.error("FATAL: GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET are not defined in environment variables.");
 }
 
 export const oauth2Client = new OAuth2Client(
