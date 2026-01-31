@@ -25,7 +25,9 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 
-const GOOGLE_REDIRECT_URI = `${baseUrl}/api/auth/google/callback`;
+// Use the URL constructor for a robust way to build the redirect URI, avoiding double slashes.
+const GOOGLE_REDIRECT_URI = new URL('/api/auth/google/callback', baseUrl).toString();
+
 
 if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
   // This check is important for both local and production.
