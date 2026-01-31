@@ -43,6 +43,7 @@ function IntegrationsTab() {
   );
   const { data: userProfile, isLoading: isUserProfileLoading } = useDoc<UserProfile>(userProfileRef);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
 
   useEffect(() => {
     const error = searchParams.get('error');
@@ -73,6 +74,11 @@ function IntegrationsTab() {
     setIsDisconnecting(true);
     // Navigate to the disconnect endpoint. It handles the logic and redirects back.
     window.location.href = '/api/auth/google/disconnect';
+  };
+
+  const handleConnect = () => {
+    setIsConnecting(true);
+    window.location.href = '/api/auth/google/redirect';
   };
 
 
@@ -129,11 +135,13 @@ function IntegrationsTab() {
                 {isDisconnecting ? 'Desconectando...' : 'Desconectar'}
               </Button>
             ) : (
-              <Button asChild className="w-full">
-                <a href="/api/auth/google/redirect">
+              <Button className="w-full" onClick={handleConnect} disabled={isConnecting}>
+                {isConnecting ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
                   <Power className="mr-2 h-4 w-4" />
-                  Conectar com Google
-                </a>
+                )}
+                {isConnecting ? 'Conectando...' : 'Conectar com Google'}
               </Button>
             )}
           </CardFooter>
