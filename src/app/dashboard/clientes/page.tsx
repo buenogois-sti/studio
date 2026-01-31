@@ -93,7 +93,7 @@ function ClientForm({
   onSave: () => void;
   client?: Client | null;
 }) {
-  const { firestore } = useFirebase();
+  const { firestore, user } = useFirebase();
   const { toast } = useToast();
   const [isSaving, setIsSaving] = React.useState(false);
 
@@ -116,7 +116,7 @@ function ClientForm({
   }, [client, form]);
 
   async function onSubmit(values: z.infer<typeof clientSchema>) {
-    if (!firestore) return;
+    if (!firestore || !user) return;
     setIsSaving(true);
     
     try {
@@ -126,8 +126,8 @@ function ClientForm({
         updateDocumentNonBlocking(clientRef, { ...values, updatedAt: serverTimestamp() });
         toast({ title: 'Cliente atualizado!', description: `Os dados de ${values.name} foram salvos.` });
       } else {
-        // Add new client with Drive/Sheet automation
-        const { folderId, sheetId } = await createClientFolderAndSheet(values.name);
+        // Add new client with Drive/Sheet automation, passing the user ID for auth
+        const { folderId, sheetId } = await createClientFolderAndSheet(values.name, user.uid);
 
         if (!folderId || !sheetId) {
             throw new Error('Falha ao criar pasta ou planilha no Google Drive.');

@@ -11,6 +11,7 @@ export type UserProfile = {
   role: UserRole;
   createdAt: Timestamp;
   updatedAt: Timestamp;
+  googleRefreshToken?: string;
 };
 
 export type Client = {

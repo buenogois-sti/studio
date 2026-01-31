@@ -50,6 +50,14 @@ export default function LoginPage() {
         try {
             const result = await signInWithPopup(auth, provider);
             const loggedInUser = result.user;
+            
+            // Create a server-side session cookie for backend access
+            const idToken = await loggedInUser.getIdToken();
+            await fetch('/api/auth/session', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ idToken }),
+            });
 
             const userDocRef = doc(firestore, 'users', loggedInUser.uid);
             const userDoc = await getDoc(userDocRef);

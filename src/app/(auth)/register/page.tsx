@@ -55,6 +55,14 @@ export default function RegisterPage() {
   async function onSubmit(values: z.infer<typeof registerSchema>) {
     if (!firestore || !user) return;
     
+    // Create server-side session cookie
+    const idToken = await user.getIdToken();
+    await fetch('/api/auth/session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idToken }),
+    });
+
     const userRef = doc(firestore, 'users', user.uid);
 
     const newUserProfile: Omit<UserProfile, 'createdAt' | 'updatedAt' | 'role'> = {

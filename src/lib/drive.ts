@@ -1,45 +1,54 @@
 'use server';
 
-import { google } from 'googleapis';
-import { GoogleAuth } from 'google-auth-library';
+import { google, type drive_v3, type sheets_v4 } from 'googleapis';
+import { firestoreAdmin } from '@/firebase/admin';
+import { oauth2Client } from '@/lib/google-auth';
 
-const PROJECT_ID = 'studio-7080106838-23904';
+const ROOT_FOLDER_ID = process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID;
 
-// This function creates and returns an authenticated client that will
-// automatically use Application Default Credentials (ADC).
-function getAuthClient() {
-  const auth = new GoogleAuth({
-    // Explicitly setting the project ID to resolve any ambiguity for ADC.
-    projectId: PROJECT_ID,
-    scopes: [
-      'https://www.googleapis.com/auth/drive',
-      'https://www.googleapis.com/auth/spreadsheets',
-    ],
-  });
-  
-  // The `auth.getClient()` method will automatically find and use the credentials
-  // set up by `gcloud auth application-default login` in a local environment,
-  // or the runtime's service account in a deployed Google Cloud environment.
-  return auth;
+interface GoogleApiClients {
+    drive: drive_v3.Drive;
+    sheets: sheets_v4.Sheets;
 }
 
-// Creates a new folder within a specified parent folder in Google Drive.
-async function createClientFolder(clientName: string) {
-  const auth = getAuthClient();
-  const drive = google.drive({ version: 'v3', auth });
+/**
+ * Creates authenticated Google API clients for a specific user.
+ * It fetches the user's refresh token from Firestore, sets it on the OAuth2 client,
+ * and then returns initialized clients for Drive and Sheets.
+ * The google-auth-library will automatically handle refreshing the access token.
+ * @param userId The UID of the user to authenticate as.
+ * @returns An object containing authenticated Drive and Sheets clients.
+ */
+async function getGoogleApiClientsForUser(userId: string): Promise<GoogleApiClients> {
+    const userDoc = await firestoreAdmin.collection('users').doc(userId).get();
+    const userData = userDoc.data();
+    const refreshToken = userData?.googleRefreshToken;
 
-  const rootFolderId = process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID;
-  if (!rootFolderId) {
+    if (!refreshToken) {
+        throw new Error('Usuário não conectado ao Google ou token de atualização ausente. Por favor, conecte sua conta na página de Configurações.');
+    }
+    
+    // Set the refresh token on the shared OAuth2 client instance.
+    // The library will handle access token refreshing automatically.
+    oauth2Client.setCredentials({ refresh_token: refreshToken });
+
+    const drive = google.drive({ version: 'v3', auth: oauth2Client });
+    const sheets = google.sheets({ version: 'v4', auth: oauth2Client });
+    
+    return { drive, sheets };
+}
+
+
+// Creates a new folder for a client within the root folder.
+async function createClientFolder(drive: drive_v3.Drive, clientName: string): Promise<string | null | undefined> {
+  if (!ROOT_FOLDER_ID) {
     throw new Error('A variável de ambiente GOOGLE_DRIVE_ROOT_FOLDER_ID não está definida.');
   }
 
-  // To create a folder in a Shared Drive, the `parents` field must contain
-  // the ID of the Shared Drive (or a folder within it), and `supportsAllDrives`
-  // must be true in the request.
   const fileMetadata = {
     name: clientName,
     mimeType: 'application/vnd.google-apps.folder',
-    parents: [rootFolderId],
+    parents: [ROOT_FOLDER_ID],
   };
 
   try {
@@ -58,10 +67,7 @@ async function createClientFolder(clientName: string) {
 }
 
 // Creates a new Google Sheet for the client.
-async function createClientSheet(clientName: string) {
-    const auth = getAuthClient();
-    const sheets = google.sheets({ version: 'v4', auth });
-
+async function createClientSheet(sheets: sheets_v4.Sheets, clientName: string): Promise<string | null | undefined> {
     const spreadsheet = {
         properties: {
             title: `Financeiro - ${clientName}`,
@@ -80,18 +86,16 @@ async function createClientSheet(clientName: string) {
     }
 }
 
-// Orchestrates the creation of both the folder and the sheet.
-export async function createClientFolderAndSheet(clientName: string): Promise<{ folderId: string | null | undefined, sheetId: string | null | undefined }> {
+// Orchestrates the creation of both the folder and the sheet, using user-specific auth.
+export async function createClientFolderAndSheet(clientName: string, userId: string): Promise<{ folderId: string | null | undefined, sheetId: string | null | undefined }> {
     try {
-        const folderId = await createClientFolder(clientName);
-        const sheetId = await createClientSheet(clientName);
+        const { drive, sheets } = await getGoogleApiClientsForUser(userId);
+
+        const folderId = await createClientFolder(drive, clientName);
+        const sheetId = await createClientSheet(sheets, clientName);
         
-        // Optionally, move the sheet into the newly created folder
+        // Move the sheet into the newly created folder
         if (folderId && sheetId) {
-            const auth = getAuthClient();
-            const drive = google.drive({ version: 'v3', auth });
-            
-            // Retrieve the file to update its parents
             const file = await drive.files.get({
                 fileId: sheetId,
                 fields: 'parents',
@@ -112,7 +116,7 @@ export async function createClientFolderAndSheet(clientName: string): Promise<{ 
         return { folderId, sheetId };
     } catch (error) {
         console.error("Error in createClientFolderAndSheet:", error);
-        // Re-throw the specific error from the failing function (createClientFolder or createClientSheet)
+        // Re-throw the specific error from the failing function.
         throw error;
     }
 }

@@ -46,11 +46,14 @@ export function UserNav() {
     }
   };
   
-  const handleLogout = () => {
+  const handleLogout = async () => {
     if (auth) {
-      auth.signOut().then(() => {
-        router.push('/login');
-      });
+      // Clear the server-side session cookie first
+      await fetch('/api/auth/session', { method: 'DELETE' });
+      // Then sign out the client
+      await auth.signOut();
+      // Redirect to login page
+      router.push('/login');
     }
   };
 
