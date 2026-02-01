@@ -5,7 +5,7 @@ export const H1 = React.forwardRef<HTMLHeadingElement, React.HTMLAttributes<HTML
     <h1
         ref={ref}
         className={cn(
-            "scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl",
+            "scroll-m-20 text-2xl font-bold tracking-tight font-headline",
             className
         )}
         {...props}
