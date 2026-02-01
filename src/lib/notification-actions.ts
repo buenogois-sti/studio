@@ -35,3 +35,18 @@ export async function createNotification(data: CreateNotificationData): Promise<
     // Don't re-throw, to avoid failing the primary action.
   }
 }
+
+export async function markNotificationAsRead(userId: string, notificationId: string): Promise<void> {
+    if (!firestoreAdmin) {
+        console.error("Firebase Admin not initialized, cannot mark notification as read.");
+        return;
+    }
+
+    try {
+        const notifRef = firestoreAdmin.doc(`users/${userId}/notifications/${notificationId}`);
+        await notifRef.update({ isRead: true });
+    } catch (error) {
+        console.error(`Error marking notification ${notificationId} as read:`, error);
+        // Do not re-throw, it's not a critical failure.
+    }
+}

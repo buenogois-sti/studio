@@ -4,12 +4,13 @@ import { Bell, Check } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy, limit, doc, writeBatch } from 'firebase/firestore';
 import type { Notification } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { markNotificationAsRead } from '@/lib/notification-actions';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -27,6 +28,7 @@ import { Badge } from './ui/badge';
 export function NotificationBell() {
   const { data: session } = useSession();
   const { firestore } = useFirebase();
+  const router = useRouter();
   const [isOpen, setIsOpen] = React.useState(false);
 
   const notificationsQuery = useMemoFirebase(
@@ -57,6 +59,16 @@ export function NotificationBell() {
     }
   };
 
+  const handleNotificationClick = (notification: Notification) => {
+    if (!notification.isRead && session?.user?.id) {
+      markNotificationAsRead(session.user.id, notification.id);
+    }
+    if (notification.href && notification.href !== '#') {
+      router.push(notification.href);
+    }
+    setIsOpen(false);
+  };
+
   return (
     <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
       <DropdownMenuTrigger asChild>
@@ -82,8 +94,11 @@ export function NotificationBell() {
             </div>
           ) : notifications && notifications.length > 0 ? (
             notifications.map(notif => (
-              <DropdownMenuItem key={notif.id} asChild className={cn("flex-col items-start gap-1 p-3 whitespace-normal cursor-pointer", !notif.isRead && "bg-accent/50")}>
-                <Link href={notif.href || '#'} onClick={() => setIsOpen(false)}>
+              <DropdownMenuItem
+                key={notif.id}
+                className={cn("flex-col items-start gap-1 p-3 whitespace-normal cursor-pointer", !notif.isRead && "bg-accent/50")}
+                onClick={() => handleNotificationClick(notif)}
+              >
                   <div className="flex items-center justify-between w-full">
                     <p className="text-sm font-semibold">{notif.title}</p>
                     {!notif.isRead && <div className="h-2 w-2 rounded-full bg-primary" />}
@@ -92,7 +107,6 @@ export function NotificationBell() {
                   <p className="text-xs text-muted-foreground/80 mt-1">
                     {notif.createdAt && formatDistanceToNow(notif.createdAt.toDate(), { addSuffix: true, locale: ptBR })}
                   </p>
-                </Link>
               </DropdownMenuItem>
             ))
           ) : (
