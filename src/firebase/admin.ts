@@ -32,6 +32,14 @@ if (!admin.apps.length) {
       // This is the default for many cloud environments like Firebase App Hosting.
       console.log("Initializing Firebase Admin with Application Default Credentials (ADC). No service account JSON found.");
       admin.initializeApp();
+      
+      // --- NEW: Project ID Validation for ADC ---
+      const adminProjectId = admin.app().options.projectId;
+      if (adminProjectId && adminProjectId !== firebaseConfig.projectId) {
+        throw new Error(`CRITICAL_ERROR: Mismatched Project IDs. The server's Application Default Credentials (ADC) are for project ID '${adminProjectId}', but the client-side config is for '${firebaseConfig.projectId}'. Please ensure your server environment is configured to use the correct Firebase project.`);
+      }
+      // --- END: Project ID Validation for ADC ---
+
       initialized = true;
     }
   } catch (error: any) {
@@ -63,3 +71,4 @@ if (!admin.apps.length) {
 export const firebaseAdmin = initialized ? admin : null;
 export const firestoreAdmin = initialized ? admin.firestore() : null;
 export const authAdmin = initialized ? admin.auth() : null;
+
