@@ -361,56 +361,7 @@ export default function AudienciasPage() {
 
 
   return (
-    <div className="grid gap-8 md:grid-cols-1 lg:grid-cols-[380px_1fr]">
-      <div className="flex flex-col gap-6">
-        <Card>
-          <CardHeader>
-             <CardTitle className="font-headline">Calendário</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Calendar
-              mode="single"
-              selected={date}
-              onSelect={setDate}
-              className="rounded-md border p-0"
-              locale={ptBR}
-              modifiers={{ hasHearing: hearings.filter(h => h.date).map(h => (h.date as unknown as Timestamp).toDate()) }}
-              modifiersClassNames={{ hasHearing: "bg-primary/20 text-primary-foreground rounded-md" }}
-            />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="font-headline text-lg">Próximas Audiências</CardTitle>
-             <NewHearingDialog onHearingCreated={handleHearingCreated} />
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-                <div className="space-y-4">
-                    {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-20 w-full" />)}
-                </div>
-            ) : upcomingHearings.length > 0 ? (
-              <ScrollArea className="h-[250px]">
-                <div className="space-y-3 pr-4">
-                  {upcomingHearings.slice(0, 7).map(hearing => {
-                    const { processName, clientName } = getHearingInfo(hearing);
-                    return (
-                      <div key={hearing.id} className="p-3 rounded-lg border bg-muted/50 transition-colors hover:bg-muted">
-                        <p className="font-semibold text-sm truncate">{processName}</p>
-                        <p className="text-xs text-muted-foreground">{clientName}</p>
-                        <p className="text-sm font-medium mt-1">{formatDate(hearing.date)}</p>
-                      </div>
-                    );
-                  })}
-                </div>
-              </ScrollArea>
-            ) : (
-              <p className="text-sm text-muted-foreground text-center py-4">Nenhuma audiência futura agendada.</p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
+    <div className="grid gap-8 md:grid-cols-1 lg:grid-cols-[1fr_380px]">
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
             <h2 className="font-headline text-2xl font-semibold capitalize">
@@ -474,6 +425,54 @@ export default function AudienciasPage() {
                 </div>
             </ScrollArea>
         )}
+      </div>
+
+      <div className="flex flex-col gap-6">
+        <Card>
+          <CardHeader>
+             <CardTitle className="font-headline">Calendário</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Calendar
+              mode="single"
+              selected={date}
+              onSelect={setDate}
+              locale={ptBR}
+              modifiers={{ hasHearing: hearings.filter(h => h.date).map(h => (h.date as unknown as Timestamp).toDate()) }}
+              modifiersClassNames={{ hasHearing: "bg-primary/20 text-primary-foreground rounded-md" }}
+            />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="font-headline text-lg">Próximas Audiências</CardTitle>
+             <NewHearingDialog onHearingCreated={handleHearingCreated} />
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+                <div className="space-y-4">
+                    {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-20 w-full" />)}
+                </div>
+            ) : upcomingHearings.length > 0 ? (
+              <ScrollArea className="h-[250px]">
+                <div className="space-y-3 pr-4">
+                  {upcomingHearings.slice(0, 7).map(hearing => {
+                    const { processName, clientName } = getHearingInfo(hearing);
+                    return (
+                      <div key={hearing.id} className="p-3 rounded-lg border bg-muted/50 transition-colors hover:bg-muted">
+                        <p className="font-semibold text-sm truncate">{processName}</p>
+                        <p className="text-xs text-muted-foreground">{clientName}</p>
+                        <p className="text-sm font-medium mt-1">{formatDate(hearing.date)}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </ScrollArea>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-4">Nenhuma audiência futura agendada.</p>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
