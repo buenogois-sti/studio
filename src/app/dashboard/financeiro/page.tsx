@@ -431,12 +431,14 @@ function FinancialTitlesTable({
   processesMap,
   isLoading,
   onAction,
+  originLabels,
 }: {
   titles: FinancialTitle[];
   clientsMap: Map<string, string>;
   processesMap: Map<string, Process>;
   isLoading: boolean;
   onAction: () => void;
+  originLabels: Map<string, string>;
 }) {
   const { toast } = useToast();
 
@@ -520,7 +522,7 @@ function FinancialTitlesTable({
                 </div>
               </TableCell>
               <TableCell className="hidden sm:table-cell">
-                <Badge variant="outline">{title.origin.replace(/_/g, ' ')}</Badge>
+                <Badge variant="outline">{originLabels.get(title.origin) || title.origin.replace(/_/g, ' ')}</Badge>
               </TableCell>
               <TableCell className="hidden md:table-cell">
                 <Badge variant={getStatusVariant(effectiveStatus)} className="capitalize">
@@ -589,6 +591,11 @@ export default function FinanceiroPage() {
   
   const clientsMap = React.useMemo(() => new Map(clientsData?.map(c => [c.id, `${c.firstName} ${c.lastName}`])), [clientsData]);
   const processesMap = React.useMemo(() => new Map(processesData?.map(p => [p.id, p])), [processesData]);
+
+  const originLabels = React.useMemo(() => {
+    const allOrigins = [...revenueOrigins, ...expenseOrigins];
+    return new Map(allOrigins.map(o => [o.value, o.label]));
+  }, []);
 
   const handleRefresh = () => setRefreshKey(prev => prev + 1);
 
@@ -694,7 +701,7 @@ export default function FinanceiroPage() {
               <CardDescription>Visualize as movimentações mais recentes do seu escritório.</CardDescription>
             </CardHeader>
             <CardContent>
-              <FinancialTitlesTable titles={titles.slice(0, 10)} clientsMap={clientsMap} processesMap={processesMap} isLoading={isLoading} onAction={handleRefresh} />
+              <FinancialTitlesTable titles={titles.slice(0, 10)} clientsMap={clientsMap} processesMap={processesMap} isLoading={isLoading} onAction={handleRefresh} originLabels={originLabels} />
             </CardContent>
           </Card>
         </TabsContent>
@@ -705,7 +712,7 @@ export default function FinanceiroPage() {
               <CardDescription>Visualize todos os honorários, acordos e pagamentos recebidos.</CardDescription>
             </CardHeader>
             <CardContent>
-              <FinancialTitlesTable titles={receitas} clientsMap={clientsMap} processesMap={processesMap} isLoading={isLoading} onAction={handleRefresh} />
+              <FinancialTitlesTable titles={receitas} clientsMap={clientsMap} processesMap={processesMap} isLoading={isLoading} onAction={handleRefresh} originLabels={originLabels} />
             </CardContent>
           </Card>
         </TabsContent>
@@ -716,7 +723,7 @@ export default function FinanceiroPage() {
               <CardDescription>Visualize todas as custas, despesas e pagamentos efetuados.</CardDescription>
             </CardHeader>
             <CardContent>
-              <FinancialTitlesTable titles={despesas} clientsMap={clientsMap} processesMap={processesMap} isLoading={isLoading} onAction={handleRefresh} />
+              <FinancialTitlesTable titles={despesas} clientsMap={clientsMap} processesMap={processesMap} isLoading={isLoading} onAction={handleRefresh} originLabels={originLabels} />
             </CardContent>
           </Card>
         </TabsContent>
