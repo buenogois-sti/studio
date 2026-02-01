@@ -4,7 +4,9 @@ service cloud.firestore {
 
     // --- Helper Functions ---
     function isSignedIn() {
-      return request.auth != null;
+      // User must be authenticated AND have a verified email.
+      // This is more robust than just checking for auth != null.
+      return request.auth != null && request.auth.token.email_verified == true;
     }
 
     function isUser(userId) {
@@ -41,13 +43,15 @@ service cloud.firestore {
       }
     }
 
-    // Admins and Lawyers can manage clients, processes, and hearings.
+    // Any signed-in user can read data, but writes are restricted.
     match /clients/{clientId} {
-      allow read, write: if isOneOfRoles(['admin', 'lawyer']);
+      allow read: if isSignedIn();
+      allow write: if isOneOfRoles(['admin', 'lawyer']);
     }
 
     match /processes/{processId} {
-      allow read, write: if isOneOfRoles(['admin', 'lawyer']);
+      allow read: if isSignedIn();
+      allow write: if isOneOfRoles(['admin', 'lawyer']);
 
       match /fee_split_rules/default {
         allow read, write: if isOneOfRoles(['admin', 'lawyer', 'financial']);
@@ -55,21 +59,21 @@ service cloud.firestore {
     }
 
     match /hearings/{hearingId} {
-      allow read, write: if isOneOfRoles(['admin', 'lawyer']);
+      allow read: if isSignedIn();
+      allow write: if isOneOfRoles(['admin', 'lawyer']);
     }
 
-    // Financial collections: Admins/Financial can write, Lawyers can only read.
     match /financial_events/{eventId} {
-      allow read: if isOneOfRoles(['admin', 'lawyer', 'financial']);
+      allow read: if isSignedIn();
       allow write: if isOneOfRoles(['admin', 'financial']);
     }
 
     match /financial_titles/{titleId} {
-      allow read: if isOneOfRoles(['admin', 'lawyer', 'financial']);
+      allow read: if isSignedIn();
       allow write: if isOneOfRoles(['admin', 'financial']);
     }
 
-    // Staff can be managed by admins. All signed-in users can read the staff list.
+    // Staff list can be read by any authenticated user.
     match /staff/{staffId} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
@@ -81,7 +85,7 @@ service cloud.firestore {
       }
     }
 
-    // Document templates can be read by anyone signed in, only managed by admins.
+    // Document templates can be read by anyone signed in.
     match /document_templates/{templateId} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
