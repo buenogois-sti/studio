@@ -1,89 +1,63 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
     // --- Helper Functions ---
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function isUser(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
-    function hasRole(role) {
-      return isSignedIn() && request.auth.token != null && request.auth.token.role == role;
-    }
-
     function isOneOfRoles(roles) {
-      return isSignedIn() && request.auth.token != null && request.auth.token.role in roles;
+      return request.auth != null && request.auth.token != null && request.auth.token.role in roles;
     }
-
     function isAdmin() {
-      return hasRole('admin');
+      return isOneOfRoles(['admin']);
+    }
+    function isUser(userId) {
+      return request.auth != null && request.auth.uid == userId;
     }
 
-    // --- Collection Rules ---
-
-    match /users/{userId} {
+    // --- Global Read Rule ---
+    // This allows any user (even unauthenticated) to read data from any collection.
+    // This is a temporary measure to prevent the app from freezing due to the
+    // ongoing server authentication issue (invalid-custom-token).
+    // Write permissions below are still secure.
+    match /{path=**} {
       allow read: if true;
+    }
+
+    // --- Collection-Specific Write Rules ---
+    match /users/{userId} {
       allow update: if isUser(userId) || isAdmin();
       allow create, delete: if isAdmin();
-
-      match /logs/{logId} {
-        allow create: if isUser(userId);
-        allow read: if true;
-        allow update, delete: if false;
-      }
     }
-
+    match /users/{userId}/logs/{logId} {
+      allow create: if isUser(userId);
+      // read is covered by global rule, write is denied by default
+    }
     match /clients/{clientId} {
-      allow read: if true;
       allow write: if isOneOfRoles(['admin', 'lawyer']);
     }
-
     match /processes/{processId} {
-      allow read: if true;
       allow write: if isOneOfRoles(['admin', 'lawyer']);
-
-      match /fee_split_rules/default {
-        allow read: if true;
-        allow write: if isOneOfRoles(['admin', 'lawyer', 'financial']);
-      }
     }
-
+    match /processes/{processId}/fee_split_rules/default {
+      allow write: if isOneOfRoles(['admin', 'lawyer', 'financial']);
+    }
     match /hearings/{hearingId} {
-      allow read: if true;
       allow write: if isOneOfRoles(['admin', 'lawyer']);
     }
-
     match /financial_events/{eventId} {
-      allow read: if true;
       allow write: if isOneOfRoles(['admin', 'financial']);
     }
-
     match /financial_titles/{titleId} {
-      allow read: if true;
       allow write: if isOneOfRoles(['admin', 'financial']);
     }
-
     match /staff/{staffId} {
-      allow read: if true;
       allow write: if isAdmin();
-
-      match /credits/{creditId} {
-        allow read: if true;
-        allow write: if isOneOfRoles(['admin', 'financial']);
-      }
     }
-
+    match /staff/{staffId}/credits/{creditId} {
+      allow write: if isOneOfRoles(['admin', 'financial']);
+    }
     match /document_templates/{templateId} {
-      allow read: if true;
       allow write: if isAdmin();
     }
-
     match /system_settings/{settingId} {
-      allow read: if true;
       allow write: if isAdmin();
     }
   }
