@@ -17,6 +17,7 @@ import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -617,6 +618,10 @@ export default function ProcessosPage() {
   const [isDeleting, setIsDeleting] = React.useState(false);
   const [isSyncing, setIsSyncing] = React.useState<string | null>(null);
   const [eventProcess, setEventProcess] = React.useState<Process | null>(null);
+  
+  const searchParams = useSearchParams();
+  const [searchTerm, setSearchTerm] = React.useState('');
+  const [clientFilterName, setClientFilterName] = React.useState<string | null>(null);
 
   const { firestore, isUserLoading } = useFirebase();
   const { data: session } = useSession();
@@ -642,6 +647,46 @@ export default function ProcessosPage() {
   );
 
   const isLoading = isUserLoading || isLoadingProcesses || isLoadingClients;
+  
+  const clientIdFilter = searchParams.get('clientId');
+  const staffIdFilter = searchParams.get('staffId');
+
+  React.useEffect(() => {
+      if (clientIdFilter) {
+          getClientById(clientIdFilter).then(client => {
+              if (client) {
+                  setClientFilterName(`${client.firstName} ${client.lastName}`);
+              }
+          });
+      } else {
+          setClientFilterName(null);
+      }
+  }, [clientIdFilter]);
+
+  const filteredProcesses = React.useMemo(() => {
+    if (!processesData) return [];
+    let data = [...processesData];
+
+    if (clientIdFilter) {
+        data = data.filter(p => p.clientId === clientIdFilter);
+    }
+    if (staffIdFilter) {
+        data = data.filter(p => p.responsibleStaffIds?.includes(staffIdFilter));
+    }
+    
+    if (searchTerm.trim()) {
+        const lowercasedFilter = searchTerm.toLowerCase();
+        data = data.filter(process => {
+            const name = process.name.toLowerCase();
+            const processNumber = (process.processNumber || '').toLowerCase();
+            const clientName = (clientsMap.get(process.clientId) || '').toLowerCase();
+            return name.includes(lowercasedFilter) || processNumber.includes(lowercasedFilter) || clientName.includes(lowercasedFilter);
+        });
+    }
+    
+    return data;
+  }, [processesData, clientIdFilter, staffIdFilter, searchTerm, clientsMap]);
+
 
   const handleAddNew = () => {
     setEditingProcess(null);
@@ -720,9 +765,18 @@ export default function ProcessosPage() {
       <div className="grid flex-1 items-start gap-4 auto-rows-max">
         <div className="flex items-center gap-4">
           <h1 className="flex-1 shrink-0 whitespace-nowrap text-xl font-semibold tracking-tight sm:grow-0 font-headline">
-            Processos
+             {clientFilterName ? `Processos de ${clientFilterName}` : 'Processos'}
           </h1>
           <div className="hidden items-center gap-2 md:ml-auto md:flex">
+             <div className="relative w-full max-w-sm">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar processos..."
+                    className="pl-8 h-8"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+              </div>
             <Button variant="outline" size="sm" className="h-8 gap-1">
               <File className="h-3.5 w-3.5" />
               <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
@@ -784,8 +838,8 @@ export default function ProcessosPage() {
                       </TableCell>
                     </TableRow>
                   ))
-                ) : processesData && processesData.length > 0 ? (
-                  processesData.map((process) => (
+                ) : filteredProcesses && filteredProcesses.length > 0 ? (
+                  filteredProcesses.map((process) => (
                     <TableRow key={process.id}>
                       <TableCell className="font-medium">
                         {process.name}
@@ -868,7 +922,7 @@ export default function ProcessosPage() {
                 ) : (
                   <TableRow>
                     <TableCell colSpan={6} className="h-24 text-center">
-                      Nenhum processo encontrado. Comece adicionando um novo.
+                       {searchTerm ? `Nenhum processo encontrado para "${searchTerm}".` : "Nenhum processo encontrado."}
                     </TableCell>
                   </TableRow>
                 )}
