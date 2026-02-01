@@ -23,6 +23,7 @@ import { useDoc, useFirebase, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import type { UserProfile } from '@/lib/types';
 import { ClientKitManager } from '@/components/settings/client-kit-manager';
+import { TemplateLibraryManager } from '@/components/settings/template-library-manager';
 
 
 function IntegrationsTab() {
@@ -134,10 +135,11 @@ export default function ConfiguracoesPage() {
       </div>
 
       <Tabs defaultValue="integracoes" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 md:grid-cols-7 mb-6">
+        <TabsList className="grid w-full grid-cols-4 md:grid-cols-8 mb-6">
           <TabsTrigger value="geral">Geral</TabsTrigger>
           <TabsTrigger value="integracoes">Integrações</TabsTrigger>
           <TabsTrigger value="kit-cliente">Kit Cliente</TabsTrigger>
+          <TabsTrigger value="modelos-acervo">Modelos Acervo</TabsTrigger>
           <TabsTrigger value="financeiro">Financeiro</TabsTrigger>
           <TabsTrigger value="usuarios">Usuários</TabsTrigger>
           <TabsTrigger value="aparencia">Aparência</TabsTrigger>
@@ -180,6 +182,10 @@ export default function ConfiguracoesPage() {
 
         <TabsContent value="kit-cliente">
             <ClientKitManager />
+        </TabsContent>
+
+        <TabsContent value="modelos-acervo">
+            <TemplateLibraryManager />
         </TabsContent>
 
         <TabsContent value="financeiro">
@@ -249,3 +255,5 @@ export default function ConfiguracoesPage() {
     </div>
   );
 }
+
+    

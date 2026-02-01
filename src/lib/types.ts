@@ -172,3 +172,15 @@ export type ClientKitTemplate = {
   templateId: string;
   destination: string;
 };
+
+export type DocumentTemplate = {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  templateFileId: string;
+  createdAt: Timestamp;
+  updatedAt?: Timestamp;
+};
+
+    

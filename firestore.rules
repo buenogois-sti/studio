@@ -44,6 +44,11 @@ service cloud.firestore {
     match /staff/{staffId} {
       allow read, write: if true; // Temporarily allow all access
     }
+
+    // Secures the document template collection.
+    match /document_templates/{templateId} {
+      allow read, write: if true; // Temporarily allow all access
+    }
   }
 }
 

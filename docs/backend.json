@@ -659,6 +659,50 @@
           }
         }
       }
+    },
+    "DocumentTemplate": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "DocumentTemplate",
+      "type": "object",
+      "description": "Represents a document template in the firm's central library.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the template."
+        },
+        "name": {
+          "type": "string",
+          "description": "The user-facing name of the template."
+        },
+        "description": {
+          "type": "string",
+          "description": "A brief explanation of the template's purpose."
+        },
+        "category": {
+          "type": "string",
+          "description": "Category for organizing templates (e.g., 'Procurações', 'Recibos')."
+        },
+        "templateFileId": {
+          "type": "string",
+          "description": "The ID of the source Google Drive file for the template."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "description",
+        "category",
+        "templateFileId",
+        "createdAt"
+      ]
     }
   },
   "auth": {
@@ -732,6 +776,14 @@
         "$ref": "#/backend/entities/SystemSettings"
       },
       "description": "Stores global configuration documents for the system, like the client kit templates."
+    },
+    "/document_templates/{templateId}": {
+      "schema": {
+        "$ref": "#/backend/entities/DocumentTemplate"
+      },
+      "description": "Stores the central library of document templates."
     }
   }
 }
+
+    

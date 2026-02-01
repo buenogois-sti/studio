@@ -42,6 +42,7 @@ import {
   Briefcase,
   AlertCircle,
   Loader2,
+  Library,
 } from 'lucide-react';
 import type { UserProfile } from '@/lib/types';
 import {
@@ -85,6 +86,12 @@ const navItems = [
     roles: ['admin', 'financial'],
   },
   {
+    href: '/dashboard/acervo',
+    label: 'Acervo',
+    icon: Library,
+    roles: ['admin', 'lawyer'],
+  },
+  {
     href: '/dashboard/staff',
     label: 'Equipe',
     icon: Briefcase,
@@ -104,6 +111,7 @@ const BreadcrumbMap: { [key: string]: string } = {
   '/dashboard/processos': 'Processos',
   '/dashboard/audiencias': 'Audiências',
   '/dashboard/financeiro': 'Financeiro',
+  '/dashboard/acervo': 'Acervo de Modelos',
   '/dashboard/staff': 'Equipe',
   '/dashboard/configuracoes': 'Configurações',
 };
