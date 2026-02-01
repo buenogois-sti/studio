@@ -2,7 +2,6 @@
 
 import * as React from 'react';
 import {
-  Calendar as CalendarIcon,
   PlusCircle,
   Loader2,
   ChevronLeft,
@@ -74,7 +73,7 @@ import {
 const hearingSchema = z.object({
   processId: z.string().min(1, 'É obrigatório selecionar um processo.'),
   processName: z.string(),
-  date: z.date({ required_error: 'A data é obrigatória.' }),
+  date: z.coerce.date({ required_error: 'A data é obrigatória.' }),
   time: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Formato de hora inválido (HH:MM).'),
   location: z.string().min(3, 'O local é obrigatório.'),
   responsibleParty: z.string().min(3, 'O responsável é obrigatório.'),
@@ -236,29 +235,13 @@ function NewHearingDialog({ onHearingCreated }: { onHearingCreated: () => void }
                   render={({ field }) => (
                     <FormItem className="flex flex-col">
                       <FormLabel>Data da Audiência *</FormLabel>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant={"outline"}
-                              className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}
-                            >
-                              {field.value ? format(field.value, "PPP", { locale: ptBR }) : <span>Inserir data</span>}
-                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={field.value}
-                            onSelect={field.onChange}
-                            disabled={(date) => date < new Date()}
-                            initialFocus
-                            locale={ptBR}
-                          />
-                        </PopoverContent>
-                      </Popover>
+                      <FormControl>
+                        <Input
+                          type="date"
+                          {...field}
+                          value={field.value instanceof Date ? format(field.value, 'yyyy-MM-dd') : field.value || ''}
+                        />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -589,3 +572,5 @@ export default function AudienciasPage() {
     </>
   );
 }
+
+    

@@ -3,7 +3,7 @@ import * as React from 'react';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Loader2, CalendarIcon } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { addMonths, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -13,20 +13,17 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
 import { useToast } from '@/components/ui/use-toast';
-import { cn } from '@/lib/utils';
 import type { Process } from '@/lib/types';
 import { createFinancialEventAndTitles } from '@/lib/finance-actions';
 
 const eventSchema = z.object({
   type: z.enum(['ACORDO', 'SENTENCA', 'EXECUCAO', 'CONTRATO'], { required_error: 'O tipo do evento é obrigatório.'}),
-  eventDate: z.date({ required_error: 'A data do evento é obrigatória.' }),
+  eventDate: z.coerce.date({ required_error: 'A data do evento é obrigatória.' }),
   description: z.string().min(3, 'A descrição é obrigatória.'),
   totalValue: z.coerce.number().positive('O valor total deve ser positivo.'),
   installments: z.coerce.number().int().min(1, 'Deve haver pelo menos 1 parcela.'),
-  firstDueDate: z.date({ required_error: 'A data do primeiro vencimento é obrigatória.' }),
+  firstDueDate: z.coerce.date({ required_error: 'A data do primeiro vencimento é obrigatória.' }),
 });
 
 interface FinancialEventDialogProps {
@@ -136,7 +133,13 @@ export function FinancialEventDialog({ process, open, onOpenChange, onEventCreat
                 render={({ field }) => (
                   <FormItem className="flex flex-col">
                     <FormLabel>Data do Evento *</FormLabel>
-                    <Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP", { locale: ptBR }) : <span>Inserir data</span>}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus locale={ptBR}/></PopoverContent></Popover>
+                    <FormControl>
+                        <Input
+                            type="date"
+                            {...field}
+                            value={field.value instanceof Date ? format(field.value, 'yyyy-MM-dd') : field.value || ''}
+                        />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -171,7 +174,13 @@ export function FinancialEventDialog({ process, open, onOpenChange, onEventCreat
                     render={({ field }) => (
                         <FormItem className="flex flex-col">
                         <FormLabel>Vencimento da 1ª Parcela *</FormLabel>
-                        <Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP", { locale: ptBR }) : <span>Inserir data</span>}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus locale={ptBR}/></PopoverContent></Popover>
+                        <FormControl>
+                            <Input
+                                type="date"
+                                {...field}
+                                value={field.value instanceof Date ? format(field.value, 'yyyy-MM-dd') : field.value || ''}
+                            />
+                        </FormControl>
                         <FormMessage />
                         </FormItem>
                     )}
@@ -190,3 +199,5 @@ export function FinancialEventDialog({ process, open, onOpenChange, onEventCreat
     </Dialog>
   );
 }
+
+    

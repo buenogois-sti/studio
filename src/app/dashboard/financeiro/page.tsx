@@ -26,7 +26,6 @@ import {
   File,
   Loader2,
   MoreVertical,
-  CalendarIcon,
   Check
 } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
@@ -61,7 +60,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -90,7 +88,7 @@ const titleSchema = z.object({
   type: z.enum(['RECEITA', 'DESPESA'], { required_error: 'Selecione o tipo.'}),
   origin: z.enum(allOrigins, { required_error: 'Selecione a origem.'}),
   value: z.coerce.number().positive('O valor deve ser um número positivo.'),
-  dueDate: z.date({ required_error: 'A data de vencimento é obrigatória.' }),
+  dueDate: z.coerce.date({ required_error: 'A data de vencimento é obrigatória.' }),
   status: z.enum(['PENDENTE', 'PAGO', 'ATRASADO']).default('PENDENTE'),
   paidToStaffId: z.string().optional(),
 }).refine((data) => {
@@ -419,28 +417,13 @@ function NewTitleDialog({ onTitleCreated, staffData }: { onTitleCreated: () => v
                   render={({ field }) => (
                     <FormItem className="flex flex-col">
                       <FormLabel>Data de Vencimento *</FormLabel>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant={"outline"}
-                              className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}
-                            >
-                              {field.value ? format(field.value, "PPP", { locale: ptBR }) : <span>Inserir data</span>}
-                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={field.value}
-                            onSelect={field.onChange}
-                            initialFocus
-                            locale={ptBR}
-                          />
-                        </PopoverContent>
-                      </Popover>
+                      <FormControl>
+                        <Input
+                          type="date"
+                          {...field}
+                          value={field.value instanceof Date ? format(field.value, 'yyyy-MM-dd') : field.value || ''}
+                        />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -786,3 +769,5 @@ export default function FinanceiroPage() {
     </div>
   );
 }
+
+    
