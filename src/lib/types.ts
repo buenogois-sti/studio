@@ -76,6 +76,7 @@ export type Hearing = {
   location: string;
   responsibleParty: string;
   notes?: string;
+  googleCalendarEventId?: string;
 };
 
 export type FinancialEvent = {

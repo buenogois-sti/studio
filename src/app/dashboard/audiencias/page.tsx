@@ -1,7 +1,15 @@
 'use client';
 
 import * as React from 'react';
-import { Calendar as CalendarIcon, PlusCircle, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import {
+  Calendar as CalendarIcon,
+  PlusCircle,
+  Loader2,
+  ChevronLeft,
+  ChevronRight,
+  MoreVertical,
+  RefreshCw,
+} from 'lucide-react';
 import { format, startOfWeek, endOfWeek, eachDayOfInterval, addDays, isToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { z } from 'zod';
@@ -28,6 +36,21 @@ import { createHearing } from '@/lib/hearing-actions';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 
 const hearingSchema = z.object({
@@ -355,7 +378,7 @@ export default function AudienciasPage() {
     return format(dateObj, 'HH:mm', { locale: ptBR });
   }
 
-  const handleHearingCreated = () => setRefreshKey(prev => prev + 1);
+  const handleRefresh = () => setRefreshKey(prev => prev + 1);
   const goToPreviousWeek = () => setDate(addDays(selectedDate, -7));
   const goToNextWeek = () => setDate(addDays(selectedDate, 7));
 
@@ -379,45 +402,67 @@ export default function AudienciasPage() {
                 <Loader2 className="h-12 w-12 animate-spin text-muted-foreground" />
              </div>
         ) : (
-            <ScrollArea className="h-[calc(100vh-12rem)] rounded-lg border">
-                <div className="p-1 sm:p-4">
+            <ScrollArea className="h-[calc(100vh-12rem)]">
+                <div className="pr-4">
                 {daysInWeek.map((day, index) => {
                     const hearingsOnDay = hearings
                         .filter(h => h.date && new Date((h.date as unknown as Timestamp).seconds * 1000).toDateString() === day.toDateString())
                         .sort((a,b) => (a.date as unknown as Timestamp).seconds - (b.date as unknown as Timestamp).seconds);
                     
                     return (
-                        <div key={index} className="mb-6">
-                            <h3 className={cn("font-semibold text-lg mb-4 pl-2 sticky top-0 bg-background/80 backdrop-blur-sm py-2 z-10", isToday(day) && "text-primary")}>
+                        <div key={index} className="mb-8">
+                            <h3 className={cn("font-semibold text-lg mb-4 pl-2 sticky top-0 bg-background/80 backdrop-blur-sm py-2 z-10 border-b", isToday(day) && "text-primary")}>
                                 {format(day, "EEEE, dd 'de' MMMM", { locale: ptBR })}
                             </h3>
                             {hearingsOnDay.length > 0 ? (
-                                <div className="space-y-4">
-                                {hearingsOnDay.map(hearing => {
-                                    const { processName, clientName, clientAvatar } = getHearingInfo(hearing);
-                                    return (
-                                        <Card key={hearing.id} className="p-4 flex items-start gap-4 transition-all hover:shadow-md hover:border-primary/50">
-                                            <div className="flex flex-col items-center">
-                                                <Badge variant="secondary" className="font-mono text-base mb-2">
-                                                    {formatTime(hearing.date)}
-                                                </Badge>
-                                                <Avatar className="h-10 w-10">
-                                                    <AvatarImage src={clientAvatar} />
-                                                    <AvatarFallback>{clientName?.charAt(0) || 'P'}</AvatarFallback>
-                                                </Avatar>
-                                            </div>
-                                            <div className="flex-1 space-y-1">
-                                                <p className="font-bold text-base">{processName}</p>
-                                                <p className="text-sm text-muted-foreground">Cliente: {clientName}</p>
-                                                <p className="text-sm text-muted-foreground">Local: {hearing.location}</p>
-                                                <p className="text-sm text-muted-foreground">Responsável: {hearing.responsibleParty}</p>
-                                            </div>
-                                        </Card>
-                                    );
-                                })}
-                                </div>
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead className="w-[80px]">Hora</TableHead>
+                                            <TableHead>Processo / Cliente</TableHead>
+                                            <TableHead className="hidden md:table-cell">Local</TableHead>
+                                            <TableHead className="hidden lg:table-cell">Responsável</TableHead>
+                                            <TableHead className="text-right w-[50px]">Ações</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {hearingsOnDay.map(hearing => {
+                                            const { processName, clientName } = getHearingInfo(hearing);
+                                            return (
+                                                <TableRow key={hearing.id} className="hover:bg-muted/50">
+                                                    <TableCell>
+                                                        <Badge variant="secondary" className="font-mono text-sm">
+                                                            {formatTime(hearing.date)}
+                                                        </Badge>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="font-bold">{processName}</div>
+                                                        <div className="text-sm text-muted-foreground">{clientName}</div>
+                                                    </TableCell>
+                                                    <TableCell className="hidden md:table-cell">{hearing.location}</TableCell>
+                                                    <TableCell className="hidden lg:table-cell">{hearing.responsibleParty}</TableCell>
+                                                    <TableCell className="text-right">
+                                                        <DropdownMenu>
+                                                            <DropdownMenuTrigger asChild>
+                                                                <Button variant="ghost" size="icon">
+                                                                    <MoreVertical className="h-4 w-4" />
+                                                                </Button>
+                                                            </DropdownMenuTrigger>
+                                                            <DropdownMenuContent>
+                                                                <DropdownMenuItem>Ver Detalhes</DropdownMenuItem>
+                                                                <DropdownMenuItem>Editar</DropdownMenuItem>
+                                                                <DropdownMenuSeparator />
+                                                                <DropdownMenuItem className="text-destructive">Excluir</DropdownMenuItem>
+                                                            </DropdownMenuContent>
+                                                        </DropdownMenu>
+                                                    </TableCell>
+                                                </TableRow>
+                                            );
+                                        })}
+                                    </TableBody>
+                                </Table>
                             ) : (
-                                <p className="text-sm text-muted-foreground pl-2">Nenhuma audiência agendada.</p>
+                                <p className="text-sm text-muted-foreground px-4 py-8 text-center">Nenhuma audiência agendada para este dia.</p>
                             )}
                         </div>
                     );
@@ -446,7 +491,13 @@ export default function AudienciasPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="font-headline text-lg">Próximas Audiências</CardTitle>
-             <NewHearingDialog onHearingCreated={handleHearingCreated} />
+             <div className="flex items-center gap-2">
+                <Button variant="outline" size="icon" className="h-8 w-8" onClick={handleRefresh}>
+                    <RefreshCw className="h-4 w-4" />
+                    <span className="sr-only">Sincronizar Audiências</span>
+                </Button>
+                <NewHearingDialog onHearingCreated={handleRefresh} />
+             </div>
           </CardHeader>
           <CardContent>
             {isLoading ? (

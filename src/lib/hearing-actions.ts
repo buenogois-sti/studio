@@ -22,7 +22,7 @@ export async function createHearing(data: CreateHearingData) {
   const { processId, processName, hearingDate, location, responsibleParty, notes } = data;
 
   try {
-    // 1. Save to Firestore
+    // 1. Save to Firestore first, to get an ID
     const hearingRef = await firestoreAdmin.collection('hearings').add({
       processId,
       date: new Date(hearingDate), // Store as Firestore Timestamp
@@ -43,7 +43,7 @@ export async function createHearing(data: CreateHearingData) {
       const event = {
         summary: `Audiência: ${processName}`,
         location: location,
-        description: `Detalhes da audiência para o processo "${processName}".\n\nNotas: ${notes || 'Nenhuma'}`,
+        description: `Detalhes da audiência para o processo "${processName}".\n\nNotas: ${notes || 'Nenhuma'}\n\nID Interno: ${hearingRef.id}`,
         start: {
           dateTime: formatISO(startDateTime),
           timeZone: 'America/Sao_Paulo',
@@ -60,6 +60,12 @@ export async function createHearing(data: CreateHearingData) {
       });
 
       console.log('Event created in Google Calendar:', createdEvent.data.htmlLink);
+
+      // 3. Update Firestore document with the Google Calendar Event ID
+      if (createdEvent.data.id) {
+          await hearingRef.update({ googleCalendarEventId: createdEvent.data.id });
+          console.log(`Linked Google Calendar event ${createdEvent.data.id} to Firestore hearing ${hearingRef.id}`);
+      }
       
     } catch (calendarError: any) {
         // If calendar fails, we don't fail the whole operation, but we log it.
