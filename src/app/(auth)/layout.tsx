@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { Logo } from '@/components/logo';
 import { Scale, Briefcase, FileText, DollarSign } from 'lucide-react';
 
@@ -17,8 +18,16 @@ export default function AuthLayout({
   return (
     <div className="w-full h-screen lg:grid lg:grid-cols-2">
       <div className="relative hidden h-full flex-col p-10 text-white lg:flex overflow-hidden">
+        <Image
+            src="https://picsum.photos/seed/law-office/1920/1080"
+            alt="Imagem de fundo de um escritório de advocacia moderno"
+            fill
+            className="object-cover"
+            data-ai-hint="modern law office"
+            priority
+        />
         {/* Background Gradient & Animated Shapes */}
-        <div className="absolute inset-0 bg-gradient-to-br from-card via-background to-background" />
+        <div className="absolute inset-0 bg-gradient-to-br from-card/70 via-background/80 to-background" />
         <div className="absolute inset-0 z-0">
             <Scale className="absolute -top-20 -left-20 h-[30rem] w-[30rem] text-primary/5 opacity-50 animate-spin-slow" />
             <FloatingIcon icon={Briefcase} className="h-16 w-16 top-1/4 left-1/4 animate-float" />
