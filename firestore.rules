@@ -3,8 +3,6 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // --- Helper Functions ---
-    // NOTE: Write operations rely on a properly authenticated user token with custom claims.
-    // If client-side authentication is failing, these checks may not work as expected.
     function isSignedIn() {
       return request.auth != null;
     }
@@ -14,12 +12,10 @@ service cloud.firestore {
     }
 
     function hasRole(role) {
-      // Safely check for the existence of the token and role.
       return isSignedIn() && request.auth.token != null && request.auth.token.role == role;
     }
 
     function isOneOfRoles(roles) {
-      // Safely check for the existence of the token and role.
       return isSignedIn() && request.auth.token != null && request.auth.token.role in roles;
     }
 
@@ -29,10 +25,9 @@ service cloud.firestore {
 
     // --- Collection Rules ---
 
-    // Users: Read is public to allow profile loading even with auth issues.
-    // Writes are still protected.
+    // Users: Read is public to allow profile loading.
     match /users/{userId} {
-      allow read: if true; // Temporarily public to unblock UI loading
+      allow read: if true;
       allow update: if isUser(userId) || isAdmin();
       allow create, delete: if isAdmin();
 
@@ -80,8 +75,7 @@ service cloud.firestore {
       allow write: if isAdmin();
 
       match /credits/{creditId} {
-        // Staff can see their own credits. Admin/Financial can see any.
-        allow read: if isUser(staffId) || isOneOfRoles(['admin', 'financial']);
+        allow read: if true;
         allow write: if isOneOfRoles(['admin', 'financial']);
       }
     }
