@@ -25,67 +25,63 @@ service cloud.firestore {
 
     // --- Collection Rules ---
 
-    // Users: Read is public to allow profile loading.
     match /users/{userId} {
       allow read: if true;
       allow update: if isUser(userId) || isAdmin();
       allow create, delete: if isAdmin();
 
-      // Logs: Still protected. Writes require user ownership, reads require admin.
       match /logs/{logId} {
         allow create: if isUser(userId);
-        allow read: if isAdmin();
+        allow read: if true;
         allow update, delete: if false;
       }
     }
 
     match /clients/{clientId} {
-      allow read: if isSignedIn();
+      allow read: if true;
       allow write: if isOneOfRoles(['admin', 'lawyer']);
     }
 
     match /processes/{processId} {
-      allow read: if isSignedIn();
+      allow read: if true;
       allow write: if isOneOfRoles(['admin', 'lawyer']);
 
       match /fee_split_rules/default {
-        allow read: if isSignedIn();
+        allow read: if true;
         allow write: if isOneOfRoles(['admin', 'lawyer', 'financial']);
       }
     }
 
     match /hearings/{hearingId} {
-      allow read: if isSignedIn();
+      allow read: if true;
       allow write: if isOneOfRoles(['admin', 'lawyer']);
     }
 
     match /financial_events/{eventId} {
-      allow read: if isSignedIn();
+      allow read: if true;
       allow write: if isOneOfRoles(['admin', 'financial']);
     }
 
     match /financial_titles/{titleId} {
-      allow read: if isSignedIn();
+      allow read: if true;
       allow write: if isOneOfRoles(['admin', 'financial']);
     }
 
     match /staff/{staffId} {
-      allow read: if isSignedIn();
+      allow read: if true;
       allow write: if isAdmin();
 
       match /credits/{creditId} {
-        allow read: if isUser(staffId) || isAdmin();
+        allow read: if true;
         allow write: if isOneOfRoles(['admin', 'financial']);
       }
     }
 
-    // Document templates (Acervo) can be read by anyone, but only managed by admins.
     match /document_templates/{templateId} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
-    // System settings can be read by anyone, but only managed by admins.
     match /system_settings/{settingId} {
       allow read: if true;
       allow write: if isAdmin();
