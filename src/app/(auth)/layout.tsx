@@ -1,6 +1,7 @@
 'use client';
 
 import { Logo } from '@/components/logo';
+import { Scale } from 'lucide-react';
 
 export default function AuthLayout({
   children,
@@ -12,6 +13,11 @@ export default function AuthLayout({
       <div className="relative hidden h-full flex-col p-10 text-white lg:flex overflow-hidden">
         {/* Background Gradient & Noise Texture */}
         <div className="absolute inset-0 bg-gradient-to-br from-slate-900 to-teal-950 noise-bg" />
+        
+        {/* Large background logo */}
+        <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
+          <Scale className="h-[50vh] w-[50vh] text-primary/10" />
+        </div>
         
         {/* Content */}
         <div className="relative z-20 flex items-center text-lg font-medium">
