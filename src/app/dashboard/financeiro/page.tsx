@@ -236,6 +236,28 @@ function NewTitleDialog({ onTitleCreated, staffData }: { onTitleCreated: () => v
     }
   });
 
+  const handleCurrencyChange = (e: React.ChangeEvent<HTMLInputElement>, field: { onChange: (value: number | undefined) => void }) => {
+    const { value } = e.target;
+    const digitsOnly = value.replace(/\D/g, '');
+    if (digitsOnly === '') {
+        field.onChange(undefined);
+        return;
+    }
+    const numberValue = Number(digitsOnly) / 100;
+    field.onChange(numberValue);
+  };
+
+  const formatCurrencyForDisplay = (value: number | undefined) => {
+    if (value === undefined || value === null || isNaN(value)) {
+        return '';
+    }
+    return new Intl.NumberFormat('pt-BR', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    }).format(value);
+  };
+
+
   const watchedType = form.watch('type');
   const watchedOrigin = form.watch('origin');
   
@@ -258,7 +280,7 @@ function NewTitleDialog({ onTitleCreated, staffData }: { onTitleCreated: () => v
   }, [requiresProcess, form]);
 
 
-  const onSubmit = async (values: z.infer<typeof titleSchema>) => {
+  const onSubmit = async (values: z.infer<typeof titleSchema>>) => {
     setIsSaving(true);
     try {
       const payload: any = { ...values };
@@ -405,7 +427,13 @@ function NewTitleDialog({ onTitleCreated, staffData }: { onTitleCreated: () => v
                         <FormItem>
                         <FormLabel>Valor (R$) *</FormLabel>
                         <FormControl>
-                            <Input type="number" placeholder="1000.00" {...field} />
+                            <Input
+                              type="text"
+                              placeholder="0,00"
+                              {...field}
+                              value={formatCurrencyForDisplay(field.value)}
+                              onChange={(e) => handleCurrencyChange(e, field)}
+                            />
                         </FormControl>
                         <FormMessage />
                         </FormItem>
@@ -421,7 +449,8 @@ function NewTitleDialog({ onTitleCreated, staffData }: { onTitleCreated: () => v
                         <Input
                           type="date"
                           {...field}
-                          value={field.value instanceof Date ? format(field.value, 'yyyy-MM-dd') : field.value || ''}
+                          value={field.value instanceof Date ? format(field.value, 'yyyy-MM-dd') : ''}
+                          onChange={(e) => field.onChange(e.target.valueAsDate)}
                         />
                       </FormControl>
                       <FormMessage />
@@ -769,5 +798,3 @@ export default function FinanceiroPage() {
     </div>
   );
 }
-
-    

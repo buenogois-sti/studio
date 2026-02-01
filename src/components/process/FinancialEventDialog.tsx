@@ -45,6 +45,27 @@ export function FinancialEventDialog({ process, open, onOpenChange, onEventCreat
     }
   });
 
+  const handleCurrencyChange = (e: React.ChangeEvent<HTMLInputElement>, field: { onChange: (value: number | undefined) => void }) => {
+    const { value } = e.target;
+    const digitsOnly = value.replace(/\D/g, '');
+    if (digitsOnly === '') {
+        field.onChange(undefined);
+        return;
+    }
+    const numberValue = Number(digitsOnly) / 100;
+    field.onChange(numberValue);
+  };
+
+  const formatCurrencyForDisplay = (value: number | undefined) => {
+    if (value === undefined || value === null || isNaN(value)) {
+        return '';
+    }
+    return new Intl.NumberFormat('pt-BR', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    }).format(value);
+  };
+
   React.useEffect(() => {
     if (process && open) {
       form.reset({
@@ -58,7 +79,7 @@ export function FinancialEventDialog({ process, open, onOpenChange, onEventCreat
     }
   }, [process, open, form]);
 
-  const onSubmit = async (values: z.infer<typeof eventSchema>) => {
+  const onSubmit = async (values: z.infer<typeof eventSchema>>) => {
     if (!process) return;
 
     setIsSaving(true);
@@ -135,9 +156,10 @@ export function FinancialEventDialog({ process, open, onOpenChange, onEventCreat
                     <FormLabel>Data do Evento *</FormLabel>
                     <FormControl>
                         <Input
-                            type="date"
-                            {...field}
-                            value={field.value instanceof Date ? format(field.value, 'yyyy-MM-dd') : field.value || ''}
+                          type="date"
+                          {...field}
+                          value={field.value instanceof Date ? format(field.value, 'yyyy-MM-dd') : ''}
+                          onChange={(e) => field.onChange(e.target.valueAsDate)}
                         />
                     </FormControl>
                     <FormMessage />
@@ -150,7 +172,15 @@ export function FinancialEventDialog({ process, open, onOpenChange, onEventCreat
                   render={({ field }) => (
                       <FormItem>
                       <FormLabel>Valor Total (R$) *</FormLabel>
-                      <FormControl><Input type="number" placeholder="50000.00" {...field} /></FormControl>
+                      <FormControl>
+                        <Input
+                          type="text"
+                          placeholder="0,00"
+                          {...field}
+                          value={formatCurrencyForDisplay(field.value)}
+                          onChange={(e) => handleCurrencyChange(e, field)}
+                        />
+                      </FormControl>
                       <FormMessage />
                       </FormItem>
                   )}
@@ -175,10 +205,11 @@ export function FinancialEventDialog({ process, open, onOpenChange, onEventCreat
                         <FormItem className="flex flex-col">
                         <FormLabel>Vencimento da 1ª Parcela *</FormLabel>
                         <FormControl>
-                            <Input
+                             <Input
                                 type="date"
                                 {...field}
-                                value={field.value instanceof Date ? format(field.value, 'yyyy-MM-dd') : field.value || ''}
+                                value={field.value instanceof Date ? format(field.value, 'yyyy-MM-dd') : ''}
+                                onChange={(e) => field.onChange(e.target.valueAsDate)}
                             />
                         </FormControl>
                         <FormMessage />
@@ -199,5 +230,3 @@ export function FinancialEventDialog({ process, open, onOpenChange, onEventCreat
     </Dialog>
   );
 }
-
-    

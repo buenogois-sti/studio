@@ -243,6 +243,27 @@ function ProcessForm({
         },
   });
 
+  const handleCurrencyChange = (e: React.ChangeEvent<HTMLInputElement>, field: { onChange: (value: number | undefined) => void }) => {
+    const { value } = e.target;
+    const digitsOnly = value.replace(/\D/g, '');
+    if (digitsOnly === '') {
+        field.onChange(undefined);
+        return;
+    }
+    const numberValue = Number(digitsOnly) / 100;
+    field.onChange(numberValue);
+  };
+
+  const formatCurrencyForDisplay = (value: number | undefined) => {
+    if (value === undefined || value === null || isNaN(value)) {
+        return '';
+    }
+    return new Intl.NumberFormat('pt-BR', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    }).format(value);
+  };
+
   const { fields, append, remove } = useFieldArray({
     control: form.control,
     name: 'opposingParties',
@@ -485,9 +506,11 @@ function ProcessForm({
                         <FormLabel>Valor da Causa</FormLabel>
                         <FormControl>
                           <Input
-                            type="number"
-                            placeholder="R$ 10.000,00"
+                            type="text"
+                            placeholder="R$ 0,00"
                             {...field}
+                            value={formatCurrencyForDisplay(field.value)}
+                            onChange={(e) => handleCurrencyChange(e, field)}
                           />
                         </FormControl>
                         <FormMessage />
