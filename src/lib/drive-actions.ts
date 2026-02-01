@@ -94,3 +94,31 @@ export async function renameFile(fileId: string, newName: string): Promise<drive
         throw new Error(error.message || 'Ocorreu um erro desconhecido ao renomear o arquivo.');
     }
 }
+
+export async function createFolder(parentId: string, folderName: string): Promise<drive_v3.Schema$File> {
+    if (!folderName) {
+        throw new Error('O nome da pasta não pode ser vazio.');
+    }
+    try {
+        const { drive } = await getGoogleApiClientsForUser();
+        const fileMetadata = {
+            name: folderName,
+            mimeType: 'application/vnd.google-apps.folder',
+            parents: [parentId],
+        };
+        const file = await drive.files.create({
+            requestBody: fileMetadata,
+            fields: 'id, name, mimeType, webViewLink, iconLink, createdTime',
+            supportsAllDrives: true,
+        });
+
+        if (!file.data) {
+            throw new Error('A API do Google não retornou dados da pasta após a criação.');
+        }
+
+        return file.data;
+    } catch (error: any) {
+        console.error('Error creating folder in Google Drive:', error);
+        throw new Error(error.message || 'Ocorreu um erro desconhecido ao criar a pasta no Google Drive.');
+    }
+}
