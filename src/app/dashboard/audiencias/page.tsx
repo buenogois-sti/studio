@@ -12,7 +12,7 @@ import {
   CalendarCheck,
   AlertTriangle,
 } from 'lucide-react';
-import { format, startOfWeek, endOfWeek, eachDayOfInterval, addDays, isToday } from 'date-fns';
+import { format, addDays, isToday, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
@@ -180,11 +180,6 @@ function NewHearingDialog({ onHearingCreated }: { onHearingCreated: () => void }
             responsibleParty: values.responsibleParty,
             notes: values.notes,
         });
-
-      toast({
-        title: 'Audiência Agendada!',
-        description: 'A audiência foi salva e adicionada ao seu Google Agenda.',
-      });
 
       form.reset();
       setSelectedProcess(null);
@@ -359,13 +354,21 @@ export default function AudienciasPage() {
   const clientsMap = React.useMemo(() => new Map(clientsData?.map(c => [c.id, c])), [clientsData]);
 
   const isLoading = isUserLoading || isLoadingHearings || isLoadingProcesses || isLoadingClients;
-  const hearings = hearingsData || [];
-
-  // Date and week logic
+  
+  // Date and hearing filtering logic
   const selectedDate = date || new Date();
-  const startOfWeekDate = startOfWeek(selectedDate, { weekStartsOn: 1 });
-  const endOfWeekDate = endOfWeek(selectedDate, { weekStartsOn: 1 });
-  const daysInWeek = eachDayOfInterval({ start: startOfWeekDate, end: endOfWeekDate });
+  
+  const hearingsForDay = React.useMemo(() => {
+    if (!hearingsData) return [];
+    return hearingsData
+        .filter(h => {
+            if (!h.date) return false;
+            const hearingDate = (h.date as unknown as Timestamp).toDate();
+            return isSameDay(hearingDate, selectedDate);
+        })
+        .sort((a, b) => (a.date as unknown as Timestamp).seconds - (b.date as unknown as Timestamp).seconds);
+  }, [hearingsData, selectedDate]);
+
 
   const getHearingInfo = (hearing: Hearing) => {
     const process = processesMap.get(hearing.processId);
@@ -386,8 +389,8 @@ export default function AudienciasPage() {
   }
 
   const handleRefresh = () => setRefreshKey(prev => prev + 1);
-  const goToPreviousWeek = () => setDate(addDays(selectedDate, -7));
-  const goToNextWeek = () => setDate(addDays(selectedDate, 7));
+  const goToPreviousDay = () => setDate(addDays(selectedDate, -1));
+  const goToNextDay = () => setDate(addDays(selectedDate, 1));
 
   const handleDelete = async () => {
     if (!hearingToDelete) return;
@@ -419,12 +422,12 @@ export default function AudienciasPage() {
         <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
                 <h2 className="font-headline text-2xl font-semibold capitalize">
-                    {format(startOfWeekDate, 'MMMM yyyy', { locale: ptBR })}
+                    {format(selectedDate, "d 'de' MMMM 'de' yyyy", { locale: ptBR })}
                 </h2>
                 <div className="flex items-center gap-2">
-                    <Button variant="outline" size="icon" onClick={goToPreviousWeek}><ChevronLeft className="h-4 w-4" /></Button>
+                    <Button variant="outline" size="icon" onClick={goToPreviousDay}><ChevronLeft className="h-4 w-4" /></Button>
                     <Button variant="outline" onClick={() => setDate(new Date())}>Hoje</Button>
-                    <Button variant="outline" size="icon" onClick={goToNextWeek}><ChevronRight className="h-4 w-4" /></Button>
+                    <Button variant="outline" size="icon" onClick={goToNextDay}><ChevronRight className="h-4 w-4" /></Button>
                 </div>
             </div>
              <div className="flex items-center gap-2">
@@ -436,114 +439,121 @@ export default function AudienciasPage() {
              </div>
         </div>
 
-        {isLoading ? (
-             <div className="flex h-full items-center justify-center rounded-lg border-2 border-dashed">
-                <Loader2 className="h-12 w-12 animate-spin text-muted-foreground" />
-             </div>
-        ) : (
-            <ScrollArea className="h-[calc(100vh-12rem)]">
-                <div className="pr-4">
-                {daysInWeek.map((day, index) => {
-                    const hearingsOnDay = hearings
-                        .filter(h => h.date && new Date((h.date as unknown as Timestamp).seconds * 1000).toDateString() === day.toDateString())
-                        .sort((a,b) => (a.date as unknown as Timestamp).seconds - (b.date as unknown as Timestamp).seconds);
-                    
-                    return (
-                        <div key={index} className="mb-8">
-                            <h3 className={cn("font-semibold text-lg mb-4 pl-2 sticky top-0 bg-background/80 backdrop-blur-sm py-2 z-10 border-b", isToday(day) && "text-primary")}>
-                                {format(day, "EEEE, dd 'de' MMMM", { locale: ptBR })}
-                            </h3>
-                            {hearingsOnDay.length > 0 ? (
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead className="w-[150px]">Hora</TableHead>
-                                            <TableHead>Detalhes da Audiência</TableHead>
-                                            <TableHead className="hidden md:table-cell">Local</TableHead>
-                                            <TableHead className="hidden lg:table-cell">Responsável</TableHead>
-                                            <TableHead className="text-right w-[50px]">Ações</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {hearingsOnDay.map(hearing => {
-                                            const { processName, clientName, clientAvatar } = getHearingInfo(hearing);
-                                            return (
-                                                <TableRow key={hearing.id} className="hover:bg-muted/50">
-                                                    <TableCell>
-                                                        <div className="flex items-center gap-2">
-                                                            <Badge variant="secondary" className="font-mono text-base font-semibold">
-                                                                {formatTime(hearing.date)}
-                                                            </Badge>
-                                                             <TooltipProvider>
-                                                                <Tooltip>
-                                                                    <TooltipTrigger>
-                                                                        {hearing.googleCalendarEventId ? (
-                                                                            <CalendarCheck className="h-5 w-5 text-green-500" />
-                                                                        ) : (
-                                                                            <AlertTriangle className="h-5 w-5 text-yellow-500" />
-                                                                        )}
-                                                                    </TooltipTrigger>
-                                                                    <TooltipContent>
-                                                                        <p>
-                                                                            {hearing.googleCalendarEventId 
-                                                                                ? 'Sincronizado com Google Agenda' 
-                                                                                : 'Não sincronizado com Google Agenda'}
-                                                                        </p>
-                                                                    </TooltipContent>
-                                                                </Tooltip>
-                                                            </TooltipProvider>
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <div className="font-bold text-base">{processName}</div>
-                                                         <div className="flex items-center gap-2 mt-1">
-                                                            <Avatar className="h-6 w-6 border">
-                                                                <AvatarImage src={clientAvatar} />
-                                                                <AvatarFallback>{clientName.charAt(0)}</AvatarFallback>
-                                                            </Avatar>
-                                                            <span className="text-sm text-muted-foreground">{clientName}</span>
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell className="hidden md:table-cell">{hearing.location}</TableCell>
-                                                    <TableCell className="hidden lg:table-cell">{hearing.responsibleParty}</TableCell>
-                                                    <TableCell className="text-right">
-                                                        <DropdownMenu>
-                                                            <DropdownMenuTrigger asChild>
-                                                                <Button variant="ghost" size="icon">
-                                                                    <MoreVertical className="h-4 w-4" />
-                                                                </Button>
-                                                            </DropdownMenuTrigger>
-                                                            <DropdownMenuContent>
-                                                                <DropdownMenuItem>Ver Detalhes</DropdownMenuItem>
-                                                                <DropdownMenuItem>Editar</DropdownMenuItem>
-                                                                <DropdownMenuSeparator />
-                                                                <DropdownMenuItem className="text-destructive" onSelect={() => setHearingToDelete(hearing)}>
-                                                                    Excluir
-                                                                </DropdownMenuItem>
-                                                            </DropdownMenuContent>
-                                                        </DropdownMenu>
-                                                    </TableCell>
-                                                </TableRow>
-                                            );
-                                        })}
-                                    </TableBody>
-                                </Table>
-                            ) : (
-                                <p className="text-sm text-muted-foreground px-4 py-8 text-center">Nenhuma audiência agendada para este dia.</p>
-                            )}
-                        </div>
-                    );
-                })}
-                </div>
-            </ScrollArea>
-        )}
+        <Card>
+            <CardHeader>
+                <CardTitle>
+                    Audiências para {isToday(selectedDate) ? "Hoje" : format(selectedDate, 'dd/MM')}
+                </CardTitle>
+                <CardDescription>
+                    {isLoading ? 'Carregando audiências...' : 
+                    hearingsForDay.length > 0 
+                        ? `Você tem ${hearingsForDay.length} audiência(s) agendada(s) para este dia.` 
+                        : 'Nenhuma audiência agendada para este dia.'
+                    }
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead className="w-[150px]">Hora</TableHead>
+                            <TableHead>Detalhes da Audiência</TableHead>
+                            <TableHead className="hidden md:table-cell">Local</TableHead>
+                            <TableHead className="hidden lg:table-cell">Responsável</TableHead>
+                            <TableHead className="text-right w-[50px]">Ações</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {isLoading ? (
+                            Array.from({ length: 3 }).map((_, i) => (
+                                <TableRow key={i}>
+                                    <TableCell><Skeleton className="h-6 w-24"/></TableCell>
+                                    <TableCell><Skeleton className="h-5 w-48"/></TableCell>
+                                    <TableCell className="hidden md:table-cell"><Skeleton className="h-5 w-32"/></TableCell>
+                                    <TableCell className="hidden lg:table-cell"><Skeleton className="h-5 w-24"/></TableCell>
+                                    <TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto"/></TableCell>
+                                </TableRow>
+                            ))
+                        ) : hearingsForDay.length > 0 ? (
+                            hearingsForDay.map(hearing => {
+                                const { processName, clientName, clientAvatar } = getHearingInfo(hearing);
+                                return (
+                                    <TableRow key={hearing.id} className="hover:bg-muted/50">
+                                        <TableCell>
+                                            <div className="flex items-center gap-2">
+                                                <Badge variant="secondary" className="font-mono text-base font-semibold">
+                                                    {formatTime(hearing.date)}
+                                                </Badge>
+                                                 <TooltipProvider>
+                                                    <Tooltip>
+                                                        <TooltipTrigger>
+                                                            {hearing.googleCalendarEventId ? (
+                                                                <CalendarCheck className="h-5 w-5 text-green-500" />
+                                                            ) : (
+                                                                <AlertTriangle className="h-5 w-5 text-yellow-500" />
+                                                            )}
+                                                        </TooltipTrigger>
+                                                        <TooltipContent>
+                                                            <p>
+                                                                {hearing.googleCalendarEventId 
+                                                                    ? 'Sincronizado com Google Agenda' 
+                                                                    : 'Não sincronizado com Google Agenda'}
+                                                            </p>
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                </TooltipProvider>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="font-bold text-base">{processName}</div>
+                                             <div className="flex items-center gap-2 mt-1">
+                                                <Avatar className="h-6 w-6 border">
+                                                    <AvatarImage src={clientAvatar} />
+                                                    <AvatarFallback>{clientName.charAt(0)}</AvatarFallback>
+                                                </Avatar>
+                                                <span className="text-sm text-muted-foreground">{clientName}</span>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="hidden md:table-cell">{hearing.location}</TableCell>
+                                        <TableCell className="hidden lg:table-cell">{hearing.responsibleParty}</TableCell>
+                                        <TableCell className="text-right">
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="ghost" size="icon">
+                                                        <MoreVertical className="h-4 w-4" />
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent>
+                                                    <DropdownMenuItem>Ver Detalhes</DropdownMenuItem>
+                                                    <DropdownMenuItem>Editar</DropdownMenuItem>
+                                                    <DropdownMenuSeparator />
+                                                    <DropdownMenuItem className="text-destructive" onSelect={() => setHearingToDelete(hearing)}>
+                                                        Excluir
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })
+                        ) : (
+                            <TableRow>
+                                <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                                    Nenhuma audiência agendada.
+                                </TableCell>
+                            </TableRow>
+                        )}
+                    </TableBody>
+                </Table>
+            </CardContent>
+        </Card>
       </div>
 
       <div className="flex flex-col gap-6">
         <Card>
           <CardHeader>
              <CardTitle className="font-headline">Calendário</CardTitle>
-             <CardDescription>Selecione uma data para ver a semana correspondente.</CardDescription>
+             <CardDescription>Selecione um dia para ver os detalhes.</CardDescription>
           </CardHeader>
           <CardContent className="p-0">
             <Calendar
@@ -551,7 +561,7 @@ export default function AudienciasPage() {
               selected={date}
               onSelect={setDate}
               locale={ptBR}
-              modifiers={{ hasHearing: hearings.filter(h => h.date).map(h => (h.date as unknown as Timestamp).toDate()) }}
+              modifiers={{ hasHearing: hearingsData?.filter(h => h.date).map(h => (h.date as unknown as Timestamp).toDate()) || [] }}
               modifiersClassNames={{ hasHearing: "bg-primary/20 text-primary-foreground rounded-md" }}
             />
           </CardContent>
