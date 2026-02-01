@@ -125,3 +125,10 @@ export type Staff = {
   createdAt: Timestamp;
   updatedAt?: Timestamp;
 };
+
+export type ClientKitTemplate = {
+  id: string;
+  name: string;
+  templateId: string;
+  destination: string;
+};

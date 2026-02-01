@@ -465,6 +465,41 @@
         "email",
         "createdAt"
       ]
+    },
+    "SystemSettings": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "SystemSettings",
+      "type": "object",
+      "description": "Stores global system settings.",
+      "properties": {
+        "clientKitTemplates": {
+          "type": "array",
+          "description": "List of template documents for the new client kit.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "templateId": {
+                "type": "string"
+              },
+              "destination": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "templateId",
+              "destination"
+            ]
+          }
+        }
+      }
     }
   },
   "auth": {
@@ -514,6 +549,12 @@
         "$ref": "#/backend/entities/Staff"
       },
       "description": "Stores staff member information."
+    },
+    "/system_settings/{settingId}": {
+      "schema": {
+        "$ref": "#/backend/entities/SystemSettings"
+      },
+      "description": "Stores global configuration documents for the system, like the client kit templates."
     }
   }
 }

@@ -10,12 +10,6 @@ import type { Client, Process } from './types';
 
 const ROOT_FOLDER_ID = process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID;
 
-const TEMPLATE_DOCS = [
-  { envKey: 'TEMPLATE_PROCURACAO_ID', name: 'Procuração Ad Judicia', destination: '00_DADOS_DO_CLIENTE' },
-  { envKey: 'TEMPLATE_HIPOSSUFICIENCIA_ID', name: 'Declaração de Hipossuficiência', destination: '02_DOCUMENTOS_PESSOAIS' },
-  { envKey: 'TEMPLATE_CONTRATO_ID', name: 'Contrato de Honorários', destination: '01_CONTRATO_E_HONORÁRIOS' },
-];
-
 const CLIENT_FOLDER_STRUCTURE = [
   '00_DADOS_DO_CLIENTE',
   '01_CONTRATO_E_HONORÁRIOS',
@@ -112,11 +106,21 @@ async function findFolderByName(drive: drive_v3.Drive, parentId: string, name: s
     }
 }
 
-async function createClientKitFromTemplates(drive: drive_v3.Drive, clientName: string, subfolderIds: Map<string, string>): Promise<void> {
-    console.log('Starting client kit creation with new structure...');
+async function createClientKitFromTemplates(
+    drive: drive_v3.Drive, 
+    clientName: string, 
+    subfolderIds: Map<string, string>,
+    templates: { name: string; templateId: string; destination: string; }[]
+): Promise<void> {
+    console.log('Starting client kit creation from settings...');
     
-    for (const doc of TEMPLATE_DOCS) {
-        const templateId = process.env[doc.envKey];
+    if (templates.length === 0) {
+        console.log("No client kit templates configured in settings. Skipping.");
+        return;
+    }
+
+    for (const doc of templates) {
+        const templateId = doc.templateId;
         const destinationFolderId = subfolderIds.get(doc.destination);
 
         if (templateId && destinationFolderId) {
@@ -135,7 +139,7 @@ async function createClientKitFromTemplates(drive: drive_v3.Drive, clientName: s
                 console.error(`Error copying template ${doc.name} (ID: ${templateId}):`, error.message);
             }
         } else {
-            if (!templateId) console.warn(`Template environment variable ${doc.envKey} not set. Skipping document.`);
+            if (!templateId) console.warn(`Template ID for ${doc.name} is missing. Skipping document.`);
             if (!destinationFolderId) console.warn(`Destination folder '${doc.destination}' not found. Skipping document '${doc.name}'.`);
         }
     }
@@ -202,7 +206,10 @@ export async function syncClientToDrive(clientId: string, clientName: string): P
         const subfolderIds = await createMultipleFolders(drive, mainFolderId, CLIENT_FOLDER_STRUCTURE);
         console.log("Client subfolders created.");
 
-        await createClientKitFromTemplates(drive, clientName, subfolderIds);
+        const settingsDoc = await firestoreAdmin.collection('system_settings').doc('client_kit').get();
+        const templates = settingsDoc.exists && settingsDoc.data()?.templates ? settingsDoc.data()?.templates : [];
+
+        await createClientKitFromTemplates(drive, clientName, subfolderIds, templates);
 
         const sheetId = await createClientSheet(sheets, clientName);
         if (!sheetId) {
