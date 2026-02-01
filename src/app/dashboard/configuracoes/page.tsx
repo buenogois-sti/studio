@@ -14,17 +14,24 @@ import {
   PowerOff,
   Briefcase,
   AlertCircle,
-  Loader2
+  Loader2,
+  PlusCircle,
+  Edit,
+  Trash2,
+  CloudDownload
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
-import { useDoc, useFirebase, useMemoFirebase } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { useDoc, useFirebase, useMemoFirebase, useCollection } from '@/firebase';
+import { doc, collection } from 'firebase/firestore';
 import type { UserProfile } from '@/lib/types';
 import { ClientKitManager } from '@/components/settings/client-kit-manager';
 import { TemplateLibraryManager } from '@/components/settings/template-library-manager';
-
+import { Switch } from '@/components/ui/switch';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Skeleton } from '@/components/ui/skeleton';
 
 function IntegrationsTab() {
   const { data: session, status } = useSession();
@@ -125,6 +132,67 @@ function IntegrationsTab() {
   )
 }
 
+function UsersTab() {
+    const { firestore } = useFirebase();
+    const usersQuery = useMemoFirebase(
+        () => (firestore ? collection(firestore, 'users') : null),
+        [firestore]
+    );
+    const { data: users, isLoading } = useCollection<UserProfile>(usersQuery);
+
+    const roleLabels: { [key: string]: string } = {
+        admin: 'Administrador',
+        lawyer: 'Advogado',
+        financial: 'Financeiro',
+    };
+
+    return (
+        <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                    <CardTitle>Gerenciamento de Usuários</CardTitle>
+                    <CardDescription>Adicione, remova e gerencie as permissões dos usuários do sistema.</CardDescription>
+                </div>
+                <Button disabled><PlusCircle className="mr-2 h-4 w-4" /> Convidar Usuário</Button>
+            </CardHeader>
+            <CardContent>
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Nome</TableHead>
+                            <TableHead>Email</TableHead>
+                            <TableHead>Perfil</TableHead>
+                            <TableHead className="text-right">Ações</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {isLoading ? (
+                            [...Array(3)].map((_, i) => (
+                                <TableRow key={i}>
+                                    <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+                                    <TableCell><Skeleton className="h-5 w-48" /></TableCell>
+                                    <TableCell><Skeleton className="h-6 w-24" /></TableCell>
+                                    <TableCell className="text-right"><Skeleton className="h-8 w-20 ml-auto" /></TableCell>
+                                </TableRow>
+                            ))
+                        ) : users?.map(user => (
+                            <TableRow key={user.id}>
+                                <TableCell>{user.firstName} {user.lastName}</TableCell>
+                                <TableCell>{user.email}</TableCell>
+                                <TableCell><Badge variant="secondary">{roleLabels[user.role] || user.role}</Badge></TableCell>
+                                <TableCell className="text-right">
+                                    <Button variant="ghost" size="icon" disabled><Edit className="h-4 w-4" /></Button>
+                                    <Button variant="ghost" size="icon" disabled><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </CardContent>
+        </Card>
+    );
+}
+
 export default function ConfiguracoesPage() {
   return (
     <div className="flex flex-col gap-6">
@@ -194,61 +262,105 @@ export default function ConfiguracoesPage() {
               <CardTitle>Parâmetros Financeiros</CardTitle>
               <CardDescription>Defina padrões para honorários, vencimentos, moeda e alertas financeiros.</CardDescription>
             </CardHeader>
-            <CardContent className="flex flex-1 items-center justify-center rounded-lg border border-dashed shadow-sm py-16">
-              <div className="flex flex-col items-center gap-1 text-center">
-                <Loader2 className="h-12 w-12 text-muted-foreground animate-spin" />
-                <h3 className="text-lg font-bold tracking-tight">Em construção</h3>
-                <p className="text-sm text-muted-foreground">O módulo de finanças está sendo desenvolvido.</p>
-              </div>
+            <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="defaultFee">Honorários Padrão (%)</Label>
+                        <Input id="defaultFee" type="number" defaultValue="20" />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="paymentTerms">Prazo de Pagamento Padrão (dias)</Label>
+                        <Input id="paymentTerms" type="number" defaultValue="30" />
+                    </div>
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="currency">Moeda</Label>
+                    <Input id="currency" defaultValue="BRL (R$)" disabled />
+                </div>
+                <div className="flex items-center space-x-2">
+                    <Switch id="late-fee-alerts" defaultChecked/>
+                    <Label htmlFor="late-fee-alerts">Ativar alertas de títulos vencidos</Label>
+                </div>
             </CardContent>
+            <CardFooter>
+                <Button>Salvar Parâmetros</Button>
+            </CardFooter>
           </Card>
         </TabsContent>
 
         <TabsContent value="usuarios">
-          <Card>
-            <CardHeader>
-              <CardTitle>Gerenciamento de Usuários</CardTitle>
-              <CardDescription>Adicione, remova e gerencie as permissões dos usuários do sistema.</CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-1 items-center justify-center rounded-lg border border-dashed shadow-sm py-16">
-              <div className="flex flex-col items-center gap-1 text-center">
-                <Users className="h-12 w-12 text-muted-foreground" />
-                <h3 className="text-lg font-bold tracking-tight">Em construção</h3>
-                <p className="text-sm text-muted-foreground">O módulo de gerenciamento de usuários está sendo desenvolvido.</p>
-              </div>
-            </CardContent>
-          </Card>
+          <UsersTab />
         </TabsContent>
 
         <TabsContent value="aparencia">
           <Card>
             <CardHeader>
-              <CardTitle>Aparência</CardTitle>
-              <CardDescription>Personalize o tema e a aparência do sistema.</CardDescription>
+                <CardTitle>Aparência</CardTitle>
+                <CardDescription>Personalize o tema e a aparência do sistema.</CardDescription>
             </CardHeader>
-            <CardContent className="flex flex-1 items-center justify-center rounded-lg border border-dashed shadow-sm py-16">
-              <div className="flex flex-col items-center gap-1 text-center">
-                <Palette className="h-12 w-12 text-muted-foreground" />
-                <h3 className="text-lg font-bold tracking-tight">Em construção</h3>
-                <p className="text-sm text-muted-foreground">O módulo de customização visual está sendo desenvolvido.</p>
-              </div>
+            <CardContent className="space-y-6">
+                <div className="space-y-2">
+                    <Label htmlFor="primary-color">Cor Primária</Label>
+                    <div className="flex items-center gap-2">
+                        <Input id="primary-color" defaultValue="#F5D030" className="w-32" />
+                        <div className="w-8 h-8 rounded-md border" style={{ backgroundColor: '#F5D030' }}></div>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Altere a cor de destaque do sistema. Use um valor hexadecimal.</p>
+                </div>
+                <div className="flex items-center space-x-2">
+                    <Switch id="dark-mode" defaultChecked disabled />
+                    <Label htmlFor="dark-mode">Modo Escuro (Padrão)</Label>
+                </div>
+                <Alert>
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Atualização do Tema</AlertTitle>
+                    <AlertDescription>
+                        A alteração da cor primária requer a recompilação dos estilos e pode levar alguns instantes para ser aplicada em todo o sistema.
+                    </AlertDescription>
+                </Alert>
             </CardContent>
+            <CardFooter>
+                <Button>Salvar Aparência</Button>
+            </CardFooter>
           </Card>
         </TabsContent>
 
         <TabsContent value="backup">
           <Card>
             <CardHeader>
-              <CardTitle>Backup</CardTitle>
-              <CardDescription>Configure e agende backups automáticos dos seus dados.</CardDescription>
+                <CardTitle>Backup e Restauração</CardTitle>
+                <CardDescription>Configure e agende backups automáticos dos seus dados para o Google Drive.</CardDescription>
             </CardHeader>
-            <CardContent className="flex flex-1 items-center justify-center rounded-lg border border-dashed shadow-sm py-16">
-              <div className="flex flex-col items-center gap-1 text-center">
-                <Save className="h-12 w-12 text-muted-foreground" />
-                <h3 className="text-lg font-bold tracking-tight">Em construção</h3>
-                <p className="text-sm text-muted-foreground">O módulo de backup está sendo desenvolvido.</p>
-              </div>
+            <CardContent className="space-y-6">
+                <div className="space-y-2">
+                    <Label>Frequência do Backup Automático</Label>
+                    <RadioGroup defaultValue="daily" disabled>
+                        <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="daily" id="daily" />
+                            <Label htmlFor="daily">Diário</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="weekly" id="weekly" />
+                            <Label htmlFor="weekly">Semanal</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="disabled" id="disabled" />
+                            <Label htmlFor="disabled">Desativado</Label>
+                        </div>
+                    </RadioGroup>
+                </div>
+                <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Função em Desenvolvimento</AlertTitle>
+                    <AlertDescription>
+                        A funcionalidade de backup automático ainda não está disponível.
+                    </AlertDescription>
+                </Alert>
             </CardContent>
+            <CardFooter className="flex justify-between">
+                <Button disabled>Salvar Configuração</Button>
+                <Button variant="outline" disabled><CloudDownload className="mr-2 h-4 w-4"/> Fazer Backup Manual</Button>
+            </CardFooter>
           </Card>
         </TabsContent>
       </Tabs>
