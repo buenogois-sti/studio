@@ -349,7 +349,7 @@ function ProcessForm({
             <div className="space-y-6">
               <section>
                 <H2>Dados do Processo</H2>
-                <div className="grid grid-cols-1 gap-4 mt-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
                   <FormField
                     control={form.control}
                     name="clientId"
@@ -372,7 +372,7 @@ function ProcessForm({
                     control={form.control}
                     name="name"
                     render={({ field }) => (
-                      <FormItem>
+                      <FormItem className="md:col-span-2">
                         <FormLabel>Nome do Processo *</FormLabel>
                         <FormControl>
                           <Input
@@ -442,7 +442,7 @@ function ProcessForm({
                     control={form.control}
                     name="courtBranch"
                     render={({ field }) => (
-                      <FormItem>
+                      <FormItem className="md:col-span-2">
                         <FormLabel>Vara</FormLabel>
                         <FormControl>
                           <Input
@@ -566,7 +566,7 @@ function ProcessForm({
       </Form>
 
       <Sheet open={isClientSheetOpen} onOpenChange={setIsClientSheetOpen}>
-        <SheetContent className="sm:max-w-2xl w-full">
+        <SheetContent className="sm:max-w-4xl w-full">
           <SheetHeader>
             <SheetTitle>Adicionar Novo Cliente</SheetTitle>
             <SheetDescription>
@@ -848,7 +848,7 @@ export default function ProcessosPage() {
       </div>
 
       <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-        <SheetContent className="sm:max-w-2xl w-full">
+        <SheetContent className="sm:max-w-4xl w-full">
           <SheetHeader>
             <SheetTitle>
               {editingProcess ? 'Editar Processo' : 'Adicionar Novo Processo'}

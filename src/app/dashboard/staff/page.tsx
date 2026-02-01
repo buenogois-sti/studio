@@ -320,7 +320,7 @@ export default function StaffPage() {
       </div>
 
       <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-        <SheetContent className="sm:max-w-2xl w-full">
+        <SheetContent className="sm:max-w-4xl w-full">
           <SheetHeader>
             <SheetTitle>{editingStaff ? 'Editar Membro da Equipe' : 'Adicionar Novo Membro'}</SheetTitle>
             <SheetDescription>
