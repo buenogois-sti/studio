@@ -291,38 +291,6 @@ function NewTitleDialog({ onTitleCreated }: { onTitleCreated: () => void }) {
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-             {requiresProcess && (
-                <FormField
-                  control={form.control}
-                  name="processId"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <FormLabel>Processo Associado *</FormLabel>
-                      <ProcessSearch 
-                          selectedProcess={selectedProcess}
-                          onSelect={(process) => {
-                              setSelectedProcess(process);
-                              field.onChange(process.id);
-                          }}
-                      />
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-             )}
-             <FormField
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                    <FormItem>
-                    <FormLabel>Descrição *</FormLabel>
-                    <FormControl>
-                        <Input placeholder="Ex: Honorários iniciais" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                    </FormItem>
-                )}
-            />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
@@ -361,6 +329,38 @@ function NewTitleDialog({ onTitleCreated }: { onTitleCreated: () => void }) {
                   )}
                 />
             </div>
+             {requiresProcess && (
+                <FormField
+                  control={form.control}
+                  name="processId"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>Processo Associado *</FormLabel>
+                      <ProcessSearch 
+                          selectedProcess={selectedProcess}
+                          onSelect={(process) => {
+                              setSelectedProcess(process);
+                              field.onChange(process.id);
+                          }}
+                      />
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+             )}
+             <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Descrição *</FormLabel>
+                    <FormControl>
+                        <Input placeholder="Ex: Honorários iniciais" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                    </FormItem>
+                )}
+            />
              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                  <FormField
                     control={form.control}
