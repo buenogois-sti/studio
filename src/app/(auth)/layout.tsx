@@ -19,7 +19,7 @@ export default function AuthLayout({
     <div className="w-full h-screen lg:grid lg:grid-cols-2">
       <div className="relative hidden h-full flex-col p-10 text-white lg:flex overflow-hidden">
         <Image
-            src="https://picsum.photos/seed/law-office/1920/1080"
+            src="https://images.unsplash.com/photo-1605647540924-852290f6b0d5?q=80&w=1974&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
             alt="Imagem de fundo de um escritório de advocacia moderno"
             fill
             className="object-cover"
