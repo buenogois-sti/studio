@@ -169,14 +169,19 @@ function AnimatedSection({ children, className = '', delay = 0 }: { children: Re
 }
 
 function FloatingParticles() {
-  const particles = Array.from({ length: 20 }, (_, i) => ({
-    id: i,
-    size: Math.random() * 4 + 2,
-    x: Math.random() * 100,
-    y: Math.random() * 100,
-    duration: Math.random() * 20 + 10,
-    delay: Math.random() * 5,
-  }));
+  const [particles, setParticles] = useState<any[]>([]);
+
+  useEffect(() => {
+    const newParticles = Array.from({ length: 20 }, (_, i) => ({
+      id: i,
+      size: Math.random() * 4 + 2,
+      x: Math.random() * 100,
+      y: Math.random() * 100,
+      duration: Math.random() * 20 + 10,
+      delay: Math.random() * 5,
+    }));
+    setParticles(newParticles);
+  }, []);
 
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none">
