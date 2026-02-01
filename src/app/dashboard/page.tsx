@@ -39,7 +39,7 @@ import Link from 'next/link';
 import { ChartContainer, ChartTooltipContent } from '@/components/ui/chart';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy, limit, Timestamp } from 'firebase/firestore';
-import type { Client, FinancialTransaction, Process, Hearing, Log } from '@/lib/types';
+import type { Client, FinancialTitle, Process, Hearing, Log } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -55,11 +55,11 @@ export default function Dashboard() {
   const { firestore } = useFirebase();
   const { data: session, status } = useSession();
 
-  const transactionsQuery = useMemoFirebase(
-    () => (firestore ? collection(firestore, 'financial_transactions') : null),
+  const titlesQuery = useMemoFirebase(
+    () => (firestore ? collection(firestore, 'financial_titles') : null),
     [firestore]
   );
-  const { data: transactionsData, isLoading: isLoadingTransactions } = useCollection<FinancialTransaction>(transactionsQuery);
+  const { data: titlesData, isLoading: isLoadingTitles } = useCollection<FinancialTitle>(titlesQuery);
 
   const clientsQuery = useMemoFirebase(
     () => (firestore ? collection(firestore, 'clients') : null),
@@ -85,14 +85,14 @@ export default function Dashboard() {
   );
   const { data: logsData, isLoading: isLoadingLogs } = useCollection<Log>(logsQuery);
 
-  const isLoading = status === 'loading' || isLoadingTransactions || isLoadingClients || isLoadingProcesses || isLoadingHearings || isLoadingLogs;
+  const isLoading = status === 'loading' || isLoadingTitles || isLoadingClients || isLoadingProcesses || isLoadingHearings || isLoadingLogs;
 
   const totalRevenue = React.useMemo(() => {
-    if (!transactionsData) return 0;
-    return transactionsData
-      .filter((t) => t.type === 'receita')
-      .reduce((sum, t) => sum + t.amount, 0);
-  }, [transactionsData]);
+    if (!titlesData) return 0;
+    return titlesData
+      .filter((t) => t.type === 'RECEITA' && t.status === 'PAGO')
+      .reduce((sum, t) => sum + t.value, 0);
+  }, [titlesData]);
 
   const chartData = React.useMemo(() => {
     const monthLabels: {key: string, name: string}[] = [];

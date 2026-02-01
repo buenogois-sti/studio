@@ -182,5 +182,3 @@ export type DocumentTemplate = {
   createdAt: Timestamp;
   updatedAt?: Timestamp;
 };
-
-    
