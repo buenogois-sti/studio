@@ -65,28 +65,44 @@ export default function LoginPage() {
     }
 
     return (
-        <Card className="mx-auto max-w-sm animate-scaleIn">
-            <CardHeader>
-                <CardTitle className="text-2xl font-headline">Acessar Plataforma</CardTitle>
-                <CardDescription>
-                    Use sua conta do Google para entrar.
+        <Card className="mx-auto max-w-sm shadow-2xl border-2 dark:border-slate-800 animate-scaleIn backdrop-blur-sm">
+            <CardHeader className="space-y-2 pb-6">
+                <CardTitle className="text-3xl font-headline font-bold tracking-tight">
+                    Acessar a Plataforma
+                </CardTitle>
+                <CardDescription className="text-base">
+                    Sistema interno de gestão jurídica
                 </CardDescription>
             </CardHeader>
             <CardContent>
-                <div className="space-y-4">
-                     <Button onClick={handleGoogleSignIn} disabled={isLoading} className="w-full">
+                <div className="space-y-6">
+                     <Button 
+                        onClick={handleGoogleSignIn} 
+                        disabled={isLoading} 
+                        className="w-full h-12 text-base font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
+                        size="lg"
+                     >
                         {isLoading ? (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                         ) : (
                            <GoogleIcon className="mr-2 h-5 w-5" />
                         )}
-                        {isLoading ? 'Aguarde...' : 'Entrar com Google' }
+                        {isLoading ? 'Aguarde...' : 'Entrar com Google Workspace' }
                     </Button>
-                    <div className="mt-4 text-center text-sm">
-                        Não tem uma conta?{' '}
-                        <Link href="/register" className="underline">
-                            Registre-se
-                        </Link>
+                    
+                    <div className="relative">
+                        <div className="absolute inset-0 flex items-center">
+                            <span className="w-full border-t" />
+                        </div>
+                        <div className="relative flex justify-center text-xs uppercase">
+                            <span className="bg-background px-2 text-muted-foreground">
+                                Acesso restrito
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <div className="text-center text-sm text-muted-foreground">
+                        Apenas contas @buenogois.adv.br
                     </div>
                 </div>
             </CardContent>
