@@ -73,19 +73,19 @@ const services = [
 const testimonials = [
     {
         name: 'Ana Paula Santos',
-        text: 'O Dr. Alan é incrível! Conseguiu recuperar todas as minhas verbas rescisórias que a empresa não queria pagar. Muito profissional e atencioso. Recomendo para todos que precisam de um advogado trabalhista de confiança!',
+        text: 'A equipe da Bueno Gois Advogados é incrível! Conseguiram recuperar todas as minhas verbas rescisórias que a empresa não queria pagar. Muito profissionais e atenciosos. Recomendo para todos que precisam de um advogado trabalhista de confiança!',
         avatar: '/image/testimonial-1.jpg',
         avatarHint: 'person happy'
     },
     {
         name: 'Roberto Oliveira',
-        text: 'Super recomendo! O Dr. Alan resolveu meu caso de assédio moral rapidamente. Tava sofrendo muito no trabalho e ele conseguiu uma indenização justa. Definitivamente o melhor advogado trabalhista que já conheci!',
+        text: 'Super recomendo! O time da Bueno Gois resolveu meu caso de assédio moral rapidamente. Estava sofrendo muito no trabalho e eles conseguiram uma indenização justa. Definitivamente o melhor escritório trabalhista que já conheci!',
         avatar: '/image/testimonial-2.jpg',
         avatarHint: 'person happy'
     },
     {
         name: 'Maria Fernanda Costa',
-        text: 'Nossa, o Dr. Alan salvou minha vida! Tava sendo demitida sem justa causa e ele conseguiu reverter tudo. Profissionalismo total e dedicação de verdade. Agradeço demais pelo trabalho que ele fez. Recomendo pra todo mundo!',
+        text: 'Nossa, a Bueno Gois Advogados salvou minha vida! Estava sendo demitida sem justa causa e eles conseguiram reverter tudo. Profissionalismo total e dedicação de verdade. Agradeço demais pelo trabalho que fizeram. Recomendo pra todo mundo!',
         avatar: '/image/testimonial-3.jpg',
         avatarHint: 'person happy'
     },
@@ -253,7 +253,7 @@ function StatsCounter({ end, duration = 2000, suffix = '', prefix = '' }: { end:
 export default function LandingPage() {
   const scrollY = useScrollPosition();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const whatsappUrl = "https://wa.me/5511980590128?text=Olá%20Dr.%20Alan!%20Gostaria%20de%20uma%20consulta%20gratuita.";
+  const whatsappUrl = "https://wa.me/5511980590128?text=Olá!%20Vi%20o%20site%20da%20Bueno%20Gois%20Advogados%20e%20gostaria%20de%20saber%20mais%20sobre%20seus%20serviços.";
 
   return (
     <div className="bg-background text-foreground font-body overflow-x-hidden">
@@ -324,7 +324,7 @@ export default function LandingPage() {
                       <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-accent/20 rounded-3xl blur-3xl" />
                       <img
                         src="/lawyer-portrait.png"
-                        alt="Dr. Alan Bueno De Gois"
+                        alt="Advogado Bueno Gois"
                         width={500}
                         height={600}
                         className="relative object-contain object-bottom filter drop-shadow-[0_35px_60px_rgba(245,208,48,0.3)]"
@@ -353,7 +353,7 @@ export default function LandingPage() {
 
                 {/* Description */}
                 <p className="text-xl text-white/90 max-w-2xl leading-relaxed text-justify">
-                  Advogado trabalhista especializado em{' '}
+                  Advocacia trabalhista especializada em{' '}
                   <span className="text-primary font-semibold">rescisão de contrato</span>,{' '}
                   <span className="text-primary font-semibold">horas extras</span>,{' '}
                   <span className="text-primary font-semibold">assédio moral</span> e mais.
@@ -474,7 +474,7 @@ export default function LandingPage() {
             {/* Title Section - Centered */}
             <AnimatedSection className="text-center mb-12">
               <h2 className="font-headline text-4xl md:text-5xl font-bold text-gray-900 mb-6">
-                Sobre Dr. Alan Bueno De Gois - Advogado
+                Sobre Bueno Gois Advogados e Associados
                 <br />
                 <span className="text-[#152c4b] font-black">Trabalhista Especialista</span>
               </h2>
@@ -497,13 +497,13 @@ export default function LandingPage() {
                 <div className="space-y-6">
                   <AnimatedSection>
                     <p className="text-lg text-gray-600 leading-relaxed text-justify">
-                      Seus direitos trabalhistas merecem <span className="font-bold text-gray-900">proteção e respeito</span>. Sou o <span className="font-bold text-gray-900">Dr. Alan Bueno de Gois</span>, advogado trabalhista com <span className="font-bold text-gray-900">mais de 10 anos de experiência</span>, dedicado exclusivamente à defesa de trabalhadores.
+                      Seus direitos trabalhistas merecem <span className="font-bold text-gray-900">proteção e respeito</span>. Somos a <span className="font-bold text-gray-900">Bueno Gois Advogados</span>, um escritório com <span className="font-bold text-gray-900">mais de 10 anos de experiência</span>, dedicado exclusivamente à defesa de trabalhadores.
                     </p>
                   </AnimatedSection>
                   
                   <AnimatedSection delay={100}>
                     <p className="text-lg text-gray-600 leading-relaxed text-justify">
-                      <span className="font-bold text-gray-900">Por que escolher um especialista em Direito Trabalhista?</span> Em ações trabalhistas, <span className="font-bold text-gray-900">cada detalhe faz diferença</span>. Minha <span className="font-bold text-gray-900">experiência e atualização constante</span> me permitem identificar <span className="font-bold text-gray-900">oportunidades</span> que muitas vezes passam despercebidas por outros profissionais.
+                      <span className="font-bold text-gray-900">Por que escolher um especialista em Direito Trabalhista?</span> Em ações trabalhistas, <span className="font-bold text-gray-900">cada detalhe faz diferença</span>. Nossa <span className="font-bold text-gray-900">experiência e atualização constante</span> nos permitem identificar <span className="font-bold text-gray-900">oportunidades</span> que muitas vezes passam despercebidas por outros profissionais.
                     </p>
                   </AnimatedSection>
                   
@@ -511,7 +511,7 @@ export default function LandingPage() {
                     <div className="bg-[#152c4b]/10 border-2 border-[#152c4b]/30 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all" style={{ boxShadow: '0 8px 24px rgba(21, 44, 75, 0.15)' }}>
                       <p className="text-gray-900 font-bold text-lg flex items-start gap-3">
                         <Sparkles className="w-6 h-6 text-[#152c4b] flex-shrink-0 mt-1" />
-                        <span className="text-justify">Disponibilidade imediata – Casos trabalhistas não têm hora marcada. Estou pronto para ouvir você e agir rapidamente para proteger seus direitos.</span>
+                        <span className="text-justify">Disponibilidade imediata – Casos trabalhistas não têm hora marcada. Estamos prontos para ouvir você e agir rapidamente para proteger seus direitos.</span>
                       </p>
                     </div>
                   </AnimatedSection>
@@ -524,7 +524,7 @@ export default function LandingPage() {
                     >
                       <Link href={whatsappUrl} target="_blank">
                         <MessageCircle className="mr-3 h-5 w-5 group-hover:rotate-12 transition-transform" />
-                        Fale Comigo Agora
+                        Fale Conosco Agora
                         <ArrowRight className="ml-3 h-5 w-5 group-hover:translate-x-1 transition-transform" />
                       </Link>
                     </Button>
@@ -538,7 +538,7 @@ export default function LandingPage() {
                   <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-transparent to-primary/10 z-10" />
                   <img
                     src="/lawyer-action.jpg"
-                    alt="Dr. Alan Bueno De Gois em seu escritório"
+                    alt="Escritório Bueno Gois"
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 filter brightness-105"
                   />
                   <div className="absolute bottom-4 left-4 right-4 bg-background/90 backdrop-blur-sm p-4 rounded-xl z-20 transform translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-500">
@@ -547,7 +547,7 @@ export default function LandingPage() {
                         <Scale className="w-5 h-5 text-primary" />
                       </div>
                       <div className="text-sm">
-                        <div className="font-bold text-white">Dr. Alan Bueno</div>
+                        <div className="font-bold text-white">Bueno Gois Advogados</div>
                         <div className="text-xs text-muted-foreground">OAB/SP 123.456</div>
                       </div>
                     </div>
@@ -798,7 +798,7 @@ export default function LandingPage() {
                   >
                     <Link href={whatsappUrl} target="_blank">
                       <MessageCircle className="mr-3 h-5 w-5 group-hover:rotate-12 transition-transform" />
-                      Fale com o Dr. Alan
+                      Fale com nossa equipe
                       <ArrowRight className="ml-3 h-5 w-5 group-hover:translate-x-1 transition-transform" />
                     </Link>
                   </Button>
@@ -862,7 +862,7 @@ export default function LandingPage() {
           </div>
 
           <div className="mt-12 pt-6 border-t border-white/10 text-center text-white/60 text-sm">
-            &copy; {new Date().getFullYear()} Dr. Alan Bueno De Gois - Advocacia Trabalhista. Todos os direitos reservados.
+            &copy; {new Date().getFullYear()} Bueno Gois Advogados e Associados. Todos os direitos reservados.
           </div>
           <div className="text-center text-white/40 text-xs mt-2">
             Desenvolvido com tecnologia de ponta e design moderno
@@ -873,9 +873,9 @@ export default function LandingPage() {
       {/* WhatsApp Floating Widget */}
       <WhatsAppFloating
         phoneNumber="5511980590128"
-        message="Olá Dr. Alan! Vi seu site e gostaria de saber mais sobre os serviços de advocacia trabalhista."
-        welcomeMessage="Olá! 👋 Sou o Dr. Alan Bueno. Como posso ajudar com seus direitos trabalhistas?"
-        userName="Dr. Alan Bueno"
+        message="Olá! Vi o site da Bueno Gois Advogados e gostaria de saber mais sobre os serviços de advocacia trabalhista."
+        welcomeMessage="Olá! 👋 Sou da Bueno Gois Advogados. Como posso ajudar com seus direitos trabalhistas?"
+        userName="Bueno Gois Adv."
         delay={3000}
         autoHideDelay={10000}
       />

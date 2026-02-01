@@ -239,7 +239,7 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
             <Link href="/dashboard" className="flex items-center gap-2">
                 <Logo />
                 <span className="font-bold text-lg text-primary group-data-[collapsible=icon]:hidden">
-                Dr. Alan
+                Bueno Gois
                 </span>
             </Link>
             </SidebarHeader>
@@ -300,5 +300,3 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <InnerLayout>{children}</InnerLayout>
     )
 }
-
-    

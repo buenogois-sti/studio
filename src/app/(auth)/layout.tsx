@@ -38,14 +38,14 @@ export default function AuthLayout({
         {/* Content */}
         <div className="relative z-20 flex items-center text-lg font-medium">
           <Logo className="mr-2 h-10 w-10" />
-          Dr. Alan Bueno De Gois
+          Bueno Gois Advogados e Associados
         </div>
         <div className="relative z-20 mt-auto">
           <blockquote className="space-y-2 rounded-lg bg-black/20 backdrop-blur-sm p-6 border border-primary/20">
             <p className="text-lg font-headline">
               &ldquo;A plataforma de gestão que centraliza nossas operações e otimiza o atendimento ao cliente com tecnologia e eficiência.&rdquo;
             </p>
-            <footer className="text-sm font-semibold text-primary">Equipe Jurídica</footer>
+            <footer className="text-sm font-semibold text-primary">Bueno Gois Advogados e Associados</footer>
           </blockquote>
         </div>
       </div>

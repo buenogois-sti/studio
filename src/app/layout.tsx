@@ -5,8 +5,8 @@ import { Providers } from './providers';
 
 
 export const metadata: Metadata = {
-  title: 'Dr. Alan Bueno De Gois - Advogado Trabalhista',
-  description: 'Advogado trabalhista especialista em São Bernardo do Campo. Defesa de direitos trabalhistas, rescisão, horas extras, assédio e mais.',
+  title: 'Bueno Gois Advogados e Associados',
+  description: 'Plataforma de gestão para escritórios de advocacia.',
 };
 
 export default function RootLayout({

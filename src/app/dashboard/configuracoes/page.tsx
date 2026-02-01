@@ -155,7 +155,7 @@ export default function ConfiguracoesPage() {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="officeName">Nome do Escritório</Label>
-                <Input id="officeName" defaultValue="Dr. Alan Bueno De Gois - Advocacia Trabalhista" />
+                <Input id="officeName" defaultValue="Bueno Gois Advogados e Associados" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="officeAddress">Endereço Principal</Label>
@@ -255,5 +255,3 @@ export default function ConfiguracoesPage() {
     </div>
   );
 }
-
-    
