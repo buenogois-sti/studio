@@ -17,6 +17,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -60,11 +61,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
 import {
   Command,
   CommandEmpty,
@@ -127,16 +123,13 @@ const processSchema = z.object({
   status: z.enum(['Ativo', 'Arquivado', 'Pendente']),
 });
 
-function ClientSearchCombobox({
-  value,
-  onChange,
+function ClientSearch({
+  onSelect,
   onAddNew,
 }: {
-  value: Client | null;
-  onChange: (client: Client | null) => void;
+  onSelect: (client: Client) => void;
   onAddNew: () => void;
 }) {
-  const [open, setOpen] = React.useState(false);
   const [search, setSearch] = React.useState('');
   const [results, setResults] = React.useState<Client[]>([]);
   const [isLoading, setIsLoading] = React.useState(false);
@@ -167,73 +160,49 @@ function ClientSearchCombobox({
   }, [search, toast]);
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          className="w-full justify-between"
-        >
-          {value
-            ? `${value.firstName} ${value.lastName}`
-            : 'Selecione um cliente...'}
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-        <Command>
-          <CommandInput
-            placeholder="Buscar cliente por nome ou CPF..."
-            value={search}
-            onValueChange={setSearch}
-          />
-          <CommandList>
-            {isLoading && <CommandEmpty>Buscando...</CommandEmpty>}
-            {!isLoading && !results.length && search.length > 1 && (
-              <CommandEmpty>Nenhum cliente encontrado.</CommandEmpty>
-            )}
-            <CommandGroup>
-              {results.map((client) => (
-                <CommandItem
-                  key={client.id}
-                  value={`${client.firstName} ${client.lastName} ${client.document}`}
-                  onSelect={() => {
-                    onChange(client);
-                    setOpen(false);
-                  }}
-                >
-                  <Check
-                    className={cn(
-                      'mr-2 h-4 w-4',
-                      value?.id === client.id ? 'opacity-100' : 'opacity-0'
-                    )}
-                  />
-                  <div className="flex flex-col">
-                    <span>
-                      {client.firstName} {client.lastName}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {client.document}
-                    </span>
-                  </div>
-                </CommandItem>
-              ))}
-            </CommandGroup>
-            <CommandSeparator />
-            <CommandGroup>
-              <CommandItem
-                onSelect={onAddNew}
-                className="text-primary cursor-pointer"
-              >
-                <PlusCircle className="mr-2 h-4 w-4" />
-                Cadastrar novo cliente...
-              </CommandItem>
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+    <Command className="rounded-lg border bg-background shadow-sm">
+      <CommandInput
+        placeholder="Buscar cliente por nome ou CPF..."
+        value={search}
+        onValueChange={setSearch}
+      />
+      <CommandList>
+        {isLoading && <CommandEmpty>Buscando...</CommandEmpty>}
+        {!isLoading && !results.length && search.length > 1 && (
+          <CommandEmpty>Nenhum cliente encontrado.</CommandEmpty>
+        )}
+        <CommandGroup>
+          {results.map((client) => (
+            <CommandItem
+              key={client.id}
+              value={`${client.firstName} ${client.lastName} ${client.document}`}
+              onSelect={() => {
+                onSelect(client);
+              }}
+            >
+              <div className="flex flex-col">
+                <span>
+                  {client.firstName} {client.lastName}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {client.document}
+                </span>
+              </div>
+            </CommandItem>
+          ))}
+        </CommandGroup>
+        <CommandSeparator />
+        <CommandGroup>
+          <CommandItem
+            onSelect={onAddNew}
+            className="text-primary cursor-pointer"
+          >
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Cadastrar novo cliente
+          </CommandItem>
+        </CommandGroup>
+      </CommandList>
+    </Command>
   );
 }
 
@@ -283,13 +252,12 @@ function ProcessForm({
 
   React.useEffect(() => {
     if (process?.clientId && !selectedClient) {
-      // Fetch client if editing a process
       const fetchClient = async () => {
         try {
           const client = await getClientById(process.clientId);
           if (client) {
             setSelectedClient(client);
-            form.setValue('clientId', client.id); // Also set the form value
+            form.setValue('clientId', client.id);
           }
         } catch (error: any) {
           console.error("Failed to fetch client for process:", error);
@@ -302,11 +270,10 @@ function ProcessForm({
       };
       fetchClient();
     }
-     // Clear client on process change to null (new process)
     if (!process) {
         setSelectedClient(null);
     }
-  }, [process, toast, form]);
+  }, [process, toast, form, selectedClient]);
 
   const handleNewClientSaved = (newClient: Client) => {
     setSelectedClient(newClient);
@@ -365,28 +332,51 @@ function ProcessForm({
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <ScrollArea className="h-[calc(100vh-10rem)] p-4">
-            <div className="space-y-6">
+            <div className="space-y-8">
               <section>
-                <H2>Dados do Processo</H2>
+                <H2>1. Cliente do Processo</H2>
+                 <div className="mt-4">
+                  {selectedClient ? (
+                    <div className="flex items-center gap-4 rounded-lg border bg-card p-4">
+                      <Avatar className="h-12 w-12 border">
+                        <AvatarImage src={selectedClient.avatar} alt={`${selectedClient.firstName} ${selectedClient.lastName}`} />
+                        <AvatarFallback>{selectedClient.firstName?.charAt(0) ?? 'C'}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex-grow">
+                        <p className="font-semibold">{`${selectedClient.firstName} ${selectedClient.lastName}`}</p>
+                        <p className="text-sm text-muted-foreground">{selectedClient.document}</p>
+                      </div>
+                      <Button variant="outline" onClick={() => {
+                        setSelectedClient(null);
+                        form.setValue('clientId', '', { shouldValidate: true });
+                      }}>
+                        Alterar
+                      </Button>
+                    </div>
+                  ) : (
+                    <FormField
+                      control={form.control}
+                      name="clientId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <ClientSearch
+                            onSelect={(client) => {
+                              setSelectedClient(client);
+                              field.onChange(client.id);
+                            }}
+                            onAddNew={() => setIsClientSheetOpen(true)}
+                          />
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+                </div>
+              </section>
+
+              <section>
+                <H2>2. Dados do Processo</H2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
-                  <FormField
-                    control={form.control}
-                    name="clientId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Cliente *</FormLabel>
-                        <ClientSearchCombobox
-                          value={selectedClient}
-                          onChange={(client) => {
-                            setSelectedClient(client);
-                            field.onChange(client?.id || '');
-                          }}
-                          onAddNew={() => setIsClientSheetOpen(true)}
-                        />
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
                   <FormField
                     control={form.control}
                     name="name"
@@ -461,7 +451,7 @@ function ProcessForm({
                     control={form.control}
                     name="courtBranch"
                     render={({ field }) => (
-                      <FormItem className="md:col-span-2">
+                      <FormItem>
                         <FormLabel>Vara</FormLabel>
                         <FormControl>
                           <Input
@@ -493,7 +483,7 @@ function ProcessForm({
                 </div>
               </section>
               <section>
-                <H2>Parte Contrária</H2>
+                <H2>3. Parte Contrária</H2>
                 <div className="space-y-2 mt-4">
                   {fields.map((field, index) => (
                     <div key={field.id} className="flex items-center gap-2">
@@ -543,7 +533,7 @@ function ProcessForm({
                 </div>
               </section>
               <section>
-                <H2>Observações</H2>
+                <H2>4. Observações</H2>
                 <FormField
                   control={form.control}
                   name="description"
