@@ -68,6 +68,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { createFinancialTitle, updateFinancialTitleStatus } from '@/lib/finance-actions';
 import { searchProcesses } from '@/lib/process-actions';
+import { StaffCreditCard } from '@/components/finance/StaffCreditCard';
 
 
 const operationalExpenseOrigins = [
@@ -689,10 +690,11 @@ export default function FinanceiroPage() {
       </div>
 
       <Tabs defaultValue="overview">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="overview">Visão Geral</TabsTrigger>
           <TabsTrigger value="revenues">Receitas</TabsTrigger>
           <TabsTrigger value="expenses">Despesas</TabsTrigger>
+          <TabsTrigger value="staff_fees">Repasses da Equipe</TabsTrigger>
         </TabsList>
         <TabsContent value="overview">
           <Card>
@@ -727,7 +729,26 @@ export default function FinanceiroPage() {
             </CardContent>
           </Card>
         </TabsContent>
+         <TabsContent value="staff_fees">
+          <Card>
+            <CardHeader>
+              <CardTitle>Honorários da Equipe</CardTitle>
+              <CardDescription>Resumo dos valores a receber por cada membro da equipe que participa de honorários.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {isLoading ? (
+                    [...Array(3)].map((_, i) => <Skeleton key={i} className="h-56 w-full" />)
+                ) : (
+                    staffData && staffData
+                        .filter(s => s.role === 'lawyer' || s.role === 'intern')
+                        .map(member => <StaffCreditCard key={member.id} staffMember={member} />)
+                )}
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
     </div>
   );
 }
+
+    

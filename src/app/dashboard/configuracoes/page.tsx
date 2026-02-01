@@ -24,7 +24,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
 import { useDoc, useFirebase, useMemoFirebase, useCollection } from '@/firebase';
-import { doc, collection } from 'firebase/firestore';
+import { doc, collection, setDoc } from 'firebase/firestore';
 import type { UserProfile } from '@/lib/types';
 import { ClientKitManager } from '@/components/settings/client-kit-manager';
 import { TemplateLibraryManager } from '@/components/settings/template-library-manager';
@@ -193,6 +193,88 @@ function UsersTab() {
     );
 }
 
+function FinancialTab() {
+  const { firestore, isUserLoading } = useFirebase();
+  const { toast } = useToast();
+
+  const settingsRef = useMemoFirebase(() => firestore ? doc(firestore, 'system_settings', 'finance') : null, [firestore]);
+  const { data: settings, isLoading: isLoadingSettings } = useDoc<{ lawyerFeeVisibility?: boolean }>(settingsRef);
+  
+  const isLoading = isUserLoading || isLoadingSettings;
+  const isVisible = settings?.lawyerFeeVisibility ?? false;
+
+  const handleVisibilityChange = async (checked: boolean) => {
+      if (!settingsRef) return;
+      try {
+          await setDoc(settingsRef, { lawyerFeeVisibility: checked }, { merge: true });
+          toast({ title: 'Configuração salva!', description: 'A visibilidade dos honorários foi atualizada.' });
+      } catch (error: any) {
+          toast({ variant: 'destructive', title: 'Erro ao salvar', description: error.message });
+      }
+  };
+
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle>Parâmetros Financeiros</CardTitle>
+          <CardDescription>Defina padrões para honorários, vencimentos, moeda e alertas financeiros.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                    <Label htmlFor="defaultFee">Honorários Padrão (%)</Label>
+                    <Input id="defaultFee" type="number" defaultValue="20" />
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="paymentTerms">Prazo de Pagamento Padrão (dias)</Label>
+                    <Input id="paymentTerms" type="number" defaultValue="30" />
+                </div>
+            </div>
+            <div className="space-y-2">
+                <Label htmlFor="currency">Moeda</Label>
+                <Input id="currency" defaultValue="BRL (R$)" disabled />
+            </div>
+            <div className="flex items-center space-x-2">
+                <Switch id="late-fee-alerts" defaultChecked/>
+                <Label htmlFor="late-fee-alerts">Ativar alertas de títulos vencidos</Label>
+            </div>
+        </CardContent>
+        <CardFooter>
+            <Button>Salvar Parâmetros</Button>
+        </CardFooter>
+      </Card>
+
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle>Controle de Honorários da Equipe</CardTitle>
+          <CardDescription>Gerencie as configurações de visualização de honorários para os advogados.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="flex items-center space-x-4">
+              <Skeleton className="h-6 w-10 rounded-lg" />
+              <Skeleton className="h-5 w-64" />
+            </div>
+          ) : (
+            <div className="flex items-center space-x-4 rounded-lg border p-4">
+              <Switch
+                id="fee-visibility"
+                checked={isVisible}
+                onCheckedChange={handleVisibilityChange}
+              />
+              <Label htmlFor="fee-visibility" className="cursor-pointer">
+                Permitir que advogados visualizem seus próprios saldos de honorários
+              </Label>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </>
+  );
+}
+
+
 export default function ConfiguracoesPage() {
   return (
     <div className="flex flex-col gap-6">
@@ -257,35 +339,7 @@ export default function ConfiguracoesPage() {
         </TabsContent>
 
         <TabsContent value="financeiro">
-          <Card>
-            <CardHeader>
-              <CardTitle>Parâmetros Financeiros</CardTitle>
-              <CardDescription>Defina padrões para honorários, vencimentos, moeda e alertas financeiros.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="defaultFee">Honorários Padrão (%)</Label>
-                        <Input id="defaultFee" type="number" defaultValue="20" />
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="paymentTerms">Prazo de Pagamento Padrão (dias)</Label>
-                        <Input id="paymentTerms" type="number" defaultValue="30" />
-                    </div>
-                </div>
-                <div className="space-y-2">
-                    <Label htmlFor="currency">Moeda</Label>
-                    <Input id="currency" defaultValue="BRL (R$)" disabled />
-                </div>
-                <div className="flex items-center space-x-2">
-                    <Switch id="late-fee-alerts" defaultChecked/>
-                    <Label htmlFor="late-fee-alerts">Ativar alertas de títulos vencidos</Label>
-                </div>
-            </CardContent>
-            <CardFooter>
-                <Button>Salvar Parâmetros</Button>
-            </CardFooter>
-          </Card>
+          <FinancialTab />
         </TabsContent>
 
         <TabsContent value="usuarios">
@@ -367,3 +421,5 @@ export default function ConfiguracoesPage() {
     </div>
   );
 }
+
+    

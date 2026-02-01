@@ -665,6 +665,10 @@
               "destination"
             ]
           }
+        },
+        "lawyerFeeVisibility": {
+          "type": "boolean",
+          "description": "Controls if lawyers can see their own fee statements."
         }
       }
     },
@@ -793,3 +797,5 @@
     }
   }
 }
+
+    
