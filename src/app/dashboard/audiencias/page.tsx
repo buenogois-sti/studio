@@ -1,9 +1,8 @@
-
 'use client';
 
 import * as React from 'react';
-import { Calendar as CalendarIcon, PlusCircle, Loader2 } from 'lucide-react';
-import { format } from 'date-fns';
+import { Calendar as CalendarIcon, PlusCircle, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { format, startOfWeek, endOfWeek, eachDayOfInterval, addDays, isToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
@@ -28,6 +27,7 @@ import { searchProcesses } from '@/lib/process-actions';
 import { createHearing } from '@/lib/hearing-actions';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 
 const hearingSchema = z.object({
@@ -302,31 +302,26 @@ export default function AudienciasPage() {
   const { firestore, isUserLoading } = useFirebase();
   const [refreshKey, setRefreshKey] = React.useState(0);
 
-  // Fetch all hearings
-  const hearingsQuery = useMemoFirebase(
-    () => (firestore ? collection(firestore, 'hearings') : null),
-    [firestore, refreshKey]
-  );
+  // Data fetching
+  const hearingsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'hearings') : null, [firestore, refreshKey]);
   const { data: hearingsData, isLoading: isLoadingHearings } = useCollection<Hearing>(hearingsQuery);
 
-  // Fetch all processes
-  const processesQuery = useMemoFirebase(
-    () => (firestore ? collection(firestore, 'processes') : null),
-    [firestore, refreshKey]
-  );
+  const processesQuery = useMemoFirebase(() => firestore ? collection(firestore, 'processes') : null, [firestore]);
   const { data: processesData, isLoading: isLoadingProcesses } = useCollection<Process>(processesQuery);
   const processesMap = React.useMemo(() => new Map(processesData?.map(p => [p.id, p])), [processesData]);
 
-  // Fetch all clients
-  const clientsQuery = useMemoFirebase(
-    () => (firestore ? collection(firestore, 'clients') : null),
-    [firestore, refreshKey]
-  );
+  const clientsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'clients') : null, [firestore]);
   const { data: clientsData, isLoading: isLoadingClients } = useCollection<Client>(clientsQuery);
   const clientsMap = React.useMemo(() => new Map(clientsData?.map(c => [c.id, c])), [clientsData]);
 
   const isLoading = isUserLoading || isLoadingHearings || isLoadingProcesses || isLoadingClients;
   const hearings = hearingsData || [];
+
+  // Date and week logic
+  const selectedDate = date || new Date();
+  const startOfWeekDate = startOfWeek(selectedDate, { weekStartsOn: 1 });
+  const endOfWeekDate = endOfWeek(selectedDate, { weekStartsOn: 1 });
+  const daysInWeek = eachDayOfInterval({ start: startOfWeekDate, end: endOfWeekDate });
 
   const upcomingHearings = React.useMemo(() => {
     const today = new Date();
@@ -336,20 +331,6 @@ export default function AudienciasPage() {
       .sort((a, b) => (a.date as unknown as Timestamp).toMillis() - (b.date as unknown as Timestamp).toMillis());
   }, [hearings]);
 
-  const selectedDayHearings = React.useMemo(() => {
-    if (!date) return [];
-    const selected = new Date(date);
-    selected.setHours(0, 0, 0, 0);
-    const selectedEnd = new Date(selected);
-    selectedEnd.setDate(selectedEnd.getDate() + 1);
-    
-    return hearings.filter(h => {
-      if (!h.date) return false;
-      const hearingDate = (h.date as unknown as Timestamp).toDate();
-      return hearingDate >= selected && hearingDate < selectedEnd;
-    });
-  }, [hearings, date]);
-  
   const getHearingInfo = (hearing: Hearing) => {
     const process = processesMap.get(hearing.processId);
     if (!process) return { processName: 'Processo não encontrado', clientName: 'Cliente não encontrado', clientAvatar: '' };
@@ -374,19 +355,17 @@ export default function AudienciasPage() {
     return format(dateObj, 'HH:mm', { locale: ptBR });
   }
 
-  const handleHearingCreated = () => {
-    // Increment key to force re-fetch of collections if not using realtime updates
-    // For onSnapshot, this helps if queries themselves change, though not strictly needed here.
-    setRefreshKey(prev => prev + 1);
-  };
+  const handleHearingCreated = () => setRefreshKey(prev => prev + 1);
+  const goToPreviousWeek = () => setDate(addDays(selectedDate, -7));
+  const goToNextWeek = () => setDate(addDays(selectedDate, 7));
 
 
   return (
-    <div className="grid gap-6 md:grid-cols-[350px_1fr] lg:grid-cols-[400px_1fr]">
+    <div className="grid gap-8 md:grid-cols-1 lg:grid-cols-[380px_1fr]">
       <div className="flex flex-col gap-6">
         <Card>
           <CardHeader>
-             <CardTitle className="font-headline">Calendário de Audiências</CardTitle>
+             <CardTitle className="font-headline">Calendário</CardTitle>
           </CardHeader>
           <CardContent>
             <Calendar
@@ -395,12 +374,8 @@ export default function AudienciasPage() {
               onSelect={setDate}
               className="rounded-md border p-0"
               locale={ptBR}
-              modifiers={{
-                hasHearing: hearings.filter(h => h.date).map(h => (h.date as unknown as Timestamp).toDate())
-              }}
-              modifiersClassNames={{
-                hasHearing: "bg-primary/20 text-primary-foreground rounded-md font-bold"
-              }}
+              modifiers={{ hasHearing: hearings.filter(h => h.date).map(h => (h.date as unknown as Timestamp).toDate()) }}
+              modifiersClassNames={{ hasHearing: "bg-primary/20 text-primary-foreground rounded-md" }}
             />
           </CardContent>
         </Card>
@@ -412,23 +387,23 @@ export default function AudienciasPage() {
           <CardContent>
             {isLoading ? (
                 <div className="space-y-4">
-                    <Skeleton className="h-16 w-full" />
-                    <Skeleton className="h-16 w-full" />
-                    <Skeleton className="h-16 w-full" />
+                    {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-20 w-full" />)}
                 </div>
             ) : upcomingHearings.length > 0 ? (
-              <div className="space-y-4">
-                {upcomingHearings.slice(0, 5).map(hearing => {
-                  const { processName, clientName } = getHearingInfo(hearing);
-                  return (
-                    <div key={hearing.id} className="p-3 rounded-lg border bg-muted/50">
-                      <p className="font-semibold text-sm truncate">{processName}</p>
-                      <p className="text-xs text-muted-foreground">{clientName}</p>
-                      <p className="text-xs text-muted-foreground mt-1">{formatDate(hearing.date)}</p>
-                    </div>
-                  );
-                })}
-              </div>
+              <ScrollArea className="h-[250px]">
+                <div className="space-y-3 pr-4">
+                  {upcomingHearings.slice(0, 7).map(hearing => {
+                    const { processName, clientName } = getHearingInfo(hearing);
+                    return (
+                      <div key={hearing.id} className="p-3 rounded-lg border bg-muted/50 transition-colors hover:bg-muted">
+                        <p className="font-semibold text-sm truncate">{processName}</p>
+                        <p className="text-xs text-muted-foreground">{clientName}</p>
+                        <p className="text-sm font-medium mt-1">{formatDate(hearing.date)}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </ScrollArea>
             ) : (
               <p className="text-sm text-muted-foreground text-center py-4">Nenhuma audiência futura agendada.</p>
             )}
@@ -436,49 +411,70 @@ export default function AudienciasPage() {
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="font-headline">
-            Audiências para {date ? format(date, "EEEE, dd 'de' MMMM", { locale: ptBR }) : '...'}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-              <div className="flex h-full items-center justify-center">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-              </div>
-          ) : selectedDayHearings.length > 0 ? (
-            <div className="space-y-4">
-              {selectedDayHearings.map(hearing => {
-                const { processName, clientName, clientAvatar } = getHearingInfo(hearing);
-                return (
-                  <div key={hearing.id} className="p-4 rounded-lg border bg-card flex items-start gap-4">
-                     <Avatar>
-                        <AvatarImage src={clientAvatar} />
-                        <AvatarFallback>{clientName?.charAt(0) || 'P'}</AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 space-y-1">
-                      <p className="font-bold">{processName}</p>
-                      <p className="text-sm text-muted-foreground">Cliente: {clientName}</p>
-                      <p className="text-sm text-muted-foreground">Local: {hearing.location}</p>
-                      <p className="text-sm text-muted-foreground">Responsável: {hearing.responsibleParty}</p>
-                    </div>
-                    <Badge variant="secondary" className="font-mono text-base">
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {formatTime(hearing.date)}
-                    </Badge>
-                  </div>
-                );
-              })}
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+            <h2 className="font-headline text-2xl font-semibold capitalize">
+                {format(startOfWeekDate, 'MMMM yyyy', { locale: ptBR })}
+            </h2>
+            <div className="flex items-center gap-2">
+                <Button variant="outline" size="icon" onClick={goToPreviousWeek}><ChevronLeft className="h-4 w-4" /></Button>
+                <Button variant="outline" onClick={() => setDate(new Date())}>Hoje</Button>
+                <Button variant="outline" size="icon" onClick={goToNextWeek}><ChevronRight className="h-4 w-4" /></Button>
             </div>
-          ) : (
-             <div className="flex h-48 flex-col items-center justify-center rounded-lg border-2 border-dashed">
-                <CalendarIcon className="h-12 w-12 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground mt-2">Nenhuma audiência para o dia selecionado.</p>
+        </div>
+
+        {isLoading ? (
+             <div className="flex h-full items-center justify-center rounded-lg border-2 border-dashed">
+                <Loader2 className="h-12 w-12 animate-spin text-muted-foreground" />
              </div>
-          )}
-        </CardContent>
-      </Card>
+        ) : (
+            <ScrollArea className="h-[calc(100vh-12rem)] rounded-lg border">
+                <div className="p-1 sm:p-4">
+                {daysInWeek.map((day, index) => {
+                    const hearingsOnDay = hearings
+                        .filter(h => h.date && new Date((h.date as unknown as Timestamp).seconds * 1000).toDateString() === day.toDateString())
+                        .sort((a,b) => (a.date as unknown as Timestamp).seconds - (b.date as unknown as Timestamp).seconds);
+                    
+                    return (
+                        <div key={index} className="mb-6">
+                            <h3 className={cn("font-semibold text-lg mb-4 pl-2 sticky top-0 bg-background/80 backdrop-blur-sm py-2 z-10", isToday(day) && "text-primary")}>
+                                {format(day, "EEEE, dd 'de' MMMM", { locale: ptBR })}
+                            </h3>
+                            {hearingsOnDay.length > 0 ? (
+                                <div className="space-y-4">
+                                {hearingsOnDay.map(hearing => {
+                                    const { processName, clientName, clientAvatar } = getHearingInfo(hearing);
+                                    return (
+                                        <Card key={hearing.id} className="p-4 flex items-start gap-4 transition-all hover:shadow-md hover:border-primary/50">
+                                            <div className="flex flex-col items-center">
+                                                <Badge variant="secondary" className="font-mono text-base mb-2">
+                                                    {formatTime(hearing.date)}
+                                                </Badge>
+                                                <Avatar className="h-10 w-10">
+                                                    <AvatarImage src={clientAvatar} />
+                                                    <AvatarFallback>{clientName?.charAt(0) || 'P'}</AvatarFallback>
+                                                </Avatar>
+                                            </div>
+                                            <div className="flex-1 space-y-1">
+                                                <p className="font-bold text-base">{processName}</p>
+                                                <p className="text-sm text-muted-foreground">Cliente: {clientName}</p>
+                                                <p className="text-sm text-muted-foreground">Local: {hearing.location}</p>
+                                                <p className="text-sm text-muted-foreground">Responsável: {hearing.responsibleParty}</p>
+                                            </div>
+                                        </Card>
+                                    );
+                                })}
+                                </div>
+                            ) : (
+                                <p className="text-sm text-muted-foreground pl-2">Nenhuma audiência agendada.</p>
+                            )}
+                        </div>
+                    );
+                })}
+                </div>
+            </ScrollArea>
+        )}
+      </div>
     </div>
   );
 }
