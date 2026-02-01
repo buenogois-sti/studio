@@ -65,7 +65,7 @@ export default function LoginPage() {
     }
 
     return (
-        <Card className="mx-auto max-w-sm">
+        <Card className="mx-auto max-w-sm animate-scaleIn">
             <CardHeader>
                 <CardTitle className="text-2xl font-headline">Acessar Plataforma</CardTitle>
                 <CardDescription>
@@ -76,9 +76,9 @@ export default function LoginPage() {
                 <div className="space-y-4">
                      <Button onClick={handleGoogleSignIn} disabled={isLoading} className="w-full">
                         {isLoading ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         ) : (
-                           <GoogleIcon className="h-5 w-5" />
+                           <GoogleIcon className="mr-2 h-5 w-5" />
                         )}
                         {isLoading ? 'Aguarde...' : 'Entrar com Google' }
                     </Button>

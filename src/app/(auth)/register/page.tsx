@@ -65,7 +65,7 @@ export default function RegisterPage() {
     }
 
     return (
-        <Card className="mx-auto max-w-sm">
+        <Card className="mx-auto max-w-sm animate-scaleIn">
             <CardHeader>
                 <CardTitle className="text-2xl font-headline">Criar Conta</CardTitle>
                 <CardDescription>
@@ -78,7 +78,7 @@ export default function RegisterPage() {
                         {isLoading ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
                         ) : (
-                           <GoogleIcon className="h-5 w-5" />
+                           <GoogleIcon className="mr-2 h-5 w-5" />
                         )}
                         {isLoading ? 'Aguarde...' : 'Registrar com Google' }
                     </Button>
