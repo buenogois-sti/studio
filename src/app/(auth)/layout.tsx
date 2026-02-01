@@ -19,11 +19,11 @@ export default function AuthLayout({
     <div className="w-full h-screen lg:grid lg:grid-cols-2">
       <div className="relative hidden h-full flex-col p-10 text-white lg:flex overflow-hidden">
         <Image
-            src="https://picsum.photos/seed/law-books/1920/1080"
-            alt="Imagem de fundo de uma biblioteca de direito"
+            src="https://picsum.photos/seed/law-office/1920/1080"
+            alt="Imagem de fundo de um escritório de advocacia"
             fill
             className="object-cover"
-            data-ai-hint="law books"
+            data-ai-hint="law office"
             priority
         />
         {/* Background Gradient & Animated Shapes */}
