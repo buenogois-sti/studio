@@ -186,15 +186,15 @@ function NewHearingDialog({ onHearingCreated }: { onHearingCreated: () => void }
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm" className="h-8 gap-1">
-          <PlusCircle className="h-3.5 w-3.5" />
-          <span className="sr-only sm:not-sr-only">Agendar</span>
+        <Button size="sm" className="h-9 gap-1">
+          <PlusCircle className="h-4 w-4" />
+          <span className="sr-only sm:not-sr-only">Agendar Audiência</span>
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[625px]">
         <DialogHeader>
           <DialogTitle>Agendar Nova Audiência</DialogTitle>
-          <CardDescription>Preencha os dados para criar a audiência no sistema e no seu Google Agenda.</CardDescription>
+          <DialogDescription>Preencha os dados para criar a audiência no sistema e no seu Google Agenda.</DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -346,14 +346,6 @@ export default function AudienciasPage() {
   const endOfWeekDate = endOfWeek(selectedDate, { weekStartsOn: 1 });
   const daysInWeek = eachDayOfInterval({ start: startOfWeekDate, end: endOfWeekDate });
 
-  const upcomingHearings = React.useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return hearings
-      .filter(h => h.date && (h.date as unknown as Timestamp).toDate() >= today)
-      .sort((a, b) => (a.date as unknown as Timestamp).toMillis() - (b.date as unknown as Timestamp).toMillis());
-  }, [hearings]);
-
   const getHearingInfo = (hearing: Hearing) => {
     const process = processesMap.get(hearing.processId);
     if (!process) return { processName: 'Processo não encontrado', clientName: 'Cliente não encontrado', clientAvatar: '' };
@@ -366,12 +358,6 @@ export default function AudienciasPage() {
     };
   };
 
-  const formatDate = (date: Timestamp | string) => {
-    if (!date) return '';
-    const dateObj = typeof date === 'string' ? new Date(date) : date.toDate();
-    return format(dateObj, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
-  }
-  
   const formatTime = (date: Timestamp | string) => {
     if (!date) return '';
     const dateObj = typeof date === 'string' ? new Date(date) : date.toDate();
@@ -384,17 +370,26 @@ export default function AudienciasPage() {
 
 
   return (
-    <div className="grid gap-8 md:grid-cols-1 lg:grid-cols-[1fr_380px]">
+    <div className="grid gap-8 md:grid-cols-1 lg:grid-cols-[1fr_350px]">
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
-            <h2 className="font-headline text-2xl font-semibold capitalize">
-                {format(startOfWeekDate, 'MMMM yyyy', { locale: ptBR })}
-            </h2>
-            <div className="flex items-center gap-2">
-                <Button variant="outline" size="icon" onClick={goToPreviousWeek}><ChevronLeft className="h-4 w-4" /></Button>
-                <Button variant="outline" onClick={() => setDate(new Date())}>Hoje</Button>
-                <Button variant="outline" size="icon" onClick={goToNextWeek}><ChevronRight className="h-4 w-4" /></Button>
+            <div className="flex items-center gap-4">
+                <h2 className="font-headline text-2xl font-semibold capitalize">
+                    {format(startOfWeekDate, 'MMMM yyyy', { locale: ptBR })}
+                </h2>
+                <div className="flex items-center gap-2">
+                    <Button variant="outline" size="icon" onClick={goToPreviousWeek}><ChevronLeft className="h-4 w-4" /></Button>
+                    <Button variant="outline" onClick={() => setDate(new Date())}>Hoje</Button>
+                    <Button variant="outline" size="icon" onClick={goToNextWeek}><ChevronRight className="h-4 w-4" /></Button>
+                </div>
             </div>
+             <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" className="h-9 gap-1" onClick={handleRefresh}>
+                    <RefreshCw className="h-4 w-4" />
+                    <span>Sincronizar</span>
+                </Button>
+                <NewHearingDialog onHearingCreated={handleRefresh} />
+             </div>
         </div>
 
         {isLoading ? (
@@ -418,8 +413,8 @@ export default function AudienciasPage() {
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
-                                            <TableHead className="w-[80px]">Hora</TableHead>
-                                            <TableHead>Processo / Cliente</TableHead>
+                                            <TableHead className="w-[100px]">Hora</TableHead>
+                                            <TableHead>Detalhes da Audiência</TableHead>
                                             <TableHead className="hidden md:table-cell">Local</TableHead>
                                             <TableHead className="hidden lg:table-cell">Responsável</TableHead>
                                             <TableHead className="text-right w-[50px]">Ações</TableHead>
@@ -427,17 +422,23 @@ export default function AudienciasPage() {
                                     </TableHeader>
                                     <TableBody>
                                         {hearingsOnDay.map(hearing => {
-                                            const { processName, clientName } = getHearingInfo(hearing);
+                                            const { processName, clientName, clientAvatar } = getHearingInfo(hearing);
                                             return (
                                                 <TableRow key={hearing.id} className="hover:bg-muted/50">
-                                                    <TableCell>
-                                                        <Badge variant="secondary" className="font-mono text-sm">
+                                                    <TableCell className="w-[100px]">
+                                                        <Badge variant="secondary" className="font-mono text-base font-semibold">
                                                             {formatTime(hearing.date)}
                                                         </Badge>
                                                     </TableCell>
                                                     <TableCell>
-                                                        <div className="font-bold">{processName}</div>
-                                                        <div className="text-sm text-muted-foreground">{clientName}</div>
+                                                        <div className="font-bold text-base">{processName}</div>
+                                                         <div className="flex items-center gap-2 mt-1">
+                                                            <Avatar className="h-6 w-6 border">
+                                                                <AvatarImage src={clientAvatar} />
+                                                                <AvatarFallback>{clientName.charAt(0)}</AvatarFallback>
+                                                            </Avatar>
+                                                            <span className="text-sm text-muted-foreground">{clientName}</span>
+                                                        </div>
                                                     </TableCell>
                                                     <TableCell className="hidden md:table-cell">{hearing.location}</TableCell>
                                                     <TableCell className="hidden lg:table-cell">{hearing.responsibleParty}</TableCell>
@@ -476,6 +477,7 @@ export default function AudienciasPage() {
         <Card>
           <CardHeader>
              <CardTitle className="font-headline">Calendário</CardTitle>
+             <CardDescription>Selecione uma data para ver a semana correspondente.</CardDescription>
           </CardHeader>
           <CardContent className="p-0">
             <Calendar
@@ -486,42 +488,6 @@ export default function AudienciasPage() {
               modifiers={{ hasHearing: hearings.filter(h => h.date).map(h => (h.date as unknown as Timestamp).toDate()) }}
               modifiersClassNames={{ hasHearing: "bg-primary/20 text-primary-foreground rounded-md" }}
             />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="font-headline text-lg">Próximas Audiências</CardTitle>
-             <div className="flex items-center gap-2">
-                <Button variant="outline" size="icon" className="h-8 w-8" onClick={handleRefresh}>
-                    <RefreshCw className="h-4 w-4" />
-                    <span className="sr-only">Sincronizar Audiências</span>
-                </Button>
-                <NewHearingDialog onHearingCreated={handleRefresh} />
-             </div>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-                <div className="space-y-4">
-                    {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-20 w-full" />)}
-                </div>
-            ) : upcomingHearings.length > 0 ? (
-              <ScrollArea className="h-[250px]">
-                <div className="space-y-3 pr-4">
-                  {upcomingHearings.slice(0, 7).map(hearing => {
-                    const { processName, clientName } = getHearingInfo(hearing);
-                    return (
-                      <div key={hearing.id} className="p-3 rounded-lg border bg-muted/50 transition-colors hover:bg-muted">
-                        <p className="font-semibold text-sm truncate">{processName}</p>
-                        <p className="text-xs text-muted-foreground">{clientName}</p>
-                        <p className="text-sm font-medium mt-1">{formatDate(hearing.date)}</p>
-                      </div>
-                    );
-                  })}
-                </div>
-              </ScrollArea>
-            ) : (
-              <p className="text-sm text-muted-foreground text-center py-4">Nenhuma audiência futura agendada.</p>
-            )}
           </CardContent>
         </Card>
       </div>
