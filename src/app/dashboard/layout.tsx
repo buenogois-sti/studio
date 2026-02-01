@@ -1,4 +1,3 @@
-
 'use client';
 
 import Link from 'next/link';
@@ -144,16 +143,17 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
     const { toast } = useToast();
 
     React.useEffect(() => {
-        if (session?.error) {
+        if (session?.error && !session.error.startsWith('ServerConfigError:')) {
             let title = 'Erro de Sessão';
             let description = 'Ocorreu um erro inesperado na sua sessão.';
+            let shouldSignOut = false;
 
-            if (session.error.startsWith('ServerConfigError:')) {
-                title = 'Erro de Configuração do Servidor';
-                description = session.error.replace('ServerConfigError: ', '');
-            } else if (session.error === 'RefreshAccessTokenError') {
+            if (session.error === 'RefreshAccessTokenError') {
+                title = 'Sessão Expirada';
                 description = 'Sua sessão expirou e não foi possível renová-la. Por favor, faça login novamente.';
+                shouldSignOut = true;
             } else if (session.error === 'DatabaseError') {
+                title = 'Erro de Banco de Dados';
                 description = 'Não foi possível acessar seus dados de perfil. Verifique a configuração do servidor e tente novamente.';
             }
             
@@ -161,10 +161,12 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
                 variant: 'destructive',
                 title: title,
                 description: description,
-                duration: 10000,
+                duration: 20000,
             });
-            // Log out the user to force a clean login flow
-            signOut({ callbackUrl: '/login' });
+
+            if (shouldSignOut) {
+                signOut({ callbackUrl: '/login' });
+            }
         }
     }, [session, toast]);
 
@@ -240,6 +242,29 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
     const currentNavItem = getBestNavItemForPath(pathname);
     const hasPermission = userProfile && currentNavItem && currentNavItem.roles.includes(userProfile.role);
 
+    // If there's a server config error, show a specific error page instead of the content.
+    // This prevents the app from crashing and shows a clear message.
+    if (session?.error && session.error.startsWith('ServerConfigError:')) {
+        return (
+             <div className="flex flex-1 h-screen w-screen items-center justify-center rounded-lg bg-background">
+                <div className="flex flex-col items-center gap-2 text-center p-4">
+                    <AlertCircle className="h-16 w-16 text-destructive" />
+                    <h1 className="text-2xl font-bold tracking-tight font-headline mt-4">Erro Crítico de Configuração</h1>
+                    <p className="text-base text-muted-foreground max-w-xl">
+                       Não foi possível conectar ao Firebase. A autenticação falhou devido a um erro de configuração no servidor.
+                    </p>
+                    <p className="text-sm text-destructive bg-destructive/10 p-3 rounded-md mt-2 max-w-2xl">
+                        <strong>Detalhes do Erro:</strong> {session.error.replace('ServerConfigError: ', '')}
+                    </p>
+                    <p className="text-sm text-muted-foreground max-w-xl mt-2">
+                      Por favor, verifique a variável de ambiente `FIREBASE_SERVICE_ACCOUNT_JSON` em sua plataforma de hospedagem (Vercel, etc.) e faça o deploy novamente. Consulte a documentação para mais detalhes.
+                    </p>
+                    <Button onClick={() => signOut({ callbackUrl: '/login' })} className="mt-4">Tentar Login Novamente</Button>
+                </div>
+            </div>
+        )
+    }
+
     return (
         <SidebarProvider>
         <Sidebar variant="sidebar" collapsible="icon">
@@ -309,3 +334,5 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <InnerLayout>{children}</InnerLayout>
     )
 }
+
+    
