@@ -80,3 +80,38 @@ export async function createHearing(data: CreateHearingData) {
     throw new Error(error.message || 'Falha ao agendar audiência.');
   }
 }
+
+export async function deleteHearing(hearingId: string, googleCalendarEventId?: string) {
+  if (!firestoreAdmin) {
+    throw new Error('A conexão com o servidor de dados falhou.');
+  }
+
+  try {
+    // 1. Delete from Google Calendar if an event ID exists
+    if (googleCalendarEventId) {
+      try {
+        const { calendar } = await getGoogleApiClientsForUser();
+        await calendar.events.delete({
+          calendarId: 'primary',
+          eventId: googleCalendarEventId,
+        });
+        console.log(`Successfully deleted Google Calendar event: ${googleCalendarEventId}`);
+      } catch (calendarError: any) {
+         if ((calendarError as any).code !== 404) {
+            console.error(`Failed to delete Google Calendar event ${googleCalendarEventId}, but proceeding with Firestore deletion. Error: ${(calendarError as any).message}`);
+        } else {
+            console.log(`Google Calendar event ${googleCalendarEventId} was not found. It might have been deleted already.`);
+        }
+      }
+    }
+
+    // 2. Delete from Firestore
+    await firestoreAdmin.collection('hearings').doc(hearingId).delete();
+    console.log(`Successfully deleted hearing ${hearingId} from Firestore.`);
+
+    return { success: true, message: 'Audiência excluída com sucesso.' };
+  } catch (error: any) {
+    console.error('Error deleting hearing:', error);
+    throw new Error(error.message || 'Falha ao excluir audiência.');
+  }
+}

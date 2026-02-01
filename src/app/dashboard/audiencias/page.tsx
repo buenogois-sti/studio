@@ -9,6 +9,8 @@ import {
   ChevronRight,
   MoreVertical,
   RefreshCw,
+  CalendarCheck,
+  AlertTriangle,
 } from 'lucide-react';
 import { format, startOfWeek, endOfWeek, eachDayOfInterval, addDays, isToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -32,7 +34,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { searchProcesses } from '@/lib/process-actions';
-import { createHearing } from '@/lib/hearing-actions';
+import { createHearing, deleteHearing } from '@/lib/hearing-actions';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -51,6 +53,22 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 
 const hearingSchema = z.object({
@@ -324,6 +342,9 @@ export default function AudienciasPage() {
   const [date, setDate] = React.useState<Date | undefined>(new Date());
   const { firestore, isUserLoading } = useFirebase();
   const [refreshKey, setRefreshKey] = React.useState(0);
+  const [hearingToDelete, setHearingToDelete] = React.useState<Hearing | null>(null);
+  const [isDeleting, setIsDeleting] = React.useState(false);
+  const { toast } = useToast();
 
   // Data fetching
   const hearingsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'hearings') : null, [firestore, refreshKey]);
@@ -368,8 +389,31 @@ export default function AudienciasPage() {
   const goToPreviousWeek = () => setDate(addDays(selectedDate, -7));
   const goToNextWeek = () => setDate(addDays(selectedDate, 7));
 
+  const handleDelete = async () => {
+    if (!hearingToDelete) return;
+    setIsDeleting(true);
+    try {
+        await deleteHearing(hearingToDelete.id, hearingToDelete.googleCalendarEventId);
+        toast({
+            title: 'Audiência Excluída',
+            description: 'A audiência foi removida com sucesso.',
+        });
+        handleRefresh();
+    } catch (e: any) {
+        toast({
+            variant: 'destructive',
+            title: 'Erro ao Excluir',
+            description: e.message || 'Não foi possível remover a audiência.',
+        });
+    } finally {
+        setHearingToDelete(null);
+        setIsDeleting(false);
+    }
+  };
+
 
   return (
+    <>
     <div className="grid gap-8 md:grid-cols-1 lg:grid-cols-[1fr_350px]">
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
@@ -413,7 +457,7 @@ export default function AudienciasPage() {
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
-                                            <TableHead className="w-[100px]">Hora</TableHead>
+                                            <TableHead className="w-[150px]">Hora</TableHead>
                                             <TableHead>Detalhes da Audiência</TableHead>
                                             <TableHead className="hidden md:table-cell">Local</TableHead>
                                             <TableHead className="hidden lg:table-cell">Responsável</TableHead>
@@ -425,10 +469,30 @@ export default function AudienciasPage() {
                                             const { processName, clientName, clientAvatar } = getHearingInfo(hearing);
                                             return (
                                                 <TableRow key={hearing.id} className="hover:bg-muted/50">
-                                                    <TableCell className="w-[100px]">
-                                                        <Badge variant="secondary" className="font-mono text-base font-semibold">
-                                                            {formatTime(hearing.date)}
-                                                        </Badge>
+                                                    <TableCell>
+                                                        <div className="flex items-center gap-2">
+                                                            <Badge variant="secondary" className="font-mono text-base font-semibold">
+                                                                {formatTime(hearing.date)}
+                                                            </Badge>
+                                                             <TooltipProvider>
+                                                                <Tooltip>
+                                                                    <TooltipTrigger>
+                                                                        {hearing.googleCalendarEventId ? (
+                                                                            <CalendarCheck className="h-5 w-5 text-green-500" />
+                                                                        ) : (
+                                                                            <AlertTriangle className="h-5 w-5 text-yellow-500" />
+                                                                        )}
+                                                                    </TooltipTrigger>
+                                                                    <TooltipContent>
+                                                                        <p>
+                                                                            {hearing.googleCalendarEventId 
+                                                                                ? 'Sincronizado com Google Agenda' 
+                                                                                : 'Não sincronizado com Google Agenda'}
+                                                                        </p>
+                                                                    </TooltipContent>
+                                                                </Tooltip>
+                                                            </TooltipProvider>
+                                                        </div>
                                                     </TableCell>
                                                     <TableCell>
                                                         <div className="font-bold text-base">{processName}</div>
@@ -453,7 +517,9 @@ export default function AudienciasPage() {
                                                                 <DropdownMenuItem>Ver Detalhes</DropdownMenuItem>
                                                                 <DropdownMenuItem>Editar</DropdownMenuItem>
                                                                 <DropdownMenuSeparator />
-                                                                <DropdownMenuItem className="text-destructive">Excluir</DropdownMenuItem>
+                                                                <DropdownMenuItem className="text-destructive" onSelect={() => setHearingToDelete(hearing)}>
+                                                                    Excluir
+                                                                </DropdownMenuItem>
                                                             </DropdownMenuContent>
                                                         </DropdownMenu>
                                                     </TableCell>
@@ -492,5 +558,24 @@ export default function AudienciasPage() {
         </Card>
       </div>
     </div>
+    
+    <AlertDialog open={!!hearingToDelete} onOpenChange={(open) => !isDeleting && !open && setHearingToDelete(null)}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+                <AlertDialogDescription>
+                    Tem certeza que deseja excluir esta audiência? Esta ação também removerá o evento do Google Agenda, se estiver sincronizado. A ação não pode ser desfeita.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDelete} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
+                    {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {isDeleting ? 'Excluindo...' : 'Excluir'}
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }
