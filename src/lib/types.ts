@@ -114,6 +114,7 @@ export type FinancialTitle = {
   dueDate: Date | Timestamp;
   paymentDate?: Timestamp;
   status: 'PENDENTE' | 'PAGO' | 'ATRASADO';
+  paidToStaffId?: string;
 };
 
 export type FeeSplitRule = {

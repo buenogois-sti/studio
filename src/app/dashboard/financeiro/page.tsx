@@ -92,6 +92,7 @@ const titleSchema = z.object({
   value: z.coerce.number().positive('O valor deve ser um número positivo.'),
   dueDate: z.date({ required_error: 'A data de vencimento é obrigatória.' }),
   status: z.enum(['PENDENTE', 'PAGO', 'ATRASADO']).default('PENDENTE'),
+  paidToStaffId: z.string().optional(),
 }).refine((data) => {
     // If origin is NOT an operational expense, processId is required.
     if (![...operationalExpenseOrigins].includes(data.origin as any)) {
@@ -101,7 +102,16 @@ const titleSchema = z.object({
 }, {
     message: "É obrigatório selecionar um processo para esta origem.",
     path: ["processId"],
+}).refine((data) => {
+    if (data.origin === 'HONORARIOS_PAGOS') {
+        return !!data.paidToStaffId;
+    }
+    return true;
+}, {
+    message: 'É obrigatório selecionar o beneficiário.',
+    path: ['paidToStaffId'],
 });
+
 
 const formatDate = (date: Timestamp | string | undefined | Date) => {
   if (!date) return 'N/A';
@@ -209,9 +219,11 @@ const expenseOrigins = [
     { value: 'OUTRAS_DESPESAS', label: 'Outras Despesas' },
 ];
 
+const allOriginLabels = new Map([...revenueOrigins, ...expenseOrigins].map(o => [o.value, o.label]));
+
 
 // --- NewTitleDialog Component ---
-function NewTitleDialog({ onTitleCreated }: { onTitleCreated: () => void }) {
+function NewTitleDialog({ onTitleCreated, staffData }: { onTitleCreated: () => void; staffData: Staff[] | null }) {
   const [open, setOpen] = React.useState(false);
   const [isSaving, setIsSaving] = React.useState(false);
   const { toast } = useToast();
@@ -236,6 +248,7 @@ function NewTitleDialog({ onTitleCreated }: { onTitleCreated: () => void }) {
     form.setValue('origin', watchedType === 'RECEITA' ? 'HONORARIOS_CONTRATUAIS' : 'CUSTAS_PROCESSUAIS');
     form.setValue('processId', undefined);
     setSelectedProcess(null);
+    form.setValue('paidToStaffId', undefined, { shouldValidate: false });
   }, [watchedType, form]);
 
   React.useEffect(() => {
@@ -253,6 +266,9 @@ function NewTitleDialog({ onTitleCreated }: { onTitleCreated: () => void }) {
       const payload: any = { ...values };
       if (!requiresProcess) {
         delete payload.processId; // Ensure it's not sent
+      }
+      if (payload.origin !== 'HONORARIOS_PAGOS') {
+        delete payload.paidToStaffId;
       }
 
       await createFinancialTitle(payload);
@@ -330,6 +346,26 @@ function NewTitleDialog({ onTitleCreated }: { onTitleCreated: () => void }) {
                   )}
                 />
             </div>
+             {watchedOrigin === 'HONORARIOS_PAGOS' && (
+                <FormField
+                    control={form.control}
+                    name="paidToStaffId"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Beneficiário (Advogado) *</FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <FormControl><SelectTrigger><SelectValue placeholder="Selecione o advogado..." /></SelectTrigger></FormControl>
+                                <SelectContent>
+                                    {staffData?.filter(s => s.role === 'lawyer' || s.role === 'intern').map(staff => (
+                                        <SelectItem key={staff.id} value={staff.id}>{staff.firstName} {staff.lastName}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+             )}
              {requiresProcess && (
                 <FormField
                   control={form.control}
@@ -342,6 +378,7 @@ function NewTitleDialog({ onTitleCreated }: { onTitleCreated: () => void }) {
                           onSelect={(process) => {
                               setSelectedProcess(process);
                               field.onChange(process.id);
+                              form.setValue('description', `${allOriginLabels.get(form.getValues('origin')) || 'Lançamento'} - ${process.name}`);
                           }}
                       />
                       <FormMessage />
@@ -594,8 +631,7 @@ export default function FinanceiroPage() {
   const processesMap = React.useMemo(() => new Map(processesData?.map(p => [p.id, p])), [processesData]);
 
   const originLabels = React.useMemo(() => {
-    const allOrigins = [...revenueOrigins, ...expenseOrigins];
-    return new Map(allOrigins.map(o => [o.value, o.label]));
+    return allOriginLabels;
   }, []);
 
   const handleRefresh = () => setRefreshKey(prev => prev + 1);
@@ -634,7 +670,7 @@ export default function FinanceiroPage() {
             <File className="h-4 w-4" />
             <span className="whitespace-nowrap">Exportar</span>
           </Button>
-          <NewTitleDialog onTitleCreated={handleRefresh} />
+          <NewTitleDialog onTitleCreated={handleRefresh} staffData={staffData} />
         </div>
       </div>
 
@@ -750,5 +786,3 @@ export default function FinanceiroPage() {
     </div>
   );
 }
-
-    
