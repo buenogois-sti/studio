@@ -82,7 +82,7 @@ export type FinancialEvent = {
   id: string;
   processId: string;
   type: 'ACORDO' | 'SENTENCA' | 'EXECUCAO' | 'CONTRATO';
-  eventDate: Timestamp;
+  eventDate: Date | Timestamp;
   description: string;
   totalValue: number;
 };
@@ -110,7 +110,7 @@ export type FinancialTitle = {
     | 'SERVICOS_TERCEIROS'
     | 'OUTRAS_DESPESAS';
   value: number;
-  dueDate: Timestamp;
+  dueDate: Date | Timestamp;
   paymentDate?: Timestamp;
   status: 'PENDENTE' | 'PAGO' | 'ATRASADO';
 };

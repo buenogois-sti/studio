@@ -47,7 +47,7 @@ export async function createFinancialEventAndTitles(data: CreateEventData) {
   const newEvent: Omit<FinancialEvent, 'id'> = {
     processId,
     type,
-    eventDate,
+    eventDate: new Date(eventDate),
     description,
     totalValue,
   };
@@ -64,7 +64,7 @@ export async function createFinancialEventAndTitles(data: CreateEventData) {
       ? `${description} - Parcela ${i + 1}/${installments}`
       : description;
       
-    const dueDate = addMonths(firstDueDate, i);
+    const dueDate = addMonths(new Date(firstDueDate), i);
 
     const newTitle: Omit<FinancialTitle, 'id'> = {
       financialEventId: eventRef.id,
