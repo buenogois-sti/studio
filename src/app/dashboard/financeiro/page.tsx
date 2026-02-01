@@ -280,7 +280,7 @@ function NewTitleDialog({ onTitleCreated, staffData }: { onTitleCreated: () => v
   }, [requiresProcess, form]);
 
 
-  const onSubmit = async (values: z.infer<typeof titleSchema>>) => {
+  async function onSubmit(values: z.infer<typeof titleSchema>) {
     setIsSaving(true);
     try {
       const payload: any = { ...values };
@@ -311,7 +311,7 @@ function NewTitleDialog({ onTitleCreated, staffData }: { onTitleCreated: () => v
     } finally {
       setIsSaving(false);
     }
-  };
+  }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

@@ -79,7 +79,7 @@ export function FinancialEventDialog({ process, open, onOpenChange, onEventCreat
     }
   }, [process, open, form]);
 
-  const onSubmit = async (values: z.infer<typeof eventSchema>>) => {
+  async function onSubmit(values: z.infer<typeof eventSchema>) {
     if (!process) return;
 
     setIsSaving(true);
@@ -104,7 +104,7 @@ export function FinancialEventDialog({ process, open, onOpenChange, onEventCreat
     } finally {
       setIsSaving(false);
     }
-  };
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
