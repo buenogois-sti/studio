@@ -1,4 +1,3 @@
-
 'use server';
 
 import { firestoreAdmin } from '@/firebase/admin';
@@ -37,25 +36,18 @@ export async function createHearing(data: CreateHearingData) {
     });
     console.log('Hearing created in Firestore with ID:', hearingRef.id);
 
-    // 2. Add to Google Calendar
+    // 2. Try to add to Google Calendar
     try {
       const { calendar } = await getGoogleApiClientsForUser();
-      
       const startDateTime = new Date(hearingDate);
-      const endDateTime = add(startDateTime, { hours: 1 }); // Assume 1-hour duration
+      const endDateTime = add(startDateTime, { hours: 1 });
 
       const event = {
         summary: `Audiência: ${processName}`,
         location: location,
         description: `Detalhes da audiência para o processo "${processName}".\n\nNotas: ${notes || 'Nenhuma'}\n\nID Interno: ${hearingRef.id}`,
-        start: {
-          dateTime: formatISO(startDateTime),
-          timeZone: 'America/Sao_Paulo',
-        },
-        end: {
-          dateTime: formatISO(endDateTime),
-          timeZone: 'America/Sao_Paulo',
-        },
+        start: { dateTime: formatISO(startDateTime), timeZone: 'America/Sao_Paulo' },
+        end: { dateTime: formatISO(endDateTime), timeZone: 'America/Sao_Paulo' },
       };
 
       const createdEvent = await calendar.events.insert({
@@ -63,31 +55,34 @@ export async function createHearing(data: CreateHearingData) {
         requestBody: event,
       });
 
-      console.log('Event created in Google Calendar:', createdEvent.data.htmlLink);
-
-      // 3. Update Firestore document with the Google Calendar Event ID
+      // 3a. On Calendar Success: Update Firestore with Event ID and send success notification
       if (createdEvent.data.id) {
-          await hearingRef.update({ googleCalendarEventId: createdEvent.data.id });
-          console.log(`Linked Google Calendar event ${createdEvent.data.id} to Firestore hearing ${hearingRef.id}`);
-      }
-      
-    } catch (calendarError: any) {
-        // If calendar fails, we don't fail the whole operation, but we log it.
-        // The hearing is already in Firestore.
-        console.error("Failed to create Google Calendar event, but hearing was saved to Firestore. Error:", calendarError.message);
-    }
+        await hearingRef.update({ googleCalendarEventId: createdEvent.data.id });
+        console.log(`Linked Google Calendar event ${createdEvent.data.id} to Firestore hearing ${hearingRef.id}`);
 
-    // 4. Create Notification
-    if (session?.user?.id) {
-        await createNotification({
-            userId: session.user.id,
-            title: "Nova Audiência Agendada",
-            description: `A audiência para o processo "${processName}" foi agendada para ${new Date(hearingDate).toLocaleDateString('pt-BR')}.`,
-            href: `/dashboard/audiencias`,
-        });
+        if (session?.user?.id) {
+            await createNotification({
+                userId: session.user.id,
+                title: "Audiência Agendada e Sincronizada",
+                description: `A audiência para "${processName}" foi salva e adicionada ao seu Google Agenda.`,
+                href: `/dashboard/audiencias`,
+            });
+        }
+      }
+    } catch (calendarError: any) {
+      // 3b. On Calendar Failure: Log error and send failure notification
+      console.error("Failed to create Google Calendar event, but hearing was saved to Firestore. Error:", calendarError.message);
+      if (session?.user?.id) {
+          await createNotification({
+              userId: session.user.id,
+              title: "Falha na Sincronização da Agenda",
+              description: `A audiência "${processName}" foi salva, mas falhou ao sincronizar com o Google Agenda.`,
+              href: `/dashboard/audiencias`,
+          });
+      }
     }
     
-    return { success: true, message: 'Audiência agendada com sucesso no sistema e no Google Agenda!' };
+    return { success: true, message: 'Operação de agendamento concluída.' };
 
   } catch (error: any) {
     console.error('Error creating hearing:', error);
