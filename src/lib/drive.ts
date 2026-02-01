@@ -9,14 +9,23 @@ import type { Client, Process } from './types';
 
 const ROOT_FOLDER_ID = process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID;
 
-const CLIENT_FOLDER_STRUCTURE = [
-  '00_DADOS_DO_CLIENTE',
-  '01_CONTRATO_E_HONORÁRIOS',
-  '02_DOCUMENTOS_PESSOAIS',
-  '03_PROCESSOS',
-  '04_FINANCEIRO',
-  '99_ADMINISTRATIVO_INTERNO'
-];
+const CLIENT_FOLDER_STRUCTURE: Record<string, string[] | Record<string, string[]>> = {
+  'level1': [
+    '00_DADOS_DO_CLIENTE',
+    '01_CONTRATO_E_HONORÁRIOS',
+    '02_DOCUMENTOS_PESSOAIS',
+    '03_PROCESSOS',
+    '04_FINANCEIRO',
+    '99_ADMINISTRATIVO_INTERNO'
+  ],
+  '04_FINANCEIRO': [
+    'COMPROVANTES_PAGAMENTOS_CLIENTE',
+    'RECIBOS_HONORARIOS',
+    'NOTAS_FISCAIS_SERVICOS',
+    'CUSTAS_PROCESSUAIS',
+    'ADMINISTRATIVO'
+  ]
+};
 
 const PROCESS_FOLDER_STRUCTURE: Record<string, string[] | Record<string, string[]>> = {
   'level1': [
@@ -203,20 +212,32 @@ export async function syncClientToDrive(clientId: string, clientName: string): P
             throw new Error('Falha ao criar a pasta principal do cliente no Google Drive.');
         }
 
-        const subfolderIds = await createMultipleFolders(drive, mainFolderId, CLIENT_FOLDER_STRUCTURE);
-        console.log("Client subfolders created.");
+        const level1FolderIds = await createMultipleFolders(drive, mainFolderId, CLIENT_FOLDER_STRUCTURE.level1 as string[]);
+        console.log("Client level 1 subfolders created.");
+
+        for (const [parent, children] of Object.entries(CLIENT_FOLDER_STRUCTURE)) {
+            if (parent === 'level1') continue;
+            if (Array.isArray(children)) {
+                const parentFolderId = level1FolderIds.get(parent);
+                if (parentFolderId) {
+                    await createMultipleFolders(drive, parentFolderId, children as string[]);
+                }
+            }
+        }
+        console.log("Client nested subfolders created.");
+
 
         const settingsDoc = await firestoreAdmin.collection('system_settings').doc('client_kit').get();
         const templates = settingsDoc.exists && settingsDoc.data()?.templates ? settingsDoc.data()?.templates : [];
 
-        await createClientKitFromTemplates(drive, clientName, subfolderIds, templates);
+        await createClientKitFromTemplates(drive, clientName, level1FolderIds, templates);
 
         const sheetId = await createClientSheet(sheets, clientName);
         if (!sheetId) {
             throw new Error('Falha ao criar planilha no Google Sheets.');
         }
         
-        const adminFolderId = subfolderIds.get('99_ADMINISTRATIVO_INTERNO');
+        const adminFolderId = level1FolderIds.get('99_ADMINISTRATIVO_INTERNO');
         if (adminFolderId) {
             const file = await drive.files.get({
                 fileId: sheetId,
