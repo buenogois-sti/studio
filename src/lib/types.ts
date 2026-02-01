@@ -1,3 +1,4 @@
+'use client';
 import type { Timestamp } from 'firebase/firestore';
 
 export type UserRole = 'admin' | 'lawyer' | 'financial';
@@ -99,7 +100,15 @@ export type FinancialTitle = {
     | 'HONORARIOS_CONTRATUAIS'
     | 'SUCUMBENCIA'
     | 'CUSTAS_PROCESSUAIS'
-    | 'DESPESA_OPERACIONAL';
+    | 'HONORARIOS_PAGOS'
+    | 'SALARIOS_PROLABORE'
+    | 'ALUGUEL_CONTAS'
+    | 'INFRAESTRUTURA_TI'
+    | 'MARKETING_PUBLICIDADE'
+    | 'IMPOSTOS_TAXAS'
+    | 'MATERIAL_ESCRITORIO'
+    | 'SERVICOS_TERCEIROS'
+    | 'OUTRAS_DESPESAS';
   value: number;
   dueDate: Timestamp;
   paymentDate?: Timestamp;

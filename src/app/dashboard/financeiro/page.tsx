@@ -70,21 +70,36 @@ import { createFinancialTitle, updateFinancialTitleStatus } from '@/lib/finance-
 import { searchProcesses } from '@/lib/process-actions';
 
 
+const operationalExpenseOrigins = [
+  'SALARIOS_PROLABORE', 'ALUGUEL_CONTAS', 'INFRAESTRUTURA_TI', 'MARKETING_PUBLICIDADE', 
+  'IMPOSTOS_TAXAS', 'MATERIAL_ESCRITORIO', 'SERVICOS_TERCEIROS', 'OUTRAS_DESPESAS'
+] as const;
+
+const processLinkedRevenueOrigins = [
+    'ACORDO', 'SENTENCA', 'HONORARIOS_CONTRATUAIS', 'SUCUMBENCIA'
+] as const;
+
+const processLinkedExpenseOrigins = [ 'CUSTAS_PROCESSUAIS', 'HONORARIOS_PAGOS' ] as const;
+
+const allOrigins = [...processLinkedRevenueOrigins, ...processLinkedExpenseOrigins, ...operationalExpenseOrigins];
+
 const titleSchema = z.object({
   processId: z.string().optional(),
   description: z.string().min(3, 'A descrição é obrigatória.'),
   type: z.enum(['RECEITA', 'DESPESA'], { required_error: 'Selecione o tipo.'}),
-  origin: z.enum([
-    'ACORDO',
-    'SENTENCA',
-    'HONORARIOS_CONTRATUAIS',
-    'SUCUMBENCIA',
-    'CUSTAS_PROCESSUAIS',
-    'DESPESA_OPERACIONAL',
-  ], { required_error: 'Selecione a origem.'}),
+  origin: z.enum(allOrigins, { required_error: 'Selecione a origem.'}),
   value: z.coerce.number().positive('O valor deve ser um número positivo.'),
   dueDate: z.date({ required_error: 'A data de vencimento é obrigatória.' }),
   status: z.enum(['PENDENTE', 'PAGO', 'ATRASADO']).default('PENDENTE'),
+}).refine((data) => {
+    // If origin is NOT an operational expense, processId is required.
+    if (![...operationalExpenseOrigins].includes(data.origin as any)) {
+        return !!data.processId;
+    }
+    return true;
+}, {
+    message: "É obrigatório selecionar um processo para esta origem.",
+    path: ["processId"],
 });
 
 const formatDate = (date: Timestamp | string | undefined | Date) => {
@@ -173,6 +188,27 @@ function ProcessSearch({ onSelect, selectedProcess }: { onSelect: (process: Proc
   );
 }
 
+const revenueOrigins = [
+    { value: 'HONORARIOS_CONTRATUAIS', label: 'Honorários Contratuais' },
+    { value: 'ACORDO', label: 'Acordo' },
+    { value: 'SENTENCA', label: 'Sentença' },
+    { value: 'SUCUMBENCIA', label: 'Sucumbência' },
+];
+
+const expenseOrigins = [
+    { value: 'CUSTAS_PROCESSUAIS', label: 'Custas Processuais' },
+    { value: 'HONORARIOS_PAGOS', label: 'Pagamento de Honorários' },
+    { value: 'SALARIOS_PROLABORE', label: 'Salários e Pró-labore' },
+    { value: 'ALUGUEL_CONTAS', label: 'Aluguel e Contas Fixas' },
+    { value: 'INFRAESTRUTURA_TI', label: 'Infraestrutura e TI' },
+    { value: 'MARKETING_PUBLICIDADE', label: 'Marketing e Publicidade' },
+    { value: 'IMPOSTOS_TAXAS', label: 'Impostos e Taxas' },
+    { value: 'MATERIAL_ESCRITORIO', label: 'Material de Escritório' },
+    { value: 'SERVICOS_TERCEIROS', label: 'Serviços de Terceiros' },
+    { value: 'OUTRAS_DESPESAS', label: 'Outras Despesas' },
+];
+
+
 // --- NewTitleDialog Component ---
 function NewTitleDialog({ onTitleCreated }: { onTitleCreated: () => void }) {
   const [open, setOpen] = React.useState(false);
@@ -189,29 +225,32 @@ function NewTitleDialog({ onTitleCreated }: { onTitleCreated: () => void }) {
     }
   });
 
+  const watchedType = form.watch('type');
   const watchedOrigin = form.watch('origin');
-  const isOperationalExpense = watchedOrigin === 'DESPESA_OPERACIONAL';
+  
+  const requiresProcess = !operationalExpenseOrigins.includes(watchedOrigin as any);
 
   React.useEffect(() => {
-    // If it's an operational expense, we don't need a process
-    if (isOperationalExpense) {
+    // Reset dependent fields when type changes
+    form.setValue('origin', watchedType === 'RECEITA' ? 'HONORARIOS_CONTRATUAIS' : 'CUSTAS_PROCESSUAIS');
+    form.setValue('processId', undefined);
+    setSelectedProcess(null);
+  }, [watchedType, form]);
+
+  React.useEffect(() => {
+    // If an operational expense is selected, clear process info
+    if (!requiresProcess) {
       setSelectedProcess(null);
-      form.setValue('processId', undefined);
+      form.setValue('processId', undefined, { shouldValidate: true });
     }
-  }, [isOperationalExpense, form]);
+  }, [requiresProcess, form]);
 
 
   const onSubmit = async (values: z.infer<typeof titleSchema>) => {
     setIsSaving(true);
     try {
-      if (!isOperationalExpense && !values.processId) {
-          form.setError('processId', { type: 'manual', message: 'É obrigatório selecionar um processo para esta origem.' });
-          setIsSaving(false);
-          return;
-      }
-      
       const payload: any = { ...values };
-      if (isOperationalExpense) {
+      if (!requiresProcess) {
         delete payload.processId; // Ensure it's not sent
       }
 
@@ -252,7 +291,7 @@ function NewTitleDialog({ onTitleCreated }: { onTitleCreated: () => void }) {
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-             {!isOperationalExpense && (
+             {requiresProcess && (
                 <FormField
                   control={form.control}
                   name="processId"
@@ -308,15 +347,13 @@ function NewTitleDialog({ onTitleCreated }: { onTitleCreated: () => void }) {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Origem *</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
                         <SelectContent>
-                           <SelectItem value="HONORARIOS_CONTRATUAIS">Honorários Contratuais</SelectItem>
-                           <SelectItem value="ACORDO">Acordo</SelectItem>
-                           <SelectItem value="SENTENCA">Sentença</SelectItem>
-                           <SelectItem value="SUCUMBENCIA">Sucumbência</SelectItem>
-                           <SelectItem value="CUSTAS_PROCESSUAIS">Custas Processuais</SelectItem>
-                           <SelectItem value="DESPESA_OPERACIONAL">Despesa Operacional</SelectItem>
+                           {watchedType === 'RECEITA' ? 
+                             revenueOrigins.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>) :
+                             expenseOrigins.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)
+                           }
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -414,7 +451,8 @@ function FinancialTitlesTable({
   };
 
   const getAssociatedName = (title: FinancialTitle) => {
-    if (title.origin === 'DESPESA_OPERACIONAL') return 'Escritório';
+    if (operationalExpenseOrigins.includes(title.origin as any)) return 'Escritório';
+    
     if (title.processId) {
       const process = processesMap.get(title.processId);
       if (process && process.clientId) {
@@ -468,6 +506,11 @@ function FinancialTitlesTable({
       <TableBody>
         {titles.map((title) => {
           const isRevenue = title.type === 'RECEITA';
+          const dueDate = (title.dueDate as Timestamp).toDate();
+          // Client-side check for overdue status to provide immediate visual feedback
+          const isOverdue = title.status === 'PENDENTE' && dueDate < new Date();
+          const effectiveStatus = isOverdue ? 'ATRASADO' : title.status;
+
           return (
             <TableRow key={title.id}>
               <TableCell>
@@ -480,12 +523,12 @@ function FinancialTitlesTable({
                 <Badge variant="outline">{title.origin.replace(/_/g, ' ')}</Badge>
               </TableCell>
               <TableCell className="hidden md:table-cell">
-                <Badge variant={getStatusVariant(title.status)} className="capitalize">
-                  {title.status.toLowerCase()}
+                <Badge variant={getStatusVariant(effectiveStatus)} className="capitalize">
+                  {effectiveStatus.toLowerCase()}
                 </Badge>
               </TableCell>
               <TableCell className="hidden md:table-cell">
-                <div className="font-medium">{formatDate(title.dueDate)}</div>
+                <div className={cn("font-medium", isOverdue && "text-destructive")}>{formatDate(dueDate)}</div>
                 {title.status === 'PAGO' && title.paymentDate && <div className="text-xs text-muted-foreground">Pago: {formatDate(title.paymentDate)}</div>}
               </TableCell>
               <TableCell className={cn('text-right font-semibold', isRevenue ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400')}>
