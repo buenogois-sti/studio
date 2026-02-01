@@ -1,6 +1,67 @@
 'use server';
 import { firestoreAdmin } from '@/firebase/admin';
 import type { Client } from './types';
+import type { firestore as adminFirestore } from 'firebase-admin';
+
+// Helper function to serialize a Firestore document into a Client object
+function serializeClient(doc: adminFirestore.DocumentSnapshot): Client | null {
+    const data = doc.data();
+    const id = doc.id;
+
+    if (!data) {
+        return null;
+    }
+
+    // --- Robust Date Handling ---
+    let createdAtString: string;
+    if (data.createdAt && typeof data.createdAt.toDate === 'function') {
+        createdAtString = data.createdAt.toDate().toISOString();
+    } else if (typeof data.createdAt === 'string') {
+        createdAtString = data.createdAt;
+    } else {
+        // If createdAt is missing or in a wrong format, we cannot proceed.
+        // It's a required field in the Client type.
+        console.warn(`Document ${id} is missing a valid 'createdAt' field. Skipping.`);
+        return null;
+    }
+
+    let updatedAtString: string | undefined = undefined;
+    if (data.updatedAt) {
+        if (typeof data.updatedAt.toDate === 'function') {
+            updatedAtString = data.updatedAt.toDate().toISOString();
+        } else if (typeof data.updatedAt === 'string') {
+            updatedAtString = data.updatedAt;
+        }
+    }
+    // --- End Robust Date Handling ---
+
+    const serializableClient: Client = {
+        id: id,
+        firstName: data.firstName || '',
+        lastName: data.lastName || '',
+        document: data.document || '',
+        email: data.email || '',
+        avatar: data.avatar || '',
+        createdAt: createdAtString,
+        updatedAt: updatedAtString,
+        clientType: data.clientType,
+        motherName: data.motherName,
+        rg: data.rg,
+        ctps: data.ctps,
+        pis: data.pis,
+        phone: data.phone,
+        mobile: data.mobile,
+        emergencyContact: data.emergencyContact,
+        legalArea: data.legalArea,
+        address: data.address,
+        bankInfo: data.bankInfo,
+        driveFolderId: data.driveFolderId,
+        sheetId: data.sheetId,
+    };
+    
+    return serializableClient;
+}
+
 
 export async function searchClients(query: string): Promise<Client[]> {
     if (!query) return [];
@@ -14,61 +75,7 @@ export async function searchClients(query: string): Promise<Client[]> {
         const clientsSnapshot = await firestoreAdmin.collection('clients').get();
         
         const allClientsData = clientsSnapshot.docs
-            .map(doc => {
-                const data = doc.data();
-                const id = doc.id;
-
-                if (!data) {
-                    return null;
-                }
-
-                // --- Robust Date Handling ---
-                let createdAtString: string;
-                if (data.createdAt && typeof data.createdAt.toDate === 'function') {
-                    createdAtString = data.createdAt.toDate().toISOString();
-                } else if (typeof data.createdAt === 'string') {
-                    createdAtString = data.createdAt;
-                } else {
-                    console.warn(`Document ${id} is missing a valid 'createdAt' field. Skipping.`);
-                    return null;
-                }
-
-                let updatedAtString: string | undefined = undefined;
-                if (data.updatedAt) {
-                    if (typeof data.updatedAt.toDate === 'function') {
-                        updatedAtString = data.updatedAt.toDate().toISOString();
-                    } else if (typeof data.updatedAt === 'string') {
-                        updatedAtString = data.updatedAt;
-                    }
-                }
-                // --- End Robust Date Handling ---
-
-                const serializableClient: Client = {
-                    id: id,
-                    firstName: data.firstName || '',
-                    lastName: data.lastName || '',
-                    document: data.document || '',
-                    email: data.email || '',
-                    avatar: data.avatar || '',
-                    createdAt: createdAtString,
-                    updatedAt: updatedAtString,
-                    clientType: data.clientType,
-                    motherName: data.motherName,
-                    rg: data.rg,
-                    ctps: data.ctps,
-                    pis: data.pis,
-                    phone: data.phone,
-                    mobile: data.mobile,
-                    emergencyContact: data.emergencyContact,
-                    legalArea: data.legalArea,
-                    address: data.address,
-                    bankInfo: data.bankInfo,
-                    driveFolderId: data.driveFolderId,
-                    sheetId: data.sheetId,
-                };
-                
-                return serializableClient;
-            })
+            .map(serializeClient)
             .filter((client): client is Client => client !== null);
 
         const lowerCaseQuery = query.toLowerCase();
@@ -83,5 +90,28 @@ export async function searchClients(query: string): Promise<Client[]> {
     } catch (error) {
         console.error("Error searching clients:", error);
         throw new Error('Ocorreu um erro ao buscar os clientes.');
+    }
+}
+
+export async function getClientById(clientId: string): Promise<Client | null> {
+    if (!clientId) return null;
+    
+    if (!firestoreAdmin) {
+        console.error("Firebase Admin not initialized, cannot get client by ID.");
+        throw new Error("A conexão com o servidor de dados falhou. Verifique a configuração do servidor.");
+    }
+    
+    try {
+        const clientDoc = await firestoreAdmin.collection('clients').doc(clientId).get();
+        
+        if (!clientDoc.exists) {
+            return null;
+        }
+
+        return serializeClient(clientDoc);
+        
+    } catch (error) {
+        console.error(`Error fetching client with ID ${clientId}:`, error);
+        throw new Error('Ocorreu um erro ao buscar os dados do cliente.');
     }
 }

@@ -108,7 +108,7 @@ import {
 import type { Process, Client } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/use-toast';
-import { searchClients } from '@/lib/client-actions';
+import { searchClients, getClientById } from '@/lib/client-actions';
 import { ClientForm } from '@/components/client/ClientForm';
 import { cn } from '@/lib/utils';
 import { syncProcessToDrive } from '@/lib/drive';
@@ -284,10 +284,29 @@ function ProcessForm({
   React.useEffect(() => {
     if (process?.clientId && !selectedClient) {
       // Fetch client if editing a process
-      const clientRef = doc(firestore, 'clients', process.clientId);
-      // This part would ideally use a dedicated fetch function
+      const fetchClient = async () => {
+        try {
+          const client = await getClientById(process.clientId);
+          if (client) {
+            setSelectedClient(client);
+            form.setValue('clientId', client.id); // Also set the form value
+          }
+        } catch (error: any) {
+          console.error("Failed to fetch client for process:", error);
+          toast({
+            variant: "destructive",
+            title: "Erro ao Carregar Cliente",
+            description: error.message || "Não foi possível carregar os dados do cliente associado a este processo."
+          });
+        }
+      };
+      fetchClient();
     }
-  }, [process, firestore, selectedClient]);
+     // Clear client on process change to null (new process)
+    if (!process) {
+        setSelectedClient(null);
+    }
+  }, [process, toast, form]);
 
   const handleNewClientSaved = (newClient: Client) => {
     setSelectedClient(newClient);
