@@ -289,35 +289,62 @@
           "type": "string",
           "description": "Unique identifier for the financial transaction entity."
         },
-        "clientId": {
+        "description": {
           "type": "string",
-          "description": "Reference to Client. (Relationship: Client 1:N FinancialTransaction)"
-        },
-        "type": {
-          "type": "string",
-          "description": "The type of financial transaction (e.g., accounts payable, accounts receivable)."
+          "description": "A description of the financial transaction."
         },
         "amount": {
           "type": "number",
           "description": "The amount of the financial transaction."
         },
-        "description": {
+        "type": {
           "type": "string",
-          "description": "A description of the financial transaction."
+          "description": "The type of transaction (e.g., 'receita', 'despesa').",
+          "enum": [
+            "receita",
+            "despesa"
+          ]
         },
         "transactionDate": {
           "type": "string",
-          "description": "The date of the financial transaction.",
+          "description": "The date the transaction occurred.",
           "format": "date-time"
+        },
+        "category": {
+          "type": "string",
+          "description": "Category of the transaction (e.g., 'Honorários', 'Custas', 'Aluguel')."
+        },
+        "status": {
+          "type": "string",
+          "description": "The payment status of the transaction.",
+          "enum": [
+            "pago",
+            "pendente",
+            "vencido"
+          ]
+        },
+        "dueDate": {
+          "type": "string",
+          "description": "The due date for a pending transaction.",
+          "format": "date-time"
+        },
+        "clientId": {
+          "type": "string",
+          "description": "Optional reference to a Client. (Relationship: Client 1:N FinancialTransaction)"
+        },
+        "staffId": {
+          "type": "string",
+          "description": "Optional reference to a Staff member for payroll or expenses."
         }
       },
       "required": [
         "id",
-        "clientId",
-        "type",
-        "amount",
         "description",
-        "transactionDate"
+        "amount",
+        "type",
+        "transactionDate",
+        "category",
+        "status"
       ]
     },
     "Log": {

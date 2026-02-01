@@ -79,12 +79,17 @@ export type Hearing = {
 
 export type FinancialTransaction = {
   id: string;
-  clientId: string;
   description: string;
   amount: number;
   type: 'receita' | 'despesa';
   transactionDate: Timestamp;
+  category: string;
+  status: 'pago' | 'pendente' | 'vencido';
+  dueDate?: Timestamp;
+  clientId?: string;
+  staffId?: string;
 };
+
 
 export type Log = {
     id: string;
