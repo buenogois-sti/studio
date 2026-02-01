@@ -1,4 +1,3 @@
-
 'use server';
 
 import { google, type drive_v3, type sheets_v4, type calendar_v3 } from 'googleapis';
@@ -15,6 +14,7 @@ const CLIENT_FOLDER_STRUCTURE = [
   '01_CONTRATO_E_HONORÁRIOS',
   '02_DOCUMENTOS_PESSOAIS',
   '03_PROCESSOS',
+  '04_FINANCEIRO',
   '99_ADMINISTRATIVO_INTERNO'
 ];
 
