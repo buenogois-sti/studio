@@ -2,54 +2,94 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper function to check if a user is signed in.
+    // --- Helper Functions ---
     function isSignedIn() {
       return request.auth != null;
     }
 
-    // WARNING: Rules are temporarily open for debugging authentication issues.
-    // This is insecure and should be reverted once the issue is resolved.
+    function isUser(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
 
-    // Rules for the user profile collection.
+    function hasRole(role) {
+      // Ensure token and role exist before checking
+      return isSignedIn() && request.auth.token.role == role;
+    }
+
+    function isOneOfRoles(roles) {
+      // Ensure token and role exist before checking
+      return isSignedIn() && request.auth.token.role in roles;
+    }
+
+    function isAdmin() {
+      return hasRole('admin');
+    }
+
+    // --- Collection Rules ---
+
+    // Users can read/update their own profile. Admins can manage any profile.
     match /users/{userId} {
-      allow read, write: if true; // Temporarily allow all access
+      allow read, update: if isUser(userId) || isAdmin();
+      // Allow creation/deletion only by admins.
+      allow create, delete: if isAdmin();
 
-      // Rules for a user's private audit logs.
+      // User can create their own logs. Admins can read them. Logs are immutable.
       match /logs/{logId} {
-        allow read, write: if true; // Temporarily allow all access
+        allow create: if isUser(userId);
+        allow read: if isAdmin();
+        allow update, delete: if false;
       }
     }
 
-    // Secures the client data collection.
+    // Admins and Lawyers can manage clients, processes, and hearings.
     match /clients/{clientId} {
-      allow read, write: if true; // Temporarily allow all access
+      allow read, write: if isOneOfRoles(['admin', 'lawyer']);
     }
 
-    // Secures the legal process collection.
     match /processes/{processId} {
-      allow read, write: if true; // Temporarily allow all access
+      allow read, write: if isOneOfRoles(['admin', 'lawyer']);
+
+      match /fee_split_rules/default {
+        allow read, write: if isOneOfRoles(['admin', 'lawyer', 'financial']);
+      }
     }
 
-    // Secures the court hearing collection.
     match /hearings/{hearingId} {
-      allow read, write: if true; // Temporarily allow all access
+      allow read, write: if isOneOfRoles(['admin', 'lawyer']);
     }
 
-    // Secures the financial transaction collection.
-    match /financial_transactions/{financialTransactionId} {
-      allow read, write: if true; // Temporarily allow all access
+    // Financial collections: Admins/Financial can write, Lawyers can only read.
+    match /financial_events/{eventId} {
+      allow read: if isOneOfRoles(['admin', 'lawyer', 'financial']);
+      allow write: if isOneOfRoles(['admin', 'financial']);
     }
 
-    // Secures the staff data collection.
+    match /financial_titles/{titleId} {
+      allow read: if isOneOfRoles(['admin', 'lawyer', 'financial']);
+      allow write: if isOneOfRoles(['admin', 'financial']);
+    }
+
+    // Staff can be managed by admins. All signed-in users can read the staff list.
     match /staff/{staffId} {
-      allow read, write: if true; // Temporarily allow all access
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+
+      // Credits are viewable by the staff member, but managed by admin/financial.
+      match /credits/{creditId} {
+        allow read: if isUser(staffId) || isOneOfRoles(['admin', 'financial']);
+        allow write: if isOneOfRoles(['admin', 'financial']);
+      }
     }
 
-    // Secures the document template collection.
+    // Document templates can be read by anyone signed in, only managed by admins.
     match /document_templates/{templateId} {
-      allow read, write: if true; // Temporarily allow all access
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // System settings are only manageable by admins.
+    match /system_settings/{settingId} {
+      allow read, write: if isAdmin();
     }
   }
 }
-
-    

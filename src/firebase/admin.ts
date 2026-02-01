@@ -1,5 +1,6 @@
 
 import admin from 'firebase-admin';
+import { firebaseConfig } from './config';
 
 let initialized = false;
 
@@ -14,6 +15,14 @@ if (!admin.apps.length) {
       // --- Initialize with Service Account from environment variable ---
       console.log("Initializing Firebase Admin with Service Account from environment variable.");
       const serviceAccount = JSON.parse(serviceAccountJson);
+
+      // --- NEW: Project ID Validation ---
+      if (serviceAccount.project_id !== firebaseConfig.projectId) {
+        console.error('CRITICAL_ERROR: Mismatched Project IDs in Firebase configuration.');
+        throw new Error(`Firebase Admin SDK is configured with project ID '${serviceAccount.project_id}', but the client-side config expects '${firebaseConfig.projectId}'. Please ensure your FIREBASE_SERVICE_ACCOUNT_JSON environment variable corresponds to the correct Firebase project.`);
+      }
+      // --- END: Project ID Validation ---
+
       admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
       });
@@ -29,13 +38,18 @@ if (!admin.apps.length) {
     // --- Log a detailed error if initialization fails but DO NOT THROW ---
     let errorMessage = 'CRITICAL_ERROR: Firebase Admin SDK initialization failed. ';
 
-    if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+    if (error.message.includes('Mismatched Project IDs')) {
+        errorMessage = error.message;
+    } else if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
       errorMessage += 'This likely means the `FIREBASE_SERVICE_ACCOUNT_JSON` environment variable is malformed or has incorrect permissions. ';
     } else {
       errorMessage += 'This likely means Application Default Credentials (ADC) are not configured correctly in your server environment, or the `FIREBASE_SERVICE_ACCOUNT_JSON` environment variable is missing. ';
     }
 
-    errorMessage += `Original error: ${error.message}`;
+    // Append the original error message only if it's not the one we specifically threw.
+    if (!error.message.includes('Mismatched Project IDs')) {
+        errorMessage += `Original error: ${error.message}`;
+    }
 
     console.error(errorMessage);
     // The 'initialized' flag remains false.
