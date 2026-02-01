@@ -36,10 +36,9 @@ import {
   Tooltip,
 } from 'recharts';
 import Link from 'next/link';
-import { chartData } from '@/lib/data';
 import { ChartContainer, ChartTooltipContent } from '@/components/ui/chart';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, limit } from 'firebase/firestore';
+import { collection, query, orderBy, limit, Timestamp } from 'firebase/firestore';
 import type { Client, FinancialTransaction, Process, Hearing, Log } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatDistanceToNow } from 'date-fns';
@@ -94,6 +93,41 @@ export default function Dashboard() {
       .filter((t) => t.type === 'receita')
       .reduce((sum, t) => sum + t.amount, 0);
   }, [transactionsData]);
+
+  const chartData = React.useMemo(() => {
+    const monthLabels: {key: string, name: string}[] = [];
+    const now = new Date();
+    for (let i = 5; i >= 0; i--) {
+        const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const monthKey = `${date.getFullYear()}-${date.getMonth()}`;
+        const monthName = date.toLocaleString('pt-BR', { month: 'short' });
+        const formattedMonth = (monthName.charAt(0).toUpperCase() + monthName.slice(1)).replace('.', '');
+        monthLabels.push({ key: monthKey, name: formattedMonth });
+    }
+
+    const counts: Record<string, number> = monthLabels.reduce((acc, month) => {
+        acc[month.key] = 0;
+        return acc;
+    }, {} as Record<string, number>);
+
+    if (processesData) {
+        processesData.forEach(process => {
+            if (process.createdAt) {
+                const createdAtDate = (process.createdAt as Timestamp).toDate();
+                const monthKey = `${createdAtDate.getFullYear()}-${createdAtDate.getMonth()}`;
+                if (counts.hasOwnProperty(monthKey)) {
+                    counts[monthKey]++;
+                }
+            }
+        });
+    }
+
+    return monthLabels.map(month => ({
+        month: month.name,
+        newCases: counts[month.key],
+    }));
+
+  }, [processesData]);
   
   const clientCount = clientsData?.length || 0;
   const processCount = processesData?.length || 0;
