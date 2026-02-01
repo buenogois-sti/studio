@@ -69,6 +69,7 @@ export default function ClientsPage() {
   const [clientToDelete, setClientToDelete] = React.useState<Client | null>(null);
   const [isDeleting, setIsDeleting] = React.useState(false);
   const [isSyncing, setIsSyncing] = React.useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = React.useState('');
   const { toast } = useToast();
   
   const { firestore } = useFirebase();
@@ -87,6 +88,18 @@ export default function ClientsPage() {
   );
   const { data: processesData, isLoading: isLoadingProcesses } = useCollection<Process>(processesQuery);
   const processes = processesData || [];
+
+  const filteredClients = React.useMemo(() => {
+    if (!searchTerm.trim()) {
+        return clients;
+    }
+    const lowercasedFilter = searchTerm.toLowerCase();
+    return clients.filter(client => {
+      const fullName = `${client.firstName} ${client.lastName}`.toLowerCase();
+      const document = client.document || '';
+      return fullName.includes(lowercasedFilter) || document.includes(lowercasedFilter);
+    });
+  }, [clients, searchTerm]);
 
 
   const formatDate = (date: Timestamp | string | undefined) => {
@@ -169,12 +182,17 @@ export default function ClientsPage() {
             <h1 className="flex-1 shrink-0 whitespace-nowrap text-xl font-semibold tracking-tight sm:grow-0 font-headline">
               Clientes
             </h1>
-            {!isLoading && <Badge variant="secondary">{clients.length}</Badge>}
+            {!isLoading && <Badge variant="secondary">{filteredClients.length}</Badge>}
           </div>
           <div className="hidden items-center gap-2 md:ml-auto md:flex">
             <div className="relative w-full max-w-sm">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Pesquisar clientes..." className="pl-8" />
+              <Input
+                placeholder="Pesquisar clientes..."
+                className="pl-8"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -223,9 +241,9 @@ export default function ClientsPage() {
               </Card>
             ))}
           </div>
-        ) : (
+        ) : filteredClients.length > 0 ? (
           <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6">
-            {clients.map((client) => {
+            {filteredClients.map((client) => {
               const clientProcesses = processes.filter(p => p.clientId === client.id);
 
               return (
@@ -335,6 +353,28 @@ export default function ClientsPage() {
               )
             })}
           </div>
+        ) : (
+             <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed shadow-sm min-h-[400px]">
+                <div className="flex flex-col items-center gap-2 text-center">
+                    <Search className="h-12 w-12 text-muted-foreground" />
+                    <h3 className="text-2xl font-bold tracking-tight">Nenhum Cliente Encontrado</h3>
+                    <p className="text-sm text-muted-foreground max-w-sm">
+                        {searchTerm 
+                            ? `Sua busca por "${searchTerm}" não retornou resultados. Tente um termo diferente.`
+                            : "Ainda não há clientes cadastrados."
+                        }
+                    </p>
+                    <div className="mt-4 flex gap-2">
+                         {searchTerm && (
+                             <Button variant="outline" onClick={() => setSearchTerm('')}>Limpar Busca</Button>
+                        )}
+                        <Button onClick={handleAddNew}>
+                            <PlusCircle className="mr-2 h-4 w-4" />
+                            Adicionar Cliente
+                        </Button>
+                    </div>
+                </div>
+            </div>
         )}
       </div>
 
