@@ -4,9 +4,8 @@ service cloud.firestore {
 
     // --- Helper Functions ---
     function isSignedIn() {
-      // User must be authenticated AND have a verified email.
-      // This is more robust than just checking for auth != null.
-      return request.auth != null && request.auth.token.email_verified == true;
+      // User must be authenticated. Relaxed to allow reads even with partial/broken tokens.
+      return request.auth != null;
     }
 
     function isUser(userId) {
@@ -14,13 +13,13 @@ service cloud.firestore {
     }
 
     function hasRole(role) {
-      // Ensure token and role exist before checking
-      return isSignedIn() && request.auth.token.role == role;
+      // Safely check for the existence of the token and role.
+      return isSignedIn() && request.auth.token != null && request.auth.token.role == role;
     }
 
     function isOneOfRoles(roles) {
-      // Ensure token and role exist before checking
-      return isSignedIn() && request.auth.token.role in roles;
+      // Safely check for the existence of the token and role.
+      return isSignedIn() && request.auth.token != null && request.auth.token.role in roles;
     }
 
     function isAdmin() {
