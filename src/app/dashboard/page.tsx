@@ -2,16 +2,13 @@
 import * as React from 'react';
 import {
   Activity,
-  ArrowUpRight,
+  ArrowRight,
   Calendar,
   DollarSign,
   FolderKanban,
   Users,
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
@@ -33,16 +30,19 @@ import {
   ResponsiveContainer,
   XAxis,
   YAxis,
-  Tooltip,
 } from 'recharts';
 import Link from 'next/link';
-import { ChartContainer, ChartTooltipContent } from '@/components/ui/chart';
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy, limit, Timestamp } from 'firebase/firestore';
 import type { Client, FinancialTitle, Process, Hearing, Log } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import { formatDistanceToNow } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 
 const chartConfig = {
   newCases: {
@@ -55,38 +55,25 @@ export default function Dashboard() {
   const { firestore } = useFirebase();
   const { data: session, status } = useSession();
 
-  const titlesQuery = useMemoFirebase(
-    () => (firestore ? collection(firestore, 'financial_titles') : null),
-    [firestore]
-  );
+  // Data Fetching
+  const titlesQuery = useMemoFirebase(() => firestore ? collection(firestore, 'financial_titles') : null, [firestore]);
   const { data: titlesData, isLoading: isLoadingTitles } = useCollection<FinancialTitle>(titlesQuery);
 
-  const clientsQuery = useMemoFirebase(
-    () => (firestore ? collection(firestore, 'clients') : null),
-    [firestore]
-  );
+  const clientsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'clients') : null, [firestore]);
   const { data: clientsData, isLoading: isLoadingClients } = useCollection<Client>(clientsQuery);
   
-  const processesQuery = useMemoFirebase(
-    () => (firestore ? collection(firestore, 'processes') : null),
-    [firestore]
-  );
+  const processesQuery = useMemoFirebase(() => firestore ? collection(firestore, 'processes') : null, [firestore]);
   const { data: processesData, isLoading: isLoadingProcesses } = useCollection<Process>(processesQuery);
 
-  const hearingsQuery = useMemoFirebase(
-    () => (firestore ? collection(firestore, 'hearings') : null),
-    [firestore]
-  );
+  const hearingsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'hearings') : null, [firestore]);
   const { data: hearingsData, isLoading: isLoadingHearings } = useCollection<Hearing>(hearingsQuery);
 
-  const logsQuery = useMemoFirebase(
-    () => (firestore && session?.user?.id ? query(collection(firestore, `users/${session.user.id}/logs`), orderBy('timestamp', 'desc'), limit(5)) : null),
-    [firestore, session]
-  );
+  const logsQuery = useMemoFirebase(() => (firestore && session?.user?.id ? query(collection(firestore, `users/${session.user.id}/logs`), orderBy('timestamp', 'desc'), limit(5)) : null), [firestore, session]);
   const { data: logsData, isLoading: isLoadingLogs } = useCollection<Log>(logsQuery);
 
   const isLoading = status === 'loading' || isLoadingTitles || isLoadingClients || isLoadingProcesses || isLoadingHearings || isLoadingLogs;
 
+  // Data Processing
   const totalRevenue = React.useMemo(() => {
     if (!titlesData) return 0;
     return titlesData
@@ -105,10 +92,7 @@ export default function Dashboard() {
         monthLabels.push({ key: monthKey, name: formattedMonth });
     }
 
-    const counts: Record<string, number> = monthLabels.reduce((acc, month) => {
-        acc[month.key] = 0;
-        return acc;
-    }, {} as Record<string, number>);
+    const counts: Record<string, number> = monthLabels.reduce((acc, month) => ({ ...acc, [month.key]: 0 }), {});
 
     if (processesData) {
         processesData.forEach(process => {
@@ -122,111 +106,144 @@ export default function Dashboard() {
         });
     }
 
-    return monthLabels.map(month => ({
-        month: month.name,
-        newCases: counts[month.key],
-    }));
-
+    return monthLabels.map(month => ({ month: month.name, newCases: counts[month.key] }));
   }, [processesData]);
+
+  const upcomingHearings = React.useMemo(() => {
+    if (!hearingsData) return [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    return hearingsData
+      .filter(h => h.date && (h.date as Timestamp).toDate() >= today)
+      .sort((a, b) => (a.date as Timestamp).seconds - (b.date as Timestamp).seconds)
+      .slice(0, 5);
+  }, [hearingsData]);
   
-  const clientCount = clientsData?.length || 0;
-  const processCount = processesData?.length || 0;
-  const hearingCount = hearingsData?.length || 0;
+  const processesMap = React.useMemo(() => new Map(processesData?.map(p => [p.id, p])), [processesData]);
 
   const formatLogTime = (timestamp: any) => {
     if (!timestamp) return '';
-    const date = timestamp.toDate();
-    return formatDistanceToNow(date, { addSuffix: true, locale: ptBR });
+    return formatDistanceToNow(timestamp.toDate(), { addSuffix: true, locale: ptBR });
   }
 
+  const StatCard = ({ title, value, icon: Icon, href, description }: { title: string; value: string | number; icon: React.ElementType; href: string; description: string; }) => (
+    <Link href={href} className="group">
+      <Card className="transition-all duration-300 hover:bg-card/95 hover:shadow-lg hover:shadow-primary/10 hover:-translate-y-1">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">{title}</CardTitle>
+          <Icon className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <>
+              <Skeleton className="h-8 w-3/4 mb-1" />
+              <Skeleton className="h-4 w-1/2" />
+            </>
+          ) : (
+            <>
+              <div className="text-2xl font-bold">{value}</div>
+              <p className="text-xs text-muted-foreground">{description}</p>
+            </>
+          )}
+        </CardContent>
+      </Card>
+    </Link>
+  );
+
   return (
-    <div className="flex flex-col gap-4">
-      <div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Faturamento Total</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-                <Skeleton className="h-8 w-3/4" />
-            ) : (
-                <div className="text-2xl font-bold">
-              {totalRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-            </div>
-            )}
-            <p className="text-xs text-muted-foreground">+20.1% em relação ao mês passado</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Clientes Ativos</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-             {isLoading ? (
-                <Skeleton className="h-8 w-1/4" />
-            ) : (
-                <div className="text-2xl font-bold">+{clientCount}</div>
-            )}
-            <p className="text-xs text-muted-foreground">+3 no último mês</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Processos Ativos</CardTitle>
-            <FolderKanban className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-                <Skeleton className="h-8 w-1/4" />
-            ) : (
-                <div className="text-2xl font-bold">+{processCount}</div>
-            )}
-            <p className="text-xs text-muted-foreground">+10 no último mês</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Próximas Audiências</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-             {isLoading ? (
-                <Skeleton className="h-8 w-1/4" />
-            ) : (
-                <div className="text-2xl font-bold">+{hearingCount}</div>
-            )}
-            <p className="text-xs text-muted-foreground">2 na próxima semana</p>
-          </CardContent>
-        </Card>
+    <div className="flex flex-col gap-8">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight font-headline">
+          Bem-vindo de volta, {session?.user?.name?.split(' ')[0]}!
+        </h1>
+        <p className="text-muted-foreground">
+          Aqui está um resumo da atividade do seu escritório.
+        </p>
       </div>
-      <div className="grid gap-4 md:gap-8 lg:grid-cols-2 xl:grid-cols-3">
-        <Card className="xl:col-span-2">
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <StatCard 
+          title="Faturamento (Pago)" 
+          value={totalRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+          icon={DollarSign}
+          href="/dashboard/financeiro"
+          description="+20.1% vs. mês anterior"
+        />
+        <StatCard 
+          title="Clientes Ativos" 
+          value={`+${clientsData?.length || 0}`}
+          icon={Users}
+          href="/dashboard/clientes"
+          description="+3 no último mês"
+        />
+        <StatCard 
+          title="Processos Ativos" 
+          value={`+${processesData?.length || 0}`}
+          icon={FolderKanban}
+          href="/dashboard/processos"
+          description="+10 no último mês"
+        />
+      </div>
+
+      <div className="grid gap-4 md:gap-8 lg:grid-cols-3">
+        <Card className="lg:col-span-1 h-full">
+          <CardHeader>
+            <CardTitle className="font-headline">Próximas Audiências</CardTitle>
+            <CardDescription>Seus próximos 5 compromissos.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="space-y-4">
+                {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
+              </div>
+            ) : upcomingHearings.length > 0 ? (
+              <div className="space-y-4">
+                {upcomingHearings.map(hearing => {
+                  const process = processesMap.get(hearing.processId);
+                  return (
+                    <div key={hearing.id} className="flex items-center gap-4">
+                       <div className="flex flex-col items-center justify-center p-2 bg-muted rounded-md w-16 h-16">
+                           <span className="text-sm font-bold uppercase">{format(hearing.date.toDate(), 'MMM', { locale: ptBR })}</span>
+                           <span className="text-2xl font-bold">{format(hearing.date.toDate(), 'dd')}</span>
+                       </div>
+                      <div className="flex-1">
+                        <p className="font-semibold truncate">{process?.name || 'Processo não encontrado'}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {format(hearing.date.toDate(), "EEEE, HH:mm'h'", { locale: ptBR })}
+                        </p>
+                      </div>
+                      <Button asChild variant="ghost" size="icon">
+                        <Link href="/dashboard/audiencias"><ArrowRight className="h-4 w-4" /></Link>
+                      </Button>
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-full py-10 border border-dashed rounded-lg">
+                <Calendar className="h-10 w-10 mb-2" />
+                <p className="font-semibold">Nenhuma audiência agendada</p>
+                <p className="text-sm">Você está com a agenda livre!</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle className="font-headline">Novos Casos por Mês</CardTitle>
+            <CardDescription>Visão geral de novos processos nos últimos 6 meses.</CardDescription>
           </CardHeader>
           <CardContent className="pl-2">
             <ChartContainer config={chartConfig} className="h-[300px] w-full">
               <ResponsiveContainer>
                 <BarChart data={chartData}>
-                  <XAxis
-                    dataKey="month"
-                    stroke="#888888"
-                    fontSize={12}
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <YAxis
-                    stroke="#888888"
-                    fontSize={12}
-                    tickLine={false}
-                    axisLine={false}
-                    tickFormatter={(value) => `${value}`}
-                  />
-                  <Tooltip
-                    content={<ChartTooltipContent />}
-                    cursor={{ fill: 'hsl(var(--muted))' }}
+                  <XAxis dataKey="month" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
+                  <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `${value}`} />
+                  <ChartTooltip
+                    cursor={false}
+                    content={<ChartTooltipContent indicator="dot" />}
                   />
                   <Bar dataKey="newCases" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
                 </BarChart>
@@ -234,7 +251,9 @@ export default function Dashboard() {
             </ChartContainer>
           </CardContent>
         </Card>
-        <Card>
+      </div>
+
+      <Card>
           <CardHeader>
             <CardTitle className="font-headline">Atividade Recente</CardTitle>
             <CardDescription>
@@ -256,11 +275,9 @@ export default function Dashboard() {
               logsData && logsData.length > 0 ? (
                 logsData.map((activity) => (
                     <div key={activity.id} className="flex items-center gap-4">
-                    <Avatar className="hidden h-9 w-9 sm:flex">
+                    <Avatar className="hidden h-9 w-9 sm:flex border">
                         <AvatarImage src={`https://picsum.photos/seed/act${activity.id}/100/100`} alt="Avatar" data-ai-hint="abstract pattern" />
-                        <AvatarFallback>
-                            <Activity className="h-4 w-4"/>
-                        </AvatarFallback>
+                        <AvatarFallback><Activity className="h-4 w-4"/></AvatarFallback>
                     </Avatar>
                     <div className="grid gap-1">
                         <p className="text-sm font-medium leading-none">
@@ -273,12 +290,11 @@ export default function Dashboard() {
                     </div>
                 ))
               ) : (
-                <p className="text-sm text-muted-foreground text-center">Nenhuma atividade recente.</p>
+                <p className="text-sm text-muted-foreground text-center p-4">Nenhuma atividade recente para exibir.</p>
               )
             )}
           </CardContent>
         </Card>
-      </div>
     </div>
   );
 }
