@@ -193,3 +193,13 @@ export type DocumentTemplate = {
   createdAt: Timestamp;
   updatedAt?: Timestamp;
 };
+
+export type Notification = {
+  id: string;
+  userId: string;
+  title: string;
+  description: string;
+  href?: string;
+  isRead: boolean;
+  createdAt: Timestamp;
+};

@@ -487,6 +487,49 @@
         "status"
       ]
     },
+    "Notification": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Notification",
+      "type": "object",
+      "description": "Represents a user-specific notification in the system.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "userId": {
+          "type": "string",
+          "description": "ID of the user who receives the notification."
+        },
+        "title": {
+          "type": "string",
+          "description": "The title of the notification."
+        },
+        "description": {
+          "type": "string",
+          "description": "A short description of the event."
+        },
+        "href": {
+          "type": "string",
+          "description": "An optional link to the relevant page."
+        },
+        "isRead": {
+          "type": "boolean",
+          "description": "Whether the user has read the notification."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "title",
+        "description",
+        "isRead",
+        "createdAt"
+      ]
+    },
     "Log": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Log",
@@ -765,6 +808,12 @@
       },
       "description": "Stores individual financial titles (receivables/payables)."
     },
+    "/users/{userId}/notifications/{notificationId}": {
+      "schema": {
+        "$ref": "#/backend/entities/Notification"
+      },
+      "description": "Stores user-specific notifications. Secured by path-based ownership."
+    },
     "/users/{userId}/logs/{logId}": {
       "schema": {
         "$ref": "#/backend/entities/Log"
@@ -797,5 +846,3 @@
     }
   }
 }
-
-    

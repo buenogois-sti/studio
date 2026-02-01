@@ -52,6 +52,7 @@ import {
 } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
+import { NotificationBell } from '@/components/NotificationBell';
 
 
 const navItems = [
@@ -273,7 +274,7 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
             <header className="flex h-14 items-center gap-4 border-b bg-card px-4 lg:h-[60px] lg:px-6 sticky top-0 z-30">
             <SidebarTrigger className="shrink-0 md:hidden" />
             {getBreadcrumb()}
-            <div className="ml-auto flex items-center gap-4">
+            <div className="ml-auto flex items-center gap-2">
                 <form>
                 <div className="relative">
                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -284,6 +285,7 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
                     />
                 </div>
                 </form>
+                <NotificationBell />
                 <UserNav />
             </div>
             </header>

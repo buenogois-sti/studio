@@ -4,6 +4,9 @@
 import { firestoreAdmin } from '@/firebase/admin';
 import { getGoogleApiClientsForUser } from '@/lib/drive';
 import { add, formatISO } from 'date-fns';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/app/api/auth/[...nextauth]/options';
+import { createNotification } from './notification-actions';
 
 interface CreateHearingData {
   processId: string;
@@ -20,6 +23,7 @@ export async function createHearing(data: CreateHearingData) {
   }
 
   const { processId, processName, hearingDate, location, responsibleParty, notes } = data;
+  const session = await getServerSession(authOptions);
 
   try {
     // 1. Save to Firestore first, to get an ID
@@ -71,6 +75,16 @@ export async function createHearing(data: CreateHearingData) {
         // If calendar fails, we don't fail the whole operation, but we log it.
         // The hearing is already in Firestore.
         console.error("Failed to create Google Calendar event, but hearing was saved to Firestore. Error:", calendarError.message);
+    }
+
+    // 4. Create Notification
+    if (session?.user?.id) {
+        await createNotification({
+            userId: session.user.id,
+            title: "Nova Audiência Agendada",
+            description: `A audiência para o processo "${processName}" foi agendada para ${new Date(hearingDate).toLocaleDateString('pt-BR')}.`,
+            href: `/dashboard/audiencias`,
+        });
     }
     
     return { success: true, message: 'Audiência agendada com sucesso no sistema e no Google Agenda!' };

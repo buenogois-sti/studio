@@ -25,10 +25,16 @@ service cloud.firestore {
     match /users/{userId} {
       allow update: if isUser(userId) || isAdmin();
       allow create, delete: if isAdmin();
-    }
-    match /users/{userId}/logs/{logId} {
-      allow create: if isUser(userId);
-      // read is covered by global rule, write is denied by default
+      
+      match /notifications/{notificationId} {
+        allow read, update: if isUser(userId);
+        allow create, delete: if false;
+      }
+
+      match /logs/{logId} {
+        allow create: if isUser(userId);
+        // read is covered by global rule, write is denied by default
+      }
     }
     match /clients/{clientId} {
       allow write: if isOneOfRoles(['admin', 'lawyer']);
