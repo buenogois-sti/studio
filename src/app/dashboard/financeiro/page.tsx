@@ -28,7 +28,7 @@ import {
 } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, Timestamp, query, orderBy } from 'firebase/firestore';
-import type { Client, FinancialTransaction, Staff } from '@/lib/types';
+import type { Client, FinancialTitle, Staff, Process } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -43,30 +43,35 @@ const formatCurrency = (amount: number) => {
   return amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 };
 
-function TransactionsTable({
-  transactions,
+function FinancialTitlesTable({
+  titles,
   clientsMap,
-  staffMap,
+  processesMap,
   isLoading,
 }: {
-  transactions: FinancialTransaction[];
+  titles: FinancialTitle[];
   clientsMap: Map<string, string>;
-  staffMap: Map<string, string>;
+  processesMap: Map<string, Process>;
   isLoading: boolean;
 }) {
-  const getAssociatedName = (trans: FinancialTransaction) => {
-    if (trans.clientId) return clientsMap.get(trans.clientId) || 'Cliente não encontrado';
-    if (trans.staffId) return staffMap.get(trans.staffId) || 'Membro não encontrado';
-    return 'Escritório';
+  const getAssociatedName = (title: FinancialTitle) => {
+    if (title.processId) {
+      const process = processesMap.get(title.processId);
+      if (process && process.clientId) {
+        return clientsMap.get(process.clientId) || 'Cliente não encontrado';
+      }
+    }
+    if (title.origin === 'DESPESA_OPERACIONAL') return 'Escritório';
+    return 'N/A';
   };
 
-  const getStatusVariant = (status: 'pago' | 'pendente' | 'vencido') => {
+  const getStatusVariant = (status: 'PAGO' | 'PENDENTE' | 'ATRASADO') => {
     switch (status) {
-      case 'pago':
+      case 'PAGO':
         return 'secondary';
-      case 'pendente':
+      case 'PENDENTE':
         return 'default';
-      case 'vencido':
+      case 'ATRASADO':
         return 'destructive';
       default:
         return 'outline';
@@ -81,10 +86,10 @@ function TransactionsTable({
     );
   }
 
-  if (transactions.length === 0) {
+  if (titles.length === 0) {
      return (
         <div className="text-center text-muted-foreground py-16">
-            Nenhuma transação encontrada nesta categoria.
+            Nenhum título financeiro encontrado nesta categoria.
         </div>
      )
   }
@@ -94,37 +99,37 @@ function TransactionsTable({
       <TableHeader>
         <TableRow>
           <TableHead>Descrição</TableHead>
-          <TableHead className="hidden sm:table-cell">Categoria</TableHead>
+          <TableHead className="hidden sm:table-cell">Origem</TableHead>
           <TableHead className="hidden md:table-cell">Status</TableHead>
-          <TableHead className="hidden md:table-cell">Data</TableHead>
+          <TableHead className="hidden md:table-cell">Vencimento</TableHead>
           <TableHead className="text-right">Valor</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
-        {transactions.map((trans) => {
-          const isRevenue = trans.type === 'receita';
+        {titles.map((title) => {
+          const isRevenue = title.type === 'RECEITA';
           return (
-            <TableRow key={trans.id}>
+            <TableRow key={title.id}>
               <TableCell>
-                <div className="font-medium">{trans.description}</div>
+                <div className="font-medium">{title.description}</div>
                 <div className="text-sm text-muted-foreground hidden md:block">
-                  {getAssociatedName(trans)}
+                  {getAssociatedName(title)}
                 </div>
               </TableCell>
               <TableCell className="hidden sm:table-cell">
-                <Badge variant="outline">{trans.category}</Badge>
+                <Badge variant="outline">{title.origin.replace(/_/g, ' ')}</Badge>
               </TableCell>
               <TableCell className="hidden md:table-cell">
-                <Badge variant={getStatusVariant(trans.status)} className="capitalize">
-                  {trans.status}
+                <Badge variant={getStatusVariant(title.status)} className="capitalize">
+                  {title.status.toLowerCase()}
                 </Badge>
               </TableCell>
               <TableCell className="hidden md:table-cell">
-                <div className="font-medium">{formatDate(trans.transactionDate)}</div>
-                {trans.dueDate && <div className="text-xs text-muted-foreground">Vence: {formatDate(trans.dueDate)}</div>}
+                <div className="font-medium">{formatDate(title.dueDate)}</div>
+                {title.status === 'PAGO' && title.paymentDate && <div className="text-xs text-muted-foreground">Pago: {formatDate(title.paymentDate)}</div>}
               </TableCell>
               <TableCell className={cn('text-right font-semibold', isRevenue ? 'text-green-500' : 'text-red-500')}>
-                {isRevenue ? '+' : '-'} {formatCurrency(trans.amount)}
+                {isRevenue ? '+' : '-'} {formatCurrency(title.value)}
               </TableCell>
             </TableRow>
           );
@@ -137,11 +142,11 @@ function TransactionsTable({
 export default function FinanceiroPage() {
   const { firestore, isUserLoading } = useFirebase();
 
-  const transactionsQuery = useMemoFirebase(
-    () => (firestore ? query(collection(firestore, 'financial_transactions'), orderBy('transactionDate', 'desc')) : null),
+  const titlesQuery = useMemoFirebase(
+    () => (firestore ? query(collection(firestore, 'financial_titles'), orderBy('dueDate', 'desc')) : null),
     [firestore]
   );
-  const { data: transactionsData, isLoading: isLoadingTransactions } = useCollection<FinancialTransaction>(transactionsQuery);
+  const { data: titlesData, isLoading: isLoadingTitles } = useCollection<FinancialTitle>(titlesQuery);
 
   const clientsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'clients') : null), [firestore]);
   const { data: clientsData, isLoading: isLoadingClients } = useCollection<Client>(clientsQuery);
@@ -149,33 +154,36 @@ export default function FinanceiroPage() {
   const staffQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'staff') : null), [firestore]);
   const { data: staffData, isLoading: isLoadingStaff } = useCollection<Staff>(staffQuery);
 
-  const isLoading = isUserLoading || isLoadingTransactions || isLoadingClients || isLoadingStaff;
-  const transactions = transactionsData || [];
+  const processesQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'processes') : null), [firestore]);
+  const { data: processesData, isLoading: isLoadingProcesses } = useCollection<Process>(processesQuery);
+
+  const isLoading = isUserLoading || isLoadingTitles || isLoadingClients || isLoadingStaff || isLoadingProcesses;
+  const titles = titlesData || [];
   
   const clientsMap = React.useMemo(() => new Map(clientsData?.map(c => [c.id, `${c.firstName} ${c.lastName}`])), [clientsData]);
-  const staffMap = React.useMemo(() => new Map(staffData?.map(s => [s.id, `${s.firstName} ${s.lastName}`])), [staffData]);
+  const processesMap = React.useMemo(() => new Map(processesData?.map(p => [p.id, p])), [processesData]);
 
   const { monthlyRevenue, monthlyExpenses, pendingReceivables } = React.useMemo(() => {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    return transactions.reduce((acc, t) => {
-        const transactionDate = (t.transactionDate as Timestamp)?.toDate();
-        if (t.status === 'pago' && transactionDate >= startOfMonth) {
-            if (t.type === 'receita') acc.monthlyRevenue += t.amount;
-            if (t.type === 'despesa') acc.monthlyExpenses += t.amount;
+    return titles.reduce((acc, t) => {
+        const paymentDate = (t.paymentDate as Timestamp)?.toDate();
+        if (t.status === 'PAGO' && paymentDate >= startOfMonth) {
+            if (t.type === 'RECEITA') acc.monthlyRevenue += t.value;
+            if (t.type === 'DESPESA') acc.monthlyExpenses += t.value;
         }
-        if (t.type === 'receita' && t.status === 'pendente') {
-            acc.pendingReceivables += t.amount;
+        if (t.type === 'RECEITA' && t.status === 'PENDENTE') {
+            acc.pendingReceivables += t.value;
         }
         return acc;
     }, { monthlyRevenue: 0, monthlyExpenses: 0, pendingReceivables: 0 });
-  }, [transactions]);
+  }, [titles]);
   
   const monthlyBalance = monthlyRevenue - monthlyExpenses;
 
-  const receitas = React.useMemo(() => transactions.filter((t) => t.type === 'receita'), [transactions]);
-  const despesas = React.useMemo(() => transactions.filter((t) => t.type === 'despesa'), [transactions]);
+  const receitas = React.useMemo(() => titles.filter((t) => t.type === 'RECEITA'), [titles]);
+  const despesas = React.useMemo(() => titles.filter((t) => t.type === 'DESPESA'), [titles]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -188,7 +196,7 @@ export default function FinanceiroPage() {
           </Button>
           <Button size="sm" className="h-9 gap-1">
             <PlusCircle className="h-4 w-4" />
-            <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">Nova Transação</span>
+            <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">Novo Título</span>
           </Button>
         </div>
       </div>
@@ -253,11 +261,11 @@ export default function FinanceiroPage() {
         <TabsContent value="overview">
           <Card>
             <CardHeader>
-              <CardTitle>Últimas Transações</CardTitle>
+              <CardTitle>Últimos Títulos Financeiros</CardTitle>
               <CardDescription>Visualize as movimentações mais recentes do seu escritório.</CardDescription>
             </CardHeader>
             <CardContent>
-              <TransactionsTable transactions={transactions.slice(0, 10)} clientsMap={clientsMap} staffMap={staffMap} isLoading={isLoading} />
+              <FinancialTitlesTable titles={titles.slice(0, 10)} clientsMap={clientsMap} processesMap={processesMap} isLoading={isLoading} />
             </CardContent>
           </Card>
         </TabsContent>
@@ -268,7 +276,7 @@ export default function FinanceiroPage() {
               <CardDescription>Visualize todos os honorários, acordos e pagamentos recebidos.</CardDescription>
             </CardHeader>
             <CardContent>
-              <TransactionsTable transactions={receitas} clientsMap={clientsMap} staffMap={staffMap} isLoading={isLoading} />
+              <FinancialTitlesTable titles={receitas} clientsMap={clientsMap} processesMap={processesMap} isLoading={isLoading} />
             </CardContent>
           </Card>
         </TabsContent>
@@ -279,7 +287,7 @@ export default function FinanceiroPage() {
               <CardDescription>Visualize todas as custas, despesas e pagamentos efetuados.</CardDescription>
             </CardHeader>
             <CardContent>
-              <TransactionsTable transactions={despesas} clientsMap={clientsMap} staffMap={staffMap} isLoading={isLoading} />
+              <FinancialTitlesTable titles={despesas} clientsMap={clientsMap} processesMap={processesMap} isLoading={isLoading} />
             </CardContent>
           </Card>
         </TabsContent>

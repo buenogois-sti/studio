@@ -77,17 +77,52 @@ export type Hearing = {
   notes?: string;
 };
 
-export type FinancialTransaction = {
+export type FinancialEvent = {
   id: string;
+  processId: string;
+  type: 'ACORDO' | 'SENTENCA' | 'EXECUCAO' | 'CONTRATO';
+  eventDate: Timestamp;
   description: string;
-  amount: number;
-  type: 'receita' | 'despesa';
-  transactionDate: Timestamp;
-  category: string;
-  status: 'pago' | 'pendente' | 'vencido';
-  dueDate?: Timestamp;
-  clientId?: string;
-  staffId?: string;
+  totalValue: number;
+};
+
+export type FinancialTitle = {
+  id: string;
+  financialEventId?: string;
+  processId: string;
+  clientId: string;
+  description: string;
+  type: 'RECEITA' | 'DESPESA';
+  origin:
+    | 'ACORDO'
+    | 'SENTENCA'
+    | 'HONORARIOS_CONTRATUAIS'
+    | 'SUCUMBENCIA'
+    | 'CUSTAS_PROCESSUAIS'
+    | 'DESPESA_OPERACIONAL';
+  value: number;
+  dueDate: Timestamp;
+  paymentDate?: Timestamp;
+  status: 'PENDENTE' | 'PAGO' | 'ATRASADO';
+};
+
+export type FeeSplitRule = {
+  processId: string;
+  participants: {
+    staffId: string;
+    percentage: number;
+  }[];
+};
+
+export type LawyerCredit = {
+  id: string;
+  staffId: string;
+  processId: string;
+  financialTitleId: string;
+  value: number;
+  creditDate: Timestamp;
+  status: 'DISPONIVEL' | 'RETIDO' | 'PAGO';
+  payoutDate?: Timestamp;
 };
 
 

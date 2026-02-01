@@ -279,71 +279,203 @@
         "responsibleParty"
       ]
     },
-    "FinancialTransaction": {
+    "FinancialEvent": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "FinancialTransaction",
+      "title": "FinancialEvent",
+      "description": "Represents a legal event that can trigger financial transactions, like an agreement or a court sentence.",
       "type": "object",
-      "description": "Represents a financial transaction in the LexFlow Workspace system.",
       "properties": {
         "id": {
-          "type": "string",
-          "description": "Unique identifier for the financial transaction entity."
+          "type": "string"
         },
-        "description": {
+        "processId": {
           "type": "string",
-          "description": "A description of the financial transaction."
-        },
-        "amount": {
-          "type": "number",
-          "description": "The amount of the financial transaction."
+          "description": "Link to the Process entity."
         },
         "type": {
           "type": "string",
-          "description": "The type of transaction (e.g., 'receita', 'despesa').",
           "enum": [
-            "receita",
-            "despesa"
+            "ACORDO",
+            "SENTENCA",
+            "EXECUCAO",
+            "CONTRATO"
           ]
         },
-        "transactionDate": {
+        "eventDate": {
           "type": "string",
-          "description": "The date the transaction occurred.",
           "format": "date-time"
         },
-        "category": {
-          "type": "string",
-          "description": "Category of the transaction (e.g., 'Honorários', 'Custas', 'Aluguel')."
+        "description": {
+          "type": "string"
         },
-        "status": {
-          "type": "string",
-          "description": "The payment status of the transaction.",
-          "enum": [
-            "pago",
-            "pendente",
-            "vencido"
-          ]
-        },
-        "dueDate": {
-          "type": "string",
-          "description": "The due date for a pending transaction.",
-          "format": "date-time"
-        },
-        "clientId": {
-          "type": "string",
-          "description": "Optional reference to a Client. (Relationship: Client 1:N FinancialTransaction)"
-        },
-        "staffId": {
-          "type": "string",
-          "description": "Optional reference to a Staff member for payroll or expenses."
+        "totalValue": {
+          "type": "number"
         }
       },
       "required": [
         "id",
-        "description",
-        "amount",
+        "processId",
         "type",
-        "transactionDate",
-        "category",
+        "eventDate",
+        "totalValue"
+      ]
+    },
+    "FinancialTitle": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "FinancialTitle",
+      "description": "Represents a single financial receivable or payable, generated from a FinancialEvent.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "financialEventId": {
+          "type": "string",
+          "description": "Link to the originating FinancialEvent."
+        },
+        "processId": {
+          "type": "string",
+          "description": "Denormalized link to the Process."
+        },
+        "clientId": {
+          "type": "string",
+          "description": "Denormalized link to the Client."
+        },
+        "description": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "RECEITA",
+            "DESPESA"
+          ]
+        },
+        "origin": {
+          "type": "string",
+          "enum": [
+            "ACORDO",
+            "SENTENCA",
+            "HONORARIOS_CONTRATUAIS",
+            "SUCUMBENCIA",
+            "CUSTAS_PROCESSUAIS",
+            "DESPESA_OPERACIONAL"
+          ]
+        },
+        "value": {
+          "type": "number"
+        },
+        "dueDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "paymentDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "PENDENTE",
+            "PAGO",
+            "ATRASADO"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "processId",
+        "clientId",
+        "description",
+        "type",
+        "origin",
+        "value",
+        "dueDate",
+        "status"
+      ]
+    },
+    "FeeSplitRule": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "FeeSplitRule",
+      "description": "Defines the fee splitting rule for a specific process.",
+      "type": "object",
+      "properties": {
+        "processId": {
+          "type": "string",
+          "description": "The ID of the process this rule applies to."
+        },
+        "participants": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "staffId": {
+                "type": "string",
+                "description": "ID of the staff member (lawyer)."
+              },
+              "percentage": {
+                "type": "number",
+                "description": "Percentage of the fee (0-100)."
+              }
+            },
+            "required": [
+              "staffId",
+              "percentage"
+            ]
+          }
+        }
+      },
+      "required": [
+        "processId",
+        "participants"
+      ]
+    },
+    "LawyerCredit": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "LawyerCredit",
+      "description": "Represents a credit generated for a lawyer from a paid FinancialTitle.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "staffId": {
+          "type": "string"
+        },
+        "processId": {
+          "type": "string"
+        },
+        "financialTitleId": {
+          "type": "string",
+          "description": "The paid title that generated this credit."
+        },
+        "value": {
+          "type": "number"
+        },
+        "creditDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "DISPONIVEL",
+            "RETIDO",
+            "PAGO"
+          ]
+        },
+        "payoutDate": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "staffId",
+        "processId",
+        "financialTitleId",
+        "value",
+        "creditDate",
         "status"
       ]
     },
@@ -553,17 +685,29 @@
       },
       "description": "Stores legal process information, linked to a client."
     },
+    "/processes/{processId}/fee_split_rules/default": {
+      "schema": {
+        "$ref": "#/backend/entities/FeeSplitRule"
+      },
+      "description": "Stores the fee split rule for a specific process."
+    },
     "/hearings/{hearingId}": {
       "schema": {
         "$ref": "#/backend/entities/Hearing"
       },
       "description": "Stores hearing information."
     },
-    "/financial_transactions/{financialTransactionId}": {
+    "/financial_events/{eventId}": {
       "schema": {
-        "$ref": "#/backend/entities/FinancialTransaction"
+        "$ref": "#/backend/entities/FinancialEvent"
       },
-      "description": "Stores financial transaction information."
+      "description": "Stores legal-financial events."
+    },
+    "/financial_titles/{titleId}": {
+      "schema": {
+        "$ref": "#/backend/entities/FinancialTitle"
+      },
+      "description": "Stores individual financial titles (receivables/payables)."
     },
     "/users/{userId}/logs/{logId}": {
       "schema": {
@@ -576,6 +720,12 @@
         "$ref": "#/backend/entities/Staff"
       },
       "description": "Stores staff member information."
+    },
+    "/staff/{staffId}/credits/{creditId}": {
+      "schema": {
+        "$ref": "#/backend/entities/LawyerCredit"
+      },
+      "description": "Stores credits generated for a staff member."
     },
     "/system_settings/{settingId}": {
       "schema": {
