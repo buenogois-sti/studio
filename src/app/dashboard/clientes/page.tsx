@@ -338,7 +338,12 @@ export default function ClientsPage() {
         )}
       </div>
 
-      <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+      <Sheet open={isSheetOpen} onOpenChange={(open) => {
+          if (!open) {
+            setEditingClient(null);
+          }
+          setIsSheetOpen(open);
+        }}>
         <SheetContent className="sm:max-w-4xl w-full">
           <SheetHeader>
             <SheetTitle>{editingClient ? 'Editar Cliente' : 'Adicionar Novo Cliente'}</SheetTitle>
