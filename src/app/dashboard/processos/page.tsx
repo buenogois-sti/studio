@@ -10,6 +10,7 @@ import {
   ChevronsUpDown,
   Check,
   X,
+  DollarSign,
 } from 'lucide-react';
 import { z } from 'zod';
 import { useForm, useFieldArray } from 'react-hook-form';
@@ -108,6 +109,7 @@ import { searchClients, getClientById } from '@/lib/client-actions';
 import { ClientForm } from '@/components/client/ClientForm';
 import { cn } from '@/lib/utils';
 import { syncProcessToDrive } from '@/lib/drive';
+import { FinancialEventDialog } from '@/components/process/FinancialEventDialog';
 
 const processSchema = z.object({
   clientId: z.string().min(1, { message: 'Selecione um cliente.' }),
@@ -272,6 +274,17 @@ function ProcessForm({
     }
     if (!process) {
         setSelectedClient(null);
+        form.reset({
+          clientId: '',
+          name: '',
+          processNumber: '',
+          court: '',
+          courtBranch: '',
+          caseValue: undefined,
+          opposingParties: [],
+          description: '',
+          status: 'Pendente',
+        });
     }
   }, [process, toast, form, selectedClient]);
 
@@ -575,7 +588,7 @@ function ProcessForm({
       </Form>
 
       <Sheet open={isClientSheetOpen} onOpenChange={setIsClientSheetOpen}>
-        <SheetContent className="sm:max-w-4xl w-full">
+        <SheetContent className="w-full sm:max-w-2xl">
           <SheetHeader>
             <SheetTitle>Adicionar Novo Cliente</SheetTitle>
             <SheetDescription>
@@ -603,6 +616,7 @@ export default function ProcessosPage() {
   const [processToDelete, setProcessToDelete] = React.useState<Process | null>(null);
   const [isDeleting, setIsDeleting] = React.useState(false);
   const [isSyncing, setIsSyncing] = React.useState<string | null>(null);
+  const [eventProcess, setEventProcess] = React.useState<Process | null>(null);
 
   const { firestore, isUserLoading } = useFirebase();
   const { data: session } = useSession();
@@ -638,6 +652,10 @@ export default function ProcessosPage() {
     setEditingProcess(process);
     setIsSheetOpen(true);
   };
+  
+  const handleAddFinancialEvent = (process: Process) => {
+    setEventProcess(process);
+  }
 
   const handleDeleteTrigger = (process: Process) => {
     setProcessToDelete(process);
@@ -817,6 +835,10 @@ export default function ProcessosPage() {
                             <DropdownMenuItem onClick={() => handleEdit(process)}>
                               Editar
                             </DropdownMenuItem>
+                             <DropdownMenuItem onClick={() => handleAddFinancialEvent(process)}>
+                              <DollarSign className="mr-2 h-4 w-4" />
+                              <span>Adicionar Evento Financeiro</span>
+                            </DropdownMenuItem>
                             <DropdownMenuItem>Ver Audiências</DropdownMenuItem>
                              <DropdownMenuSeparator />
                              {process.driveFolderId ? (
@@ -856,8 +878,13 @@ export default function ProcessosPage() {
         </Card>
       </div>
 
-      <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-        <SheetContent className="sm:max-w-4xl w-full">
+      <Sheet open={isSheetOpen} onOpenChange={(open) => {
+          if (!open) {
+              setEditingProcess(null);
+          }
+          setIsSheetOpen(open);
+      }}>
+        <SheetContent className="w-full sm:max-w-4xl">
           <SheetHeader>
             <SheetTitle>
               {editingProcess ? 'Editar Processo' : 'Adicionar Novo Processo'}
@@ -897,6 +924,13 @@ export default function ProcessosPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <FinancialEventDialog
+        process={eventProcess}
+        open={!!eventProcess}
+        onOpenChange={(open) => { if (!open) setEventProcess(null); }}
+        onEventCreated={() => { /* Maybe refresh finance page data in future */ }}
+      />
     </>
   );
 }

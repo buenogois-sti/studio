@@ -31,7 +31,7 @@ import {
 } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, Timestamp, query, orderBy } from 'firebase/firestore';
-import type { Client, FinancialTitle, Process } from '@/lib/types';
+import type { Client, FinancialTitle, Process, Staff } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -71,7 +71,7 @@ import { searchProcesses } from '@/lib/process-actions';
 
 
 const titleSchema = z.object({
-  processId: z.string().min(1, 'É obrigatório selecionar um processo.'),
+  processId: z.string().optional(),
   description: z.string().min(3, 'A descrição é obrigatória.'),
   type: z.enum(['RECEITA', 'DESPESA'], { required_error: 'Selecione o tipo.'}),
   origin: z.enum([
@@ -87,9 +87,9 @@ const titleSchema = z.object({
   status: z.enum(['PENDENTE', 'PAGO', 'ATRASADO']).default('PENDENTE'),
 });
 
-const formatDate = (date: Timestamp | string | undefined) => {
+const formatDate = (date: Timestamp | string | undefined | Date) => {
   if (!date) return 'N/A';
-    const dateObj = typeof date === 'string' ? new Date(date) : date.toDate();
+    const dateObj = typeof date === 'string' ? new Date(date) : (date instanceof Timestamp) ? date.toDate() : date;
   return format(dateObj, 'dd/MM/yyyy', { locale: ptBR });
 };
 
@@ -189,11 +189,33 @@ function NewTitleDialog({ onTitleCreated }: { onTitleCreated: () => void }) {
     }
   });
 
+  const watchedOrigin = form.watch('origin');
+  const isOperationalExpense = watchedOrigin === 'DESPESA_OPERACIONAL';
+
+  React.useEffect(() => {
+    // If it's an operational expense, we don't need a process
+    if (isOperationalExpense) {
+      setSelectedProcess(null);
+      form.setValue('processId', undefined);
+    }
+  }, [isOperationalExpense, form]);
+
+
   const onSubmit = async (values: z.infer<typeof titleSchema>) => {
     setIsSaving(true);
     try {
-      // The status field is already in the values with a default
-      await createFinancialTitle(values);
+      if (!isOperationalExpense && !values.processId) {
+          form.setError('processId', { type: 'manual', message: 'É obrigatório selecionar um processo para esta origem.' });
+          setIsSaving(false);
+          return;
+      }
+      
+      const payload: any = { ...values };
+      if (isOperationalExpense) {
+        delete payload.processId; // Ensure it's not sent
+      }
+
+      await createFinancialTitle(payload);
 
       toast({
         title: 'Título Criado!',
@@ -230,23 +252,25 @@ function NewTitleDialog({ onTitleCreated }: { onTitleCreated: () => void }) {
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-             <FormField
-              control={form.control}
-              name="processId"
-              render={({ field }) => (
-                <FormItem className="flex flex-col">
-                  <FormLabel>Processo Associado *</FormLabel>
-                   <ProcessSearch 
-                      selectedProcess={selectedProcess}
-                      onSelect={(process) => {
-                          setSelectedProcess(process);
-                          field.onChange(process.id);
-                      }}
-                   />
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+             {!isOperationalExpense && (
+                <FormField
+                  control={form.control}
+                  name="processId"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>Processo Associado *</FormLabel>
+                      <ProcessSearch 
+                          selectedProcess={selectedProcess}
+                          onSelect={(process) => {
+                              setSelectedProcess(process);
+                              field.onChange(process.id);
+                          }}
+                      />
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+             )}
              <FormField
                 control={form.control}
                 name="description"
@@ -390,13 +414,13 @@ function FinancialTitlesTable({
   };
 
   const getAssociatedName = (title: FinancialTitle) => {
+    if (title.origin === 'DESPESA_OPERACIONAL') return 'Escritório';
     if (title.processId) {
       const process = processesMap.get(title.processId);
       if (process && process.clientId) {
         return clientsMap.get(process.clientId) || 'Cliente não encontrado';
       }
     }
-    if (title.origin === 'DESPESA_OPERACIONAL') return 'Escritório';
     return 'N/A';
   };
 

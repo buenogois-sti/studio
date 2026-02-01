@@ -89,8 +89,8 @@ export type FinancialEvent = {
 export type FinancialTitle = {
   id: string;
   financialEventId?: string;
-  processId: string;
-  clientId: string;
+  processId?: string;
+  clientId?: string;
   description: string;
   type: 'RECEITA' | 'DESPESA';
   origin:
