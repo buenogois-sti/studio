@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -144,17 +145,23 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
 
     React.useEffect(() => {
         if (session?.error) {
+            let title = 'Erro de Sessão';
             let description = 'Ocorreu um erro inesperado na sua sessão.';
-            if (session.error === 'RefreshAccessTokenError') {
+
+            if (session.error.startsWith('ServerConfigError:')) {
+                title = 'Erro de Configuração do Servidor';
+                description = session.error.replace('ServerConfigError: ', '');
+            } else if (session.error === 'RefreshAccessTokenError') {
                 description = 'Sua sessão expirou e não foi possível renová-la. Por favor, faça login novamente.';
             } else if (session.error === 'DatabaseError') {
                 description = 'Não foi possível acessar seus dados de perfil. Verifique a configuração do servidor e tente novamente.';
             }
+            
             toast({
                 variant: 'destructive',
-                title: 'Erro de Sessão',
+                title: title,
                 description: description,
-                duration: 5000,
+                duration: 10000,
             });
             // Log out the user to force a clean login flow
             signOut({ callbackUrl: '/login' });

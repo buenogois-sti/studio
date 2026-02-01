@@ -3,6 +3,7 @@ import admin from 'firebase-admin';
 import { firebaseConfig } from './config';
 
 let initialized = false;
+export let firebaseAdminInitializationError: string | null = null;
 
 // This file initializes the Firebase Admin SDK for server-side operations.
 // It ensures initialization happens only once.
@@ -59,6 +60,7 @@ if (!admin.apps.length) {
         errorMessage += `Original error: ${error.message}`;
     }
 
+    firebaseAdminInitializationError = errorMessage;
     console.error(errorMessage);
     // The 'initialized' flag remains false.
   }
@@ -71,4 +73,3 @@ if (!admin.apps.length) {
 export const firebaseAdmin = initialized ? admin : null;
 export const firestoreAdmin = initialized ? admin.firestore() : null;
 export const authAdmin = initialized ? admin.auth() : null;
-

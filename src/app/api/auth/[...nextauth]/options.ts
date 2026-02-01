@@ -2,7 +2,7 @@
 import type { NextAuthOptions, User, Account, Session } from 'next-auth';
 import type { JWT } from 'next-auth/jwt';
 import GoogleProvider from 'next-auth/providers/google';
-import { firebaseAdmin, firestoreAdmin, authAdmin } from '@/firebase/admin';
+import { firebaseAdmin, firestoreAdmin, authAdmin, firebaseAdminInitializationError } from '@/firebase/admin';
 import type { UserProfile, UserRole } from '@/lib/types';
 
 // --- Environment Variable Validation ---
@@ -108,6 +108,12 @@ export const authOptions: NextAuthOptions = {
         },
 
         async jwt({ token, user, account }) {
+            if (firebaseAdminInitializationError) {
+                console.error("Firebase Admin initialization error propagated to JWT callback:", firebaseAdminInitializationError);
+                token.error = `ServerConfigError: ${firebaseAdminInitializationError}`;
+                return token;
+            }
+            
             // Guard clause to ensure Firebase Admin is initialized
             if (!firestoreAdmin || !authAdmin) {
                 console.error("CRITICAL_ERROR: Firebase Admin SDK is not initialized. Cannot access Firestore or Auth.");
