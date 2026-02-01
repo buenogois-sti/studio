@@ -327,7 +327,7 @@ export default function ClientsPage() {
                         {client.driveFolderId ? (
                              <Badge variant="secondary" className='bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300'>Sincronizado</Badge>
                         ) : (
-                             <Badge variant="outline">Pendente Sincronização</Badge>
+                             <Badge variant="outline" className='border-red-500 text-red-600 bg-red-50 dark:bg-red-950/30 dark:text-red-400 dark:border-red-800'>Pendente Sincronização</Badge>
                         )}
                     </div>
                   </CardFooter>
