@@ -7,7 +7,8 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/options';
 import type { Session } from 'next-auth';
 import type { Client, Process } from './types';
 
-const ROOT_FOLDER_ID = process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID;
+const ROOT_CLIENTS_FOLDER_ID = '1DVI828qlM7SoN4-FJsGj9wwmxcOEjh6l';
+const ADMIN_FINANCE_FOLDER_ID = '1V6xGiXQnapkA4y4m3on1s5zZTYqMPkhH';
 
 const CLIENT_FOLDER_STRUCTURE: Record<string, string[] | Record<string, string[]>> = {
   'level1': [
@@ -155,14 +156,10 @@ async function createClientKitFromTemplates(
 }
 
 async function createClientMainFolder(drive: drive_v3.Drive, clientName: string): Promise<string | null | undefined> {
-  if (!ROOT_FOLDER_ID) {
-    throw new Error('A variável de ambiente GOOGLE_DRIVE_ROOT_FOLDER_ID não está definida.');
-  }
-
   const fileMetadata = {
     name: clientName,
     mimeType: 'application/vnd.google-apps.folder',
-    parents: [ROOT_FOLDER_ID],
+    parents: [ROOT_CLIENTS_FOLDER_ID],
   };
 
   try {
