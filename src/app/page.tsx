@@ -737,7 +737,7 @@ export default function LandingPage() {
                     </div>
                   </div>
                   <Button
-                    className="mt-6 w-full group bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-6 rounded-xl shadow-[0_20px_60px_rgba(245,208,48,0.4)] hover:shadow-[0_20px_60px_rgba(245,208,48,0.6)] transition-all duration-300 hover:scale-105"
+                    className="mt-6 w-full group bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-6 rounded-xl shadow-[0_20px_60px_rgba(245_208_48_0.4)] hover:shadow-[0_20px_60px_rgba(245,208,48_0.6)] transition-all duration-300 hover:scale-105"
                     asChild
                   >
                     <Link href={whatsappUrl} target="_blank">

@@ -5,19 +5,16 @@ import {
   MoreVertical,
   PlusCircle,
   Search,
-  File,
   ListFilter,
   Loader2,
   FolderKanban,
   LayoutGrid,
   List,
-  Copy,
   MessageSquare,
   Mail,
   ExternalLink,
   Trash2,
   Edit,
-  DollarSign,
   FileUp,
   X,
   UserCheck,
@@ -84,7 +81,6 @@ import type { Client, Process, ClientStatus } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/use-toast';
 import { syncClientToDrive } from '@/lib/drive';
-import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { VCFImportDialog } from '@/components/client/VCFImportDialog';
 import { ClientDetailsSheet } from '@/components/client/ClientDetailsSheet';
@@ -232,12 +228,6 @@ export default function ClientsPage() {
     } finally {
         setIsSyncing(null);
     }
-  };
-
-  const copyToClipboard = (text: string | undefined, label: string) => {
-    if (!text) return;
-    navigator.clipboard.writeText(text);
-    toast({ title: `${label} copiado!` });
   };
 
   const renderClientActions = (client: Client) => (
@@ -434,7 +424,7 @@ export default function ClientsPage() {
                         )}
                     </CardFooter>
                   </Card>
-                )
+                );
               })}
             </div>
           ) : (
@@ -489,7 +479,8 @@ export default function ClientsPage() {
                             </div>
                           </TableCell>
                         </TableRow>
-                      ))}
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </CardContent>

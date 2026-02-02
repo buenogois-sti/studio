@@ -87,13 +87,13 @@ const processLinkedRevenueOrigins = [
 
 const processLinkedExpenseOrigins = [ 'CUSTAS_PROCESSUAIS', 'HONORARIOS_PAGOS' ] as const;
 
-const allOrigins = [...processLinkedRevenueOrigins, ...processLinkedExpenseOrigins, ...operationalExpenseOrigins] as const;
+const allOriginsArray = [...processLinkedRevenueOrigins, ...processLinkedExpenseOrigins, ...operationalExpenseOrigins] as [string, ...string[]];
 
 const titleSchema = z.object({
   processId: z.string().optional(),
   description: z.string().min(3, 'A descrição é obrigatória.'),
   type: z.enum(['RECEITA', 'DESPESA'], { required_error: 'Selecione o tipo.'}),
-  origin: z.enum(allOrigins as unknown as [string, ...string[]], { required_error: 'Selecione a origem.'}),
+  origin: z.enum(allOriginsArray, { required_error: 'Selecione a origem.'}),
   value: z.coerce.number().positive('O valor deve ser um número positivo.'),
   dueDate: z.coerce.date({ required_error: 'A data de vencimento é obrigatória.' }),
   paymentDate: z.coerce.date().optional(),
@@ -600,7 +600,7 @@ function FinancialTitlesTable({
   if (isLoading) {
     return (
       <div className="space-y-4">
-        {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}
+        {[...Array(5)].map((_, i) => <Skeleton className="h-16 w-full" />)}
       </div>
     );
   }
@@ -995,7 +995,7 @@ export default function FinanceiroPage() {
          <TabsContent value="staff_fees">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {isLoading ? (
-                    [...Array(3)].map((_, i) => <Skeleton key={i} className="h-56 w-full" />)
+                    [...Array(3)].map((_, i) => <Skeleton className="h-56 w-full" />)
                 ) : (
                     staffData && staffData
                         .filter(s => s.role === 'lawyer' || s.role === 'intern')

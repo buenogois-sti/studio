@@ -4,7 +4,6 @@ import {
   MoreVertical,
   PlusCircle,
   Search,
-  File,
   Loader2,
   X,
   DollarSign,
@@ -18,7 +17,6 @@ import { z } from 'zod';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useSession } from 'next-auth/react';
-import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 
 import { Badge } from '@/components/ui/badge';
