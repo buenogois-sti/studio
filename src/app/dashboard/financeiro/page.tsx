@@ -1,4 +1,3 @@
-
 'use client';
 import * as React from 'react';
 import {
@@ -21,7 +20,6 @@ import { Button } from '@/components/ui/button';
 import {
   ArrowUpRight,
   ArrowDownRight,
-  Scale,
   DollarSign,
   PlusCircle,
   File,
@@ -37,7 +35,7 @@ import {
   X
 } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, Timestamp, query, orderBy, limit } from 'firebase/firestore';
+import { collection, Timestamp, query, orderBy } from 'firebase/firestore';
 import type { Client, FinancialTitle, Process, Staff } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -77,7 +75,6 @@ import { searchProcesses } from '@/lib/process-actions';
 import { StaffCreditCard } from '@/components/finance/StaffCreditCard';
 import { Textarea } from '@/components/ui/textarea';
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 
 const operationalExpenseOrigins = [
   'SALARIOS_PROLABORE', 'ALUGUEL_CONTAS', 'INFRAESTRUTURA_TI', 'MARKETING_PUBLICIDADE', 
@@ -90,13 +87,13 @@ const processLinkedRevenueOrigins = [
 
 const processLinkedExpenseOrigins = [ 'CUSTAS_PROCESSUAIS', 'HONORARIOS_PAGOS' ] as const;
 
-const allOrigins = [...processLinkedRevenueOrigins, ...processLinkedExpenseOrigins, ...operationalExpenseOrigins];
+const allOrigins = [...processLinkedRevenueOrigins, ...processLinkedExpenseOrigins, ...operationalExpenseOrigins] as const;
 
 const titleSchema = z.object({
   processId: z.string().optional(),
   description: z.string().min(3, 'A descrição é obrigatória.'),
   type: z.enum(['RECEITA', 'DESPESA'], { required_error: 'Selecione o tipo.'}),
-  origin: z.enum(allOrigins, { required_error: 'Selecione a origem.'}),
+  origin: z.enum(allOrigins as unknown as [string, ...string[]], { required_error: 'Selecione a origem.'}),
   value: z.coerce.number().positive('O valor deve ser um número positivo.'),
   dueDate: z.coerce.date({ required_error: 'A data de vencimento é obrigatória.' }),
   paymentDate: z.coerce.date().optional(),
@@ -635,7 +632,7 @@ function FinancialTitlesTable({
         <TableBody>
             {titles.map((title) => {
             const isRevenue = title.type === 'RECEITA';
-            const dueDate = (title.dueDate as Timestamp).toDate();
+            const dueDate = (title.dueDate instanceof Timestamp) ? title.dueDate.toDate() : (title.dueDate instanceof Date ? title.dueDate : new Date(title.dueDate));
             const isOverdue = title.status === 'PENDENTE' && isBefore(dueDate, new Date());
             const effectiveStatus = isOverdue ? 'ATRASADO' : title.status;
 
@@ -739,7 +736,7 @@ export default function FinanceiroPage() {
     const startOfCurrentMonth = startOfMonth(now);
 
     return titles.reduce((acc, t) => {
-        const titleDate = t.paymentDate ? t.paymentDate.toDate() : t.dueDate.toDate();
+        const titleDate = t.paymentDate ? t.paymentDate.toDate() : (t.dueDate instanceof Timestamp ? t.dueDate.toDate() : (t.dueDate instanceof Date ? t.dueDate : new Date(t.dueDate)));
         const isInCurrentMonth = isAfter(titleDate, startOfCurrentMonth);
 
         if (t.status === 'PAGO' && isInCurrentMonth) {
@@ -751,7 +748,8 @@ export default function FinanceiroPage() {
             acc.pendingReceivables += t.value;
         }
 
-        if (t.status === 'PENDENTE' && isBefore(t.dueDate.toDate(), now)) {
+        const dueDateObj = (t.dueDate instanceof Timestamp) ? t.dueDate.toDate() : (t.dueDate instanceof Date ? t.dueDate : new Date(t.dueDate));
+        if (t.status === 'PENDENTE' && isBefore(dueDateObj, now)) {
             acc.totalOverdue += t.value;
         }
 
@@ -760,7 +758,7 @@ export default function FinanceiroPage() {
   }, [titles]);
 
   const chartData = React.useMemo(() => {
-    const months = [];
+    const months: Array<{ month: string, key: string, receita: number, despesa: number }> = [];
     const now = new Date();
     for (let i = 5; i >= 0; i--) {
         const d = subMonths(now, i);
@@ -789,10 +787,10 @@ export default function FinanceiroPage() {
 
   const filteredTitles = React.useMemo(() => {
     if (!searchTerm.trim()) return titles;
-    const query = searchTerm.toLowerCase();
+    const queryStr = searchTerm.toLowerCase();
     return titles.filter(t => 
-        t.description.toLowerCase().includes(query) || 
-        (t.processId && processesMap.get(t.processId)?.name.toLowerCase().includes(query))
+        t.description.toLowerCase().includes(queryStr) || 
+        (t.processId && processesMap.get(t.processId)?.name.toLowerCase().includes(queryStr))
     );
   }, [titles, searchTerm, processesMap]);
 

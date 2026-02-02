@@ -155,7 +155,7 @@ export const authOptions: NextAuthOptions = {
                     token.id = user.id;
                     token.role = role;
                     token.accessToken = account.access_token;
-                    token.accessTokenExpires = account.expires_at ? account.expires_at * 1000 : Date.now() + (account.expires_in ?? 3600) * 1000;
+                    token.accessTokenExpires = account.expires_at ? account.expires_at * 1000 : Date.now() + (Number(account.expires_in ?? 3600)) * 1000;
                     token.customToken = await authAdmin.createCustomToken(user.id, { role });
 
                 } catch (error) {

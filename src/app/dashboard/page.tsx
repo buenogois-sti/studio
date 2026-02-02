@@ -6,7 +6,6 @@ import {
   Calendar,
   DollarSign,
   FolderKanban,
-  Users,
   Sparkles,
   TrendingUp,
   AlertCircle,
@@ -104,7 +103,7 @@ function AIAdvisor({ stats, activities, isLoading }: { stats: any, activities: s
                             <p className="text-sm font-medium leading-relaxed">{insights.summary}</p>
                         </div>
                         <ul className="grid gap-2">
-                            {insights.insights.map((insight, i) => (
+                            {insights.insights.map((insight: string, i: number) => (
                                 <li key={i} className="text-xs text-muted-foreground flex gap-2">
                                     <span className="text-primary font-bold">•</span>
                                     {insight}

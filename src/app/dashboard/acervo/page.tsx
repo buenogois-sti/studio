@@ -23,7 +23,8 @@ import {
   FilePenLine,
   MoreVertical,
   Loader2,
-  X
+  X,
+  Search
 } from 'lucide-react';
 import Link from 'next/link';
 import {

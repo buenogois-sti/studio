@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Phone, MapPin, MessageCircle, Scale, Star, Briefcase, Clock, Shield, HeartHandshake, Landmark, FileText, Users, Handshake, Building, ChevronRight, ArrowRight, Sparkles, Award, TrendingUp, Target, Menu, X } from 'lucide-react';
+import { Phone, MapPin, MessageCircle, Star, Briefcase, Clock, Shield, HeartHandshake, Landmark, FileText, Users, Handshake, Building, ChevronRight, ArrowRight, Sparkles, Target } from 'lucide-react';
 import { WhatsAppFloating } from '@/components/WhatsAppFloating';
 import { Card } from '@/components/ui/card';
 
@@ -83,22 +83,6 @@ const testimonials = [
         text: 'Nossa, a Bueno Gois Advogados salvou minha vida! Estava sendo demitida sem justa causa e eles conseguiram reverter tudo. Profissionalismo total e dedicação de verdade. Agradeço demais pelo trabalho que fizeram. Recomendo pra todo mundo!',
     },
 ]
-
-// Custom Hooks
-function useMousePosition() {
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
-
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      setMousePosition({ x: e.clientX, y: e.clientY });
-    };
-
-    window.addEventListener('mousemove', handleMouseMove);
-    return () => window.removeEventListener('mousemove', handleMouseMove);
-  }, []);
-
-  return mousePosition;
-}
 
 function useScrollPosition() {
   const [scrollPosition, setScrollPosition] = useState(0);
@@ -214,43 +198,8 @@ function AnimatedGradientBg() {
   );
 }
 
-function StatsCounter({ end, duration = 2000, suffix = '', prefix = '' }: { end: number; duration?: number; suffix?: string; prefix?: string }) {
-  const [count, setCount] = useState(0);
-  const [ref, isIntersecting] = useIntersectionObserver();
-  const [hasAnimated, setHasAnimated] = useState(false);
-
-  useEffect(() => {
-    if (!isIntersecting || hasAnimated) return;
-    
-    setHasAnimated(true);
-    const steps = 60;
-    const stepValue = end / steps;
-    const stepDuration = duration / steps;
-    let currentStep = 0;
-
-    const timer = setInterval(() => {
-      currentStep++;
-      if (currentStep <= steps) {
-        setCount(Math.floor(stepValue * currentStep));
-      } else {
-        setCount(end);
-        clearInterval(timer);
-      }
-    }, stepDuration);
-
-    return () => clearInterval(timer);
-  }, [isIntersecting, end, duration, hasAnimated]);
-
-  return (
-    <span ref={ref as any}>
-      {prefix}{count.toLocaleString()}{suffix}
-    </span>
-  );
-}
-
 export default function LandingPage() {
   const scrollY = useScrollPosition();
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const whatsappUrl = "https://wa.me/5511980590128?text=Olá!%20Vi%20o%20site%20da%20Bueno%20Gois%20Advogados%20e%20gostaria%20de%20saber%20mais%20sobre%20seus%20serviços.";
 
   return (
@@ -541,9 +490,6 @@ export default function LandingPage() {
                   />
                   <div className="absolute bottom-4 left-4 right-4 bg-background/90 backdrop-blur-sm p-4 rounded-xl z-20 transform translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-500">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                        <Scale className="w-5 h-5 text-primary" />
-                      </div>
                       <div className="text-sm">
                         <div className="font-bold text-white">Bueno Gois Advogados</div>
                         <div className="text-xs text-muted-foreground">OAB/SP 123.456</div>
@@ -725,7 +671,7 @@ export default function LandingPage() {
                       height="100%"
                       frameBorder="0"
                       src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3644.684!2d-46.5556!3d-23.6936!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x94ce4278d2c00001%3A0xa1b2c3d4e5f6!2sRua%20Marechal%20Deodoro%2C%201594%20-%20Sala%202%2C%20S%C3%A3o%20Bernardo%20do%20Campo%20-%20SP%2C%2009715-070!5e0!3m2!1spt-BR!2sbr!4v1701890000000"
-                      allowFullScreen=""
+                      allowFullScreen={true}
                       loading="lazy"
                       referrerPolicy="no-referrer-when-downgrade"
                       className="rounded-2xl"

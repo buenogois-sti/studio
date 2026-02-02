@@ -5,9 +5,7 @@ import {
   PlusCircle,
   Search,
   File,
-  ListFilter,
   Loader2,
-  Check,
   X,
   DollarSign,
   ExternalLink,
@@ -34,12 +32,14 @@ import {
 } from '@/components/ui/card';
 import {
   DropdownMenu,
-  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import {
@@ -111,7 +111,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/use-toast';
 import { searchClients, getClientById } from '@/lib/client-actions';
 import { ClientForm } from '@/components/client/ClientForm';
-import { cn } from '@/lib/utils';
 import { syncProcessToDrive } from '@/lib/drive';
 import { FinancialEventDialog } from '@/components/process/FinancialEventDialog';
 import { ProcessTimelineSheet } from '@/components/process/ProcessTimelineSheet';
@@ -520,12 +519,12 @@ export default function ProcessosPage() {
     }
 
     if (searchTerm.trim()) {
-        const query = searchTerm.toLowerCase();
+        const queryStr = searchTerm.toLowerCase();
         data = data.filter(p => {
             const clientName = clientsMap.get(p.clientId)?.toLowerCase() || '';
             const processName = p.name.toLowerCase();
             const processNumber = p.processNumber?.toLowerCase() || '';
-            return processName.includes(query) || processNumber.includes(query) || clientName.includes(query);
+            return processName.includes(queryStr) || processNumber.includes(queryStr) || clientName.includes(queryStr);
         });
     }
     return data;
@@ -579,7 +578,7 @@ export default function ProcessosPage() {
       toast({ 
         variant: 'destructive', 
         title: 'Erro ao excluir', 
-        description: error.message || 'Não foi possível excluir o processo.' 
+        description: error.message || 'Não foi possível excluir the processo.' 
       });
     } finally {
       setIsDeleting(false);
