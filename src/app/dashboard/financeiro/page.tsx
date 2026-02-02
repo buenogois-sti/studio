@@ -26,7 +26,10 @@ import {
   File,
   Loader2,
   MoreVertical,
-  Check
+  Check,
+  Calendar as CalendarIcon,
+  User,
+  FileText
 } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, Timestamp, query, orderBy } from 'firebase/firestore';
@@ -67,6 +70,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { createFinancialTitle, updateFinancialTitleStatus } from '@/lib/finance-actions';
 import { searchProcesses } from '@/lib/process-actions';
 import { StaffCreditCard } from '@/components/finance/StaffCreditCard';
+import { Textarea } from '@/components/ui/textarea';
 
 
 const operationalExpenseOrigins = [
@@ -89,10 +93,11 @@ const titleSchema = z.object({
   origin: z.enum(allOrigins, { required_error: 'Selecione a origem.'}),
   value: z.coerce.number().positive('O valor deve ser um número positivo.'),
   dueDate: z.coerce.date({ required_error: 'A data de vencimento é obrigatória.' }),
+  paymentDate: z.coerce.date().optional(),
   status: z.enum(['PENDENTE', 'PAGO', 'ATRASADO']).default('PENDENTE'),
   paidToStaffId: z.string().optional(),
+  notes: z.string().optional(),
 }).refine((data) => {
-    // If origin is NOT an operational expense, processId is required.
     if (![...operationalExpenseOrigins].includes(data.origin as any)) {
         return !!data.processId;
     }
@@ -121,7 +126,6 @@ const formatCurrency = (amount: number) => {
   return amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 };
 
-// --- ProcessSearch Component ---
 function ProcessSearch({ onSelect, selectedProcess }: { onSelect: (process: Process) => void; selectedProcess: Process | null }) {
   const [search, setSearch] = React.useState('');
   const [results, setResults] = React.useState<Process[]>([]);
@@ -155,12 +159,14 @@ function ProcessSearch({ onSelect, selectedProcess }: { onSelect: (process: Proc
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="w-full justify-between"
+          className="w-full justify-between font-normal"
         >
-          {selectedProcess ? selectedProcess.name : "Selecione um processo..."}
+          <span className="truncate">
+            {selectedProcess ? selectedProcess.name : "Vincular a um processo..."}
+          </span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
         <Command>
           <CommandInput
             placeholder="Buscar processo por nome ou número..."
@@ -186,7 +192,10 @@ function ProcessSearch({ onSelect, selectedProcess }: { onSelect: (process: Proc
                       selectedProcess?.id === process.id ? "opacity-100" : "opacity-0"
                     )}
                   />
-                  {process.name}
+                  <div className="flex flex-col">
+                    <span className="font-medium">{process.name}</span>
+                    <span className="text-xs text-muted-foreground">{process.processNumber || 'Sem número'}</span>
+                  </div>
                 </CommandItem>
               ))}
             </CommandGroup>
@@ -206,7 +215,7 @@ const revenueOrigins = [
 
 const expenseOrigins = [
     { value: 'CUSTAS_PROCESSUAIS', label: 'Custas Processuais' },
-    { value: 'HONORARIOS_PAGOS', label: 'Pagamento de Honorários' },
+    { value: 'HONORARIOS_PAGOS', label: 'Pagamento de Honorários (Equipe)' },
     { value: 'SALARIOS_PROLABORE', label: 'Salários e Pró-labore' },
     { value: 'ALUGUEL_CONTAS', label: 'Aluguel e Contas Fixas' },
     { value: 'INFRAESTRUTURA_TI', label: 'Infraestrutura e TI' },
@@ -220,7 +229,6 @@ const expenseOrigins = [
 const allOriginLabels = new Map([...revenueOrigins, ...expenseOrigins].map(o => [o.value, o.label]));
 
 
-// --- NewTitleDialog Component ---
 function NewTitleDialog({ onTitleCreated, staffData }: { onTitleCreated: () => void; staffData: Staff[] | null }) {
   const [open, setOpen] = React.useState(false);
   const [isSaving, setIsSaving] = React.useState(false);
@@ -233,6 +241,7 @@ function NewTitleDialog({ onTitleCreated, staffData }: { onTitleCreated: () => v
       type: 'RECEITA',
       status: 'PENDENTE',
       origin: 'HONORARIOS_CONTRATUAIS',
+      dueDate: new Date(),
     }
   });
 
@@ -260,22 +269,23 @@ function NewTitleDialog({ onTitleCreated, staffData }: { onTitleCreated: () => v
 
   const watchedType = form.watch('type');
   const watchedOrigin = form.watch('origin');
+  const watchedStatus = form.watch('status');
   
   const requiresProcess = !operationalExpenseOrigins.includes(watchedOrigin as any);
 
   React.useEffect(() => {
-    // Reset dependent fields when type changes
-    form.setValue('origin', watchedType === 'RECEITA' ? 'HONORARIOS_CONTRATUAIS' : 'CUSTAS_PROCESSUAIS');
-    form.setValue('processId', undefined);
-    setSelectedProcess(null);
-    form.setValue('paidToStaffId', undefined, { shouldValidate: false });
+    if (watchedType) {
+        form.setValue('origin', watchedType === 'RECEITA' ? 'HONORARIOS_CONTRATUAIS' : 'CUSTAS_PROCESSUAIS');
+        form.setValue('processId', undefined);
+        setSelectedProcess(null);
+        form.setValue('paidToStaffId', undefined);
+    }
   }, [watchedType, form]);
 
   React.useEffect(() => {
-    // If an operational expense is selected, clear process info
     if (!requiresProcess) {
       setSelectedProcess(null);
-      form.setValue('processId', undefined, { shouldValidate: true });
+      form.setValue('processId', undefined);
     }
   }, [requiresProcess, form]);
 
@@ -283,19 +293,20 @@ function NewTitleDialog({ onTitleCreated, staffData }: { onTitleCreated: () => v
   async function onSubmit(values: z.infer<typeof titleSchema>) {
     setIsSaving(true);
     try {
-      const payload: any = { ...values };
-      if (!requiresProcess) {
-        delete payload.processId; // Ensure it's not sent
-      }
-      if (payload.origin !== 'HONORARIOS_PAGOS') {
-        delete payload.paidToStaffId;
-      }
+      const payload: any = { 
+        ...values,
+        // If status is PAGO and paymentDate is not set, use current date
+        paymentDate: values.status === 'PAGO' ? (values.paymentDate || new Date()) : undefined
+      };
+      
+      if (!requiresProcess) delete payload.processId;
+      if (payload.origin !== 'HONORARIOS_PAGOS') delete payload.paidToStaffId;
 
       await createFinancialTitle(payload);
 
       toast({
-        title: 'Título Criado!',
-        description: 'O novo título financeiro foi adicionado ao sistema.',
+        title: 'Título Lançado!',
+        description: 'A movimentação financeira foi registrada com sucesso.',
       });
 
       form.reset();
@@ -305,7 +316,7 @@ function NewTitleDialog({ onTitleCreated, staffData }: { onTitleCreated: () => v
     } catch (error: any) {
       toast({
         variant: 'destructive',
-        title: 'Erro ao Criar Título',
+        title: 'Erro ao Lançar',
         description: error.message || 'Não foi possível salvar o título.',
       });
     } finally {
@@ -316,30 +327,33 @@ function NewTitleDialog({ onTitleCreated, staffData }: { onTitleCreated: () => v
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm" className="h-9 gap-1">
+        <Button className="h-9 gap-1 shadow-lg bg-primary hover:bg-primary/90 text-primary-foreground">
           <PlusCircle className="h-4 w-4" />
-          <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">Novo Título</span>
+          <span>Novo Lançamento</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Lançar Novo Título Financeiro</DialogTitle>
-          <DialogDescription>Preencha os dados para criar uma nova receita ou despesa.</DialogDescription>
+          <DialogTitle className="text-xl font-bold flex items-center gap-2">
+            <DollarSign className="h-5 w-5 text-primary" />
+            Lançar Movimentação Financeira
+          </DialogTitle>
+          <DialogDescription>Cadastre uma nova receita ou despesa para o controle do escritório.</DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 pt-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 rounded-xl bg-muted/30 border border-border/50">
                 <FormField
                   control={form.control}
                   name="type"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Tipo *</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
+                      <FormLabel className="text-xs uppercase font-bold text-muted-foreground">Tipo de Movimento *</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl><SelectTrigger className="h-11"><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
                         <SelectContent>
-                          <SelectItem value="RECEITA">Receita</SelectItem>
-                          <SelectItem value="DESPESA">Despesa</SelectItem>
+                          <SelectItem value="RECEITA" className="text-green-600 font-medium">⬆ Receita (Entrada)</SelectItem>
+                          <SelectItem value="DESPESA" className="text-red-600 font-medium">⬇ Despesa (Saída)</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -351,9 +365,9 @@ function NewTitleDialog({ onTitleCreated, staffData }: { onTitleCreated: () => v
                   name="origin"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Origem *</FormLabel>
+                      <FormLabel className="text-xs uppercase font-bold text-muted-foreground">Categoria / Origem *</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
+                        <FormControl><SelectTrigger className="h-11"><SelectValue placeholder="Selecione a categoria..." /></SelectTrigger></FormControl>
                         <SelectContent>
                            {watchedType === 'RECEITA' ? 
                              revenueOrigins.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>) :
@@ -366,105 +380,174 @@ function NewTitleDialog({ onTitleCreated, staffData }: { onTitleCreated: () => v
                   )}
                 />
             </div>
-             {watchedOrigin === 'HONORARIOS_PAGOS' && (
-                <FormField
+
+            <div className="space-y-4">
+                {watchedOrigin === 'HONORARIOS_PAGOS' && (
+                    <FormField
+                        control={form.control}
+                        name="paidToStaffId"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel className="flex items-center gap-2"><User className="h-4 w-4" /> Beneficiário (Advogado/Estagiário) *</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                    <FormControl><SelectTrigger className="h-11"><SelectValue placeholder="Selecione o membro da equipe..." /></SelectTrigger></FormControl>
+                                    <SelectContent>
+                                        {staffData?.filter(s => s.role === 'lawyer' || s.role === 'intern').map(staff => (
+                                            <SelectItem key={staff.id} value={staff.id}>{staff.firstName} {staff.lastName}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                )}
+
+                {requiresProcess && (
+                    <FormField
                     control={form.control}
-                    name="paidToStaffId"
+                    name="processId"
                     render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Beneficiário (Advogado) *</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                <FormControl><SelectTrigger><SelectValue placeholder="Selecione o advogado..." /></SelectTrigger></FormControl>
-                                <SelectContent>
-                                    {staffData?.filter(s => s.role === 'lawyer' || s.role === 'intern').map(staff => (
-                                        <SelectItem key={staff.id} value={staff.id}>{staff.firstName} {staff.lastName}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            <FormMessage />
+                        <FormItem className="flex flex-col">
+                        <FormLabel className="flex items-center gap-2"><FileText className="h-4 w-4" /> Processo Associado *</FormLabel>
+                        <ProcessSearch 
+                            selectedProcess={selectedProcess}
+                            onSelect={(process) => {
+                                setSelectedProcess(process);
+                                field.onChange(process.id);
+                                if (!form.getValues('description')) {
+                                    form.setValue('description', `${allOriginLabels.get(form.getValues('origin'))} - ${process.name}`);
+                                }
+                            }}
+                        />
+                        <FormMessage />
                         </FormItem>
                     )}
-                />
-             )}
-             {requiresProcess && (
-                <FormField
-                  control={form.control}
-                  name="processId"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <FormLabel>Processo Associado *</FormLabel>
-                      <ProcessSearch 
-                          selectedProcess={selectedProcess}
-                          onSelect={(process) => {
-                              setSelectedProcess(process);
-                              field.onChange(process.id);
-                              form.setValue('description', `${allOriginLabels.get(form.getValues('origin')) || 'Lançamento'} - ${process.name}`);
-                          }}
-                      />
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-             )}
-             <FormField
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                    <FormItem>
-                    <FormLabel>Descrição *</FormLabel>
-                    <FormControl>
-                        <Input placeholder="Ex: Honorários iniciais" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                    </FormItem>
+                    />
                 )}
-            />
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                 <FormField
+
+                <FormField
                     control={form.control}
-                    name="value"
+                    name="description"
                     render={({ field }) => (
                         <FormItem>
-                        <FormLabel>Valor (R$) *</FormLabel>
+                        <FormLabel>Descrição do Lançamento *</FormLabel>
                         <FormControl>
-                            <Input
-                              type="text"
-                              placeholder="0,00"
-                              {...field}
-                              value={formatCurrencyForDisplay(field.value)}
-                              onChange={(e) => handleCurrencyChange(e, field)}
-                            />
+                            <Input placeholder="Ex: Honorários de Êxito - Processo X" className="h-11" {...field} />
                         </FormControl>
                         <FormMessage />
                         </FormItem>
                     )}
                 />
-                <FormField
-                  control={form.control}
-                  name="dueDate"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <FormLabel>Data de Vencimento *</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="date"
-                          {...field}
-                          value={field.value instanceof Date ? format(field.value, 'yyyy-MM-dd') : ''}
-                          onChange={(e) => field.onChange(e.target.valueAsDate)}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                        control={form.control}
+                        name="value"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Valor (R$) *</FormLabel>
+                            <FormControl>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">R$</span>
+                                    <Input
+                                        type="text"
+                                        placeholder="0,00"
+                                        className="h-11 pl-10 text-lg font-semibold"
+                                        {...field}
+                                        value={formatCurrencyForDisplay(field.value)}
+                                        onChange={(e) => handleCurrencyChange(e, field)}
+                                    />
+                                </div>
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    <FormField
+                    control={form.control}
+                    name="status"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Status Atual *</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl><SelectTrigger className="h-11"><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
+                            <SelectContent>
+                            <SelectItem value="PENDENTE">🕒 Pendente (Aberto)</SelectItem>
+                            <SelectItem value="PAGO">✅ Pago (Liquido)</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                    />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                    control={form.control}
+                    name="dueDate"
+                    render={({ field }) => (
+                        <FormItem className="flex flex-col">
+                        <FormLabel className="flex items-center gap-2"><CalendarIcon className="h-4 w-4" /> Vencimento *</FormLabel>
+                        <FormControl>
+                            <Input
+                            type="date"
+                            className="h-11"
+                            {...field}
+                            value={field.value instanceof Date ? format(field.value, 'yyyy-MM-dd') : ''}
+                            onChange={(e) => field.onChange(e.target.valueAsDate)}
+                            />
+                        </FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                    />
+                    {watchedStatus === 'PAGO' && (
+                        <FormField
+                        control={form.control}
+                        name="paymentDate"
+                        render={({ field }) => (
+                            <FormItem className="flex flex-col">
+                            <FormLabel className="flex items-center gap-2 text-green-600"><Check className="h-4 w-4" /> Data do Pagamento</FormLabel>
+                            <FormControl>
+                                <Input
+                                type="date"
+                                className="h-11 border-green-200 bg-green-50/30"
+                                {...field}
+                                value={field.value instanceof Date ? format(field.value, 'yyyy-MM-dd') : ''}
+                                onChange={(e) => field.onChange(e.target.valueAsDate)}
+                                />
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
                         />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                    )}
+                </div>
+
+                <FormField
+                    control={form.control}
+                    name="notes"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Observações / Notas Internas</FormLabel>
+                        <FormControl>
+                            <Textarea placeholder="Informações adicionais para o financeiro..." className="resize-none" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
                 />
             </div>
-            <DialogFooter>
+
+            <DialogFooter className="gap-2 border-t pt-6">
                 <DialogClose asChild>
-                    <Button type="button" variant="outline" disabled={isSaving}>Cancelar</Button>
+                    <Button type="button" variant="ghost" disabled={isSaving}>Cancelar</Button>
                 </DialogClose>
-                <Button type="submit" disabled={isSaving}>
+                <Button type="submit" className="px-8" disabled={isSaving}>
                     {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    {isSaving ? "Salvando..." : "Salvar Título"}
+                    {isSaving ? "Gravando..." : "Confirmar Lançamento"}
                 </Button>
             </DialogFooter>
           </form>
@@ -496,14 +579,14 @@ function FinancialTitlesTable({
     try {
       await updateFinancialTitleStatus(titleId, status);
       toast({ title: 'Status atualizado com sucesso!' });
-      onAction(); // Refresh data
+      onAction();
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Erro ao atualizar status', description: error.message });
     }
   };
 
   const getAssociatedName = (title: FinancialTitle) => {
-    if (operationalExpenseOrigins.includes(title.origin as any)) return 'Escritório';
+    if (operationalExpenseOrigins.includes(title.origin as any)) return 'Escritório (Administrativo)';
     
     if (title.processId) {
       const process = processesMap.get(title.processId);
@@ -511,109 +594,117 @@ function FinancialTitlesTable({
         return clientsMap.get(process.clientId) || 'Cliente não encontrado';
       }
     }
-    return 'N/A';
+    return 'Geral';
   };
 
   const getStatusVariant = (status: 'PAGO' | 'PENDENTE' | 'ATRASADO') => {
     switch (status) {
-      case 'PAGO':
-        return 'secondary';
-      case 'PENDENTE':
-        return 'default';
-      case 'ATRASADO':
-        return 'destructive';
-      default:
-        return 'outline';
+      case 'PAGO': return 'secondary';
+      case 'PENDENTE': return 'default';
+      case 'ATRASADO': return 'destructive';
+      default: return 'outline';
     }
   };
 
   if (isLoading) {
     return (
       <div className="space-y-4">
-        {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
+        {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}
       </div>
     );
   }
 
   if (titles.length === 0) {
      return (
-        <div className="text-center text-muted-foreground py-16">
-            Nenhum título financeiro encontrado nesta categoria.
+        <div className="text-center text-muted-foreground py-20 flex flex-col items-center gap-3">
+            <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
+                <FileText className="h-6 w-6 text-muted-foreground/50" />
+            </div>
+            <p>Nenhuma movimentação encontrada para este filtro.</p>
         </div>
      )
   }
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Descrição</TableHead>
-          <TableHead className="hidden sm:table-cell">Origem</TableHead>
-          <TableHead className="hidden md:table-cell">Status</TableHead>
-          <TableHead className="hidden md:table-cell">Vencimento</TableHead>
-          <TableHead className="text-right">Valor</TableHead>
-          <TableHead className="w-[50px]"><span className="sr-only">Ações</span></TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {titles.map((title) => {
-          const isRevenue = title.type === 'RECEITA';
-          const dueDate = (title.dueDate as Timestamp).toDate();
-          // Client-side check for overdue status to provide immediate visual feedback
-          const isOverdue = title.status === 'PENDENTE' && dueDate < new Date();
-          const effectiveStatus = isOverdue ? 'ATRASADO' : title.status;
-
-          return (
-            <TableRow key={title.id}>
-              <TableCell>
-                <div className="font-medium">{title.description}</div>
-                <div className="text-sm text-muted-foreground hidden md:block">
-                  {getAssociatedName(title)}
-                </div>
-              </TableCell>
-              <TableCell className="hidden sm:table-cell">
-                <Badge variant="outline">{originLabels.get(title.origin) || title.origin.replace(/_/g, ' ')}</Badge>
-              </TableCell>
-              <TableCell className="hidden md:table-cell">
-                <Badge variant={getStatusVariant(effectiveStatus)} className="capitalize">
-                  {effectiveStatus.toLowerCase()}
-                </Badge>
-              </TableCell>
-              <TableCell className="hidden md:table-cell">
-                <div className={cn("font-medium", isOverdue && "text-destructive")}>{formatDate(dueDate)}</div>
-                {title.status === 'PAGO' && title.paymentDate && <div className="text-xs text-muted-foreground">Pago: {formatDate(title.paymentDate)}</div>}
-              </TableCell>
-              <TableCell className={cn('text-right font-semibold', isRevenue ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400')}>
-                {isRevenue ? '+' : '-'} {formatCurrency(title.value)}
-              </TableCell>
-              <TableCell>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon"><MoreVertical className="h-4 w-4" /></Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                    {title.status !== 'PAGO' && (
-                      <DropdownMenuItem onSelect={() => handleUpdateStatus(title.id, 'PAGO')}>
-                        Marcar como Pago
-                      </DropdownMenuItem>
-                    )}
-                    {title.status === 'PAGO' && (
-                      <DropdownMenuItem onSelect={() => handleUpdateStatus(title.id, 'PENDENTE')}>
-                        Marcar como Pendente
-                      </DropdownMenuItem>
-                    )}
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem>Editar</DropdownMenuItem>
-                    <DropdownMenuItem className="text-destructive">Excluir</DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </TableCell>
+    <div className="rounded-md border bg-card">
+        <Table>
+        <TableHeader className="bg-muted/50">
+            <TableRow>
+            <TableHead className="font-bold">Título / Detalhes</TableHead>
+            <TableHead className="hidden sm:table-cell font-bold">Categoria</TableHead>
+            <TableHead className="hidden md:table-cell font-bold text-center">Status</TableHead>
+            <TableHead className="hidden md:table-cell font-bold">Vencimento</TableHead>
+            <TableHead className="text-right font-bold">Valor</TableHead>
+            <TableHead className="w-[50px]"></TableHead>
             </TableRow>
-          );
-        })}
-      </TableBody>
-    </Table>
+        </TableHeader>
+        <TableBody>
+            {titles.map((title) => {
+            const isRevenue = title.type === 'RECEITA';
+            const dueDate = (title.dueDate as Timestamp).toDate();
+            const isOverdue = title.status === 'PENDENTE' && dueDate < new Date();
+            const effectiveStatus = isOverdue ? 'ATRASADO' : title.status;
+
+            return (
+                <TableRow key={title.id} className="group hover:bg-muted/30">
+                <TableCell>
+                    <div className="font-semibold text-sm leading-none mb-1">{title.description}</div>
+                    <div className="text-xs text-muted-foreground flex items-center gap-1">
+                    <User className="h-3 w-3" />
+                    {getAssociatedName(title)}
+                    </div>
+                </TableCell>
+                <TableCell className="hidden sm:table-cell">
+                    <Badge variant="outline" className="text-[10px] font-normal border-muted-foreground/20">
+                        {originLabels.get(title.origin) || title.origin.replace(/_/g, ' ')}
+                    </Badge>
+                </TableCell>
+                <TableCell className="hidden md:table-cell text-center">
+                    <Badge variant={getStatusVariant(effectiveStatus)} className="text-[10px] h-5 px-2 uppercase tracking-tight">
+                    {effectiveStatus === 'PENDENTE' ? '🕒 ' : effectiveStatus === 'PAGO' ? '✅ ' : '⚠ '}
+                    {effectiveStatus}
+                    </Badge>
+                </TableCell>
+                <TableCell className="hidden md:table-cell">
+                    <div className={cn("text-xs font-medium", isOverdue && "text-destructive")}>{formatDate(dueDate)}</div>
+                    {title.status === 'PAGO' && title.paymentDate && (
+                        <div className="text-[10px] text-emerald-600 font-medium">Pago em {formatDate(title.paymentDate)}</div>
+                    )}
+                </TableCell>
+                <TableCell className={cn('text-right font-mono font-bold', isRevenue ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400')}>
+                    {isRevenue ? '+' : '-'} {formatCurrency(title.value)}
+                </TableCell>
+                <TableCell>
+                    <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8"><MoreVertical className="h-4 w-4" /></Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48">
+                        <DropdownMenuLabel>Ações Financeiras</DropdownMenuLabel>
+                        {title.status !== 'PAGO' && (
+                        <DropdownMenuItem onSelect={() => handleUpdateStatus(title.id, 'PAGO')} className="text-emerald-600">
+                            <Check className="mr-2 h-4 w-4" /> Marcar como Pago
+                        </DropdownMenuItem>
+                        )}
+                        {title.status === 'PAGO' && (
+                        <DropdownMenuItem onSelect={() => handleUpdateStatus(title.id, 'PENDENTE')}>
+                            Reverter para Aberto
+                        </DropdownMenuItem>
+                        )}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem>Ver Comprovante</DropdownMenuItem>
+                        <DropdownMenuItem>Editar Lançamento</DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem className="text-destructive">Excluir</DropdownMenuItem>
+                    </DropdownMenuContent>
+                    </DropdownMenu>
+                </TableCell>
+                </TableRow>
+            );
+            })}
+        </TableBody>
+        </Table>
+    </div>
   );
 }
 
@@ -675,12 +766,15 @@ export default function FinanceiroPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between gap-4">
-        <H1>Painel Financeiro</H1>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+            <H1>Painel Financeiro</H1>
+            <p className="text-sm text-muted-foreground">Gestão estratégica de entradas e saídas do escritório.</p>
+        </div>
         <div className="flex items-center gap-2">
            <Button variant="outline" size="sm" className="h-9 gap-1 hidden sm:flex">
             <File className="h-4 w-4" />
-            <span className="whitespace-nowrap">Exportar</span>
+            <span className="whitespace-nowrap">Relatórios</span>
           </Button>
           <NewTitleDialog onTitleCreated={handleRefresh} staffData={staffData} />
         </div>
@@ -691,75 +785,84 @@ export default function FinanceiroPage() {
             [...Array(4)].map((_, i) => <Skeleton key={i} className="h-32 w-full" />)
         ) : (
         <>
-            <Card>
+            <Card className="border-l-4 border-l-emerald-500">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Receita (Mês)</CardTitle>
-                    <ArrowUpRight className="h-5 w-5 text-green-500" />
+                    <CardTitle className="text-xs font-bold uppercase text-muted-foreground">Receita (Mês)</CardTitle>
+                    <ArrowUpRight className="h-5 w-5 text-emerald-500" />
                 </CardHeader>
                 <CardContent>
-                    <div className="text-2xl font-bold">{formatCurrency(monthlyRevenue)}</div>
-                    <p className="text-xs text-muted-foreground">+20.1% vs. mês anterior</p>
+                    <div className="text-2xl font-bold tracking-tight">{formatCurrency(monthlyRevenue)}</div>
+                    <div className="flex items-center gap-1 mt-1">
+                        <Badge variant="secondary" className="bg-emerald-50 text-emerald-700 text-[10px] h-4">Pago</Badge>
+                        <p className="text-[10px] text-muted-foreground">Entradas liquidadas</p>
+                    </div>
                 </CardContent>
             </Card>
-            <Card>
+            <Card className="border-l-4 border-l-rose-500">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Despesas (Mês)</CardTitle>
-                    <ArrowDownRight className="h-5 w-5 text-red-500" />
+                    <CardTitle className="text-xs font-bold uppercase text-muted-foreground">Despesas (Mês)</CardTitle>
+                    <ArrowDownRight className="h-5 w-5 text-rose-500" />
                 </CardHeader>
                 <CardContent>
-                    <div className="text-2xl font-bold">{formatCurrency(monthlyExpenses)}</div>
-                    <p className="text-xs text-muted-foreground">+12.4% vs. mês anterior</p>
+                    <div className="text-2xl font-bold tracking-tight">{formatCurrency(monthlyExpenses)}</div>
+                    <div className="flex items-center gap-1 mt-1">
+                        <Badge variant="secondary" className="bg-rose-50 text-rose-700 text-[10px] h-4">Saído</Badge>
+                        <p className="text-[10px] text-muted-foreground">Custos liquidados</p>
+                    </div>
                 </CardContent>
             </Card>
-            <Card>
+            <Card className={cn("border-l-4", monthlyBalance >= 0 ? "border-l-blue-500" : "border-l-amber-500")}>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Saldo (Mês)</CardTitle>
+                    <CardTitle className="text-xs font-bold uppercase text-muted-foreground">Saldo (Mês)</CardTitle>
                     <Scale className="h-5 w-5 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                    <div className={cn("text-2xl font-bold", monthlyBalance >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400')}>
+                    <div className={cn("text-2xl font-bold tracking-tight", monthlyBalance >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-amber-600 dark:text-amber-400')}>
                         {formatCurrency(monthlyBalance)}
                     </div>
-                     <p className="text-xs text-muted-foreground">Resultado líquido do mês</p>
+                     <p className="text-[10px] text-muted-foreground mt-1">Resultado líquido do período</p>
                 </CardContent>
             </Card>
-            <Card>
+            <Card className="border-l-4 border-l-amber-500 bg-amber-50/5">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">A Receber</CardTitle>
-                    <DollarSign className="h-5 w-5 text-muted-foreground" />
+                    <CardTitle className="text-xs font-bold uppercase text-muted-foreground">A Receber</CardTitle>
+                    <DollarSign className="h-5 w-5 text-amber-500" />
                 </CardHeader>
                 <CardContent>
-                    <div className="text-2xl font-bold">{formatCurrency(pendingReceivables)}</div>
-                    <p className="text-xs text-muted-foreground">Total de pendências de clientes</p>
+                    <div className="text-2xl font-bold tracking-tight text-amber-600">{formatCurrency(pendingReceivables)}</div>
+                    <p className="text-[10px] text-muted-foreground mt-1">Total de pendências de clientes</p>
                 </CardContent>
             </Card>
         </>
         )}
       </div>
 
-      <Tabs defaultValue="overview">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="overview">Visão Geral</TabsTrigger>
-          <TabsTrigger value="revenues">Receitas</TabsTrigger>
-          <TabsTrigger value="expenses">Despesas</TabsTrigger>
-          <TabsTrigger value="staff_fees">Repasses da Equipe</TabsTrigger>
+      <Tabs defaultValue="overview" className="space-y-4">
+        <TabsList className="bg-muted/50 p-1">
+          <TabsTrigger value="overview" className="data-[state=active]:bg-background">Visão Geral</TabsTrigger>
+          <TabsTrigger value="revenues" className="data-[state=active]:bg-background">Contas a Receber</TabsTrigger>
+          <TabsTrigger value="expenses" className="data-[state=active]:bg-background">Contas a Pagar</TabsTrigger>
+          <TabsTrigger value="staff_fees" className="data-[state=active]:bg-background">Repasses da Equipe</TabsTrigger>
         </TabsList>
         <TabsContent value="overview">
           <Card>
-            <CardHeader>
-              <CardTitle>Últimos Títulos Financeiros</CardTitle>
-              <CardDescription>Visualize as movimentações mais recentes do seu escritório.</CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Movimentações Recentes</CardTitle>
+                <CardDescription>Visualize as últimas transações registradas.</CardDescription>
+              </div>
+              <Button variant="ghost" size="sm" onClick={handleRefresh}>Sincronizar</Button>
             </CardHeader>
             <CardContent>
-              <FinancialTitlesTable titles={titles.slice(0, 10)} clientsMap={clientsMap} processesMap={processesMap} isLoading={isLoading} onAction={handleRefresh} originLabels={originLabels} />
+              <FinancialTitlesTable titles={titles.slice(0, 15)} clientsMap={clientsMap} processesMap={processesMap} isLoading={isLoading} onAction={handleRefresh} originLabels={originLabels} />
             </CardContent>
           </Card>
         </TabsContent>
         <TabsContent value="revenues">
           <Card>
             <CardHeader>
-              <CardTitle>Contas a Receber</CardTitle>
-              <CardDescription>Visualize todos os honorários, acordos e pagamentos recebidos.</CardDescription>
+              <CardTitle>Entradas (Receitas)</CardTitle>
+              <CardDescription>Controle de honorários, acordos e sentenças recebidas.</CardDescription>
             </CardHeader>
             <CardContent>
               <FinancialTitlesTable titles={receitas} clientsMap={clientsMap} processesMap={processesMap} isLoading={isLoading} onAction={handleRefresh} originLabels={originLabels} />
@@ -769,8 +872,8 @@ export default function FinanceiroPage() {
         <TabsContent value="expenses">
           <Card>
             <CardHeader>
-              <CardTitle>Contas a Pagar</CardTitle>
-              <CardDescription>Visualize todas as custas, despesas e pagamentos efetuados.</CardDescription>
+              <CardTitle>Saídas (Despesas)</CardTitle>
+              <CardDescription>Controle de custos operacionais, custas e pagamentos.</CardDescription>
             </CardHeader>
             <CardContent>
               <FinancialTitlesTable titles={despesas} clientsMap={clientsMap} processesMap={processesMap} isLoading={isLoading} onAction={handleRefresh} originLabels={originLabels} />
@@ -780,8 +883,8 @@ export default function FinanceiroPage() {
          <TabsContent value="staff_fees">
           <Card>
             <CardHeader>
-              <CardTitle>Honorários da Equipe</CardTitle>
-              <CardDescription>Resumo dos valores a receber por cada membro da equipe que participa de honorários.</CardDescription>
+              <CardTitle>Controle de Repasses</CardTitle>
+              <CardDescription>Valores a pagar e já pagos para membros da equipe.</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {isLoading ? (
