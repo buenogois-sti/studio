@@ -17,7 +17,8 @@ import {
   ExternalLink,
   Trash2,
   Edit,
-  DollarSign
+  DollarSign,
+  FileUp
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 
@@ -79,11 +80,13 @@ import { useToast } from '@/components/ui/use-toast';
 import { syncClientToDrive } from '@/lib/drive';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
+import { VCFImportDialog } from '@/components/client/VCFImportDialog';
 
 
 export default function ClientsPage() {
   const [viewMode, setViewMode] = React.useState<'grid' | 'table'>('grid');
   const [isSheetOpen, setIsSheetOpen] = React.useState(false);
+  const [isVCFDialogOpen, setIsVCFDialogOpen] = React.useState(false);
   const [editingClient, setEditingClient] = React.useState<Client | null>(null);
   const [clientToDelete, setClientToDelete] = React.useState<Client | null>(null);
   const [isDeleting, setIsDeleting] = React.useState(false);
@@ -291,10 +294,16 @@ export default function ClientsPage() {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <Button size="sm" className="h-9 gap-1" onClick={handleAddNew}>
-              <PlusCircle className="h-3.5 w-3.5" />
-              <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">Adicionar Cliente</span>
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" className="h-9 gap-1" onClick={() => setIsVCFDialogOpen(true)}>
+                <FileUp className="h-3.5 w-3.5" />
+                <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">Importar VCF</span>
+              </Button>
+              <Button size="sm" className="h-9 gap-1" onClick={handleAddNew}>
+                <PlusCircle className="h-3.5 w-3.5" />
+                <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">Adicionar Cliente</span>
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -510,6 +519,10 @@ export default function ClientsPage() {
                          {searchTerm && (
                              <Button variant="outline" onClick={() => setSearchTerm('')}>Limpar Busca</Button>
                         )}
+                        <Button variant="outline" onClick={() => setIsVCFDialogOpen(true)}>
+                            <FileUp className="mr-2 h-4 w-4" />
+                            Importar VCF
+                        </Button>
                         <Button onClick={handleAddNew}>
                             <PlusCircle className="mr-2 h-4 w-4" />
                             Adicionar Primeiro Cliente
@@ -538,6 +551,14 @@ export default function ClientsPage() {
           </ScrollArea>
         </SheetContent>
       </Sheet>
+
+      <VCFImportDialog 
+        open={isVCFDialogOpen} 
+        onOpenChange={setIsVCFDialogOpen} 
+        onImportSuccess={() => {
+          // Re-fetch handled by real-time useCollection
+        }} 
+      />
 
       <AlertDialog open={!!clientToDelete} onOpenChange={(open) => !isDeleting && !open && setClientToDelete(null)}>
         <AlertDialogContent>

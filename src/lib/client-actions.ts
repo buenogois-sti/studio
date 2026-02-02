@@ -19,8 +19,6 @@ function serializeClient(doc: adminFirestore.DocumentSnapshot): Client | null {
     } else if (typeof data.createdAt === 'string') {
         createdAtString = data.createdAt;
     } else {
-        // If createdAt is missing or in a wrong format, we cannot proceed.
-        // It's a required field in the Client type.
         console.warn(`Document ${id} is missing a valid 'createdAt' field. Skipping.`);
         return null;
     }
@@ -33,7 +31,6 @@ function serializeClient(doc: adminFirestore.DocumentSnapshot): Client | null {
             updatedAtString = data.updatedAt;
         }
     }
-    // --- End Robust Date Handling ---
 
     const serializableClient: Client = {
         id: id,
@@ -113,5 +110,34 @@ export async function getClientById(clientId: string): Promise<Client | null> {
     } catch (error) {
         console.error(`Error fetching client with ID ${clientId}:`, error);
         throw new Error('Ocorreu um erro ao buscar os dados do cliente.');
+    }
+}
+
+export async function bulkCreateClients(clients: Partial<Client>[]): Promise<{ success: boolean; count: number; error?: string }> {
+    if (!firestoreAdmin) {
+        throw new Error("A conexão com o servidor de dados falhou.");
+    }
+
+    try {
+        const batch = firestoreAdmin.batch();
+        const clientsCollection = firestoreAdmin.collection('clients');
+
+        clients.forEach(clientData => {
+            const newDocRef = clientsCollection.doc();
+            batch.set(newDocRef, {
+                ...clientData,
+                document: clientData.document || 'PENDENTE',
+                clientType: clientData.clientType || 'Pessoa Física',
+                createdAt: adminFirestore.FieldValue.serverTimestamp(),
+                updatedAt: adminFirestore.FieldValue.serverTimestamp(),
+                avatar: '',
+            });
+        });
+
+        await batch.commit();
+        return { success: true, count: clients.length };
+    } catch (error: any) {
+        console.error("Error bulk creating clients:", error);
+        return { success: false, count: 0, error: error.message };
     }
 }
