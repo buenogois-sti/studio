@@ -9,6 +9,15 @@ import {
   ListFilter,
   Loader2,
   FolderKanban,
+  LayoutGrid,
+  List,
+  Copy,
+  MessageSquare,
+  Mail,
+  ExternalLink,
+  Trash2,
+  Edit,
+  DollarSign
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 
@@ -50,8 +59,18 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ClientForm } from '@/components/client/ClientForm';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, Timestamp, doc, deleteDoc } from 'firebase/firestore';
@@ -64,6 +83,7 @@ import { cn } from '@/lib/utils';
 
 
 export default function ClientsPage() {
+  const [viewMode, setViewMode] = React.useState<'grid' | 'table'>('grid');
   const [isSheetOpen, setIsSheetOpen] = React.useState(false);
   const [editingClient, setEditingClient] = React.useState<Client | null>(null);
   const [clientToDelete, setClientToDelete] = React.useState<Client | null>(null);
@@ -107,8 +127,8 @@ export default function ClientsPage() {
     if (typeof date === 'string') {
         return new Date(date).toLocaleDateString('pt-BR');
     }
-    if (date.toDate) {
-        return date.toDate().toLocaleDateString('pt-BR');
+    if ((date as any).toDate) {
+        return (date as any).toDate().toLocaleDateString('pt-BR');
     }
     return '';
   }
@@ -171,21 +191,76 @@ export default function ClientsPage() {
     } finally {
         setIsSyncing(null);
     }
-};
+  };
 
+  const copyToClipboard = (text: string | undefined, label: string) => {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    toast({
+      title: `${label} copiado!`,
+      description: `O valor "${text}" foi copiado para a área de transferência.`,
+    });
+  };
+
+  const renderClientActions = (client: Client) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button aria-haspopup="true" size="icon" variant="ghost">
+          <MoreVertical className="h-4 w-4" />
+          <span className="sr-only">Toggle menu</span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuLabel>Ações</DropdownMenuLabel>
+        <DropdownMenuItem onClick={() => handleEdit(client)}>
+          <Edit className="mr-2 h-4 w-4" /> Editar
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href={`/dashboard/processos?clientId=${client.id}`}>
+            <FolderKanban className="mr-2 h-4 w-4" /> Ver Processos
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        {client.driveFolderId ? (
+            <>
+            <DropdownMenuItem asChild>
+                <Link href={`/dashboard/clientes/${client.id}/documentos`}>
+                  <File className="mr-2 h-4 w-4" /> Gerenciar Documentos
+                </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+                onSelect={() => window.open(`https://drive.google.com/drive/folders/${client.driveFolderId}`, '_blank')}
+            >
+                <ExternalLink className="mr-2 h-4 w-4" /> Abrir no Drive
+            </DropdownMenuItem>
+            </>
+        ) : (
+            <DropdownMenuItem onClick={() => handleSyncClient(client)} disabled={isSyncing === client.id}>
+                {isSyncing === client.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Loader2 className="mr-2 h-4 w-4" />}
+                Sincronizar com Drive
+            </DropdownMenuItem>
+        )}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteTrigger(client)}>
+          <Trash2 className="mr-2 h-4 w-4" /> Excluir
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 
   return (
     <>
       <div className="grid flex-1 items-start gap-6 auto-rows-max">
-        <div className="flex items-center gap-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className='flex items-center gap-2'>
-            <h1 className="flex-1 shrink-0 whitespace-nowrap text-xl font-semibold tracking-tight sm:grow-0 font-headline">
+            <h1 className="text-2xl font-bold tracking-tight font-headline">
               Clientes
             </h1>
             {!isLoading && <Badge variant="secondary">{filteredClients.length}</Badge>}
           </div>
-          <div className="hidden items-center gap-2 md:ml-auto md:flex">
-            <div className="relative w-full max-w-sm">
+          
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative w-full max-w-sm sm:w-auto">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Pesquisar clientes..."
@@ -194,6 +269,14 @@ export default function ClientsPage() {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
+
+            <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as any)} className="hidden sm:block">
+              <TabsList>
+                <TabsTrigger value="grid"><LayoutGrid className="h-4 w-4" /></TabsTrigger>
+                <TabsTrigger value="table"><List className="h-4 w-4" /></TabsTrigger>
+              </TabsList>
+            </Tabs>
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" className="h-9 gap-1">
@@ -208,6 +291,7 @@ export default function ClientsPage() {
                 <DropdownMenuCheckboxItem>Arquivados</DropdownMenuCheckboxItem>
               </DropdownMenuContent>
             </DropdownMenu>
+
             <Button size="sm" className="h-9 gap-1" onClick={handleAddNew}>
               <PlusCircle className="h-3.5 w-3.5" />
               <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">Adicionar Cliente</span>
@@ -233,144 +317,218 @@ export default function ClientsPage() {
                    <Skeleton className="h-4 w-full" />
                    <Separator />
                    <Skeleton className="h-8 w-full" />
-                   <Skeleton className="h-8 w-full" />
                 </CardContent>
-                <CardFooter>
-                   <Skeleton className="h-6 w-24" />
-                </CardFooter>
               </Card>
             ))}
           </div>
         ) : filteredClients.length > 0 ? (
-          <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6">
-            {filteredClients.map((client) => {
-              const clientProcesses = processes.filter(p => p.clientId === client.id);
+          viewMode === 'grid' ? (
+            <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6">
+              {filteredClients.map((client) => {
+                const clientProcesses = processes.filter(p => p.clientId === client.id);
+                const pixKey = client.bankInfo?.pixKey;
 
-              return (
-                <Card key={client.id} className="flex flex-col">
-                  <CardHeader>
-                    <div className="flex items-start justify-between gap-4">
-                        <div className="flex items-center gap-4">
-                            <Avatar className="h-12 w-12 border">
-                                <AvatarImage src={client.avatar} alt={`${client.firstName} ${client.lastName}`} data-ai-hint="person portrait" />
-                                <AvatarFallback>{client.firstName?.charAt(0) ?? 'C'}</AvatarFallback>
-                            </Avatar>
-                            <div>
-                                <h3 className="font-semibold text-lg">{`${client.firstName} ${client.lastName}`}</h3>
-                                <p className="text-sm text-muted-foreground">{client.document}</p>
+                return (
+                  <Card key={client.id} className="flex flex-col group hover:shadow-md transition-shadow">
+                    <CardHeader>
+                      <div className="flex items-start justify-between gap-4">
+                          <div className="flex items-center gap-4">
+                              <Avatar className="h-14 w-14 border-2 border-muted">
+                                  <AvatarImage src={client.avatar} alt={`${client.firstName} ${client.lastName}`} data-ai-hint="person portrait" />
+                                  <AvatarFallback className="bg-primary/10 text-primary">{client.firstName?.charAt(0) ?? 'C'}</AvatarFallback>
+                              </Avatar>
+                              <div>
+                                  <h3 className="font-semibold text-lg leading-tight">{`${client.firstName} ${client.lastName}`}</h3>
+                                  <p className="text-sm text-muted-foreground">{client.document}</p>
+                              </div>
+                          </div>
+                          {renderClientActions(client)}
+                      </div>
+                    </CardHeader>
+                    <CardContent className="flex-grow space-y-4">
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button variant="outline" size="sm" className="justify-start gap-2 h-8" asChild disabled={!client.mobile}>
+                          <a href={`https://wa.me/${client.mobile?.replace(/\D/g, '')}`} target="_blank">
+                            <MessageSquare className="h-3.5 w-3.5 text-green-500" />
+                            <span className="truncate">{client.mobile || 'Sem cel.'}</span>
+                          </a>
+                        </Button>
+                        <Button variant="outline" size="sm" className="justify-start gap-2 h-8" asChild disabled={!client.email}>
+                          <a href={`mailto:${client.email}`}>
+                            <Mail className="h-3.5 w-3.5 text-blue-500" />
+                            <span className="truncate">{client.email}</span>
+                          </a>
+                        </Button>
+                      </div>
+
+                      {pixKey && (
+                        <div className="rounded-lg bg-muted/50 p-3 flex items-center justify-between group/pix">
+                          <div className="flex items-center gap-2 overflow-hidden">
+                            <DollarSign className="h-4 w-4 text-amber-500 shrink-0" />
+                            <div className="flex flex-col min-w-0">
+                              <span className="text-[10px] uppercase font-bold text-muted-foreground leading-none">Chave PIX</span>
+                              <span className="text-sm font-medium truncate">{pixKey}</span>
                             </div>
-                        </div>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button aria-haspopup="true" size="icon" variant="ghost">
-                              <MoreVertical className="h-4 w-4" />
-                              <span className="sr-only">Toggle menu</span>
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                            <DropdownMenuItem onClick={() => handleEdit(client)}>Editar</DropdownMenuItem>
-                            <DropdownMenuItem asChild>
-                              <Link href={`/dashboard/processos?clientId=${client.id}`}>Ver Processos</Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            {client.driveFolderId ? (
-                                <>
-                                <DropdownMenuItem asChild>
-                                    <Link href={`/dashboard/clientes/${client.id}/documentos`}>Gerenciar Documentos</Link>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                    onSelect={() => window.open(`https://drive.google.com/drive/folders/${client.driveFolderId}`, '_blank')}
+                          </div>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-8 w-8 opacity-0 group-hover/pix:opacity-100 transition-opacity"
+                                  onClick={() => copyToClipboard(pixKey, 'Chave PIX')}
                                 >
-                                    Abrir no Drive
-                                </DropdownMenuItem>
-                                </>
-                            ) : (
-                                <DropdownMenuItem onClick={() => handleSyncClient(client)} disabled={isSyncing === client.id}>
-                                    {isSyncing === client.id && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                    Sincronizar com Drive
-                                </DropdownMenuItem>
-                            )}
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteTrigger(client)}>
-                              Excluir
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="flex-grow space-y-4">
-                    <div className="space-y-1 text-sm">
-                        <p className="text-muted-foreground">{client.email}</p>
-                        <p className="text-muted-foreground">{client.mobile || 'Sem celular cadastrado'}</p>
-                    </div>
+                                  <Copy className="h-3.5 w-3.5" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Copiar PIX</TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
+                      )}
 
-                    <Separator />
-                    
-                    <div>
-                      <h4 className="font-semibold text-sm mb-2">Processos ({clientProcesses.length})</h4>
-                      <div className="space-y-2">
-                          {clientProcesses.length > 0 ? (
-                              clientProcesses.slice(0, 3).map(proc => (
-                                  <div key={proc.id} className="flex items-center gap-3 text-sm p-2 rounded-lg bg-muted/50">
-                                      <FolderKanban className="h-4 w-4 text-muted-foreground shrink-0" />
-                                      <span className="flex-1 truncate font-medium">{proc.name}</span>
-                                      <Badge variant={
-                                          proc.status === 'Ativo' ? 'secondary' : proc.status === 'Arquivado' ? 'outline' : 'default'
-                                      } className={cn('shrink-0', {
-                                          'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300 border-green-200 dark:border-green-700': proc.status === 'Ativo',
-                                          'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300 border-yellow-200 dark:border-yellow-700': proc.status === 'Pendente',
-                                      })}>
-                                          {proc.status}
-                                      </Badge>
-                                  </div>
-                              ))
+                      <Separator />
+                      
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">Processos ({clientProcesses.length})</h4>
+                          <Link href={`/dashboard/processos?clientId=${client.id}`} className="text-xs text-primary hover:underline font-medium">Ver todos</Link>
+                        </div>
+                        <div className="space-y-1.5">
+                            {clientProcesses.length > 0 ? (
+                                clientProcesses.slice(0, 2).map(proc => (
+                                    <div key={proc.id} className="flex items-center gap-2 text-xs p-2 rounded-md bg-muted/30 border border-transparent hover:border-muted-foreground/20 transition-colors">
+                                        <FolderKanban className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                        <span className="flex-1 truncate font-medium">{proc.name}</span>
+                                        <Badge variant="outline" className="text-[10px] px-1.5 h-4 uppercase">{proc.status}</Badge>
+                                    </div>
+                                ))
+                            ) : (
+                                <div className="text-[11px] text-muted-foreground text-center py-2 px-2 border border-dashed rounded-md bg-muted/10">Nenhum processo ativo.</div>
+                            )}
+                        </div>
+                      </div>
+                    </CardContent>
+                    <CardFooter className="border-t pt-3 pb-3 bg-muted/10">
+                      <div className="w-full flex items-center justify-between">
+                           <div className="text-[10px] text-muted-foreground uppercase tracking-tighter">
+                              Desde: {formatDate(client.createdAt)}
+                          </div>
+                          {client.driveFolderId ? (
+                               <Badge variant="secondary" className='bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20 text-[10px] h-5'>Sincronizado</Badge>
                           ) : (
-                              <div className="text-sm text-muted-foreground text-center py-4 px-2 border border-dashed rounded-lg">Nenhum processo encontrado.</div>
-                          )}
-                          {clientProcesses.length > 3 && (
-                              <Button variant="link" size="sm" asChild className="p-0 h-auto text-xs mt-2">
-                                <Link href={`/dashboard/processos?clientId=${client.id}`}>Ver todos os {clientProcesses.length} processos</Link>
-                              </Button>
+                               <Badge variant="outline" className='border-red-500/50 text-red-600 dark:text-red-400 bg-red-500/5 text-[10px] h-5'>Pendente Drive</Badge>
                           )}
                       </div>
-                    </div>
-
-                  </CardContent>
-                  <CardFooter className="border-t pt-3 pb-3">
-                    <div className="w-full flex items-center justify-between">
-                         <div className="text-xs text-muted-foreground">
-                            Cadastro: {formatDate(client.createdAt)}
-                        </div>
-                        {client.driveFolderId ? (
-                             <Badge variant="secondary" className='bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300'>Sincronizado</Badge>
-                        ) : (
-                             <Badge variant="outline" className='border-red-500 text-red-600 bg-red-50 dark:bg-red-950/30 dark:text-red-400 dark:border-red-800'>Pendente Sincronização</Badge>
-                        )}
-                    </div>
-                  </CardFooter>
-                </Card>
-              )
-            })}
-          </div>
+                    </CardFooter>
+                  </Card>
+                )
+              })}
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="w-[300px]">Cliente</TableHead>
+                      <TableHead>Documento</TableHead>
+                      <TableHead className="hidden md:table-cell">E-mail</TableHead>
+                      <TableHead className="hidden lg:table-cell">Celular</TableHead>
+                      <TableHead>Chave PIX</TableHead>
+                      <TableHead className="hidden xl:table-cell">Cadastro</TableHead>
+                      <TableHead className="text-right">Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredClients.map((client) => (
+                      <TableRow key={client.id} className="group">
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <Avatar className="h-8 w-8">
+                              <AvatarImage src={client.avatar} />
+                              <AvatarFallback>{client.firstName?.charAt(0)}</AvatarFallback>
+                            </Avatar>
+                            <div className="flex flex-col min-w-0">
+                              <span className="font-medium truncate">{`${client.firstName} ${client.lastName}`}</span>
+                              <div className="flex items-center gap-1 md:hidden">
+                                <Badge variant="outline" className="text-[10px] h-4">{client.document}</Badge>
+                              </div>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-mono text-xs">{client.document}</TableCell>
+                        <TableCell className="hidden md:table-cell text-xs text-muted-foreground">
+                          {client.email}
+                        </TableCell>
+                        <TableCell className="hidden lg:table-cell text-xs">
+                          {client.mobile || '-'}
+                        </TableCell>
+                        <TableCell>
+                          {client.bankInfo?.pixKey ? (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs truncate max-w-[120px]">{client.bankInfo.pixKey}</span>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100"
+                                onClick={() => copyToClipboard(client.bankInfo?.pixKey, 'Chave PIX')}
+                              >
+                                <Copy className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground italic">Não inf.</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="hidden xl:table-cell text-xs text-muted-foreground">
+                          {formatDate(client.createdAt)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8" asChild disabled={!client.mobile}>
+                                    <a href={`https://wa.me/${client.mobile?.replace(/\D/g, '')}`} target="_blank">
+                                      <MessageSquare className="h-4 w-4 text-green-500" />
+                                    </a>
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>WhatsApp</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                            {renderClientActions(client)}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )
         ) : (
-             <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed shadow-sm min-h-[400px]">
-                <div className="flex flex-col items-center gap-2 text-center">
-                    <Search className="h-12 w-12 text-muted-foreground" />
+             <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed shadow-sm min-h-[400px] bg-muted/5">
+                <div className="flex flex-col items-center gap-2 text-center p-8">
+                    <div className="h-20 w-20 rounded-full bg-muted flex items-center justify-center mb-4">
+                      <Search className="h-10 w-10 text-muted-foreground" />
+                    </div>
                     <h3 className="text-2xl font-bold tracking-tight">Nenhum Cliente Encontrado</h3>
                     <p className="text-sm text-muted-foreground max-w-sm">
                         {searchTerm 
-                            ? `Sua busca por "${searchTerm}" não retornou resultados. Tente um termo diferente.`
-                            : "Ainda não há clientes cadastrados."
+                            ? `Sua busca por "${searchTerm}" não retornou resultados. Tente um termo diferente ou limpe o filtro.`
+                            : "Ainda não há clientes cadastrados em seu sistema."
                         }
                     </p>
-                    <div className="mt-4 flex gap-2">
+                    <div className="mt-6 flex gap-2">
                          {searchTerm && (
                              <Button variant="outline" onClick={() => setSearchTerm('')}>Limpar Busca</Button>
                         )}
                         <Button onClick={handleAddNew}>
                             <PlusCircle className="mr-2 h-4 w-4" />
-                            Adicionar Cliente
+                            Adicionar Primeiro Cliente
                         </Button>
                     </div>
                 </div>
@@ -388,7 +546,7 @@ export default function ClientsPage() {
           <SheetHeader>
             <SheetTitle>{editingClient ? 'Editar Cliente' : 'Adicionar Novo Cliente'}</SheetTitle>
             <SheetDescription>
-              {editingClient ? 'Altere os dados do cliente abaixo.' : 'Preencha os dados para cadastrar um novo cliente.'}
+              {editingClient ? 'Altere os dados do cliente abaixo.' : 'Preencha os dados para cadastrar um novo cliente no escritório.'}
             </SheetDescription>
           </SheetHeader>
           <ScrollArea className="h-[calc(100vh-8rem)]">
@@ -400,17 +558,17 @@ export default function ClientsPage() {
       <AlertDialog open={!!clientToDelete} onOpenChange={(open) => !isDeleting && !open && setClientToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+            <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
             <AlertDialogDescription>
               Esta ação não pode ser desfeita. Isso excluirá permanentemente o cliente
-              &quot;{clientToDelete?.firstName} {clientToDelete?.lastName}&quot; e removerá seus dados de nossos servidores.
+              <strong> &quot;{clientToDelete?.firstName} {clientToDelete?.lastName}&quot;</strong> e todos os seus registros associados.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setClientToDelete(null)} disabled={isDeleting}>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDelete} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
                 {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isDeleting ? 'Excluindo...' : 'Excluir'}
+                {isDeleting ? 'Excluindo...' : 'Excluir Cliente'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
