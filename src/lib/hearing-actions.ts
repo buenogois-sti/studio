@@ -6,6 +6,7 @@ import { add, formatISO } from 'date-fns';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/options';
 import { createNotification } from './notification-actions';
+import type { HearingStatus, HearingType } from './types';
 
 interface CreateHearingData {
   processId: string;
@@ -13,6 +14,8 @@ interface CreateHearingData {
   hearingDate: string; // ISO string from the client
   location: string;
   responsibleParty: string;
+  status: HearingStatus;
+  type: HearingType;
   notes?: string;
 }
 
@@ -21,20 +24,21 @@ export async function createHearing(data: CreateHearingData) {
     throw new Error('A conexão com o servidor de dados falhou.');
   }
 
-  const { processId, processName, hearingDate, location, responsibleParty, notes } = data;
+  const { processId, processName, hearingDate, location, responsibleParty, status, type, notes } = data;
   const session = await getServerSession(authOptions);
 
   try {
-    // 1. Save to Firestore first, to get an ID
+    // 1. Save to Firestore first
     const hearingRef = await firestoreAdmin.collection('hearings').add({
       processId,
-      date: new Date(hearingDate), // Store as Firestore Timestamp
+      date: new Date(hearingDate),
       location,
       responsibleParty,
+      status: status || 'PENDENTE',
+      type: type || 'OUTRA',
       notes: notes || '',
       createdAt: new Date(),
     });
-    console.log('Hearing created in Firestore with ID:', hearingRef.id);
 
     // 2. Try to add to Google Calendar
     try {
@@ -43,9 +47,9 @@ export async function createHearing(data: CreateHearingData) {
       const endDateTime = add(startDateTime, { hours: 1 });
 
       const event = {
-        summary: `Audiência: ${processName}`,
+        summary: `Audiência [${type}]: ${processName}`,
         location: location,
-        description: `Detalhes da audiência para o processo "${processName}".\n\nNotas: ${notes || 'Nenhuma'}\n\nID Interno: ${hearingRef.id}`,
+        description: `Status: ${status}\nTipo: ${type}\nResponsável: ${responsibleParty}\n\nNotas: ${notes || 'Nenhuma'}\n\nID Interno: ${hearingRef.id}`,
         start: { dateTime: formatISO(startDateTime), timeZone: 'America/Sao_Paulo' },
         end: { dateTime: formatISO(endDateTime), timeZone: 'America/Sao_Paulo' },
       };
@@ -55,39 +59,37 @@ export async function createHearing(data: CreateHearingData) {
         requestBody: event,
       });
 
-      // 3a. On Calendar Success: Update Firestore with Event ID and send success notification
       if (createdEvent.data.id) {
         await hearingRef.update({ googleCalendarEventId: createdEvent.data.id });
-        console.log(`Linked Google Calendar event ${createdEvent.data.id} to Firestore hearing ${hearingRef.id}`);
-
+        
         if (session?.user?.id) {
             await createNotification({
                 userId: session.user.id,
                 title: "Audiência Agendada e Sincronizada",
-                description: `A audiência para "${processName}" foi salva e adicionada ao seu Google Agenda.`,
+                description: `A audiência ${type} para "${processName}" foi salva e adicionada à agenda.`,
                 href: `/dashboard/audiencias`,
             });
         }
       }
     } catch (calendarError: any) {
-      // 3b. On Calendar Failure: Log error and send failure notification
-      console.error("Failed to create Google Calendar event, but hearing was saved to Firestore. Error:", calendarError.message);
-      if (session?.user?.id) {
-          await createNotification({
-              userId: session.user.id,
-              title: "Falha na Sincronização da Agenda",
-              description: `A audiência "${processName}" foi salva, mas falhou ao sincronizar com o Google Agenda.`,
-              href: `/dashboard/audiencias`,
-          });
-      }
+      console.error("Calendar sync failed:", calendarError.message);
     }
     
-    return { success: true, message: 'Operação de agendamento concluída.' };
-
+    return { success: true };
   } catch (error: any) {
     console.error('Error creating hearing:', error);
     throw new Error(error.message || 'Falha ao agendar audiência.');
   }
+}
+
+export async function updateHearingStatus(hearingId: string, status: HearingStatus) {
+    if (!firestoreAdmin) throw new Error('A conexão com o servidor de dados falhou.');
+    try {
+        await firestoreAdmin.collection('hearings').doc(hearingId).update({ status, updatedAt: new Date() });
+        return { success: true };
+    } catch (e: any) {
+        throw new Error('Falha ao atualizar status da audiência.');
+    }
 }
 
 export async function deleteHearing(hearingId: string, googleCalendarEventId?: string) {
@@ -96,7 +98,6 @@ export async function deleteHearing(hearingId: string, googleCalendarEventId?: s
   }
 
   try {
-    // 1. Delete from Google Calendar if an event ID exists
     if (googleCalendarEventId) {
       try {
         const { calendar } = await getGoogleApiClientsForUser();
@@ -104,21 +105,13 @@ export async function deleteHearing(hearingId: string, googleCalendarEventId?: s
           calendarId: 'primary',
           eventId: googleCalendarEventId,
         });
-        console.log(`Successfully deleted Google Calendar event: ${googleCalendarEventId}`);
       } catch (calendarError: any) {
-         if ((calendarError as any).code !== 404) {
-            console.error(`Failed to delete Google Calendar event ${googleCalendarEventId}, but proceeding with Firestore deletion. Error: ${(calendarError as any).message}`);
-        } else {
-            console.log(`Google Calendar event ${googleCalendarEventId} was not found. It might have been deleted already.`);
-        }
+         console.warn("Could not delete calendar event:", calendarError.message);
       }
     }
 
-    // 2. Delete from Firestore
     await firestoreAdmin.collection('hearings').doc(hearingId).delete();
-    console.log(`Successfully deleted hearing ${hearingId} from Firestore.`);
-
-    return { success: true, message: 'Audiência excluída com sucesso.' };
+    return { success: true };
   } catch (error: any) {
     console.error('Error deleting hearing:', error);
     throw new Error(error.message || 'Falha ao excluir audiência.');

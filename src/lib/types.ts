@@ -83,14 +83,20 @@ export type Process = {
   updatedAt?: Timestamp;
 };
 
+export type HearingStatus = 'PENDENTE' | 'REALIZADA' | 'CANCELADA' | 'ADIADA';
+export type HearingType = 'CONCILIACAO' | 'INSTRUCAO' | 'UNA' | 'JULGAMENTO' | 'OUTRA';
+
 export type Hearing = {
   id: string;
   processId: string;
   date: Timestamp;
   location: string;
   responsibleParty: string;
+  status: HearingStatus;
+  type: HearingType;
   notes?: string;
   googleCalendarEventId?: string;
+  createdAt?: Timestamp;
 };
 
 export type FinancialEvent = {
