@@ -19,7 +19,8 @@ import {
   Edit,
   DollarSign,
   FileUp,
-  X
+  X,
+  UserCheck
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 
@@ -82,12 +83,15 @@ import { syncClientToDrive } from '@/lib/drive';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { VCFImportDialog } from '@/components/client/VCFImportDialog';
+import { ClientDetailsSheet } from '@/components/client/ClientDetailsSheet';
 
 
 export default function ClientsPage() {
   const [viewMode, setViewMode] = React.useState<'grid' | 'table'>('grid');
   const [isSheetOpen, setIsSheetOpen] = React.useState(false);
   const [isVCFDialogOpen, setIsVCFDialogOpen] = React.useState(false);
+  const [isDetailsOpen, setIsDetailsOpen] = React.useState(false);
+  const [selectedClientForDetails, setSelectedClientForDetails] = React.useState<Client | null>(null);
   const [editingClient, setEditingClient] = React.useState<Client | null>(null);
   const [clientToDelete, setClientToDelete] = React.useState<Client | null>(null);
   const [isDeleting, setIsDeleting] = React.useState(false);
@@ -156,6 +160,11 @@ export default function ClientsPage() {
   const handleEdit = (client: Client) => {
     setEditingClient(client);
     setIsSheetOpen(true);
+  };
+
+  const handleViewDetails = (client: Client) => {
+    setSelectedClientForDetails(client);
+    setIsDetailsOpen(true);
   };
 
   const handleDeleteTrigger = (client: Client) => {
@@ -230,8 +239,11 @@ export default function ClientsPage() {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuLabel>Ações</DropdownMenuLabel>
+        <DropdownMenuItem onClick={() => handleViewDetails(client)}>
+          <UserCheck className="mr-2 h-4 w-4 text-primary" /> Ver Ficha Completa
+        </DropdownMenuItem>
         <DropdownMenuItem onClick={() => handleEdit(client)}>
-          <Edit className="mr-2 h-4 w-4" /> Editar
+          <Edit className="mr-2 h-4 w-4" /> Editar Cadastro
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <Link href={`/dashboard/processos?clientId=${client.id}`}>
@@ -576,6 +588,12 @@ export default function ClientsPage() {
           </ScrollArea>
         </SheetContent>
       </Sheet>
+
+      <ClientDetailsSheet 
+        client={selectedClientForDetails} 
+        open={isDetailsOpen} 
+        onOpenChange={setIsDetailsOpen} 
+      />
 
       <VCFImportDialog 
         open={isVCFDialogOpen} 
