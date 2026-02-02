@@ -116,11 +116,25 @@ export default function ClientsPage() {
   const { data: processesData, isLoading: isLoadingProcesses } = useCollection<Process>(processesQuery);
   const processes = processesData || [];
 
+  // OPTIMIZATION: Cache processes by client ID to avoid O(N*M) lookups during render
+  const processesByClientMap = React.useMemo(() => {
+    const map = new Map<string, Process[]>();
+    processes.forEach(p => {
+      if (!map.has(p.clientId)) {
+        map.set(p.clientId, []);
+      }
+      map.get(p.clientId)?.push(p);
+    });
+    return map;
+  }, [processes]);
+
   const filteredClients = React.useMemo(() => {
     if (!searchTerm.trim()) {
         return clients;
     }
     const lowercasedFilter = searchTerm.toLowerCase();
+    const cleanSearch = lowercasedFilter.replace(/\D/g, '');
+    
     return clients.filter(client => {
       const fullName = `${client.firstName} ${client.lastName}`.toLowerCase();
       const document = client.document?.toLowerCase() || '';
@@ -132,14 +146,14 @@ export default function ClientsPage() {
         fullName.includes(lowercasedFilter) || 
         document.includes(lowercasedFilter) || 
         email.includes(lowercasedFilter) ||
-        mobile.includes(lowercasedFilter.replace(/\D/g, '')) ||
-        phone.includes(lowercasedFilter.replace(/\D/g, ''))
+        (cleanSearch && mobile.includes(cleanSearch)) ||
+        (cleanSearch && phone.includes(cleanSearch))
       );
     });
   }, [clients, searchTerm]);
 
 
-  const formatDate = (date: Timestamp | string | undefined) => {
+  const formatDate = React.useCallback((date: Timestamp | string | undefined) => {
     if (!date) return '';
     if (typeof date === 'string') {
         return new Date(date).toLocaleDateString('pt-BR');
@@ -148,7 +162,7 @@ export default function ClientsPage() {
         return (date as any).toDate().toLocaleDateString('pt-BR');
     }
     return '';
-  }
+  }, []);
   
   const isLoading = status === 'loading' || isLoadingClients || isLoadingProcesses;
 
@@ -184,7 +198,7 @@ export default function ClientsPage() {
         toast({ 
           variant: 'destructive', 
           title: 'Erro ao excluir', 
-          description: error.message || 'Ocorreu um erro ao tentar excluir o cliente. Verifique suas permissões.' 
+          description: error.message || 'Ocorreu um erro ao tentar excluir o cliente.' 
         });
     } finally {
         setIsDeleting(false);
@@ -367,7 +381,8 @@ export default function ClientsPage() {
           viewMode === 'grid' ? (
             <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6">
               {filteredClients.map((client) => {
-                const clientProcesses = processes.filter(p => p.clientId === client.id);
+                // OPTIMIZATION: Instant lookup from pre-computed map
+                const clientProcesses = processesByClientMap.get(client.id) || [];
                 const pixKey = client.bankInfo?.pixKey;
 
                 return (
@@ -570,6 +585,7 @@ export default function ClientsPage() {
         )}
       </div>
 
+      {/* IMPROVED: Wider Sheet for better form UX */}
       <Sheet open={isSheetOpen} onOpenChange={(open) => {
           if (!open) {
             setEditingClient(null);

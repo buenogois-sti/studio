@@ -539,7 +539,7 @@ export default function ProcessosPage() {
       toast({ 
         variant: 'destructive', 
         title: 'Erro ao excluir', 
-        description: error.message || 'Não foi possível excluir o processo. Verifique suas permissões.' 
+        description: error.message || 'Não foi possível excluir o processo.' 
       });
     } finally {
       setIsDeleting(false);
@@ -671,6 +671,7 @@ export default function ProcessosPage() {
         </Card>
       </div>
 
+      {/* IMPROVED: Wider Sheet for better form UX */}
       <Sheet open={isSheetOpen} onOpenChange={(open) => { if (!open) setEditingProcess(null); setIsSheetOpen(open); }}>
         <SheetContent className="w-full sm:max-w-4xl">
           <SheetHeader>

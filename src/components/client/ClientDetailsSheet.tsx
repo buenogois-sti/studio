@@ -108,7 +108,8 @@ Gerado em: ${format(new Date(), "dd/MM/yyyy HH:mm")}
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="sm:max-w-xl w-full overflow-y-auto print:p-0 print:shadow-none print:border-none">
+      {/* IMPROVED: Much wider sheet for desktop viewing */}
+      <SheetContent className="sm:max-w-3xl w-full overflow-y-auto print:p-0 print:shadow-none print:border-none">
         <div className="print:block hidden mb-8">
             <h1 className="text-2xl font-bold">FICHA DO CLIENTE</h1>
             <p className="text-sm text-muted-foreground">Escritório Bueno Gois Advogados e Associados</p>
@@ -139,12 +140,12 @@ Gerado em: ${format(new Date(), "dd/MM/yyyy HH:mm")}
                 <User className="h-5 w-5 text-primary" />
                 <h3 className="font-bold text-lg uppercase tracking-tight">Dados Pessoais</h3>
             </div>
-            <div className="grid grid-cols-2 gap-x-6 gap-y-2 bg-muted/30 p-4 rounded-xl border">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 bg-muted/30 p-4 rounded-xl border">
                 <InfoRow icon={Hash} label="Documento Principal" value={client.document} />
                 <InfoRow icon={FileText} label="Tipo de Cliente" value={client.clientType} />
                 <InfoRow icon={FileText} label="RG" value={client.rg} />
                 <InfoRow icon={Briefcase} label="Área Jurídica" value={client.legalArea} />
-                <InfoRow icon={User} label="Nome da Mãe" value={client.motherName} className="col-span-2" />
+                <InfoRow icon={User} label="Nome da Mãe" value={client.motherName} className="col-span-1 sm:col-span-2" />
                 <InfoRow icon={FileText} label="CTPS" value={client.ctps} />
                 <InfoRow icon={FileText} label="PIS/PASEP" value={client.pis} />
             </div>
@@ -156,11 +157,11 @@ Gerado em: ${format(new Date(), "dd/MM/yyyy HH:mm")}
                 <Phone className="h-5 w-5 text-primary" />
                 <h3 className="font-bold text-lg uppercase tracking-tight">Canais de Contato</h3>
             </div>
-            <div className="grid grid-cols-2 gap-x-6 gap-y-2 bg-muted/30 p-4 rounded-xl border">
-                <InfoRow icon={AtSign} label="E-mail" value={client.email} className="col-span-2" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 bg-muted/30 p-4 rounded-xl border">
+                <InfoRow icon={AtSign} label="E-mail" value={client.email} className="col-span-1 sm:col-span-2" />
                 <InfoRow icon={Smartphone} label="Celular / WhatsApp" value={client.mobile} />
                 <InfoRow icon={Phone} label="Telefone Fixo" value={client.phone} />
-                <InfoRow icon={Smartphone} label="Contato Emergência" value={client.emergencyContact} className="col-span-2" />
+                <InfoRow icon={Smartphone} label="Contato Emergência" value={client.emergencyContact} className="col-span-1 sm:col-span-2" />
             </div>
           </section>
 
@@ -170,8 +171,8 @@ Gerado em: ${format(new Date(), "dd/MM/yyyy HH:mm")}
                 <MapPin className="h-5 w-5 text-primary" />
                 <h3 className="font-bold text-lg uppercase tracking-tight">Endereço Residencial</h3>
             </div>
-            <div className="grid grid-cols-2 gap-x-6 gap-y-2 bg-muted/30 p-4 rounded-xl border">
-                <InfoRow icon={MapPin} label="Logradouro" value={`${client.address?.street || ''}, ${client.address?.number || ''}`} className="col-span-2" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 bg-muted/30 p-4 rounded-xl border">
+                <InfoRow icon={MapPin} label="Logradouro" value={`${client.address?.street || ''}, ${client.address?.number || ''}`} className="col-span-1 sm:col-span-2" />
                 <InfoRow icon={MapPin} label="Complemento" value={client.address?.complement} />
                 <InfoRow icon={MapPin} label="Bairro" value={client.address?.neighborhood} />
                 <InfoRow icon={MapPin} label="Cidade" value={client.address?.city} />
@@ -186,10 +187,10 @@ Gerado em: ${format(new Date(), "dd/MM/yyyy HH:mm")}
                 <CreditCard className="h-5 w-5 text-primary" />
                 <h3 className="font-bold text-lg uppercase tracking-tight">Dados Financeiros</h3>
             </div>
-            <div className="grid grid-cols-2 gap-x-6 gap-y-2 bg-muted/30 p-4 rounded-xl border">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 bg-muted/30 p-4 rounded-xl border">
                 <InfoRow icon={CreditCard} label="Banco" value={client.bankInfo?.bankName} />
                 <InfoRow icon={CreditCard} label="Agência / Conta" value={`${client.bankInfo?.agency || ''} / ${client.bankInfo?.account || ''}`} />
-                <InfoRow icon={Smartphone} label="Chave PIX" value={client.bankInfo?.pixKey} className="col-span-2" />
+                <InfoRow icon={Smartphone} label="Chave PIX" value={client.bankInfo?.pixKey} className="col-span-1 sm:col-span-2" />
             </div>
           </section>
 

@@ -134,7 +134,7 @@ export default function StaffPage() {
         toast({ 
           variant: 'destructive', 
           title: 'Erro ao excluir', 
-          description: error.message || 'Não foi possível remover o membro. Verifique suas permissões.' 
+          description: error.message || 'Não foi possível remover o membro.' 
         });
     } finally {
         setIsDeleting(false);
@@ -354,6 +354,7 @@ export default function StaffPage() {
         )}
       </div>
 
+      {/* IMPROVED: Wider Sheet for staff form */}
       <Sheet open={isSheetOpen} onOpenChange={(open) => {
           if (!open) {
             setEditingStaff(null);
@@ -374,7 +375,7 @@ export default function StaffPage() {
       </Sheet>
 
       <AlertDialog open={!!staffToDelete} onOpenChange={(open) => !isDeleting && !open && setStaffToDelete(null)}>
-        <AlertDialogContent>
+        <AlertDialogContent className="sm:max-w-xl">
           <AlertDialogHeader>
             <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
             <AlertDialogDescription>
