@@ -1,3 +1,4 @@
+
 'use server';
 
 import { google, type drive_v3, type sheets_v4, type calendar_v3 } from 'googleapis';
@@ -115,12 +116,7 @@ async function createClientKitFromTemplates(
     subfolderIds: Map<string, string>,
     templates: { name: string; templateId: string; destination: string; }[]
 ): Promise<void> {
-    console.log('Starting client kit creation from settings...');
-    
-    if (templates.length === 0) {
-        console.log("No client kit templates configured in settings. Skipping.");
-        return;
-    }
+    if (templates.length === 0) return;
 
     for (const doc of templates) {
         const templateId = doc.templateId;
@@ -137,13 +133,9 @@ async function createClientKitFromTemplates(
                     },
                     supportsAllDrives: true,
                 });
-                console.log(`Successfully copied '${doc.name}' to folder '${doc.destination}'`);
             } catch (error: any) {
-                console.error(`Error copying template ${doc.name} (ID: ${templateId}):`, error.message);
+                console.error(`Error copying template ${doc.name}:`, error.message);
             }
-        } else {
-            if (!templateId) console.warn(`Template ID for ${doc.name} is missing. Skipping document.`);
-            if (!destinationFolderId) console.warn(`Destination folder '${doc.destination}' not found. Skipping document '${doc.name}'.`);
         }
     }
 }
@@ -161,11 +153,10 @@ async function createClientMainFolder(drive: drive_v3.Drive, clientName: string)
       fields: 'id',
       supportsAllDrives: true,
     });
-    console.log('Main client folder created with ID:', file.data.id);
     return file.data.id;
   } catch (error: any) {
     console.error('Error creating main client Google Drive folder:', error);
-    throw new Error(`Falha ao criar pasta principal do cliente no Google Drive. A API do Google retornou: ${error.message}`);
+    throw new Error(`Falha ao criar pasta principal do cliente no Google Drive.`);
   }
 }
 
@@ -180,23 +171,19 @@ async function createClientSheet(sheets: sheets_v4.Sheets, clientName: string): 
             requestBody: spreadsheet,
             fields: 'spreadsheetId',
         });
-        console.log('Spreadsheet created with ID:', response.data.spreadsheetId);
         return response.data.spreadsheetId;
     } catch (error: any) {
         console.error('Error creating Google Sheet:', error);
-        throw new Error(`Falha ao criar planilha no Google Sheets. A API do Google retornou: ${error.message}`);
+        throw new Error(`Falha ao criar planilha no Google Sheets.`);
     }
 }
 
 export async function syncClientToDrive(clientId: string, clientName: string): Promise<void> {
-    if (!firestoreAdmin) {
-        throw new Error("A conexão com o servidor de dados falhou. Verifique a configuração do servidor.");
-    }
+    if (!firestoreAdmin) throw new Error("A conexão com o servidor de dados falhou.");
     
     try {
         const { drive, sheets } = await getGoogleApiClientsForUser();
 
-        // Fetch document to include in folder name
         const clientRef = firestoreAdmin.collection('clients').doc(clientId);
         const clientDoc = await clientRef.get();
         if (!clientDoc.exists) throw new Error('Cliente não encontrado.');
@@ -205,12 +192,9 @@ export async function syncClientToDrive(clientId: string, clientName: string): P
 
         const mainFolderName = `${clientName} - ${clientDocument}`;
         const mainFolderId = await createClientMainFolder(drive, mainFolderName);
-        if (!mainFolderId) {
-            throw new Error('Falha ao criar a pasta principal do cliente no Google Drive.');
-        }
+        if (!mainFolderId) throw new Error('Falha ao criar a pasta principal do cliente.');
 
         const level1FolderIds = await createMultipleFolders(drive, mainFolderId, CLIENT_FOLDER_STRUCTURE.level1 as string[]);
-        console.log("Client level 1 subfolders created.");
 
         for (const [parent, children] of Object.entries(CLIENT_FOLDER_STRUCTURE)) {
             if (parent === 'level1') continue;
@@ -221,36 +205,25 @@ export async function syncClientToDrive(clientId: string, clientName: string): P
                 }
             }
         }
-        console.log("Client nested subfolders created.");
-
 
         const settingsDoc = await firestoreAdmin.collection('system_settings').doc('client_kit').get();
         const templates = settingsDoc.exists && settingsDoc.data()?.templates ? settingsDoc.data()?.templates : [];
-
         await createClientKitFromTemplates(drive, clientName, level1FolderIds, templates);
 
         const sheetId = await createClientSheet(sheets, clientName);
-        if (!sheetId) {
-            throw new Error('Falha ao criar planilha no Google Sheets.');
-        }
-        
-        const cadastroFolderId = level1FolderIds.get('01 - Cadastro e Documentos Pessoais');
-        if (cadastroFolderId) {
-            const file = await drive.files.get({
-                fileId: sheetId,
-                fields: 'parents',
-                supportsAllDrives: true, 
-            });
-            const previousParents = file.data.parents ? file.data.parents.join(',') : '';
-
-            await drive.files.update({
-                fileId: sheetId,
-                addParents: cadastroFolderId,
-                removeParents: previousParents,
-                fields: 'id, parents',
-                supportsAllDrives: true,
-            });
-            console.log('Moved Sheet into Cadastro folder.');
+        if (sheetId) {
+            const cadastroFolderId = level1FolderIds.get('01 - Cadastro e Documentos Pessoais');
+            if (cadastroFolderId) {
+                const file = await drive.files.get({ fileId: sheetId, fields: 'parents', supportsAllDrives: true });
+                const previousParents = file.data.parents ? file.data.parents.join(',') : '';
+                await drive.files.update({
+                    fileId: sheetId,
+                    addParents: cadastroFolderId,
+                    removeParents: previousParents,
+                    fields: 'id, parents',
+                    supportsAllDrives: true,
+                });
+            }
         }
         
         await clientRef.update({
@@ -261,15 +234,13 @@ export async function syncClientToDrive(clientId: string, clientName: string): P
 
     } catch (error: any) {
         console.error("Error in syncClientToDrive:", error);
-        throw new Error(error.message || 'Ocorreu um erro desconhecido durante a sincronização com o Google Drive.');
+        throw new Error(error.message || 'Erro durante a sincronização com o Google Drive.');
     }
 }
 
 
 export async function syncProcessToDrive(processId: string): Promise<void> {
-    if (!firestoreAdmin) {
-        throw new Error("A conexão com o servidor de dados falhou. Verifique a configuração do servidor.");
-    }
+    if (!firestoreAdmin) throw new Error("A conexão com o servidor de dados falhou.");
 
     try {
         const processRef = firestoreAdmin.collection('processes').doc(processId);
@@ -277,53 +248,36 @@ export async function syncProcessToDrive(processId: string): Promise<void> {
         if (!processDoc.exists) throw new Error('Processo não encontrado.');
         const processData = processDoc.data() as Process;
 
-        if (processData.driveFolderId) {
-             console.log("Process folder already exists.");
-             return;
-        }
+        if (processData.driveFolderId) return;
 
         const clientRef = firestoreAdmin.collection('clients').doc(processData.clientId);
         const clientDoc = await clientRef.get();
-        if (!clientDoc.exists) throw new Error('Cliente associado ao processo não encontrado.');
+        if (!clientDoc.exists) throw new Error('Cliente associado não encontrado.');
         const clientData = clientDoc.data() as Client;
 
-        if (!clientData.driveFolderId) {
-            throw new Error('O cliente principal precisa ser sincronizado com o Drive primeiro.');
-        }
+        if (!clientData.driveFolderId) throw new Error('O cliente principal precisa ser sincronizado com o Drive primeiro.');
 
         const { drive } = await getGoogleApiClientsForUser();
 
         let processosFolderId = await findFolderByName(drive, clientData.driveFolderId, '03 - Processos');
         if (!processosFolderId) {
-            console.warn("'03 - Processos' folder not found, creating it now.");
             const createdFolders = await createMultipleFolders(drive, clientData.driveFolderId, ['03 - Processos']);
             processosFolderId = createdFolders.get('03 - Processos')!;
-            if (!processosFolderId) throw new Error("Could not create '03 - Processos' folder.");
         }
 
         const processFolderName = `${processData.processNumber || 'SEM-NUMERO'} - ${processData.name}`.replace(/[\/\\?%*:|"<>]/g, '-');
-        const mainProcessFolderId = (await createMultipleFolders(drive, processosFolderId, [processFolderName])).get(processFolderName)!;
-        if (!mainProcessFolderId) throw new Error("Failed to create main process folder.");
-
-        const level1Folders = await createMultipleFolders(drive, mainProcessFolderId, PROCESS_FOLDER_STRUCTURE.level1 as string[]);
-
-        for (const [parent, children] of Object.entries(PROCESS_FOLDER_STRUCTURE)) {
-            if (parent === 'level1' || !Array.isArray(children)) continue;
-            const parentFolderId = level1Folders.get(parent);
-            if (parentFolderId) {
-                await createMultipleFolders(drive, parentFolderId, children);
-            }
-        }
+        const mainProcessFolderId = (await createMultipleFolders(drive, processosFolderId!, [processFolderName])).get(processFolderName)!;
         
-        console.log("Canonical process folder structure created successfully.");
-
-        await processRef.update({
-            driveFolderId: mainProcessFolderId,
-            updatedAt: new Date(),
-        });
+        if (mainProcessFolderId) {
+            await createMultipleFolders(drive, mainProcessFolderId, PROCESS_FOLDER_STRUCTURE.level1 as string[]);
+            await processRef.update({
+                driveFolderId: mainProcessFolderId,
+                updatedAt: new Date(),
+            });
+        }
         
     } catch (error: any) {
         console.error("Error in syncProcessToDrive:", error);
-        throw new Error(error.message || 'Ocorreu um erro desconhecido durante a sincronização do processo.');
+        throw new Error(error.message || 'Erro durante a sincronização do processo.');
     }
 }

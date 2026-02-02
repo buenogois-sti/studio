@@ -8,7 +8,6 @@ import {
   File,
   ListFilter,
   Loader2,
-  ChevronsUpDown,
   Check,
   X,
   DollarSign,
@@ -151,11 +150,10 @@ function ClientSearch({
         const clients = await searchClients(search);
         setResults(clients);
       } catch (error: any) {
-        console.error('Failed to search for clients:', error);
         toast({
           variant: 'destructive',
           title: 'Erro ao Buscar Clientes',
-          description: error.message || 'Não foi possível completar a busca. Tente novamente.',
+          description: error.message || 'Não foi possível completar a busca.',
         });
       } finally {
         setIsLoading(false);
@@ -181,27 +179,18 @@ function ClientSearch({
             <CommandItem
               key={client.id}
               value={`${client.firstName} ${client.lastName} ${client.document}`}
-              onSelect={() => {
-                onSelect(client);
-              }}
+              onSelect={() => onSelect(client)}
             >
               <div className="flex flex-col">
-                <span>
-                  {client.firstName} {client.lastName}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  {client.document}
-                </span>
+                <span>{client.firstName} {client.lastName}</span>
+                <span className="text-xs text-muted-foreground">{client.document}</span>
               </div>
             </CommandItem>
           ))}
         </CommandGroup>
         <CommandSeparator />
         <CommandGroup>
-          <CommandItem
-            onSelect={onAddNew}
-            className="text-primary cursor-pointer"
-          >
+          <CommandItem onSelect={onAddNew} className="text-primary cursor-pointer">
             <PlusCircle className="mr-2 h-4 w-4" />
             Cadastrar novo cliente
           </CommandItem>
@@ -230,8 +219,7 @@ function ProcessForm({
       ? {
           ...process,
           caseValue: process.caseValue ?? undefined,
-          opposingParties:
-            process.opposingParties?.map((p) => ({ value: p })) ?? [],
+          opposingParties: process.opposingParties?.map((p) => ({ value: p })) ?? [],
         }
       : {
           clientId: '',
@@ -246,36 +234,12 @@ function ProcessForm({
         },
   });
 
-  const handleCurrencyChange = (e: React.ChangeEvent<HTMLInputElement>, field: { onChange: (value: number | undefined) => void }) => {
-    const { value } = e.target;
-    const digitsOnly = value.replace(/\D/g, '');
-    if (digitsOnly === '') {
-        field.onChange(undefined);
-        return;
-    }
-    const numberValue = Number(digitsOnly) / 100;
-    field.onChange(numberValue);
-  };
-
-  const formatCurrencyForDisplay = (value: number | undefined) => {
-    if (value === undefined || value === null || isNaN(value)) {
-        return '';
-    }
-    return new Intl.NumberFormat('pt-BR', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-    }).format(value);
-  };
-
   const { fields, append, remove } = useFieldArray({
     control: form.control,
     name: 'opposingParties',
   });
   const [newParty, setNewParty] = React.useState('');
-
-  const [selectedClient, setSelectedClient] = React.useState<Client | null>(
-    null
-  );
+  const [selectedClient, setSelectedClient] = React.useState<Client | null>(null);
 
   React.useEffect(() => {
     if (process?.clientId && !selectedClient) {
@@ -288,30 +252,11 @@ function ProcessForm({
           }
         } catch (error: any) {
           console.error("Failed to fetch client for process:", error);
-          toast({
-            variant: "destructive",
-            title: "Erro ao Carregar Cliente",
-            description: error.message || "Não foi possível carregar os dados do cliente associado a este processo."
-          });
         }
       };
       fetchClient();
     }
-    if (!process) {
-        setSelectedClient(null);
-        form.reset({
-          clientId: '',
-          name: '',
-          processNumber: '',
-          court: '',
-          courtBranch: '',
-          caseValue: undefined,
-          opposingParties: [],
-          description: '',
-          status: 'Pendente',
-        });
-    }
-  }, [process, toast, form, selectedClient]);
+  }, [process, form, selectedClient]);
 
   const handleNewClientSaved = (newClient: Client) => {
     setSelectedClient(newClient);
@@ -332,51 +277,33 @@ function ProcessForm({
       let processId = process?.id;
 
       if (processId) {
-        const processRef = doc(firestore, 'processes', processId);
-        await updateDoc(processRef, {
+        await updateDoc(doc(firestore, 'processes', processId), {
           ...processData,
           updatedAt: serverTimestamp(),
         });
-        toast({
-          title: 'Processo atualizado!',
-          description: `O processo "${values.name}" foi salvo.`,
-        });
+        toast({ title: 'Processo atualizado!' });
       } else {
-        const processesCollection = collection(firestore, 'processes');
-        const docRef = await addDoc(processesCollection, {
+        const docRef = await addDoc(collection(firestore, 'processes'), {
           ...processData,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         });
         processId = docRef.id;
-        toast({
-          title: 'Processo cadastrado!',
-          description: `O processo "${values.name}" foi adicionado com sucesso.`,
-        });
+        toast({ title: 'Processo cadastrado!' });
 
-        // Tenta sincronizar com o Drive automaticamente se o cliente já estiver sincronizado
+        // Auto-sync with Drive if client is synced
         if (selectedClient?.driveFolderId && session) {
             try {
                 await syncProcessToDrive(processId);
-                toast({
-                    title: "Drive Sincronizado!",
-                    description: `Estrutura de pastas para o processo foi criada no Drive do cliente.`
-                });
-            } catch (driveError) {
-                console.warn("Auto-sync failed, but process was saved:", driveError);
-                // Não alertamos erro crítico aqui para não frustrar o usuário já que o registro foi salvo
+                toast({ title: "Drive Sincronizado!", description: `Estrutura de pastas criada no Drive.` });
+            } catch (e) {
+                console.warn("Drive auto-sync failed:", e);
             }
         }
       }
       onSave();
     } catch (error: any) {
-      console.error('Failed to save process:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Erro ao Salvar',
-        description:
-          error.message || 'Não foi possível salvar os dados do processo.',
-      });
+      toast({ variant: 'destructive', title: 'Erro ao Salvar', description: error.message });
     } finally {
       setIsSaving(false);
     }
@@ -400,9 +327,7 @@ function ProcessForm({
                       <Button variant="outline" onClick={() => {
                         setSelectedClient(null);
                         form.setValue('clientId', '', { shouldValidate: true });
-                      }}>
-                        Alterar
-                      </Button>
+                      }}>Alterar</Button>
                     </div>
                   ) : (
                     <FormField
@@ -434,12 +359,7 @@ function ProcessForm({
                     render={({ field }) => (
                       <FormItem className="md:col-span-2">
                         <FormLabel>Nome do Processo *</FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="Ex: Reclamação Trabalhista vs Empresa X"
-                            {...field}
-                          />
-                        </FormControl>
+                        <FormControl><Input placeholder="Ex: Reclamação Trabalhista vs Empresa X" {...field} /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -450,15 +370,8 @@ function ProcessForm({
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Status *</FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Selecione o status" />
-                            </SelectTrigger>
-                          </FormControl>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
                           <SelectContent>
                             <SelectItem value="Pendente">Pendente</SelectItem>
                             <SelectItem value="Ativo">Ativo</SelectItem>
@@ -474,67 +387,15 @@ function ProcessForm({
                     name="processNumber"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Nº do Processo (se distribuído)</FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="0000000-00.0000.0.00.0000"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="court"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Fórum</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Ex: TRT-2" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="courtBranch"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Vara</FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="Ex: 80ª Vara do Trabalho de São Paulo"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="caseValue"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Valor da Causa</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="text"
-                            placeholder="R$ 0,00"
-                            {...field}
-                            value={formatCurrencyForDisplay(field.value)}
-                            onChange={(e) => handleCurrencyChange(e, field)}
-                          />
-                        </FormControl>
+                        <FormLabel>Nº do Processo</FormLabel>
+                        <FormControl><Input placeholder="0000000-00.0000.0.00.0000" {...field} /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
                 </div>
               </section>
+              
               <section>
                 <H2>3. Parte Contrária</H2>
                 <div className="space-y-2 mt-4">
@@ -545,83 +406,29 @@ function ProcessForm({
                         name={`opposingParties.${index}.value`}
                         render={({ field }) => (
                           <FormItem className="flex-1">
-                            <FormControl>
-                              <Input
-                                placeholder="Nome da pessoa ou empresa"
-                                {...field}
-                              />
-                            </FormControl>
+                            <FormControl><Input placeholder="Nome da parte" {...field} /></FormControl>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => remove(index)}
-                      >
+                      <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)}>
                         <X className="h-4 w-4 text-destructive" />
                       </Button>
                     </div>
                   ))}
                   <div className="flex items-center gap-2 pt-2">
-                    <Input
-                      placeholder="Adicionar parte contrária"
-                      value={newParty}
-                      onChange={(e) => setNewParty(e.target.value)}
-                    />
-                    <Button
-                      type="button"
-                      onClick={() => {
-                        if (newParty.trim()) {
-                          append({ value: newParty.trim() });
-                          setNewParty('');
-                        }
-                      }}
-                    >
-                      Adicionar
-                    </Button>
+                    <Input placeholder="Adicionar parte..." value={newParty} onChange={(e) => setNewParty(e.target.value)} />
+                    <Button type="button" onClick={() => { if (newParty.trim()) { append({ value: newParty.trim() }); setNewParty(''); } }}>Adicionar</Button>
                   </div>
                 </div>
-              </section>
-              <section>
-                <H2>4. Observações</H2>
-                <FormField
-                  control={form.control}
-                  name="description"
-                  render={({ field }) => (
-                    <FormItem className="mt-4">
-                      <FormControl>
-                        <Textarea
-                          placeholder="Detalhes, andamentos, links importantes..."
-                          className="min-h-[150px]"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
               </section>
             </div>
           </ScrollArea>
           <SheetFooter className="pt-4 pr-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onSave}
-              disabled={isSaving}
-            >
-              Cancelar
-            </Button>
+            <Button type="button" variant="outline" onClick={onSave} disabled={isSaving}>Cancelar</Button>
             <Button type="submit" disabled={isSaving}>
               {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isSaving
-                ? 'Salvando...'
-                : process
-                ? 'Salvar Alterações'
-                : 'Salvar Processo'}
+              {isSaving ? 'Salvando...' : 'Salvar Processo'}
             </Button>
           </SheetFooter>
         </form>
@@ -631,16 +438,10 @@ function ProcessForm({
         <SheetContent className="w-full sm:max-w-2xl">
           <SheetHeader>
             <SheetTitle>Adicionar Novo Cliente</SheetTitle>
-            <SheetDescription>
-              Preencha os dados para cadastrar um novo cliente. Ele será
-              selecionado automaticamente após o cadastro.
-            </SheetDescription>
+            <SheetDescription>O cliente será selecionado automaticamente após o cadastro.</SheetDescription>
           </SheetHeader>
           <ScrollArea className="h-[calc(100vh-8rem)]">
-            <ClientForm
-              onSave={() => setIsClientSheetOpen(false)}
-              onSaveSuccess={handleNewClientSaved}
-            />
+            <ClientForm onSave={() => setIsClientSheetOpen(false)} onSaveSuccess={handleNewClientSaved} />
           </ScrollArea>
         </SheetContent>
       </Sheet>
@@ -650,9 +451,7 @@ function ProcessForm({
 
 export default function ProcessosPage() {
   const [isSheetOpen, setIsSheetOpen] = React.useState(false);
-  const [editingProcess, setEditingProcess] = React.useState<Process | null>(
-    null
-  );
+  const [editingProcess, setEditingProcess] = React.useState<Process | null>(null);
   const [processToDelete, setProcessToDelete] = React.useState<Process | null>(null);
   const [isDeleting, setIsDeleting] = React.useState(false);
   const [isSyncing, setIsSyncing] = React.useState<string | null>(null);
@@ -670,32 +469,23 @@ export default function ProcessosPage() {
     () => (firestore ? collection(firestore, 'processes') : null),
     [firestore]
   );
-  const { data: processesData, isLoading: isLoadingProcesses } =
-    useCollection<Process>(processesQuery);
+  const { data: processesData, isLoading: isLoadingProcesses } = useCollection<Process>(processesQuery);
 
   const clientsQuery = useMemoFirebase(
     () => (firestore ? collection(firestore, 'clients') : null),
     [firestore]
   );
-  const { data: clientsData, isLoading: isLoadingClients } =
-    useCollection<Client>(clientsQuery);
-  const clientsMap = React.useMemo(
-    () =>
-      new Map(clientsData?.map((c) => [c.id, `${c.firstName} ${c.lastName}`])),
-    [clientsData]
-  );
+  const { data: clientsData, isLoading: isLoadingClients } = useCollection<Client>(clientsQuery);
+  const clientsMap = React.useMemo(() => new Map(clientsData?.map((c) => [c.id, `${c.firstName} ${c.lastName}`])), [clientsData]);
 
   const isLoading = isUserLoading || isLoadingProcesses || isLoadingClients;
   
   const clientIdFilter = searchParams.get('clientId');
-  const staffIdFilter = searchParams.get('staffId');
 
   React.useEffect(() => {
       if (clientIdFilter) {
           getClientById(clientIdFilter).then(client => {
-              if (client) {
-                  setClientFilterName(`${client.firstName} ${client.lastName}`);
-              }
+              if (client) setClientFilterName(`${client.firstName} ${client.lastName}`);
           });
       } else {
           setClientFilterName(null);
@@ -705,44 +495,25 @@ export default function ProcessosPage() {
   const filteredProcesses = React.useMemo(() => {
     if (!processesData) return [];
     let data = [...processesData];
-
-    if (clientIdFilter) {
-        data = data.filter(p => p.clientId === clientIdFilter);
-    }
-    if (staffIdFilter) {
-        data = data.filter(p => p.responsibleStaffIds?.includes(staffIdFilter));
-    }
-    
+    if (clientIdFilter) data = data.filter(p => p.clientId === clientIdFilter);
     if (searchTerm.trim()) {
-        const lowercasedFilter = searchTerm.toLowerCase();
-        data = data.filter(process => {
-            const name = process.name.toLowerCase();
-            const processNumber = (process.processNumber || '').toLowerCase();
-            const clientName = (clientsMap.get(process.clientId) || '').toLowerCase();
-            return name.includes(lowercasedFilter) || processNumber.includes(lowercasedFilter) || clientName.includes(lowercasedFilter);
-        });
+        const query = searchTerm.toLowerCase();
+        data = data.filter(p => p.name.toLowerCase().includes(query) || (p.processNumber || '').includes(query));
     }
-    
     return data;
-  }, [processesData, clientIdFilter, staffIdFilter, searchTerm, clientsMap]);
+  }, [processesData, clientIdFilter, searchTerm]);
 
-
-  const handleAddNew = () => {
-    setEditingProcess(null);
-    setIsSheetOpen(true);
-  };
-
-  const handleEdit = (process: Process) => {
-    setEditingProcess(process);
-    setIsSheetOpen(true);
-  };
-  
-  const handleAddFinancialEvent = (process: Process) => {
-    setEventProcess(process);
-  }
-
-  const handleDeleteTrigger = (process: Process) => {
-    setProcessToDelete(process);
+  const handleSyncProcess = async (process: Process) => {
+    if (!session) return;
+    setIsSyncing(process.id);
+    try {
+        await syncProcessToDrive(process.id);
+        toast({ title: "Sincronização Concluída!" });
+    } catch (error: any) {
+        toast({ variant: 'destructive', title: 'Erro na Sincronização', description: error.message });
+    } finally {
+        setIsSyncing(null);
+    }
   };
 
   const confirmDelete = async () => {
@@ -750,53 +521,13 @@ export default function ProcessosPage() {
     setIsDeleting(true);
     try {
       await deleteDoc(doc(firestore, 'processes', processToDelete.id));
-      toast({
-        title: 'Processo excluído!',
-        description: `O processo "${processToDelete.name}" foi removido.`,
-      });
+      toast({ title: 'Processo excluído!' });
     } catch (error: any) {
-      toast({
-        variant: 'destructive',
-        title: 'Erro ao excluir',
-        description: error.message,
-      });
+      toast({ variant: 'destructive', title: 'Erro ao excluir', description: error.message });
     } finally {
       setProcessToDelete(null);
       setIsDeleting(false);
     }
-  };
-
-  const onFormSave = () => {
-    setIsSheetOpen(false);
-    setEditingProcess(null);
-  };
-
-  const handleSyncProcess = async (process: Process) => {
-    if (!session) {
-        toast({ variant: 'destructive', title: 'Erro de Autenticação', description: 'Sessão de usuário não encontrada.' });
-        return;
-    }
-    setIsSyncing(process.id);
-    try {
-        await syncProcessToDrive(process.id);
-        toast({
-            title: "Sincronização Concluída!",
-            description: `A pasta para o processo "${process.name}" foi criada no Google Drive.`
-        });
-    } catch (error: any) {
-        toast({
-            variant: 'destructive',
-            title: 'Erro na Sincronização',
-            description: error.message || 'Não foi possível criar a pasta do processo no Google Drive.'
-        });
-    } finally {
-        setIsSyncing(null);
-    }
-  };
-
-  const formatDate = (date: Timestamp | undefined) => {
-    if (!date) return 'N/A';
-    return date.toDate().toLocaleDateString('pt-BR');
   };
 
   return (
@@ -809,33 +540,18 @@ export default function ProcessosPage() {
           <div className="hidden items-center gap-2 md:ml-auto md:flex">
              <div className="relative w-full max-w-sm">
                   <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Buscar processos..."
-                    className="pl-8 h-8"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
+                  <Input placeholder="Buscar processos..." className="pl-8 h-8" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
               </div>
-            <Button variant="outline" size="sm" className="h-8 gap-1">
-              <File className="h-3.5 w-3.5" />
-              <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                Exportar
-              </span>
-            </Button>
-            <Button size="sm" className="h-8 gap-1" onClick={handleAddNew}>
+            <Button size="sm" className="h-8 gap-1" onClick={() => { setEditingProcess(null); setIsSheetOpen(true); }}>
               <PlusCircle className="h-3.5 w-3.5" />
-              <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                Adicionar Processo
-              </span>
+              <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">Adicionar Processo</span>
             </Button>
           </div>
         </div>
         <Card>
           <CardHeader>
             <CardTitle>Gerenciador de Processos</CardTitle>
-            <CardDescription>
-              Visualize e gerencie todos os processos jurídicos.
-            </CardDescription>
+            <CardDescription>Visualize e gerencie todos os processos jurídicos.</CardDescription>
           </CardHeader>
           <CardContent>
             <Table>
@@ -843,188 +559,97 @@ export default function ProcessosPage() {
                 <TableRow>
                   <TableHead>Processo</TableHead>
                   <TableHead>Cliente</TableHead>
-                  <TableHead className="hidden md:table-cell">
-                    Nº do Processo
-                  </TableHead>
+                  <TableHead className="hidden md:table-cell">Nº do Processo</TableHead>
                   <TableHead className="hidden md:table-cell">Status</TableHead>
                   <TableHead className="hidden md:table-cell">Drive</TableHead>
-                  <TableHead>
-                    <span className="sr-only">Ações</span>
-                  </TableHead>
+                  <TableHead><span className="sr-only">Ações</span></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i}>
-                      <TableCell>
-                        <Skeleton className="h-4 w-48" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-4 w-32" />
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        <Skeleton className="h-4 w-40" />
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        <Skeleton className="h-6 w-20" />
-                      </TableCell>
-                       <TableCell className="hidden md:table-cell">
-                        <Skeleton className="h-6 w-28" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-8 w-8 ml-auto" />
-                      </TableCell>
+                      <TableCell><Skeleton className="h-4 w-48" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                      <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-40" /></TableCell>
+                      <TableCell className="hidden md:table-cell"><Skeleton className="h-6 w-20" /></TableCell>
+                      <TableCell className="hidden md:table-cell"><Skeleton className="h-6 w-28" /></TableCell>
+                      <TableCell><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
                     </TableRow>
                   ))
-                ) : filteredProcesses && filteredProcesses.length > 0 ? (
-                  filteredProcesses.map((process) => (
+                ) : filteredProcesses.map((process) => (
                     <TableRow key={process.id}>
-                      <TableCell className="font-medium">
-                        {process.name}
-                      </TableCell>
-                      <TableCell>
-                        {clientsMap.get(process.clientId) ||
-                          'Cliente não encontrado'}
-                      </TableCell>
+                      <TableCell className="font-medium">{process.name}</TableCell>
+                      <TableCell>{clientsMap.get(process.clientId) || 'N/A'}</TableCell>
+                      <TableCell className="hidden md:table-cell">{process.processNumber || 'N/A'}</TableCell>
                       <TableCell className="hidden md:table-cell">
-                        {process.processNumber || 'Não distribuído'}
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        <Badge
-                          variant={
-                            process.status === 'Ativo'
-                              ? 'secondary'
-                              : process.status === 'Arquivado'
-                              ? 'outline'
-                              : 'default'
-                          }
-                          className={cn({
-                            'bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20':
-                              process.status === 'Ativo',
-                            'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/20':
-                              process.status === 'Pendente',
-                          })}
-                        >
-                          {process.status}
-                        </Badge>
+                        <Badge variant={process.status === 'Ativo' ? 'secondary' : 'outline'}>{process.status}</Badge>
                       </TableCell>
                       <TableCell className="hidden md:table-cell">
                         {process.driveFolderId ? (
-                            <Badge variant="secondary" className='bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'>Sincronizado</Badge>
+                            <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20">Sincronizado</Badge>
                         ) : (
-                            <Badge variant="outline" className='text-muted-foreground'>Não Sincronizado</Badge>
+                            <Badge variant="outline" className="text-muted-foreground">Pendente</Badge>
                         )}
                       </TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button size="icon" variant="ghost">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
+                            <Button size="icon" variant="ghost"><MoreVertical className="h-4 w-4" /></Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                            <DropdownMenuItem onClick={() => handleEdit(process)}>
-                              Editar
-                            </DropdownMenuItem>
-                             <DropdownMenuItem onClick={() => handleAddFinancialEvent(process)}>
-                              <DollarSign className="mr-2 h-4 w-4" />
-                              <span>Adicionar Evento Financeiro</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>Ver Audiências</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => { setEditingProcess(process); setIsSheetOpen(true); }}>Editar</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setEventProcess(process)}><DollarSign className="mr-2 h-4 w-4" />Financeiro</DropdownMenuItem>
                              <DropdownMenuSeparator />
                              {process.driveFolderId ? (
-                                <DropdownMenuItem
-                                    onSelect={() => window.open(`https://drive.google.com/drive/folders/${process.driveFolderId}`, '_blank')}
-                                >
-                                    <FolderOpen className="mr-2 h-4 w-4" />
-                                    Abrir Pasta no Drive
+                                <DropdownMenuItem onSelect={() => window.open(`https://drive.google.com/drive/folders/${process.driveFolderId}`, '_blank')}>
+                                    <FolderOpen className="mr-2 h-4 w-4" />Abrir Pasta
                                 </DropdownMenuItem>
                             ) : (
                                 <DropdownMenuItem onClick={() => handleSyncProcess(process)} disabled={isSyncing === process.id}>
-                                    {isSyncing === process.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ExternalLink className="mr-2 h-4 w-4" />}
-                                    Sincronizar com Drive
+                                    <ExternalLink className="mr-2 h-4 w-4" />Sincronizar
                                 </DropdownMenuItem>
                             )}
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              className="text-destructive"
-                              onClick={() => handleDeleteTrigger(process)}
-                            >
-                              Excluir
-                            </DropdownMenuItem>
+                            <DropdownMenuItem className="text-destructive" onClick={() => setProcessToDelete(process)}>Excluir</DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center">
-                       {searchTerm ? `Nenhum processo encontrado para "${searchTerm}".` : "Nenhum processo encontrado."}
-                    </TableCell>
-                  </TableRow>
-                )}
+                }
               </TableBody>
             </Table>
           </CardContent>
         </Card>
       </div>
 
-      <Sheet open={isSheetOpen} onOpenChange={(open) => {
-          if (!open) {
-              setEditingProcess(null);
-          }
-          setIsSheetOpen(open);
-      }}>
+      <Sheet open={isSheetOpen} onOpenChange={(open) => { if (!open) setEditingProcess(null); setIsSheetOpen(open); }}>
         <SheetContent className="w-full sm:max-w-4xl">
           <SheetHeader>
-            <SheetTitle>
-              {editingProcess ? 'Editar Processo' : 'Adicionar Novo Processo'}
-            </SheetTitle>
-            <SheetDescription>
-              {editingProcess
-                ? 'Altere os dados do processo abaixo.'
-                : 'Preencha os dados para cadastrar um novo processo.'}
-            </SheetDescription>
+            <SheetTitle>{editingProcess ? 'Editar Processo' : 'Adicionar Novo Processo'}</SheetTitle>
+            <SheetDescription>Preencha os dados do processo abaixo.</SheetDescription>
           </SheetHeader>
-          <ProcessForm onSave={onFormSave} process={editingProcess} />
+          <ProcessForm onSave={() => setIsSheetOpen(false)} process={editingProcess} />
         </SheetContent>
       </Sheet>
 
-      <AlertDialog
-        open={!!processToDelete}
-        onOpenChange={(open) => !isDeleting && !open && setProcessToDelete(null)}
-      >
+      <AlertDialog open={!!processToDelete} onOpenChange={(open) => !open && setProcessToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta ação não pode ser desfeita. Isso excluirá permanentemente o
-              processo &quot;{processToDelete?.name}&quot;.
-            </AlertDialogDescription>
+            <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+            <AlertDialogDescription>Esta ação excluirá permanentemente o processo "{processToDelete?.name}".</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDelete}
-              disabled={isDeleting}
-              className="bg-destructive hover:bg-destructive/90"
-            >
-              {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isDeleting ? 'Excluindo...' : 'Excluir'}
+            <AlertDialogAction onClick={confirmDelete} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
+              {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Excluir'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      <FinancialEventDialog
-        process={eventProcess}
-        open={!!eventProcess}
-        onOpenChange={(open) => { if (!open) setEventProcess(null); }}
-        onEventCreated={() => { /* Maybe refresh finance page data in future */ }}
-      />
+      <FinancialEventDialog process={eventProcess} open={!!eventProcess} onOpenChange={(open) => { if (!open) setEventProcess(null); }} onEventCreated={() => {}} />
     </>
   );
 }
