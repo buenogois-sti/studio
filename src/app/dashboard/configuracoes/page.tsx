@@ -18,7 +18,6 @@ import {
   PlusCircle,
   Edit,
   Trash2,
-  CloudDownload
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -29,9 +28,9 @@ import type { UserProfile } from '@/lib/types';
 import { ClientKitManager } from '@/components/settings/client-kit-manager';
 import { TemplateLibraryManager } from '@/components/settings/template-library-manager';
 import { Switch } from '@/components/ui/switch';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
+import { BackupManager } from '@/components/settings/backup-manager';
 
 function IntegrationsTab() {
   const { data: session, status } = useSession();
@@ -380,46 +379,9 @@ export default function ConfiguracoesPage() {
         </TabsContent>
 
         <TabsContent value="backup">
-          <Card>
-            <CardHeader>
-                <CardTitle>Backup e Restauração</CardTitle>
-                <CardDescription>Configure e agende backups automáticos dos seus dados para o Google Drive.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-                <div className="space-y-2">
-                    <Label>Frequência do Backup Automático</Label>
-                    <RadioGroup defaultValue="daily" disabled>
-                        <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="daily" id="daily" />
-                            <Label htmlFor="daily">Diário</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="weekly" id="weekly" />
-                            <Label htmlFor="weekly">Semanal</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="disabled" id="disabled" />
-                            <Label htmlFor="disabled">Desativado</Label>
-                        </div>
-                    </RadioGroup>
-                </div>
-                <Alert variant="destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Função em Desenvolvimento</AlertTitle>
-                    <AlertDescription>
-                        A funcionalidade de backup automático ainda não está disponível.
-                    </AlertDescription>
-                </Alert>
-            </CardContent>
-            <CardFooter className="flex justify-between">
-                <Button disabled>Salvar Configuração</Button>
-                <Button variant="outline" disabled><CloudDownload className="mr-2 h-4 w-4"/> Fazer Backup Manual</Button>
-            </CardFooter>
-          </Card>
+          <BackupManager />
         </TabsContent>
       </Tabs>
     </div>
   );
 }
-
-    
