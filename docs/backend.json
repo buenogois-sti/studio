@@ -758,6 +758,25 @@
         "templateFileId",
         "createdAt"
       ]
+    },
+    "UserRole": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "UserRole",
+      "type": "object",
+      "description": "Defines a pre-assigned role for a user before they sign up.",
+      "properties": {
+        "email": {
+          "type": "string",
+          "description": "The email of the invited user.",
+          "format": "email"
+        },
+        "role": {
+          "type": "string",
+          "description": "The role to be assigned to the user upon signup.",
+          "enum": ["admin", "lawyer", "financial"]
+        }
+      },
+      "required": ["email", "role"]
     }
   },
   "auth": {
@@ -771,6 +790,12 @@
         "$ref": "#/backend/entities/User"
       },
       "description": "Stores user profiles. User documents are secured by path-based ownership."
+    },
+    "/user_roles/{email}": {
+      "schema": {
+        "$ref": "#/backend/entities/UserRole"
+      },
+      "description": "Stores pre-assigned roles for users before they sign up. The document ID is the user's email."
     },
     "/clients/{clientId}": {
       "schema": {

@@ -123,20 +123,30 @@ export const authOptions: NextAuthOptions = {
             const db = firestoreAdmin;
 
             // This block runs only on initial sign-in
-            if (account && user) {
+            if (account && user && user.email) {
                 try {
                     const userRef = db.collection('users').doc(user.id);
                     const userDoc = await userRef.get();
-                    let role: UserRole = 'lawyer';
+                    let role: UserRole = 'lawyer'; // Default role
 
                     if (!userDoc.exists) {
+                        // First, check if this is the very first user in the system.
                         const usersCollection = db.collection('users');
                         const existingUsersSnapshot = await usersCollection.limit(1).get();
                         
                         if (existingUsersSnapshot.empty) {
-                            role = 'admin'; // First user is an admin
+                            role = 'admin'; // First user is always an admin
+                        } else {
+                            // If not the first user, check for a pre-assigned role
+                            const userRoleRef = db.collection('user_roles').doc(user.email);
+                            const userRoleDoc = await userRoleRef.get();
+                            if (userRoleDoc.exists) {
+                                role = (userRoleDoc.data()?.role as UserRole) || 'lawyer';
+                            }
+                            // If no pre-assigned role, it remains 'lawyer' by default
                         }
 
+                        // Now, create the user
                         const [firstName, ...lastNameParts] = user.name?.split(' ') ?? ['', ''];
                         await userRef.set({
                             id: user.id,
@@ -150,7 +160,7 @@ export const authOptions: NextAuthOptions = {
                             ...(account.refresh_token && { googleRefreshToken: account.refresh_token }),
                         });
                     } else {
-                        // User exists, just update the refresh token if a new one is provided.
+                        // User exists, get their role and update token
                         const existingData = userDoc.data() as UserProfile;
                         role = existingData.role;
                         if (account.refresh_token) {

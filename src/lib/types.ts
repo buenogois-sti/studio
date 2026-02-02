@@ -15,6 +15,11 @@ export type UserProfile = {
   googleRefreshToken?: string;
 };
 
+export type UserRoleInfo = {
+  email: string;
+  role: UserRole;
+};
+
 export type Client = {
   id: string;
   firstName: string;

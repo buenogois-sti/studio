@@ -24,13 +24,21 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
 import { useDoc, useFirebase, useMemoFirebase, useCollection } from '@/firebase';
 import { doc, collection, setDoc } from 'firebase/firestore';
-import type { UserProfile } from '@/lib/types';
+import type { UserProfile, UserRole, UserRoleInfo } from '@/lib/types';
 import { ClientKitManager } from '@/components/settings/client-kit-manager';
 import { TemplateLibraryManager } from '@/components/settings/template-library-manager';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { BackupManager } from '@/components/settings/backup-manager';
+import { getUserRoles, upsertUserRole, deleteUserRole } from '@/lib/user-actions';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose, DialogTrigger } from '@/components/ui/dialog';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { z } from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
+
 
 function IntegrationsTab() {
   const { data: session, status } = useSession();
@@ -131,13 +139,159 @@ function IntegrationsTab() {
   )
 }
 
+const roleSchema = z.object({
+  email: z.string().email('Formato de email inválido.'),
+  role: z.enum(['admin', 'lawyer', 'financial'], { required_error: 'Selecione um perfil.' }),
+});
+
+function InviteUserDialog({ onInvite, userToEdit }: { onInvite: () => void, userToEdit: (UserRoleInfo | UserProfile) | null }) {
+    const [open, setOpen] = React.useState(false);
+    const [isSaving, setIsSaving] = React.useState(false);
+    const { toast } = useToast();
+
+    const form = useForm<z.infer<typeof roleSchema>>({
+        resolver: zodResolver(roleSchema),
+    });
+
+    React.useEffect(() => {
+        if (userToEdit) {
+            form.reset({
+                email: userToEdit.email,
+                role: userToEdit.role,
+            });
+            setOpen(true);
+        }
+    }, [userToEdit, form]);
+
+    const handleOpenChange = (isOpen: boolean) => {
+        if (!isOpen) {
+             form.reset({ email: '', role: 'lawyer'});
+             onInvite(); // To reset the userToEdit state in parent
+        }
+        setOpen(isOpen);
+    }
+    
+    async function onSubmit(values: z.infer<typeof roleSchema>) {
+        setIsSaving(true);
+        const result = await upsertUserRole(values.email, values.role);
+        if (result.success) {
+            toast({ title: 'Sucesso!', description: 'O perfil do usuário foi salvo.' });
+            onInvite();
+            handleOpenChange(false);
+        } else {
+            toast({ variant: 'destructive', title: 'Erro', description: result.error });
+        }
+        setIsSaving(false);
+    }
+
+    return (
+        <Dialog open={open} onOpenChange={handleOpenChange}>
+            <DialogTrigger asChild>
+                <Button><PlusCircle className="mr-2 h-4 w-4" /> Convidar Usuário</Button>
+            </DialogTrigger>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>{userToEdit ? 'Editar Usuário' : 'Convidar Novo Usuário'}</DialogTitle>
+                    <DialogDescription>
+                        Insira o e-mail e defina o perfil de acesso. O usuário receberá acesso na próxima vez que fizer login com esta conta Google.
+                    </DialogDescription>
+                </DialogHeader>
+                <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                        <FormField
+                            control={form.control}
+                            name="email"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Email</FormLabel>
+                                    <FormControl><Input placeholder="email@buenogois.adv.br" {...field} disabled={!!userToEdit} /></FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                         <FormField
+                            control={form.control}
+                            name="role"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Perfil de Acesso</FormLabel>
+                                     <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                        <FormControl>
+                                            <SelectTrigger><SelectValue placeholder="Selecione um perfil..." /></SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                            <SelectItem value="admin">Administrador</SelectItem>
+                                            <SelectItem value="lawyer">Advogado</SelectItem>
+                                            <SelectItem value="financial">Financeiro</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <DialogFooter>
+                            <DialogClose asChild><Button type="button" variant="outline" disabled={isSaving}>Cancelar</Button></DialogClose>
+                            <Button type="submit" disabled={isSaving}>
+                                {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                {isSaving ? 'Salvando...' : 'Salvar'}
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </Form>
+            </DialogContent>
+        </Dialog>
+    )
+}
+
 function UsersTab() {
     const { firestore } = useFirebase();
-    const usersQuery = useMemoFirebase(
-        () => (firestore ? collection(firestore, 'users') : null),
-        [firestore]
-    );
-    const { data: users, isLoading } = useCollection<UserProfile>(usersQuery);
+    const [combinedUsers, setCombinedUsers] = React.useState<(UserProfile | UserRoleInfo)[]>([]);
+    const [isLoading, setIsLoading] = React.useState(true);
+    const [userToEdit, setUserToEdit] = React.useState<(UserProfile | UserRoleInfo) | null>(null);
+    const [userToDelete, setUserToDelete] = React.useState<(UserProfile | UserRoleInfo) | null>(null);
+    const [isDeleting, setIsDeleting] = React.useState(false);
+    const { toast } = useToast();
+
+    const usersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'users') : null, [firestore]);
+    const { data: activeUsers, isLoading: isLoadingUsers } = useCollection<UserProfile>(usersQuery);
+
+    const loadData = React.useCallback(async () => {
+        setIsLoading(true);
+        try {
+            const invitedUsers = await getUserRoles();
+            const existingUsers = activeUsers || [];
+            
+            const existingUserEmails = new Set(existingUsers.map(u => u.email));
+            const pendingInvites = invitedUsers.filter(r => !existingUserEmails.has(r.email));
+
+            const combined = [...existingUsers, ...pendingInvites];
+            setCombinedUsers(combined);
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Erro ao carregar usuários', description: error.message });
+        } finally {
+            setIsLoading(false);
+        }
+    }, [activeUsers, toast]);
+
+    React.useEffect(() => {
+        if (!isLoadingUsers) {
+            loadData();
+        }
+    }, [isLoadingUsers, loadData]);
+
+    const handleDelete = async () => {
+        if (!userToDelete) return;
+        setIsDeleting(true);
+        try {
+            await deleteUserRole(userToDelete.email);
+            toast({ title: 'Usuário excluído com sucesso!' });
+            loadData();
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Erro ao excluir', description: error.message });
+        }
+        setIsDeleting(false);
+        setUserToDelete(null);
+    };
 
     const roleLabels: { [key: string]: string } = {
         admin: 'Administrador',
@@ -145,50 +299,72 @@ function UsersTab() {
         financial: 'Financeiro',
     };
 
+    const isUserProfile = (user: any): user is UserProfile => 'id' in user;
+
     return (
-        <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                    <CardTitle>Gerenciamento de Usuários</CardTitle>
-                    <CardDescription>Adicione, remova e gerencie as permissões dos usuários do sistema.</CardDescription>
-                </div>
-                <Button disabled><PlusCircle className="mr-2 h-4 w-4" /> Convidar Usuário</Button>
-            </CardHeader>
-            <CardContent>
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Nome</TableHead>
-                            <TableHead>Email</TableHead>
-                            <TableHead>Perfil</TableHead>
-                            <TableHead className="text-right">Ações</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {isLoading ? (
-                            [...Array(3)].map((_, i) => (
-                                <TableRow key={i}>
-                                    <TableCell><Skeleton className="h-5 w-32" /></TableCell>
-                                    <TableCell><Skeleton className="h-5 w-48" /></TableCell>
-                                    <TableCell><Skeleton className="h-6 w-24" /></TableCell>
-                                    <TableCell className="text-right"><Skeleton className="h-8 w-20 ml-auto" /></TableCell>
-                                </TableRow>
-                            ))
-                        ) : users?.map(user => (
-                            <TableRow key={user.id}>
-                                <TableCell>{user.firstName} {user.lastName}</TableCell>
-                                <TableCell>{user.email}</TableCell>
-                                <TableCell><Badge variant="secondary">{roleLabels[user.role] || user.role}</Badge></TableCell>
-                                <TableCell className="text-right">
-                                    <Button variant="ghost" size="icon" disabled><Edit className="h-4 w-4" /></Button>
-                                    <Button variant="ghost" size="icon" disabled><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                                </TableCell>
+        <>
+            <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                    <div>
+                        <CardTitle>Gerenciamento de Usuários</CardTitle>
+                        <CardDescription>Adicione, remova e gerencie as permissões dos usuários do sistema.</CardDescription>
+                    </div>
+                    <InviteUserDialog onInvite={loadData} userToEdit={userToEdit} />
+                </CardHeader>
+                <CardContent>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Nome</TableHead>
+                                <TableHead>Email</TableHead>
+                                <TableHead>Perfil</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead className="text-right">Ações</TableHead>
                             </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
-            </CardContent>
-        </Card>
+                        </TableHeader>
+                        <TableBody>
+                            {isLoading ? (
+                                [...Array(3)].map((_, i) => (
+                                    <TableRow key={i}>
+                                        <TableCell colSpan={5}><Skeleton className="h-8 w-full" /></TableCell>
+                                    </TableRow>
+                                ))
+                            ) : combinedUsers.map(user => (
+                                <TableRow key={user.email}>
+                                    <TableCell>{isUserProfile(user) ? `${user.firstName} ${user.lastName}` : <span className="text-muted-foreground">Convidado</span>}</TableCell>
+                                    <TableCell>{user.email}</TableCell>
+                                    <TableCell><Badge variant="secondary">{roleLabels[user.role] || user.role}</Badge></TableCell>
+                                    <TableCell>
+                                        {isUserProfile(user) ? <Badge className="bg-green-100 text-green-800">Ativo</Badge> : <Badge variant="outline">Pendente</Badge>}
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        <Button variant="ghost" size="icon" onClick={() => setUserToEdit(user)}><Edit className="h-4 w-4" /></Button>
+                                        <Button variant="ghost" size="icon" onClick={() => setUserToDelete(user)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </CardContent>
+            </Card>
+            <AlertDialog open={!!userToDelete} onOpenChange={(open) => !open && setUserToDelete(null)}>
+                 <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+                        <AlertDialogDescription>
+                           Tem certeza que deseja remover o acesso de "{userToDelete?.email}"? Esta ação não pode ser desfeita.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDelete} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
+                             {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Excluir
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        </>
     );
 }
 
@@ -273,6 +449,28 @@ function FinancialTab() {
   );
 }
 
+function AppearanceTab() {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Aparência</CardTitle>
+        <CardDescription>Ajuste o tema de aparência do sistema.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex items-center space-x-3 rounded-lg border p-4">
+          <Switch id="dark-mode" defaultChecked disabled />
+          <Label htmlFor="dark-mode" className="cursor-pointer">
+            Modo Escuro (Padrão)
+          </Label>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          O modo escuro é o tema padrão. A funcionalidade para alternar entre temas claro/escuro em tempo real será implementada em breve.
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
 
 export default function ConfiguracoesPage() {
   return (
@@ -346,23 +544,7 @@ export default function ConfiguracoesPage() {
         </TabsContent>
 
         <TabsContent value="aparencia">
-          <Card>
-            <CardHeader>
-                <CardTitle>Aparência</CardTitle>
-                <CardDescription>Ajuste o tema de aparência do sistema.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-                <div className="flex items-center space-x-3 rounded-lg border p-4">
-                    <Switch id="dark-mode" defaultChecked />
-                    <Label htmlFor="dark-mode" className="cursor-pointer">
-                        Modo Escuro
-                    </Label>
-                </div>
-                 <p className="text-sm text-muted-foreground">
-                    Ative o modo escuro para uma experiência visual mais confortável. A troca de tema em tempo real será implementada em breve.
-                </p>
-            </CardContent>
-          </Card>
+          <AppearanceTab />
         </TabsContent>
 
         <TabsContent value="backup">
