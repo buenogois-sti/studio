@@ -1,10 +1,10 @@
 'use server';
 import { firestoreAdmin } from '@/firebase/admin';
 import type { Client } from './types';
-import type { firestore as adminFirestore } from 'firebase-admin';
+import { firestore } from 'firebase-admin';
 
 // Helper function to serialize a Firestore document into a Client object
-function serializeClient(doc: adminFirestore.DocumentSnapshot): Client | null {
+function serializeClient(doc: firestore.DocumentSnapshot): Client | null {
     const data = doc.data();
     const id = doc.id;
 
@@ -128,8 +128,8 @@ export async function bulkCreateClients(clients: Partial<Client>[]): Promise<{ s
                 ...clientData,
                 document: clientData.document || 'PENDENTE',
                 clientType: clientData.clientType || 'Pessoa Física',
-                createdAt: adminFirestore.FieldValue.serverTimestamp(),
-                updatedAt: adminFirestore.FieldValue.serverTimestamp(),
+                createdAt: firestore.FieldValue.serverTimestamp(),
+                updatedAt: firestore.FieldValue.serverTimestamp(),
                 avatar: '',
             });
         });
