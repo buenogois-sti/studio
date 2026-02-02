@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -19,6 +20,7 @@ import {
   PlusCircle,
   Edit,
   Trash2,
+  FolderTree,
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -39,12 +41,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { initializeAdminDriveStructure } from '@/lib/admin-drive-actions';
 
 
 function IntegrationsTab() {
   const { data: session, status } = useSession();
   const { toast } = useToast();
   const [isDisconnecting, setIsDisconnecting] = React.useState(false);
+  const [isInitializingDrive, setIsInitializingDrive] = React.useState(false);
   
   const { firestore } = useFirebase();
   const userProfileRef = useMemoFirebase(
@@ -71,65 +75,119 @@ function IntegrationsTab() {
     }
   };
 
+  const handleInitAdminDrive = async () => {
+    setIsInitializingDrive(true);
+    try {
+        const result = await initializeAdminDriveStructure();
+        if (result.success) {
+            toast({
+                title: 'Sucesso!',
+                description: result.message,
+            });
+        }
+    } catch (error: any) {
+        toast({
+            variant: 'destructive',
+            title: 'Erro na Inicialização',
+            description: error.message || 'Não foi possível criar a estrutura no Drive.',
+        });
+    } finally {
+        setIsInitializingDrive(false);
+    }
+  };
+
   const isConnected = status === 'authenticated';
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Integração com Google Workspace</CardTitle>
-        <CardDescription>
-          Gerencie a conexão com seu Google Drive para sincronização de pastas, documentos e planilhas.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        <Alert>
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Como Funciona a Integração</AlertTitle>
-          <AlertDescription>
-            Sua conta do Google é conectada quando você faz login. Isso permite que o LexFlow gerencie pastas e arquivos no seu Google Drive em seu nome, de forma segura.
-          </AlertDescription>
-        </Alert>
+    <div className="space-y-6">
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Briefcase className="h-5 w-5" />
-              Status da Conexão
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {status === 'loading' ? (
-              <div className="flex items-center justify-center p-3">
-                <Loader2 className="h-6 w-6 animate-spin" />
-              </div>
-            ) : isConnected ? (
-              <div className="flex items-center justify-between p-3 rounded-md bg-emerald-50 text-emerald-900 dark:bg-emerald-900/50 dark:text-emerald-200">
-                <div className="flex flex-col">
-                  <span className="text-sm font-semibold">Conectado</span>
-                  <span className="text-xs">{session?.user?.email}</span>
+        <CardHeader>
+            <CardTitle>Integração com Google Workspace</CardTitle>
+            <CardDescription>
+            Gerencie a conexão com seu Google Drive para sincronização de pastas, documentos e planilhas.
+            </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+            <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Como Funciona a Integração</AlertTitle>
+            <AlertDescription>
+                Sua conta do Google é conectada quando você faz login. Isso permite que o LexFlow gerencie pastas e arquivos no seu Google Drive em seu nome, de forma segura.
+            </AlertDescription>
+            </Alert>
+            <Card>
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                <Briefcase className="h-5 w-5" />
+                Status da Conexão
+                </CardTitle>
+            </CardHeader>
+            <CardContent>
+                {status === 'loading' ? (
+                <div className="flex items-center justify-center p-3">
+                    <Loader2 className="h-6 w-6 animate-spin" />
                 </div>
-                <Badge variant="default" className="bg-emerald-100 text-emerald-900 hover:bg-emerald-100 pointer-events-none">Ativo</Badge>
-              </div>
-            ) : (
-              <div className="flex items-center justify-between p-3 rounded-md bg-yellow-50 border border-yellow-200 dark:bg-yellow-950 dark:border-yellow-800">
-                <div className="flex flex-col">
-                  <span className="text-sm font-medium text-yellow-800 dark:text-yellow-200">Não Conectado</span>
-                  <span className="text-xs text-muted-foreground">Faça login para conectar sua conta.</span>
+                ) : isConnected ? (
+                <div className="flex items-center justify-between p-3 rounded-md bg-emerald-50 text-emerald-900 dark:bg-emerald-900/50 dark:text-emerald-200">
+                    <div className="flex flex-col">
+                    <span className="text-sm font-semibold">Conectado</span>
+                    <span className="text-xs">{session?.user?.email}</span>
+                    </div>
+                    <Badge variant="default" className="bg-emerald-100 text-emerald-900 hover:bg-emerald-100 pointer-events-none">Ativo</Badge>
                 </div>
-                <Badge variant="outline" className="text-yellow-700 border-yellow-300 dark:text-yellow-300 dark:border-yellow-700">Inativo</Badge>
-              </div>
-            )}
-          </CardContent>
-          <CardFooter>
-            {isConnected && (
-              <Button variant="destructive" className="w-full" onClick={handleDisconnect} disabled={isDisconnecting}>
-                {isDisconnecting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PowerOff className="mr-2 h-4 w-4" />}
-                {isDisconnecting ? 'Desconectando...' : 'Sair e Desconectar do Google'}
-              </Button>
-            )}
-          </CardFooter>
+                ) : (
+                <div className="flex items-center justify-between p-3 rounded-md bg-yellow-50 border border-yellow-200 dark:bg-yellow-950 dark:border-yellow-800">
+                    <div className="flex flex-col">
+                    <span className="text-sm font-medium text-yellow-800 dark:text-yellow-200">Não Conectado</span>
+                    <span className="text-xs text-muted-foreground">Faça login para conectar sua conta.</span>
+                    </div>
+                    <Badge variant="outline" className="text-yellow-700 border-yellow-300 dark:text-yellow-300 dark:border-yellow-700">Inativo</Badge>
+                </div>
+                )}
+            </CardContent>
+            <CardFooter>
+                {isConnected && (
+                <Button variant="destructive" className="w-full" onClick={handleDisconnect} disabled={isDisconnecting}>
+                    {isDisconnecting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PowerOff className="mr-2 h-4 w-4" />}
+                    {isDisconnecting ? 'Desconectando...' : 'Sair e Desconectar do Google'}
+                </Button>
+                )}
+            </CardFooter>
+            </Card>
+        </CardContent>
         </Card>
-      </CardContent>
-    </Card>
+
+        {isConnected && (
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <FolderTree className="h-5 w-5" />
+                        Manutenção do Google Drive
+                    </CardTitle>
+                    <CardDescription>
+                        Ferramentas para organizar e inicializar a estrutura de pastas do escritório.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/30">
+                        <div className="space-y-1">
+                            <p className="text-sm font-medium">Estrutura Administrativa / Financeira</p>
+                            <p className="text-xs text-muted-foreground">Cria a árvore de pastas padrão para gestão do escritório (Recebimentos, Pagamentos, Honorários, etc).</p>
+                        </div>
+                        <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={handleInitAdminDrive}
+                            disabled={isInitializingDrive}
+                        >
+                            {isInitializingDrive ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
+                            Inicializar Estrutura
+                        </Button>
+                    </div>
+                </CardContent>
+            </Card>
+        )}
+    </div>
   )
 }
 

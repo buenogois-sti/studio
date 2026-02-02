@@ -9,6 +9,7 @@ import type { Session } from 'next-auth';
 import type { Client, Process } from './types';
 
 const ROOT_CLIENTS_FOLDER_ID = '1DVI828qlM7SoN4-FJsGj9wwmxcOEjh6l';
+const ROOT_ADMIN_FOLDER_ID = '1V6xGiXQnapkA4y4m3on1s5zZTYqMPkhH';
 
 const CLIENT_FOLDER_STRUCTURE: Record<string, string[] | Record<string, string[]>> = {
   'level1': [
@@ -39,6 +40,28 @@ const PROCESS_FOLDER_STRUCTURE: Record<string, string[] | Record<string, string[
     '04 - Atas e Audiências',
     '05 - Execução',
     '06 - Encerramento'
+  ]
+};
+
+const ADMIN_FINANCEIRO_STRUCTURE: Record<string, string[]> = {
+  'level1': [
+    '01 - Recebimentos',
+    '02 - Pagamentos',
+    '03 - Contas Fixas',
+    '04 - Contas Variáveis',
+    '05 - Honorários Advocatícios',
+    '06 - Repasse de Advogados',
+    '07 - Impostos e Tributos',
+    '08 - Reembolsos e Custas',
+    '09 - Extratos e Conciliação',
+    '10 - Relatórios Financeiros'
+  ],
+  '05 - Honorários Advocatícios': [
+    '01 - Honorários Contratuais',
+    '02 - Honorários de Êxito',
+    '03 - Honorários Sucumbenciais',
+    '04 - Acordos',
+    '05 - Execuções'
   ]
 };
 
@@ -279,5 +302,41 @@ export async function syncProcessToDrive(processId: string): Promise<void> {
     } catch (error: any) {
         console.error("Error in syncProcessToDrive:", error);
         throw new Error(error.message || 'Erro durante a sincronização do processo.');
+    }
+}
+
+export async function initializeAdminDriveStructure(): Promise<{ success: boolean; message: string }> {
+    try {
+        const { drive } = await getGoogleApiClientsForUser();
+
+        // 1. Encontrar ou Criar pasta FINANCEIRO dentro da raiz Administrativa
+        let financeiroFolderId = await findFolderByName(drive, ROOT_ADMIN_FOLDER_ID, 'FINANCEIRO');
+        
+        if (!financeiroFolderId) {
+            const res = await drive.files.create({
+                requestBody: {
+                    name: 'FINANCEIRO',
+                    mimeType: 'application/vnd.google-apps.folder',
+                    parents: [ROOT_ADMIN_FOLDER_ID],
+                },
+                fields: 'id',
+                supportsAllDrives: true,
+            });
+            financeiroFolderId = res.data.id!;
+        }
+
+        // 2. Criar subpastas do nível 1 do financeiro
+        const level1Ids = await createMultipleFolders(drive, financeiroFolderId, ADMIN_FINANCEIRO_STRUCTURE.level1);
+
+        // 3. Criar subpastas específicas (ex: Honorários Advocatícios)
+        const honorariosFolderId = level1Ids.get('05 - Honorários Advocatícios');
+        if (honorariosFolderId) {
+            await createMultipleFolders(drive, honorariosFolderId, ADMIN_FINANCEIRO_STRUCTURE['05 - Honorários Advocatícios']);
+        }
+
+        return { success: true, message: 'Estrutura Administrativa/Financeira criada com sucesso no Google Drive.' };
+    } catch (error: any) {
+        console.error("Error initializing admin drive structure:", error);
+        throw new Error(error.message || 'Falha ao inicializar estrutura no Drive.');
     }
 }
