@@ -1,7 +1,7 @@
 'use client';
 import type { Timestamp } from 'firebase/firestore';
 
-export type UserRole = 'admin' | 'lawyer' | 'financial';
+export type UserRole = 'admin' | 'lawyer' | 'financial' | 'assistant';
 
 export type UserProfile = {
   id: string;

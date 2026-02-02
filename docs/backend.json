@@ -29,8 +29,8 @@
         },
         "role": {
           "type": "string",
-          "description": "The role of the user (e.g., admin, lawyer, financial).",
-          "format": "string"
+          "description": "The role of the user (e.g., admin, lawyer, financial, assistant).",
+          "enum": ["admin", "lawyer", "financial", "assistant"]
         },
         "createdAt": {
           "type": "string",
@@ -773,7 +773,7 @@
         "role": {
           "type": "string",
           "description": "The role to be assigned to the user upon signup.",
-          "enum": ["admin", "lawyer", "financial"]
+          "enum": ["admin", "lawyer", "financial", "assistant"]
         }
       },
       "required": ["email", "role"]

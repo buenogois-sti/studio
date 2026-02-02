@@ -25,6 +25,7 @@ const roles: { role: UserRole; label: string }[] = [
   { role: 'admin', label: 'Administrador' },
   { role: 'lawyer', label: 'Advogado' },
   { role: 'financial', label: 'Financeiro' },
+  { role: 'assistant', label: 'Secretaria / Colaborador' },
 ];
 
 export function UserNav() {

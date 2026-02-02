@@ -60,25 +60,25 @@ const navItems = [
     href: '/dashboard',
     label: 'Dashboard',
     icon: Home,
-    roles: ['admin', 'lawyer', 'financial'],
+    roles: ['admin', 'lawyer', 'financial', 'assistant'],
   },
   {
     href: '/dashboard/clientes',
     label: 'Clientes',
     icon: Users,
-    roles: ['admin', 'lawyer'],
+    roles: ['admin', 'lawyer', 'assistant'],
   },
   {
     href: '/dashboard/processos',
     label: 'Processos',
     icon: FolderKanban,
-    roles: ['admin', 'lawyer'],
+    roles: ['admin', 'lawyer', 'assistant'],
   },
   {
     href: '/dashboard/audiencias',
     label: 'Audiências',
     icon: Calendar,
-    roles: ['admin', 'lawyer'],
+    roles: ['admin', 'lawyer', 'assistant'],
   },
   {
     href: '/dashboard/financeiro',
@@ -90,7 +90,7 @@ const navItems = [
     href: '/dashboard/acervo',
     label: 'Acervo',
     icon: Library,
-    roles: ['admin', 'lawyer'],
+    roles: ['admin', 'lawyer', 'assistant'],
   },
   {
     href: '/dashboard/staff',
@@ -334,5 +334,3 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <InnerLayout>{children}</InnerLayout>
     )
 }
-
-    

@@ -37,16 +37,16 @@ service cloud.firestore {
       }
     }
     match /clients/{clientId} {
-      allow write: if isOneOfRoles(['admin', 'lawyer']);
+      allow write: if isOneOfRoles(['admin', 'lawyer', 'assistant']);
     }
     match /processes/{processId} {
-      allow write: if isOneOfRoles(['admin', 'lawyer']);
+      allow write: if isOneOfRoles(['admin', 'lawyer', 'assistant']);
     }
     match /processes/{processId}/fee_split_rules/default {
       allow write: if isOneOfRoles(['admin', 'lawyer', 'financial']);
     }
     match /hearings/{hearingId} {
-      allow write: if isOneOfRoles(['admin', 'lawyer']);
+      allow write: if isOneOfRoles(['admin', 'lawyer', 'assistant']);
     }
     match /financial_events/{eventId} {
       allow write: if isOneOfRoles(['admin', 'financial']);

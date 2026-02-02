@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from 'react';
@@ -193,7 +192,7 @@ function IntegrationsTab() {
 
 const roleSchema = z.object({
   email: z.string().email('Formato de email inválido.'),
-  role: z.enum(['admin', 'lawyer', 'financial'], { required_error: 'Selecione um perfil.' }),
+  role: z.enum(['admin', 'lawyer', 'financial', 'assistant'], { required_error: 'Selecione um perfil.' }),
 });
 
 function InviteUserDialog({ onInvite, userToEdit }: { onInvite: () => void, userToEdit: (UserRoleInfo | UserProfile) | null }) {
@@ -279,6 +278,7 @@ function InviteUserDialog({ onInvite, userToEdit }: { onInvite: () => void, user
                                             <SelectItem value="admin">Administrador</SelectItem>
                                             <SelectItem value="lawyer">Advogado</SelectItem>
                                             <SelectItem value="financial">Financeiro</SelectItem>
+                                            <SelectItem value="assistant">Secretaria / Colaborador</SelectItem>
                                         </SelectContent>
                                     </Select>
                                     <FormMessage />
@@ -353,6 +353,7 @@ function UsersTab() {
         admin: 'Administrador',
         lawyer: 'Advogado',
         financial: 'Financeiro',
+        assistant: 'Secretaria / Colaborador',
     };
 
     const isUserProfile = (user: any): user is UserProfile => 'id' in user;
