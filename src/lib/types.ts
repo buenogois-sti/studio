@@ -20,6 +20,8 @@ export type UserRoleInfo = {
   role: UserRole;
 };
 
+export type ClientStatus = 'lead' | 'active' | 'inactive';
+
 export type Client = {
   id: string;
   firstName: string;
@@ -28,6 +30,7 @@ export type Client = {
   avatar: string;
   document: string;
   email: string;
+  status?: ClientStatus;
   motherName?: string;
   rg?: string;
   ctps?: string;

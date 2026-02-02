@@ -27,10 +27,11 @@ import { Loader2 } from 'lucide-react';
 
 import { useFirebase } from '@/firebase';
 import { collection, serverTimestamp, Timestamp, doc, addDoc, updateDoc } from 'firebase/firestore';
-import type { Client } from '@/lib/types';
+import type { Client, ClientStatus } from '@/lib/types';
 import { useToast } from '@/components/ui/use-toast';
 
 const clientSchema = z.object({
+  status: z.enum(['lead', 'active', 'inactive']).default('active'),
   clientType: z.string().min(1, { message: 'Selecione o tipo de cliente.' }),
   firstName: z.string().min(2, { message: 'O nome deve ter pelo menos 2 caracteres.' }),
   lastName: z.string().min(2, { message: 'O sobrenome deve ter pelo menos 2 caracteres.' }),
@@ -77,6 +78,7 @@ export function ClientForm({
   const form = useForm<z.infer<typeof clientSchema>>({
     resolver: zodResolver(clientSchema),
     defaultValues: {
+      status: client?.status ?? 'active',
       clientType: client?.clientType ?? '',
       firstName: client?.firstName ?? '',
       lastName: client?.lastName ?? '',
@@ -162,6 +164,7 @@ export function ClientForm({
       form.reset(flatClientData);
     } else {
       form.reset({
+        status: 'active',
         clientType: '',
         firstName: '',
         lastName: '',
@@ -233,7 +236,7 @@ export function ClientForm({
           ...clientData,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
-          avatar: '', // No avatar
+          avatar: '', 
         }
         const docRef = await addDoc(clientsCollection, newClientPayload);
         const newClient: Client = {
@@ -267,6 +270,28 @@ export function ClientForm({
           <section>
             <H2>Dados Pessoais</H2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+              <FormField
+                control={form.control}
+                name="status"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Status do Cliente *</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger ref={field.ref}>
+                          <SelectValue placeholder="Selecionar status..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="active">🟢 Ativo</SelectItem>
+                        <SelectItem value="lead">🟡 Consulta / Lead</SelectItem>
+                        <SelectItem value="inactive">⚪ Inativo</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <FormField
                 control={form.control}
                 name="clientType"

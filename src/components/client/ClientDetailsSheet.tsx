@@ -22,12 +22,16 @@ import {
   Calendar,
   AtSign,
   Smartphone,
-  Hash
+  Hash,
+  ShieldCheck,
+  AlertCircle
 } from 'lucide-react';
 import type { Client } from '@/lib/types';
 import { useToast } from '@/components/ui/use-toast';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { Progress } from '@/components/ui/progress';
+import { cn } from '@/lib/utils';
 
 interface ClientDetailsSheetProps {
   client: Client | null;
@@ -39,6 +43,19 @@ export function ClientDetailsSheet({ client, open, onOpenChange }: ClientDetails
   const { toast } = useToast();
 
   if (!client) return null;
+
+  const calculateIntegrity = () => {
+    const fields = [
+      client.firstName, client.lastName, client.document, client.email,
+      client.mobile, client.rg, client.ctps, client.pis,
+      client.address?.street, client.address?.zipCode,
+      client.bankInfo?.pixKey
+    ];
+    const filled = fields.filter(f => !!f).length;
+    return Math.round((filled / fields.length) * 100);
+  };
+
+  const integrity = calculateIntegrity();
 
   const formatDate = (date: any) => {
     if (!date) return 'N/A';
@@ -100,27 +117,29 @@ Gerado em: ${format(new Date(), "dd/MM/yyyy HH:mm")}
     <div className={`flex items-start gap-3 py-2 ${className}`}>
       <Icon className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
       <div className="flex flex-col">
-        <span className="text-[10px] uppercase font-bold text-muted-foreground leading-none mb-1">{label}</span>
-        <span className="text-sm font-medium">{value || 'Não informado'}</span>
+        <span className="text-[10px] uppercase font-black text-muted-foreground leading-none mb-1 tracking-widest">{label}</span>
+        <span className={cn("text-sm font-medium", !value && "text-muted-foreground italic font-normal")}>{value || 'Pendente'}</span>
       </div>
     </div>
   );
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      {/* IMPROVED: Much wider sheet for desktop viewing */}
       <SheetContent className="sm:max-w-3xl w-full overflow-y-auto print:p-0 print:shadow-none print:border-none">
         <div className="print:block hidden mb-8">
             <h1 className="text-2xl font-bold">FICHA DO CLIENTE</h1>
-            <p className="text-sm text-muted-foreground">Escritório Bueno Gois Advogados e Associados</p>
+            <p className="text-sm text-muted-foreground">Bueno Gois Advogados e Associados</p>
             <Separator className="my-4" />
         </div>
 
         <SheetHeader className="print:hidden">
           <div className="flex items-center justify-between gap-4 mb-2">
             <div className="flex flex-col text-left">
-                <SheetTitle className="text-2xl font-headline">{client.firstName} {client.lastName}</SheetTitle>
-                <SheetDescription>Ficha completa de dados cadastrais</SheetDescription>
+                <SheetTitle className="text-2xl font-headline font-bold">{client.firstName} {client.lastName}</SheetTitle>
+                <div className="flex items-center gap-2 mt-1">
+                    <Progress value={integrity} className="h-1.5 w-24" />
+                    <span className="text-[10px] font-black text-muted-foreground uppercase">{integrity}% Integritade</span>
+                </div>
             </div>
             <div className="flex gap-2 shrink-0">
                 <Button variant="outline" size="icon" onClick={handleCopyAll} title="Copiar Resumo">
@@ -133,31 +152,48 @@ Gerado em: ${format(new Date(), "dd/MM/yyyy HH:mm")}
           </div>
         </SheetHeader>
 
-        <div id="print-area" className="space-y-8 mt-6">
+        <div id="print-area" className="space-y-8 mt-8">
+          {/* Alerta de Saúde Cadastral */}
+          {integrity < 100 && (
+              <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-500/5 border border-amber-500/20 print:hidden">
+                  <AlertCircle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                      <p className="text-sm font-bold text-amber-700">Pendências de Cadastro</p>
+                      <p className="text-xs text-amber-600 leading-relaxed">Existem campos vazios que podem ser necessários para petições automáticas. Recomendamos completar o perfil.</p>
+                  </div>
+              </div>
+          )}
+
           {/* Sessão: Dados Pessoais */}
           <section>
             <div className="flex items-center gap-2 mb-4">
-                <User className="h-5 w-5 text-primary" />
-                <h3 className="font-bold text-lg uppercase tracking-tight">Dados Pessoais</h3>
+                <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <User className="h-4 w-4 text-primary" />
+                </div>
+                <h3 className="font-black text-xs uppercase tracking-widest text-muted-foreground">Dados Pessoais</h3>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 bg-muted/30 p-4 rounded-xl border">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 bg-muted/20 p-6 rounded-2xl border border-border/50">
                 <InfoRow icon={Hash} label="Documento Principal" value={client.document} />
                 <InfoRow icon={FileText} label="Tipo de Cliente" value={client.clientType} />
                 <InfoRow icon={FileText} label="RG" value={client.rg} />
                 <InfoRow icon={Briefcase} label="Área Jurídica" value={client.legalArea} />
                 <InfoRow icon={User} label="Nome da Mãe" value={client.motherName} className="col-span-1 sm:col-span-2" />
-                <InfoRow icon={FileText} label="CTPS" value={client.ctps} />
-                <InfoRow icon={FileText} label="PIS/PASEP" value={client.pis} />
+                <div className="grid grid-cols-2 gap-4 col-span-1 sm:col-span-2">
+                    <InfoRow icon={FileText} label="CTPS" value={client.ctps} />
+                    <InfoRow icon={FileText} label="PIS/PASEP" value={client.pis} />
+                </div>
             </div>
           </section>
 
           {/* Sessão: Contato */}
           <section>
             <div className="flex items-center gap-2 mb-4">
-                <Phone className="h-5 w-5 text-primary" />
-                <h3 className="font-bold text-lg uppercase tracking-tight">Canais de Contato</h3>
+                <div className="h-8 w-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                    <Smartphone className="h-4 w-4 text-blue-500" />
+                </div>
+                <h3 className="font-black text-xs uppercase tracking-widest text-muted-foreground">Canais de Contato</h3>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 bg-muted/30 p-4 rounded-xl border">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 bg-muted/20 p-6 rounded-2xl border border-border/50">
                 <InfoRow icon={AtSign} label="E-mail" value={client.email} className="col-span-1 sm:col-span-2" />
                 <InfoRow icon={Smartphone} label="Celular / WhatsApp" value={client.mobile} />
                 <InfoRow icon={Phone} label="Telefone Fixo" value={client.phone} />
@@ -168,15 +204,16 @@ Gerado em: ${format(new Date(), "dd/MM/yyyy HH:mm")}
           {/* Sessão: Endereço */}
           <section>
             <div className="flex items-center gap-2 mb-4">
-                <MapPin className="h-5 w-5 text-primary" />
-                <h3 className="font-bold text-lg uppercase tracking-tight">Endereço Residencial</h3>
+                <div className="h-8 w-8 rounded-lg bg-rose-500/10 flex items-center justify-center">
+                    <MapPin className="h-4 w-4 text-rose-500" />
+                </div>
+                <h3 className="font-black text-xs uppercase tracking-widest text-muted-foreground">Endereço Residencial</h3>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 bg-muted/30 p-4 rounded-xl border">
-                <InfoRow icon={MapPin} label="Logradouro" value={`${client.address?.street || ''}, ${client.address?.number || ''}`} className="col-span-1 sm:col-span-2" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 bg-muted/20 p-6 rounded-2xl border border-border/50">
+                <InfoRow icon={MapPin} label="Logradouro" value={client.address?.street ? `${client.address.street}, ${client.address.number || 'S/N'}` : undefined} className="col-span-1 sm:col-span-2" />
                 <InfoRow icon={MapPin} label="Complemento" value={client.address?.complement} />
                 <InfoRow icon={MapPin} label="Bairro" value={client.address?.neighborhood} />
-                <InfoRow icon={MapPin} label="Cidade" value={client.address?.city} />
-                <InfoRow icon={MapPin} label="Estado" value={client.address?.state} />
+                <InfoRow icon={MapPin} label="Cidade / UF" value={client.address?.city ? `${client.address.city} - ${client.address.state || ''}` : undefined} />
                 <InfoRow icon={Hash} label="CEP" value={client.address?.zipCode} />
             </div>
           </section>
@@ -184,22 +221,26 @@ Gerado em: ${format(new Date(), "dd/MM/yyyy HH:mm")}
           {/* Sessão: Financeiro */}
           <section>
             <div className="flex items-center gap-2 mb-4">
-                <CreditCard className="h-5 w-5 text-primary" />
-                <h3 className="font-bold text-lg uppercase tracking-tight">Dados Financeiros</h3>
+                <div className="h-8 w-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                    <CreditCard className="h-4 w-4 text-emerald-500" />
+                </div>
+                <h3 className="font-black text-xs uppercase tracking-widest text-muted-foreground">Dados Financeiros</h3>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 bg-muted/30 p-4 rounded-xl border">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 bg-muted/20 p-6 rounded-2xl border border-border/50">
                 <InfoRow icon={CreditCard} label="Banco" value={client.bankInfo?.bankName} />
-                <InfoRow icon={CreditCard} label="Agência / Conta" value={`${client.bankInfo?.agency || ''} / ${client.bankInfo?.account || ''}`} />
+                <InfoRow icon={CreditCard} label="Agência / Conta" value={client.bankInfo?.agency ? `${client.bankInfo.agency} / ${client.bankInfo.account || ''}` : undefined} />
                 <InfoRow icon={Smartphone} label="Chave PIX" value={client.bankInfo?.pixKey} className="col-span-1 sm:col-span-2" />
             </div>
           </section>
 
-          <div className="pt-4 text-[10px] text-muted-foreground flex items-center justify-between print:mt-12">
-            <div className="flex items-center gap-2">
+          <div className="pt-8 text-[10px] text-muted-foreground flex items-center justify-between print:mt-12 border-t">
+            <div className="flex items-center gap-2 font-bold uppercase tracking-tighter">
                 <Calendar className="h-3 w-3" />
-                <span>Cliente desde: {formatDate(client.createdAt)}</span>
+                <span>Cadastrado em {formatDate(client.createdAt)}</span>
             </div>
-            <span>ID: {client.id}</span>
+            <div className="flex items-center gap-1 font-mono">
+                <ShieldCheck className="h-3 w-3" /> {client.id}
+            </div>
           </div>
         </div>
       </SheetContent>
