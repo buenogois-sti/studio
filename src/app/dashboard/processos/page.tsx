@@ -1,3 +1,4 @@
+
 'use client';
 import * as React from 'react';
 import {
@@ -11,6 +12,8 @@ import {
   Check,
   X,
   DollarSign,
+  ExternalLink,
+  FolderOpen
 } from 'lucide-react';
 import { z } from 'zod';
 import { useForm, useFieldArray } from 'react-hook-form';
@@ -217,6 +220,7 @@ function ProcessForm({
 }) {
   const { firestore } = useFirebase();
   const { toast } = useToast();
+  const { data: session } = useSession();
   const [isSaving, setIsSaving] = React.useState(false);
   const [isClientSheetOpen, setIsClientSheetOpen] = React.useState(false);
 
@@ -325,8 +329,10 @@ function ProcessForm({
         opposingParties: values.opposingParties?.map((p) => p.value),
       };
 
-      if (process?.id) {
-        const processRef = doc(firestore, 'processes', process.id);
+      let processId = process?.id;
+
+      if (processId) {
+        const processRef = doc(firestore, 'processes', processId);
         await updateDoc(processRef, {
           ...processData,
           updatedAt: serverTimestamp(),
@@ -337,15 +343,30 @@ function ProcessForm({
         });
       } else {
         const processesCollection = collection(firestore, 'processes');
-        await addDoc(processesCollection, {
+        const docRef = await addDoc(processesCollection, {
           ...processData,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         });
+        processId = docRef.id;
         toast({
           title: 'Processo cadastrado!',
           description: `O processo "${values.name}" foi adicionado com sucesso.`,
         });
+
+        // Tenta sincronizar com o Drive automaticamente se o cliente já estiver sincronizado
+        if (selectedClient?.driveFolderId && session) {
+            try {
+                await syncProcessToDrive(processId);
+                toast({
+                    title: "Drive Sincronizado!",
+                    description: `Estrutura de pastas para o processo foi criada no Drive do cliente.`
+                });
+            } catch (driveError) {
+                console.warn("Auto-sync failed, but process was saved:", driveError);
+                // Não alertamos erro crítico aqui para não frustrar o usuário já que o registro foi salvo
+            }
+        }
       }
       onSave();
     } catch (error: any) {
@@ -826,7 +847,7 @@ export default function ProcessosPage() {
                     Nº do Processo
                   </TableHead>
                   <TableHead className="hidden md:table-cell">Status</TableHead>
-                  <TableHead className="hidden md:table-cell">Status do Drive</TableHead>
+                  <TableHead className="hidden md:table-cell">Drive</TableHead>
                   <TableHead>
                     <span className="sr-only">Ações</span>
                   </TableHead>
@@ -879,9 +900,9 @@ export default function ProcessosPage() {
                               : 'default'
                           }
                           className={cn({
-                            'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300':
+                            'bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20':
                               process.status === 'Ativo',
-                            'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300':
+                            'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/20':
                               process.status === 'Pendente',
                           })}
                         >
@@ -890,9 +911,9 @@ export default function ProcessosPage() {
                       </TableCell>
                       <TableCell className="hidden md:table-cell">
                         {process.driveFolderId ? (
-                            <Badge variant="secondary" className='bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300'>Sincronizado</Badge>
+                            <Badge variant="secondary" className='bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'>Sincronizado</Badge>
                         ) : (
-                            <Badge variant="outline">Não Sincronizado</Badge>
+                            <Badge variant="outline" className='text-muted-foreground'>Não Sincronizado</Badge>
                         )}
                       </TableCell>
                       <TableCell className="text-right">
@@ -917,11 +938,12 @@ export default function ProcessosPage() {
                                 <DropdownMenuItem
                                     onSelect={() => window.open(`https://drive.google.com/drive/folders/${process.driveFolderId}`, '_blank')}
                                 >
+                                    <FolderOpen className="mr-2 h-4 w-4" />
                                     Abrir Pasta no Drive
                                 </DropdownMenuItem>
                             ) : (
                                 <DropdownMenuItem onClick={() => handleSyncProcess(process)} disabled={isSyncing === process.id}>
-                                    {isSyncing === process.id && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                    {isSyncing === process.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ExternalLink className="mr-2 h-4 w-4" />}
                                     Sincronizar com Drive
                                 </DropdownMenuItem>
                             )}
