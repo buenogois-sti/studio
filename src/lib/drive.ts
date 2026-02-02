@@ -8,44 +8,37 @@ import type { Session } from 'next-auth';
 import type { Client, Process } from './types';
 
 const ROOT_CLIENTS_FOLDER_ID = '1DVI828qlM7SoN4-FJsGj9wwmxcOEjh6l';
-const ADMIN_FINANCE_FOLDER_ID = '1V6xGiXQnapkA4y4m3on1s5zZTYqMPkhH';
 
 const CLIENT_FOLDER_STRUCTURE: Record<string, string[] | Record<string, string[]>> = {
   'level1': [
-    '00_DADOS_DO_CLIENTE',
-    '01_CONTRATO_E_HONORÁRIOS',
-    '02_DOCUMENTOS_PESSOAIS',
-    '03_PROCESSOS',
-    '04_FINANCEIRO',
-    '99_ADMINISTRATIVO_INTERNO'
+    '01 - Cadastro e Documentos Pessoais',
+    '02 - Contratos e Procurações',
+    '03 - Processos',
+    '04 - Andamentos e Prazos',
+    '05 - Provas e Documentos Processuais',
+    '06 - Financeiro',
+    '07 - Comunicações e Atendimentos',
+    '08 - Modelos e Documentos Gerados'
   ],
-  '04_FINANCEIRO': [
-    'COMPROVANTES_PAGAMENTOS_CLIENTE',
-    'RECIBOS_HONORARIOS',
-    'NOTAS_FISCAIS_SERVICOS',
-    'CUSTAS_PROCESSUAIS',
-    'ADMINISTRATIVO'
+  '06 - Financeiro': [
+    '01 - Honorários Contratuais',
+    '02 - Acordos',
+    '03 - Execuções / Sentenças',
+    '04 - Repasse para Advogados',
+    '05 - Custas e Despesas',
+    '06 - Recibos e Comprovantes'
   ]
 };
 
 const PROCESS_FOLDER_STRUCTURE: Record<string, string[] | Record<string, string[]>> = {
   'level1': [
-    '00_DADOS_DO_PROCESSO',
-    '01_PETIÇÕES_INICIAIS',
-    '02_CONTESTAÇÃO_E_MANIFESTAÇÕES',
-    '03_PROVAS',
-    '04_MOVIMENTAÇÕES_E_ANDAMENTOS',
-    '05_DECISÕES_E_SENTENÇAS',
-    '06_RECURSOS',
-    '07_CÁLCULOS_E_LIQUIDAÇÃO',
-    '08_EXECUÇÃO_E_CUMPRIMENTO',
-    '09_ACORDOS_E_CONCILIAÇÕES',
-    '10_PRAZOS',
-    '99_ENCERRAMENTO',
-  ],
-  '03_PROVAS': ['DOCUMENTAIS', 'TESTEMUNHAIS', 'PERICIAIS', 'AUDIO_VIDEO'],
-  '05_DECISÕES_E_SENTENÇAS': ['DECISÕES_INTERLOCUTÓRIAS', 'SENTENÇA', 'ACÓRDÃO'],
-  '10_PRAZOS': ['ABERTOS', 'CUMPRIDOS', 'PERDIDOS'],
+    '01 - Petições',
+    '02 - Decisões e Sentenças',
+    '03 - Recursos',
+    '04 - Atas e Audiências',
+    '05 - Execução',
+    '06 - Encerramento'
+  ]
 };
 
 
@@ -203,7 +196,14 @@ export async function syncClientToDrive(clientId: string, clientName: string): P
     try {
         const { drive, sheets } = await getGoogleApiClientsForUser();
 
-        const mainFolderName = `${clientId.substring(0, 6)} - ${clientName}`;
+        // Fetch document to include in folder name
+        const clientRef = firestoreAdmin.collection('clients').doc(clientId);
+        const clientDoc = await clientRef.get();
+        if (!clientDoc.exists) throw new Error('Cliente não encontrado.');
+        const clientData = clientDoc.data() as Client;
+        const clientDocument = clientData.document || 'PENDENTE';
+
+        const mainFolderName = `${clientName} - ${clientDocument}`;
         const mainFolderId = await createClientMainFolder(drive, mainFolderName);
         if (!mainFolderId) {
             throw new Error('Falha ao criar a pasta principal do cliente no Google Drive.');
@@ -234,8 +234,8 @@ export async function syncClientToDrive(clientId: string, clientName: string): P
             throw new Error('Falha ao criar planilha no Google Sheets.');
         }
         
-        const adminFolderId = level1FolderIds.get('99_ADMINISTRATIVO_INTERNO');
-        if (adminFolderId) {
+        const cadastroFolderId = level1FolderIds.get('01 - Cadastro e Documentos Pessoais');
+        if (cadastroFolderId) {
             const file = await drive.files.get({
                 fileId: sheetId,
                 fields: 'parents',
@@ -245,15 +245,14 @@ export async function syncClientToDrive(clientId: string, clientName: string): P
 
             await drive.files.update({
                 fileId: sheetId,
-                addParents: adminFolderId,
+                addParents: cadastroFolderId,
                 removeParents: previousParents,
                 fields: 'id, parents',
                 supportsAllDrives: true,
             });
-            console.log('Moved Sheet into 99_ADMINISTRATIVO_INTERNO folder.');
+            console.log('Moved Sheet into Cadastro folder.');
         }
         
-        const clientRef = firestoreAdmin.collection('clients').doc(clientId);
         await clientRef.update({
             driveFolderId: mainFolderId,
             sheetId: sheetId,
@@ -294,15 +293,15 @@ export async function syncProcessToDrive(processId: string): Promise<void> {
 
         const { drive } = await getGoogleApiClientsForUser();
 
-        let processosFolderId = await findFolderByName(drive, clientData.driveFolderId, '03_PROCESSOS');
+        let processosFolderId = await findFolderByName(drive, clientData.driveFolderId, '03 - Processos');
         if (!processosFolderId) {
-            console.warn("'03_PROCESSOS' folder not found, creating it now.");
-            const createdFolders = await createMultipleFolders(drive, clientData.driveFolderId, ['03_PROCESSOS']);
-            processosFolderId = createdFolders.get('03_PROCESSOS')!;
-            if (!processosFolderId) throw new Error("Could not create '03_PROCESSOS' folder.");
+            console.warn("'03 - Processos' folder not found, creating it now.");
+            const createdFolders = await createMultipleFolders(drive, clientData.driveFolderId, ['03 - Processos']);
+            processosFolderId = createdFolders.get('03 - Processos')!;
+            if (!processosFolderId) throw new Error("Could not create '03 - Processos' folder.");
         }
 
-        const processFolderName = `${processData.processNumber || 'S-N'} - ${clientData.legalArea || 'ÁREA'} - ${processData.name}`.replace(/[\/\\?%*:|"<>]/g, '-');
+        const processFolderName = `${processData.processNumber || 'SEM-NUMERO'} - ${processData.name}`.replace(/[\/\\?%*:|"<>]/g, '-');
         const mainProcessFolderId = (await createMultipleFolders(drive, processosFolderId, [processFolderName])).get(processFolderName)!;
         if (!mainProcessFolderId) throw new Error("Failed to create main process folder.");
 

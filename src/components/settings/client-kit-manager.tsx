@@ -29,10 +29,14 @@ const templateSchema = z.object({
 });
 
 const CLIENT_FOLDER_STRUCTURE = [
-  '00_DADOS_DO_CLIENTE',
-  '01_CONTRATO_E_HONORÁRIOS',
-  '02_DOCUMENTOS_PESSOAIS',
-  '99_ADMINISTRATIVO_INTERNO'
+  '01 - Cadastro e Documentos Pessoais',
+  '02 - Contratos e Procurações',
+  '03 - Processos',
+  '04 - Andamentos e Prazos',
+  '05 - Provas e Documentos Processuais',
+  '06 - Financeiro',
+  '07 - Comunicações e Atendimentos',
+  '08 - Modelos e Documentos Gerados'
 ];
 
 function TemplateFormDialog({ onSave, template }: { onSave: (templates: ClientKitTemplate[]) => Promise<void>, template?: ClientKitTemplate | null }) {
