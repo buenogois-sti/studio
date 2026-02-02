@@ -1,3 +1,4 @@
+
 'use client';
 import * as React from 'react';
 import {
@@ -29,10 +30,14 @@ import {
   Check,
   Calendar as CalendarIcon,
   User,
-  FileText
+  FileText,
+  TrendingUp,
+  AlertCircle,
+  Search,
+  X
 } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, Timestamp, query, orderBy } from 'firebase/firestore';
+import { collection, Timestamp, query, orderBy, limit } from 'firebase/firestore';
 import type { Client, FinancialTitle, Process, Staff } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -63,7 +68,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { format } from 'date-fns';
+import { format, startOfMonth, subMonths, isAfter, isBefore } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
@@ -71,7 +76,8 @@ import { createFinancialTitle, updateFinancialTitleStatus } from '@/lib/finance-
 import { searchProcesses } from '@/lib/process-actions';
 import { StaffCreditCard } from '@/components/finance/StaffCreditCard';
 import { Textarea } from '@/components/ui/textarea';
-
+import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 
 const operationalExpenseOrigins = [
   'SALARIOS_PROLABORE', 'ALUGUEL_CONTAS', 'INFRAESTRUTURA_TI', 'MARKETING_PUBLICIDADE', 
@@ -115,16 +121,31 @@ const titleSchema = z.object({
     path: ['paidToStaffId'],
 });
 
-
-const formatDate = (date: Timestamp | string | undefined | Date) => {
-  if (!date) return 'N/A';
-    const dateObj = typeof date === 'string' ? new Date(date) : (date instanceof Timestamp) ? date.toDate() : date;
-  return format(dateObj, 'dd/MM/yyyy', { locale: ptBR });
-};
-
 const formatCurrency = (amount: number) => {
   return amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 };
+
+const revenueOrigins = [
+    { value: 'HONORARIOS_CONTRATUAIS', label: 'Honorários Contratuais' },
+    { value: 'ACORDO', label: 'Acordo' },
+    { value: 'SENTENCA', label: 'Sentença' },
+    { value: 'SUCUMBENCIA', label: 'Sucumbência' },
+];
+
+const expenseOrigins = [
+    { value: 'CUSTAS_PROCESSUAIS', label: 'Custas Processuais' },
+    { value: 'HONORARIOS_PAGOS', label: 'Pagamento de Honorários (Equipe)' },
+    { value: 'SALARIOS_PROLABORE', label: 'Salários e Pró-labore' },
+    { value: 'ALUGUEL_CONTAS', label: 'Aluguel e Contas Fixas' },
+    { value: 'INFRAESTRUTURA_TI', label: 'Infraestrutura e TI' },
+    { value: 'MARKETING_PUBLICIDADE', label: 'Marketing e Publicidade' },
+    { value: 'IMPOSTOS_TAXAS', label: 'Impostos e Taxas' },
+    { value: 'MATERIAL_ESCRITORIO', label: 'Material de Escritório' },
+    { value: 'SERVICOS_TERCEIROS', label: 'Serviços de Terceiros' },
+    { value: 'OUTRAS_DESPESAS', label: 'Outras Despesas' },
+];
+
+const allOriginLabels = new Map([...revenueOrigins, ...expenseOrigins].map(o => [o.value, o.label]));
 
 function ProcessSearch({ onSelect, selectedProcess }: { onSelect: (process: Process) => void; selectedProcess: Process | null }) {
   const [search, setSearch] = React.useState('');
@@ -159,7 +180,7 @@ function ProcessSearch({ onSelect, selectedProcess }: { onSelect: (process: Proc
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="w-full justify-between font-normal"
+          className="w-full justify-between font-normal h-11"
         >
           <span className="truncate">
             {selectedProcess ? selectedProcess.name : "Vincular a um processo..."}
@@ -206,29 +227,6 @@ function ProcessSearch({ onSelect, selectedProcess }: { onSelect: (process: Proc
   );
 }
 
-const revenueOrigins = [
-    { value: 'HONORARIOS_CONTRATUAIS', label: 'Honorários Contratuais' },
-    { value: 'ACORDO', label: 'Acordo' },
-    { value: 'SENTENCA', label: 'Sentença' },
-    { value: 'SUCUMBENCIA', label: 'Sucumbência' },
-];
-
-const expenseOrigins = [
-    { value: 'CUSTAS_PROCESSUAIS', label: 'Custas Processuais' },
-    { value: 'HONORARIOS_PAGOS', label: 'Pagamento de Honorários (Equipe)' },
-    { value: 'SALARIOS_PROLABORE', label: 'Salários e Pró-labore' },
-    { value: 'ALUGUEL_CONTAS', label: 'Aluguel e Contas Fixas' },
-    { value: 'INFRAESTRUTURA_TI', label: 'Infraestrutura e TI' },
-    { value: 'MARKETING_PUBLICIDADE', label: 'Marketing e Publicidade' },
-    { value: 'IMPOSTOS_TAXAS', label: 'Impostos e Taxas' },
-    { value: 'MATERIAL_ESCRITORIO', label: 'Material de Escritório' },
-    { value: 'SERVICOS_TERCEIROS', label: 'Serviços de Terceiros' },
-    { value: 'OUTRAS_DESPESAS', label: 'Outras Despesas' },
-];
-
-const allOriginLabels = new Map([...revenueOrigins, ...expenseOrigins].map(o => [o.value, o.label]));
-
-
 function NewTitleDialog({ onTitleCreated, staffData }: { onTitleCreated: () => void; staffData: Staff[] | null }) {
   const [open, setOpen] = React.useState(false);
   const [isSaving, setIsSaving] = React.useState(false);
@@ -266,7 +264,6 @@ function NewTitleDialog({ onTitleCreated, staffData }: { onTitleCreated: () => v
     }).format(value);
   };
 
-
   const watchedType = form.watch('type');
   const watchedOrigin = form.watch('origin');
   const watchedStatus = form.watch('status');
@@ -289,13 +286,11 @@ function NewTitleDialog({ onTitleCreated, staffData }: { onTitleCreated: () => v
     }
   }, [requiresProcess, form]);
 
-
   async function onSubmit(values: z.infer<typeof titleSchema>) {
     setIsSaving(true);
     try {
       const payload: any = { 
         ...values,
-        // If status is PAGO and paymentDate is not set, use current date
         paymentDate: values.status === 'PAGO' ? (values.paymentDate || new Date()) : undefined
       };
       
@@ -557,7 +552,6 @@ function NewTitleDialog({ onTitleCreated, staffData }: { onTitleCreated: () => v
   );
 }
 
-
 function FinancialTitlesTable({
   titles,
   clientsMap,
@@ -620,13 +614,13 @@ function FinancialTitlesTable({
             <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
                 <FileText className="h-6 w-6 text-muted-foreground/50" />
             </div>
-            <p>Nenhuma movimentação encontrada para este filtro.</p>
+            <p>Nenhuma movimentação encontrada.</p>
         </div>
      )
   }
 
   return (
-    <div className="rounded-md border bg-card">
+    <div className="rounded-md border overflow-hidden">
         <Table>
         <TableHeader className="bg-muted/50">
             <TableRow>
@@ -642,7 +636,7 @@ function FinancialTitlesTable({
             {titles.map((title) => {
             const isRevenue = title.type === 'RECEITA';
             const dueDate = (title.dueDate as Timestamp).toDate();
-            const isOverdue = title.status === 'PENDENTE' && dueDate < new Date();
+            const isOverdue = title.status === 'PENDENTE' && isBefore(dueDate, new Date());
             const effectiveStatus = isOverdue ? 'ATRASADO' : title.status;
 
             return (
@@ -666,9 +660,11 @@ function FinancialTitlesTable({
                     </Badge>
                 </TableCell>
                 <TableCell className="hidden md:table-cell">
-                    <div className={cn("text-xs font-medium", isOverdue && "text-destructive")}>{formatDate(dueDate)}</div>
+                    <div className={cn("text-xs font-medium", isOverdue && "text-destructive font-bold")}>
+                        {format(dueDate, 'dd/MM/yyyy')}
+                    </div>
                     {title.status === 'PAGO' && title.paymentDate && (
-                        <div className="text-[10px] text-emerald-600 font-medium">Pago em {formatDate(title.paymentDate)}</div>
+                        <div className="text-[10px] text-emerald-600 font-medium">Pago em {format(title.paymentDate.toDate(), 'dd/MM/yyyy')}</div>
                     )}
                 </TableCell>
                 <TableCell className={cn('text-right font-mono font-bold', isRevenue ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400')}>
@@ -677,7 +673,7 @@ function FinancialTitlesTable({
                 <TableCell>
                     <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8"><MoreVertical className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8"><MoreVertical className="h-4 w-4" /></Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-48">
                         <DropdownMenuLabel>Ações Financeiras</DropdownMenuLabel>
@@ -711,6 +707,7 @@ function FinancialTitlesTable({
 export default function FinanceiroPage() {
   const { firestore, isUserLoading } = useFirebase();
   const [refreshKey, setRefreshKey] = React.useState(0);
+  const [searchTerm, setSearchTerm] = React.useState('');
 
   const titlesQuery = useMemoFirebase(
     () => (firestore ? query(collection(firestore, 'financial_titles'), orderBy('dueDate', 'desc')) : null),
@@ -733,48 +730,97 @@ export default function FinanceiroPage() {
   const clientsMap = React.useMemo(() => new Map(clientsData?.map(c => [c.id, `${c.firstName} ${c.lastName}`])), [clientsData]);
   const processesMap = React.useMemo(() => new Map(processesData?.map(p => [p.id, p])), [processesData]);
 
-  const originLabels = React.useMemo(() => {
-    return allOriginLabels;
-  }, []);
+  const originLabels = React.useMemo(() => allOriginLabels, []);
 
   const handleRefresh = () => setRefreshKey(prev => prev + 1);
 
-  const { monthlyRevenue, monthlyExpenses, pendingReceivables } = React.useMemo(() => {
+  const stats = React.useMemo(() => {
     const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfCurrentMonth = startOfMonth(now);
 
     return titles.reduce((acc, t) => {
-        const paymentDateValue = t.paymentDate as Timestamp | string | undefined;
-        if(t.status === 'PAGO' && paymentDateValue) {
-            const paymentDate = typeof paymentDateValue === 'string' ? new Date(paymentDateValue) : paymentDateValue.toDate();
-            if (paymentDate >= startOfMonth) {
-                if (t.type === 'RECEITA') acc.monthlyRevenue += t.value;
-                if (t.type === 'DESPESA') acc.monthlyExpenses += t.value;
-            }
+        const titleDate = t.paymentDate ? t.paymentDate.toDate() : t.dueDate.toDate();
+        const isInCurrentMonth = isAfter(titleDate, startOfCurrentMonth);
+
+        if (t.status === 'PAGO' && isInCurrentMonth) {
+            if (t.type === 'RECEITA') acc.monthlyRevenue += t.value;
+            if (t.type === 'DESPESA') acc.monthlyExpenses += t.value;
         }
+        
         if (t.type === 'RECEITA' && t.status === 'PENDENTE') {
             acc.pendingReceivables += t.value;
         }
-        return acc;
-    }, { monthlyRevenue: 0, monthlyExpenses: 0, pendingReceivables: 0 });
-  }, [titles]);
-  
-  const monthlyBalance = monthlyRevenue - monthlyExpenses;
 
-  const receitas = React.useMemo(() => titles.filter((t) => t.type === 'RECEITA'), [titles]);
-  const despesas = React.useMemo(() => titles.filter((t) => t.type === 'DESPESA'), [titles]);
+        if (t.status === 'PENDENTE' && isBefore(t.dueDate.toDate(), now)) {
+            acc.totalOverdue += t.value;
+        }
+
+        return acc;
+    }, { monthlyRevenue: 0, monthlyExpenses: 0, pendingReceivables: 0, totalOverdue: 0 });
+  }, [titles]);
+
+  const chartData = React.useMemo(() => {
+    const months = [];
+    const now = new Date();
+    for (let i = 5; i >= 0; i--) {
+        const d = subMonths(now, i);
+        months.push({
+            month: format(d, 'MMM', { locale: ptBR }),
+            key: format(d, 'yyyy-MM'),
+            receita: 0,
+            despesa: 0,
+        });
+    }
+
+    titles.forEach(t => {
+        if (t.status === 'PAGO' && t.paymentDate) {
+            const date = t.paymentDate.toDate();
+            const key = format(date, 'yyyy-MM');
+            const monthData = months.find(m => m.key === key);
+            if (monthData) {
+                if (t.type === 'RECEITA') monthData.receita += t.value;
+                else monthData.despesa += t.value;
+            }
+        }
+    });
+
+    return months;
+  }, [titles]);
+
+  const filteredTitles = React.useMemo(() => {
+    if (!searchTerm.trim()) return titles;
+    const query = searchTerm.toLowerCase();
+    return titles.filter(t => 
+        t.description.toLowerCase().includes(query) || 
+        (t.processId && processesMap.get(t.processId)?.name.toLowerCase().includes(query))
+    );
+  }, [titles, searchTerm, processesMap]);
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
             <H1>Painel Financeiro</H1>
-            <p className="text-sm text-muted-foreground">Gestão estratégica de entradas e saídas do escritório.</p>
+            <p className="text-sm text-muted-foreground">Gestão estratégica de faturamento e custos.</p>
         </div>
         <div className="flex items-center gap-2">
-           <Button variant="outline" size="sm" className="h-9 gap-1 hidden sm:flex">
+           <div className="relative hidden sm:block">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Pesquisar títulos..."
+                className="pl-8 w-[200px] h-9"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+              {searchTerm && (
+                <button onClick={() => setSearchTerm('')} className="absolute right-2.5 top-2.5">
+                    <X className="h-4 w-4 text-muted-foreground" />
+                </button>
+              )}
+           </div>
+           <Button variant="outline" size="sm" className="h-9 gap-1 hidden md:flex">
             <File className="h-4 w-4" />
-            <span className="whitespace-nowrap">Relatórios</span>
+            <span>Relatórios</span>
           </Button>
           <NewTitleDialog onTitleCreated={handleRefresh} staffData={staffData} />
         </div>
@@ -785,108 +831,171 @@ export default function FinanceiroPage() {
             [...Array(4)].map((_, i) => <Skeleton key={i} className="h-32 w-full" />)
         ) : (
         <>
-            <Card className="border-l-4 border-l-emerald-500">
+            <Card className="border-l-4 border-l-emerald-500 bg-emerald-500/5">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-xs font-bold uppercase text-muted-foreground">Receita (Mês)</CardTitle>
+                    <CardTitle className="text-xs font-bold uppercase text-muted-foreground">Recebido (Mês)</CardTitle>
                     <ArrowUpRight className="h-5 w-5 text-emerald-500" />
                 </CardHeader>
                 <CardContent>
-                    <div className="text-2xl font-bold tracking-tight">{formatCurrency(monthlyRevenue)}</div>
-                    <div className="flex items-center gap-1 mt-1">
-                        <Badge variant="secondary" className="bg-emerald-50 text-emerald-700 text-[10px] h-4">Pago</Badge>
-                        <p className="text-[10px] text-muted-foreground">Entradas liquidadas</p>
-                    </div>
+                    <div className="text-2xl font-bold tracking-tight">{formatCurrency(stats.monthlyRevenue)}</div>
+                    <p className="text-[10px] text-muted-foreground mt-1">Entradas já confirmadas</p>
                 </CardContent>
             </Card>
-            <Card className="border-l-4 border-l-rose-500">
+            <Card className="border-l-4 border-l-rose-500 bg-rose-500/5">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-xs font-bold uppercase text-muted-foreground">Despesas (Mês)</CardTitle>
+                    <CardTitle className="text-xs font-bold uppercase text-muted-foreground">Pago (Mês)</CardTitle>
                     <ArrowDownRight className="h-5 w-5 text-rose-500" />
                 </CardHeader>
                 <CardContent>
-                    <div className="text-2xl font-bold tracking-tight">{formatCurrency(monthlyExpenses)}</div>
-                    <div className="flex items-center gap-1 mt-1">
-                        <Badge variant="secondary" className="bg-rose-50 text-rose-700 text-[10px] h-4">Saído</Badge>
-                        <p className="text-[10px] text-muted-foreground">Custos liquidados</p>
-                    </div>
+                    <div className="text-2xl font-bold tracking-tight">{formatCurrency(stats.monthlyExpenses)}</div>
+                    <p className="text-[10px] text-muted-foreground mt-1">Custos liquidados</p>
                 </CardContent>
             </Card>
-            <Card className={cn("border-l-4", monthlyBalance >= 0 ? "border-l-blue-500" : "border-l-amber-500")}>
+            <Card className="border-l-4 border-l-blue-500 bg-blue-500/5">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-xs font-bold uppercase text-muted-foreground">Saldo (Mês)</CardTitle>
-                    <Scale className="h-5 w-5 text-muted-foreground" />
+                    <CardTitle className="text-xs font-bold uppercase text-muted-foreground">Previsão Entrada</CardTitle>
+                    <TrendingUp className="h-5 w-5 text-blue-500" />
                 </CardHeader>
                 <CardContent>
-                    <div className={cn("text-2xl font-bold tracking-tight", monthlyBalance >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-amber-600 dark:text-amber-400')}>
-                        {formatCurrency(monthlyBalance)}
-                    </div>
-                     <p className="text-[10px] text-muted-foreground mt-1">Resultado líquido do período</p>
+                    <div className="text-2xl font-bold tracking-tight text-blue-600">{formatCurrency(stats.pendingReceivables)}</div>
+                    <p className="text-[10px] text-muted-foreground mt-1">Títulos em aberto</p>
                 </CardContent>
             </Card>
-            <Card className="border-l-4 border-l-amber-500 bg-amber-50/5">
+            <Card className="border-l-4 border-l-amber-500 bg-amber-500/5">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-xs font-bold uppercase text-muted-foreground">A Receber</CardTitle>
-                    <DollarSign className="h-5 w-5 text-amber-500" />
+                    <CardTitle className="text-xs font-bold uppercase text-muted-foreground">Total Atrasado</CardTitle>
+                    <AlertCircle className="h-5 w-5 text-amber-500" />
                 </CardHeader>
                 <CardContent>
-                    <div className="text-2xl font-bold tracking-tight text-amber-600">{formatCurrency(pendingReceivables)}</div>
-                    <p className="text-[10px] text-muted-foreground mt-1">Total de pendências de clientes</p>
+                    <div className="text-2xl font-bold tracking-tight text-amber-600">{formatCurrency(stats.totalOverdue)}</div>
+                    <p className="text-[10px] text-muted-foreground mt-1">Vencidos e não pagos</p>
                 </CardContent>
             </Card>
         </>
         )}
       </div>
 
+      <div className="grid gap-4 lg:grid-cols-3">
+        <Card className="lg:col-span-2">
+            <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                    <TrendingUp className="h-5 w-5 text-primary" />
+                    Fluxo de Caixa (Últimos 6 meses)
+                </CardTitle>
+                <CardDescription>Comparativo mensal de receitas e despesas liquidadas.</CardDescription>
+            </CardHeader>
+            <CardContent className="h-[300px] w-full pt-4">
+                {isLoading ? <Skeleton className="h-full w-full" /> : (
+                    <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={chartData}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
+                            <XAxis 
+                                dataKey="month" 
+                                axisLine={false} 
+                                tickLine={false} 
+                                tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                            />
+                            <YAxis 
+                                axisLine={false} 
+                                tickLine={false} 
+                                tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                                tickFormatter={(value) => `R$${value}`}
+                            />
+                            <Tooltip 
+                                cursor={{ fill: 'hsl(var(--muted))', opacity: 0.4 }}
+                                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                                formatter={(value: number) => [formatCurrency(value), '']}
+                            />
+                            <Legend verticalAlign="top" align="right" iconType="circle" iconSize={8} wrapperStyle={{ paddingBottom: '20px', fontSize: '12px' }} />
+                            <Bar dataKey="receita" name="Receitas" fill="#10b981" radius={[4, 4, 0, 0]} barSize={30} />
+                            <Bar dataKey="despesa" name="Despesas" fill="#ef4444" radius={[4, 4, 0, 0]} barSize={30} />
+                        </BarChart>
+                    </ResponsiveContainer>
+                )}
+            </CardContent>
+        </Card>
+
+        <Card>
+            <CardHeader>
+                <CardTitle className="text-lg">Distribuição de Receita</CardTitle>
+                <CardDescription>Origem dos honorários recebidos.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                {isLoading ? <Skeleton className="h-48 w-full" /> : (
+                    revenueOrigins.map(origin => {
+                        const total = titles
+                            .filter(t => t.type === 'RECEITA' && t.origin === origin.value)
+                            .reduce((sum, t) => sum + t.value, 0);
+                        const percentage = stats.monthlyRevenue > 0 ? (total / stats.monthlyRevenue) * 100 : 0;
+                        
+                        return (
+                            <div key={origin.value} className="space-y-1">
+                                <div className="flex items-center justify-between text-sm">
+                                    <span className="text-muted-foreground">{origin.label}</span>
+                                    <span className="font-bold">{formatCurrency(total)}</span>
+                                </div>
+                                <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                                    <div 
+                                        className="h-full bg-primary transition-all duration-500" 
+                                        style={{ width: `${Math.min(percentage, 100)}%` }} 
+                                    />
+                                </div>
+                            </div>
+                        )
+                    })
+                )}
+            </CardContent>
+        </Card>
+      </div>
+
       <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList className="bg-muted/50 p-1">
-          <TabsTrigger value="overview" className="data-[state=active]:bg-background">Visão Geral</TabsTrigger>
-          <TabsTrigger value="revenues" className="data-[state=active]:bg-background">Contas a Receber</TabsTrigger>
-          <TabsTrigger value="expenses" className="data-[state=active]:bg-background">Contas a Pagar</TabsTrigger>
-          <TabsTrigger value="staff_fees" className="data-[state=active]:bg-background">Repasses da Equipe</TabsTrigger>
+        <TabsList className="bg-muted/50 p-1 w-full sm:w-auto">
+          <TabsTrigger value="overview" className="flex-1 sm:flex-none">Geral</TabsTrigger>
+          <TabsTrigger value="revenues" className="flex-1 sm:flex-none">A Receber</TabsTrigger>
+          <TabsTrigger value="expenses" className="flex-1 sm:flex-none">A Pagar</TabsTrigger>
+          <TabsTrigger value="staff_fees" className="flex-1 sm:flex-none">Repasses Equipe</TabsTrigger>
         </TabsList>
-        <TabsContent value="overview">
+        <TabsContent value="overview" className="space-y-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
-                <CardTitle>Movimentações Recentes</CardTitle>
-                <CardDescription>Visualize as últimas transações registradas.</CardDescription>
+                <CardTitle>Últimas Movimentações</CardTitle>
+                <CardDescription>Fluxo completo de caixa do escritório.</CardDescription>
               </div>
-              <Button variant="ghost" size="sm" onClick={handleRefresh}>Sincronizar</Button>
+              <Button variant="ghost" size="sm" onClick={handleRefresh}>
+                <Loader2 className={cn("h-4 w-4 mr-2", isLoading && "animate-spin")} />
+                Sincronizar
+              </Button>
             </CardHeader>
             <CardContent>
-              <FinancialTitlesTable titles={titles.slice(0, 15)} clientsMap={clientsMap} processesMap={processesMap} isLoading={isLoading} onAction={handleRefresh} originLabels={originLabels} />
+              <FinancialTitlesTable titles={filteredTitles.slice(0, 20)} clientsMap={clientsMap} processesMap={processesMap} isLoading={isLoading} onAction={handleRefresh} originLabels={originLabels} />
             </CardContent>
           </Card>
         </TabsContent>
         <TabsContent value="revenues">
           <Card>
             <CardHeader>
-              <CardTitle>Entradas (Receitas)</CardTitle>
-              <CardDescription>Controle de honorários, acordos e sentenças recebidas.</CardDescription>
+              <CardTitle>Contas a Receber</CardTitle>
+              <CardDescription>Todos os honorários e entradas previstas.</CardDescription>
             </CardHeader>
             <CardContent>
-              <FinancialTitlesTable titles={receitas} clientsMap={clientsMap} processesMap={processesMap} isLoading={isLoading} onAction={handleRefresh} originLabels={originLabels} />
+              <FinancialTitlesTable titles={filteredTitles.filter(t => t.type === 'RECEITA')} clientsMap={clientsMap} processesMap={processesMap} isLoading={isLoading} onAction={handleRefresh} originLabels={originLabels} />
             </CardContent>
           </Card>
         </TabsContent>
         <TabsContent value="expenses">
           <Card>
             <CardHeader>
-              <CardTitle>Saídas (Despesas)</CardTitle>
-              <CardDescription>Controle de custos operacionais, custas e pagamentos.</CardDescription>
+              <CardTitle>Contas a Pagar</CardTitle>
+              <CardDescription>Custos operacionais e obrigações do escritório.</CardDescription>
             </CardHeader>
             <CardContent>
-              <FinancialTitlesTable titles={despesas} clientsMap={clientsMap} processesMap={processesMap} isLoading={isLoading} onAction={handleRefresh} originLabels={originLabels} />
+              <FinancialTitlesTable titles={filteredTitles.filter(t => t.type === 'DESPESA')} clientsMap={clientsMap} processesMap={processesMap} isLoading={isLoading} onAction={handleRefresh} originLabels={originLabels} />
             </CardContent>
           </Card>
         </TabsContent>
          <TabsContent value="staff_fees">
-          <Card>
-            <CardHeader>
-              <CardTitle>Controle de Repasses</CardTitle>
-              <CardDescription>Valores a pagar e já pagos para membros da equipe.</CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {isLoading ? (
                     [...Array(3)].map((_, i) => <Skeleton key={i} className="h-56 w-full" />)
                 ) : (
@@ -894,8 +1003,7 @@ export default function FinanceiroPage() {
                         .filter(s => s.role === 'lawyer' || s.role === 'intern')
                         .map(member => <StaffCreditCard key={member.id} staffMember={member} />)
                 )}
-            </CardContent>
-          </Card>
+          </div>
         </TabsContent>
       </Tabs>
     </div>
