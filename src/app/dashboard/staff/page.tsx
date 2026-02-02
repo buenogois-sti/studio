@@ -10,6 +10,8 @@ import {
   MessageSquare,
   Copy,
   FolderKanban,
+  Search,
+  X
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 
@@ -51,6 +53,7 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { StaffForm } from '@/components/staff/StaffForm';
 import { Separator } from '@/components/ui/separator';
+import { Input } from '@/components/ui/input';
 
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, doc, deleteDoc } from 'firebase/firestore';
@@ -71,6 +74,7 @@ export default function StaffPage() {
   const [editingStaff, setEditingStaff] = React.useState<Staff | null>(null);
   const [staffToDelete, setStaffToDelete] = React.useState<Staff | null>(null);
   const [isDeleting, setIsDeleting] = React.useState(false);
+  const [searchTerm, setSearchTerm] = React.useState('');
   const { toast } = useToast();
   
   const { firestore } = useFirebase();
@@ -92,6 +96,17 @@ export default function StaffPage() {
 
   const isLoading = status === 'loading' || isLoadingStaff || isLoadingProcesses;
 
+  const filteredStaff = React.useMemo(() => {
+    if (!searchTerm.trim()) return staff;
+    const query = searchTerm.toLowerCase();
+    return staff.filter(member => {
+      const fullName = `${member.firstName} ${member.lastName}`.toLowerCase();
+      const email = member.email.toLowerCase();
+      const role = (roleLabels[member.role] || member.role).toLowerCase();
+      return fullName.includes(query) || email.includes(query) || role.includes(query);
+    });
+  }, [staff, searchTerm]);
+
   const handleAddNew = () => {
     setEditingStaff(null);
     setIsSheetOpen(true);
@@ -109,14 +124,19 @@ export default function StaffPage() {
   const confirmDelete = async () => {
     if (!firestore || !staffToDelete) return;
     setIsDeleting(true);
-    const staffRef = doc(firestore, 'staff', staffToDelete.id);
     try {
+        const staffRef = doc(firestore, 'staff', staffToDelete.id);
         await deleteDoc(staffRef);
         toast({ title: 'Membro da equipe excluído!', description: `O membro ${staffToDelete.firstName} foi removido.` });
-    } catch (error: any) {
-        toast({ variant: 'destructive', title: 'Erro ao excluir', description: error.message });
-    } finally {
         setStaffToDelete(null);
+    } catch (error: any) {
+        console.error("Erro ao excluir membro da equipe:", error);
+        toast({ 
+          variant: 'destructive', 
+          title: 'Erro ao excluir', 
+          description: error.message || 'Não foi possível remover o membro. Verifique suas permissões.' 
+        });
+    } finally {
         setIsDeleting(false);
     }
   };
@@ -145,17 +165,32 @@ export default function StaffPage() {
   return (
     <>
       <div className="grid flex-1 items-start gap-6 auto-rows-max">
-        <div className="flex items-center gap-4">
+        <div className="flex flex-col md:flex-row md:items-center gap-4">
           <div className='flex items-center gap-2'>
             <h1 className="flex-1 shrink-0 whitespace-nowrap text-xl font-semibold tracking-tight sm:grow-0 font-headline">
               Equipe
             </h1>
-            {!isLoading && <Badge variant="secondary">{staff.length}</Badge>}
+            {!isLoading && <Badge variant="secondary">{filteredStaff.length}</Badge>}
           </div>
-          <div className="hidden items-center gap-2 md:ml-auto md:flex">
+          
+          <div className="flex flex-wrap items-center gap-2 md:ml-auto">
+            <div className="relative w-full max-w-xs">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input 
+                placeholder="Pesquisar equipe..." 
+                className="pl-8 pr-8 h-9" 
+                value={searchTerm} 
+                onChange={(e) => setSearchTerm(e.target.value)} 
+              />
+              {searchTerm && (
+                <button onClick={() => setSearchTerm('')} className="absolute right-2.5 top-2.5 text-muted-foreground">
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
             <Button size="sm" className="h-9 gap-1" onClick={handleAddNew}>
               <PlusCircle className="h-3.5 w-3.5" />
-              <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">Adicionar Membro</span>
+              <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">Novo Membro</span>
             </Button>
           </div>
         </div>
@@ -179,16 +214,16 @@ export default function StaffPage() {
               </Card>
             ))}
           </div>
-        ) : staff.length > 0 ? (
+        ) : filteredStaff.length > 0 ? (
           <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6">
-            {staff.map((member) => {
+            {filteredStaff.map((member) => {
               const memberProcesses = processes.filter(p => p.responsibleStaffIds?.includes(member.id));
               return (
                 <Card key={member.id} className="flex flex-col">
                   <CardHeader>
                     <div className="flex items-start justify-between gap-4">
-                        <div>
-                            <h3 className="font-semibold text-xl">{`${member.firstName} ${member.lastName}`}</h3>
+                        <div className="min-w-0">
+                            <h3 className="font-semibold text-xl truncate">{`${member.firstName} ${member.lastName}`}</h3>
                             <Badge
                               variant={
                                 member.role === 'lawyer' ? 'secondary'
@@ -298,12 +333,22 @@ export default function StaffPage() {
             })}
           </div>
         ) : (
-           <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed shadow-sm h-96">
-                <div className="flex flex-col items-center gap-2 text-center">
-                    <Briefcase className="h-12 w-12 text-muted-foreground" />
-                    <h3 className="text-2xl font-bold tracking-tight">Nenhum membro na equipe</h3>
-                    <p className="text-sm text-muted-foreground">Comece adicionando um novo funcionário, advogado ou estagiário.</p>
-                    <Button className="mt-4" onClick={handleAddNew}>Adicionar Membro</Button>
+           <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed shadow-sm min-h-[400px]">
+                <div className="flex flex-col items-center gap-2 text-center p-8">
+                    <div className="h-20 w-20 rounded-full bg-muted flex items-center justify-center mb-4">
+                      <Briefcase className="h-10 w-10 text-muted-foreground" />
+                    </div>
+                    <h3 className="text-2xl font-bold tracking-tight">Equipe não encontrada</h3>
+                    <p className="text-sm text-muted-foreground max-w-sm">
+                        {searchTerm ? `Nenhum membro encontrado para "${searchTerm}".` : "Comece adicionando um novo funcionário, advogado ou estagiário."}
+                    </p>
+                    <div className="mt-6">
+                        {searchTerm ? (
+                          <Button variant="outline" onClick={() => setSearchTerm('')}>Limpar Pesquisa</Button>
+                        ) : (
+                          <Button onClick={handleAddNew}>Adicionar Primeiro Membro</Button>
+                        )}
+                    </div>
                 </div>
             </div>
         )}
@@ -334,7 +379,7 @@ export default function StaffPage() {
             <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
             <AlertDialogDescription>
               Esta ação não pode ser desfeita. Isso excluirá permanentemente o membro da equipe
-              &quot;{staffToDelete?.firstName} {staffToDelete?.lastName}&quot; e removerá seus dados de nossos servidores.
+              &quot;{staffToDelete?.firstName} {staffToDelete?.lastName}&quot; e removerá seus dados do sistema.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

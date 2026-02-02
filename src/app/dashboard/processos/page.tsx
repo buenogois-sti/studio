@@ -1,4 +1,3 @@
-
 'use client';
 import * as React from 'react';
 import {
@@ -456,6 +455,7 @@ export default function ProcessosPage() {
   const [isDeleting, setIsDeleting] = React.useState(false);
   const [isSyncing, setIsSyncing] = React.useState<string | null>(null);
   const [eventProcess, setEventProcess] = React.useState<Process | null>(null);
+  const [statusFilter, setStatusFilter] = React.useState<string>('all');
   
   const searchParams = useSearchParams();
   const [searchTerm, setSearchTerm] = React.useState('');
@@ -495,13 +495,24 @@ export default function ProcessosPage() {
   const filteredProcesses = React.useMemo(() => {
     if (!processesData) return [];
     let data = [...processesData];
+    
     if (clientIdFilter) data = data.filter(p => p.clientId === clientIdFilter);
+    
+    if (statusFilter !== 'all') {
+        data = data.filter(p => p.status === statusFilter);
+    }
+
     if (searchTerm.trim()) {
         const query = searchTerm.toLowerCase();
-        data = data.filter(p => p.name.toLowerCase().includes(query) || (p.processNumber || '').includes(query));
+        data = data.filter(p => {
+            const clientName = clientsMap.get(p.clientId)?.toLowerCase() || '';
+            const processName = p.name.toLowerCase();
+            const processNumber = p.processNumber?.toLowerCase() || '';
+            return processName.includes(query) || processNumber.includes(query) || clientName.includes(query);
+        });
     }
     return data;
-  }, [processesData, clientIdFilter, searchTerm]);
+  }, [processesData, clientIdFilter, searchTerm, statusFilter, clientsMap]);
 
   const handleSyncProcess = async (process: Process) => {
     if (!session) return;
@@ -522,10 +533,15 @@ export default function ProcessosPage() {
     try {
       await deleteDoc(doc(firestore, 'processes', processToDelete.id));
       toast({ title: 'Processo excluído!' });
-    } catch (error: any) {
-      toast({ variant: 'destructive', title: 'Erro ao excluir', description: error.message });
-    } finally {
       setProcessToDelete(null);
+    } catch (error: any) {
+      console.error("Erro ao excluir processo:", error);
+      toast({ 
+        variant: 'destructive', 
+        title: 'Erro ao excluir', 
+        description: error.message || 'Não foi possível excluir o processo. Verifique suas permissões.' 
+      });
+    } finally {
       setIsDeleting(false);
     }
   };
@@ -533,18 +549,42 @@ export default function ProcessosPage() {
   return (
     <>
       <div className="grid flex-1 items-start gap-4 auto-rows-max">
-        <div className="flex items-center gap-4">
+        <div className="flex flex-col md:flex-row md:items-center gap-4">
           <h1 className="flex-1 shrink-0 whitespace-nowrap text-xl font-semibold tracking-tight sm:grow-0 font-headline">
              {clientFilterName ? `Processos de ${clientFilterName}` : 'Processos'}
           </h1>
-          <div className="hidden items-center gap-2 md:ml-auto md:flex">
+          
+          <div className="flex flex-wrap items-center gap-2 md:ml-auto">
              <div className="relative w-full max-w-sm">
                   <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input placeholder="Buscar processos..." className="pl-8 h-8" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                  <Input 
+                    placeholder="Processo, Nº ou Cliente..." 
+                    className="pl-8 pr-8 h-9" 
+                    value={searchTerm} 
+                    onChange={(e) => setSearchTerm(e.target.value)} 
+                  />
+                  {searchTerm && (
+                    <button onClick={() => setSearchTerm('')} className="absolute right-2.5 top-2.5 text-muted-foreground">
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
               </div>
-            <Button size="sm" className="h-8 gap-1" onClick={() => { setEditingProcess(null); setIsSheetOpen(true); }}>
+
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-[140px] h-9">
+                  <SelectValue placeholder="Filtrar Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos Status</SelectItem>
+                  <SelectItem value="Ativo">Ativos</SelectItem>
+                  <SelectItem value="Pendente">Pendentes</SelectItem>
+                  <SelectItem value="Arquivado">Arquivados</SelectItem>
+                </SelectContent>
+              </Select>
+
+            <Button size="sm" className="h-9 gap-1" onClick={() => { setEditingProcess(null); setIsSheetOpen(true); }}>
               <PlusCircle className="h-3.5 w-3.5" />
-              <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">Adicionar Processo</span>
+              <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">Novo Processo</span>
             </Button>
           </div>
         </div>
@@ -562,7 +602,7 @@ export default function ProcessosPage() {
                   <TableHead className="hidden md:table-cell">Nº do Processo</TableHead>
                   <TableHead className="hidden md:table-cell">Status</TableHead>
                   <TableHead className="hidden md:table-cell">Drive</TableHead>
-                  <TableHead><span className="sr-only">Ações</span></TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -577,7 +617,8 @@ export default function ProcessosPage() {
                       <TableCell><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
                     </TableRow>
                   ))
-                ) : filteredProcesses.map((process) => (
+                ) : filteredProcesses.length > 0 ? (
+                  filteredProcesses.map((process) => (
                     <TableRow key={process.id}>
                       <TableCell className="font-medium">{process.name}</TableCell>
                       <TableCell>{clientsMap.get(process.clientId) || 'N/A'}</TableCell>
@@ -617,7 +658,13 @@ export default function ProcessosPage() {
                       </TableCell>
                     </TableRow>
                   ))
-                }
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                      Nenhum processo encontrado com esses filtros.
+                    </TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </CardContent>
@@ -634,7 +681,7 @@ export default function ProcessosPage() {
         </SheetContent>
       </Sheet>
 
-      <AlertDialog open={!!processToDelete} onOpenChange={(open) => !open && setProcessToDelete(null)}>
+      <AlertDialog open={!!processToDelete} onOpenChange={(open) => !isDeleting && !open && setProcessToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>

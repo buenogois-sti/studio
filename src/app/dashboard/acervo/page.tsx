@@ -23,6 +23,7 @@ import {
   FilePenLine,
   MoreVertical,
   Loader2,
+  X
 } from 'lucide-react';
 import Link from 'next/link';
 import {
@@ -298,6 +299,7 @@ export default function AcervoPage() {
   const [fileToDelete, setFileToDelete] = React.useState<DriveFile | null>(null);
   const [isDeleting, setIsDeleting] = React.useState(false);
   const [fileToRename, setFileToRename] = React.useState<DriveFile | null>(null);
+  const [searchTerm, setSearchTerm] = React.useState('');
   const { toast } = useToast();
 
   const fetchFiles = React.useCallback(async () => {
@@ -326,6 +328,12 @@ export default function AcervoPage() {
     fetchFiles();
   }, [fetchFiles]);
 
+  const filteredFiles = React.useMemo(() => {
+    if (!searchTerm.trim()) return files;
+    const query = searchTerm.toLowerCase();
+    return files.filter(file => (file.name || '').toLowerCase().includes(query));
+  }, [files, searchTerm]);
+
   const handleDelete = async () => {
       if (!fileToDelete?.id) return;
       setIsDeleting(true);
@@ -335,15 +343,16 @@ export default function AcervoPage() {
               title: 'Item Excluído',
               description: `"${fileToDelete.name}" foi removido com sucesso.`,
           });
+          setFileToDelete(null);
           fetchFiles();
       } catch (e: any) {
+            console.error("Erro ao excluir arquivo do acervo:", e);
             toast({
               variant: 'destructive',
               title: 'Erro ao Excluir',
-              description: e.message || 'Não foi possível remover o item.',
+              description: e.message || 'Não foi possível remover o item do Drive.',
           });
       } finally {
-          setFileToDelete(null);
           setIsDeleting(false);
       }
   };
@@ -351,20 +360,34 @@ export default function AcervoPage() {
   return (
     <>
       <div className="flex flex-col gap-6">
-        <H1>Acervo Digital</H1>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <H1>Acervo Digital</H1>
+          <div className="flex items-center gap-2">
+            <div className="relative w-full max-w-xs">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input 
+                placeholder="Pesquisar no acervo..." 
+                className="pl-8 pr-8 h-9" 
+                value={searchTerm} 
+                onChange={(e) => setSearchTerm(e.target.value)} 
+              />
+              {searchTerm && (
+                <button onClick={() => setSearchTerm('')} className="absolute right-2.5 top-2.5 text-muted-foreground">
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+            <NewFolderDialog parentFolderId={ACERVO_FOLDER_ID} onFolderCreated={fetchFiles} />
+            <UploadFileDialog folderId={ACERVO_FOLDER_ID} onUploadSuccess={fetchFiles} />
+          </div>
+        </div>
 
         <Card>
-          <CardHeader className="flex-row items-center justify-between">
-            <div>
-              <CardTitle>Biblioteca Central de Documentos</CardTitle>
-              <CardDescription>
-                Gerencie a biblioteca de documentos padrão do escritório.
-              </CardDescription>
-            </div>
-             <div className="flex items-center gap-2">
-                <NewFolderDialog parentFolderId={ACERVO_FOLDER_ID} onFolderCreated={fetchFiles} />
-                <UploadFileDialog folderId={ACERVO_FOLDER_ID} onUploadSuccess={fetchFiles} />
-            </div>
+          <CardHeader>
+            <CardTitle>Biblioteca Central de Documentos</CardTitle>
+            <CardDescription>
+              Gerencie a biblioteca de documentos padrão do escritório.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {error && (
@@ -405,8 +428,8 @@ export default function AcervoPage() {
                       </TableCell>
                     </TableRow>
                   ))
-                ) : files.length > 0 ? (
-                  files.map((file) => (
+                ) : filteredFiles.length > 0 ? (
+                  filteredFiles.map((file) => (
                     <TableRow key={file.id}>
                       <TableCell>
                         {file.mimeType ===
@@ -469,7 +492,7 @@ export default function AcervoPage() {
                 ) : (
                   <TableRow>
                     <TableCell colSpan={4} className="h-24 text-center">
-                      Nenhum arquivo ou pasta encontrado no Acervo Digital.
+                      {searchTerm ? 'Nenhum arquivo encontrado para esta busca.' : 'Nenhum arquivo ou pasta encontrado no Acervo Digital.'}
                     </TableCell>
                   </TableRow>
                 )}

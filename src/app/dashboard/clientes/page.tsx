@@ -18,7 +18,8 @@ import {
   Trash2,
   Edit,
   DollarSign,
-  FileUp
+  FileUp,
+  X
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 
@@ -118,8 +119,18 @@ export default function ClientsPage() {
     const lowercasedFilter = searchTerm.toLowerCase();
     return clients.filter(client => {
       const fullName = `${client.firstName} ${client.lastName}`.toLowerCase();
-      const document = client.document || '';
-      return fullName.includes(lowercasedFilter) || document.includes(lowercasedFilter);
+      const document = client.document?.toLowerCase() || '';
+      const email = client.email?.toLowerCase() || '';
+      const mobile = client.mobile?.replace(/\D/g, '') || '';
+      const phone = client.phone?.replace(/\D/g, '') || '';
+      
+      return (
+        fullName.includes(lowercasedFilter) || 
+        document.includes(lowercasedFilter) || 
+        email.includes(lowercasedFilter) ||
+        mobile.includes(lowercasedFilter.replace(/\D/g, '')) ||
+        phone.includes(lowercasedFilter.replace(/\D/g, ''))
+      );
     });
   }, [clients, searchTerm]);
 
@@ -154,14 +165,19 @@ export default function ClientsPage() {
   const confirmDelete = async () => {
     if (!firestore || !clientToDelete) return;
     setIsDeleting(true);
-    const clientRef = doc(firestore, 'clients', clientToDelete.id);
     try {
+        const clientRef = doc(firestore, 'clients', clientToDelete.id);
         await deleteDoc(clientRef);
         toast({ title: 'Cliente excluído!', description: `O cliente ${clientToDelete.firstName} foi removido.` });
-    } catch (error: any) {
-        toast({ variant: 'destructive', title: 'Erro ao excluir', description: error.message });
-    } finally {
         setClientToDelete(null);
+    } catch (error: any) {
+        console.error("Erro ao excluir cliente:", error);
+        toast({ 
+          variant: 'destructive', 
+          title: 'Erro ao excluir', 
+          description: error.message || 'Ocorreu um erro ao tentar excluir o cliente. Verifique suas permissões.' 
+        });
+    } finally {
         setIsDeleting(false);
     }
   };
@@ -265,11 +281,19 @@ export default function ClientsPage() {
             <div className="relative w-full max-w-sm sm:w-auto">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Pesquisar clientes..."
-                className="pl-8"
+                placeholder="Nome, CPF, E-mail ou Celular..."
+                className="pl-8 pr-8"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
+              {searchTerm && (
+                <button 
+                  onClick={() => setSearchTerm('')}
+                  className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
             </div>
 
             <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as any)} className="hidden sm:block">
@@ -289,8 +313,9 @@ export default function ClientsPage() {
               <DropdownMenuContent align="end">
                 <DropdownMenuLabel>Filtrar por</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuCheckboxItem checked>Ativos</DropdownMenuCheckboxItem>
-                <DropdownMenuCheckboxItem>Arquivados</DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem checked>Todos</DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem>Com Processo Ativo</DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem>Sem Processo</DropdownMenuCheckboxItem>
               </DropdownMenuContent>
             </DropdownMenu>
 
@@ -301,7 +326,7 @@ export default function ClientsPage() {
               </Button>
               <Button size="sm" className="h-9 gap-1" onClick={handleAddNew}>
                 <PlusCircle className="h-3.5 w-3.5" />
-                <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">Adicionar Cliente</span>
+                <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">Novo Cliente</span>
               </Button>
             </div>
           </div>
@@ -337,9 +362,9 @@ export default function ClientsPage() {
                   <Card key={client.id} className="flex flex-col group hover:shadow-md transition-shadow">
                     <CardHeader>
                       <div className="flex items-start justify-between gap-4">
-                          <div>
-                              <h3 className="font-semibold text-lg leading-tight">{`${client.firstName} ${client.lastName}`}</h3>
-                              <p className="text-sm text-muted-foreground">{client.document}</p>
+                          <div className="min-w-0">
+                              <h3 className="font-semibold text-lg leading-tight truncate">{`${client.firstName} ${client.lastName}`}</h3>
+                              <p className="text-sm text-muted-foreground truncate">{client.document}</p>
                           </div>
                           {renderClientActions(client)}
                       </div>
@@ -525,7 +550,7 @@ export default function ClientsPage() {
                         </Button>
                         <Button onClick={handleAddNew}>
                             <PlusCircle className="mr-2 h-4 w-4" />
-                            Adicionar Primeiro Cliente
+                            Adicionar Novo Cliente
                         </Button>
                     </div>
                 </div>
