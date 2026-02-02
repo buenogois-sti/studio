@@ -102,7 +102,7 @@ export default function LoginPage() {
                     </div>
                     
                     <div className="text-center text-sm text-muted-foreground">
-                        Apenas contas @buenogois.adv.br
+                        Apenas contas @buenogoisadvogado.com.br
                     </div>
                 </div>
             </CardContent>

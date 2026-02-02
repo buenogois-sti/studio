@@ -152,6 +152,10 @@ function InviteUserDialog({ onInvite, userToEdit }: { onInvite: () => void, user
 
     const form = useForm<z.infer<typeof roleSchema>>({
         resolver: zodResolver(roleSchema),
+        defaultValues: {
+          email: '',
+          role: 'lawyer',
+        }
     });
 
     React.useEffect(() => {
@@ -205,7 +209,7 @@ function InviteUserDialog({ onInvite, userToEdit }: { onInvite: () => void, user
                             render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Email</FormLabel>
-                                    <FormControl><Input placeholder="email@buenogois.adv.br" {...field} disabled={!!userToEdit} /></FormControl>
+                                    <FormControl><Input placeholder="email@buenogoisadvogado.com.br" {...field} disabled={!!userToEdit} /></FormControl>
                                     <FormMessage />
                                 </FormItem>
                             )}
@@ -310,7 +314,7 @@ function UsersTab() {
                         <CardTitle>Gerenciamento de Usuários</CardTitle>
                         <CardDescription>Adicione, remova e gerencie as permissões dos usuários do sistema.</CardDescription>
                     </div>
-                    <InviteUserDialog onInvite={loadData} userToEdit={userToEdit} />
+                    <InviteUserDialog onInvite={() => { loadData(); setUserToEdit(null); }} userToEdit={userToEdit} />
                 </CardHeader>
                 <CardContent>
                     <Table>
