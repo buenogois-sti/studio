@@ -13,7 +13,6 @@ import {
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -166,12 +165,9 @@ export default function StaffPage() {
             {Array.from({ length: 3 }).map((_, i) => (
               <Card key={i}>
                 <CardHeader>
-                  <div className="flex items-center gap-4">
-                    <Skeleton className="h-16 w-16 rounded-full" />
-                    <div className="w-full space-y-2">
-                      <Skeleton className="h-5 w-3/4" />
-                      <Skeleton className="h-5 w-1/2" />
-                    </div>
+                  <div className="w-full space-y-2">
+                    <Skeleton className="h-5 w-3/4" />
+                    <Skeleton className="h-5 w-1/2" />
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -191,29 +187,23 @@ export default function StaffPage() {
                 <Card key={member.id} className="flex flex-col">
                   <CardHeader>
                     <div className="flex items-start justify-between gap-4">
-                        <div className="flex items-center gap-4">
-                            <Avatar className="h-16 w-16 border-2 border-primary">
-                                <AvatarImage src={`https://picsum.photos/seed/staff${member.id}/100/100`} alt={`${member.firstName} ${member.lastName}`} data-ai-hint="person portrait" />
-                                <AvatarFallback>{member.firstName?.charAt(0) ?? 'S'}</AvatarFallback>
-                            </Avatar>
-                            <div>
-                                <h3 className="font-semibold text-xl">{`${member.firstName} ${member.lastName}`}</h3>
-                                <Badge
-                                  variant={
-                                    member.role === 'lawyer' ? 'secondary'
-                                    : member.role === 'intern' ? 'default'
-                                    : 'outline'
-                                  }
-                                  className={cn('mt-1', {
-                                    'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300 border-blue-200 dark:border-blue-700':
-                                      member.role === 'lawyer',
-                                    'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300 border-purple-200 dark:border-purple-700':
-                                      member.role === 'intern',
-                                  })}
-                                >
-                                  {roleLabels[member.role] || member.role}
-                                </Badge>
-                            </div>
+                        <div>
+                            <h3 className="font-semibold text-xl">{`${member.firstName} ${member.lastName}`}</h3>
+                            <Badge
+                              variant={
+                                member.role === 'lawyer' ? 'secondary'
+                                : member.role === 'intern' ? 'default'
+                                : 'outline'
+                              }
+                              className={cn('mt-1', {
+                                'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300 border-blue-200 dark:border-blue-700':
+                                  member.role === 'lawyer',
+                                'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300 border-purple-200 dark:border-purple-700':
+                                  member.role === 'intern',
+                              })}
+                            >
+                              {roleLabels[member.role] || member.role}
+                            </Badge>
                         </div>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>

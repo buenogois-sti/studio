@@ -3,7 +3,6 @@
 import React from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -20,6 +19,7 @@ import type { UserProfile, UserRole } from '@/lib/types';
 import { useFirebase, useDoc, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
 import { Skeleton } from './ui/skeleton';
 import { doc } from 'firebase/firestore';
+import { User } from 'lucide-react';
 
 const roles: { role: UserRole; label: string }[] = [
   { role: 'admin', label: 'Administrador' },
@@ -63,11 +63,8 @@ export function UserNav() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-          <Avatar className="h-9 w-9">
-            <AvatarImage src={session.user.image || ''} alt={session.user.name || ''} data-ai-hint="person portrait" />
-            <AvatarFallback>{userProfile.firstName ? userProfile.firstName.charAt(0) : 'U'}</AvatarFallback>
-          </Avatar>
+        <Button variant="ghost" className="relative h-9 w-9 rounded-full flex items-center justify-center bg-muted">
+          <User className="h-5 w-5 text-muted-foreground" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56" align="end" forceMount>

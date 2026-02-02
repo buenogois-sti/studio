@@ -19,7 +19,6 @@ import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -373,10 +372,6 @@ function ProcessForm({
                  <div className="mt-4">
                   {selectedClient ? (
                     <div className="flex items-center gap-4 rounded-lg border bg-card p-4">
-                      <Avatar className="h-12 w-12 border">
-                        <AvatarImage src={selectedClient.avatar} alt={`${selectedClient.firstName} ${selectedClient.lastName}`} />
-                        <AvatarFallback>{selectedClient.firstName?.charAt(0) ?? 'C'}</AvatarFallback>
-                      </Avatar>
                       <div className="flex-grow">
                         <p className="font-semibold">{`${selectedClient.firstName} ${selectedClient.lastName}`}</p>
                         <p className="text-sm text-muted-foreground">{selectedClient.document}</p>

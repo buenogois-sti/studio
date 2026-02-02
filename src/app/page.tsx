@@ -4,9 +4,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Phone, MapPin, MessageCircle, Scale, Star, Briefcase, Clock, Shield, HeartHandshake, Landmark, FileText, Users, Handshake, Building, ChevronRight, ArrowRight, Sparkles, Award, TrendingUp, Target, Menu, X } from 'lucide-react';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Card } from '@/components/ui/card';
 import { WhatsAppFloating } from '@/components/WhatsAppFloating';
+import { Card } from '@/components/ui/card';
 
 function LandingLogo({ className }: { className?: string }) {
     return (
@@ -74,20 +73,14 @@ const testimonials = [
     {
         name: 'Ana Paula Santos',
         text: 'A equipe da Bueno Gois Advogados é incrível! Conseguiram recuperar todas as minhas verbas rescisórias que a empresa não queria pagar. Muito profissionais e atenciosos. Recomendo para todos que precisam de um advogado trabalhista de confiança!',
-        avatar: '/image/testimonial-1.jpg',
-        avatarHint: 'person happy'
     },
     {
         name: 'Roberto Oliveira',
         text: 'Super recomendo! O time da Bueno Gois resolveu meu caso de assédio moral rapidamente. Estava sofrendo muito no trabalho e eles conseguiram uma indenização justa. Definitivamente o melhor escritório trabalhista que já conheci!',
-        avatar: '/image/testimonial-2.jpg',
-        avatarHint: 'person happy'
     },
     {
         name: 'Maria Fernanda Costa',
         text: 'Nossa, a Bueno Gois Advogados salvou minha vida! Estava sendo demitida sem justa causa e eles conseguiram reverter tudo. Profissionalismo total e dedicação de verdade. Agradeço demais pelo trabalho que fizeram. Recomendo pra todo mundo!',
-        avatar: '/image/testimonial-3.jpg',
-        avatarHint: 'person happy'
     },
 ]
 

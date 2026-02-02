@@ -40,7 +40,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 
@@ -264,7 +263,6 @@ export default function Dashboard() {
             {isLoading ? (
               Array.from({ length: 4 }).map((_, i) => (
                 <div key={i} className="flex items-center gap-4">
-                  <Skeleton className="h-9 w-9 rounded-full" />
                   <div className="grid gap-1 w-full">
                     <Skeleton className="h-4 w-4/5" />
                     <Skeleton className="h-3 w-1/4" />
@@ -275,10 +273,6 @@ export default function Dashboard() {
               logsData && logsData.length > 0 ? (
                 logsData.map((activity) => (
                     <div key={activity.id} className="flex items-center gap-4">
-                    <Avatar className="hidden h-9 w-9 sm:flex border">
-                        <AvatarImage src={`https://picsum.photos/seed/act${activity.id}/100/100`} alt="Avatar" data-ai-hint="abstract pattern" />
-                        <AvatarFallback><Activity className="h-4 w-4"/></AvatarFallback>
-                    </Avatar>
                     <div className="grid gap-1">
                         <p className="text-sm font-medium leading-none">
                         {activity.description}

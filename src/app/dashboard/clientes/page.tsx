@@ -21,7 +21,6 @@ import {
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -304,12 +303,9 @@ export default function ClientsPage() {
             {Array.from({ length: 3 }).map((_, i) => (
               <Card key={i}>
                 <CardHeader>
-                  <div className="flex items-center gap-4">
-                    <Skeleton className="h-12 w-12 rounded-full" />
-                    <div className="w-full space-y-2">
-                      <Skeleton className="h-5 w-3/4" />
-                      <Skeleton className="h-4 w-1/2" />
-                    </div>
+                  <div className="w-full space-y-2">
+                    <Skeleton className="h-5 w-3/4" />
+                    <Skeleton className="h-4 w-1/2" />
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -332,15 +328,9 @@ export default function ClientsPage() {
                   <Card key={client.id} className="flex flex-col group hover:shadow-md transition-shadow">
                     <CardHeader>
                       <div className="flex items-start justify-between gap-4">
-                          <div className="flex items-center gap-4">
-                              <Avatar className="h-14 w-14 border-2 border-muted">
-                                  <AvatarImage src={client.avatar} alt={`${client.firstName} ${client.lastName}`} data-ai-hint="person portrait" />
-                                  <AvatarFallback className="bg-primary/10 text-primary">{client.firstName?.charAt(0) ?? 'C'}</AvatarFallback>
-                              </Avatar>
-                              <div>
-                                  <h3 className="font-semibold text-lg leading-tight">{`${client.firstName} ${client.lastName}`}</h3>
-                                  <p className="text-sm text-muted-foreground">{client.document}</p>
-                              </div>
+                          <div>
+                              <h3 className="font-semibold text-lg leading-tight">{`${client.firstName} ${client.lastName}`}</h3>
+                              <p className="text-sm text-muted-foreground">{client.document}</p>
                           </div>
                           {renderClientActions(client)}
                       </div>
@@ -445,16 +435,10 @@ export default function ClientsPage() {
                     {filteredClients.map((client) => (
                       <TableRow key={client.id} className="group">
                         <TableCell>
-                          <div className="flex items-center gap-3">
-                            <Avatar className="h-8 w-8">
-                              <AvatarImage src={client.avatar} />
-                              <AvatarFallback>{client.firstName?.charAt(0)}</AvatarFallback>
-                            </Avatar>
-                            <div className="flex flex-col min-w-0">
-                              <span className="font-medium truncate">{`${client.firstName} ${client.lastName}`}</span>
-                              <div className="flex items-center gap-1 md:hidden">
-                                <Badge variant="outline" className="text-[10px] h-4">{client.document}</Badge>
-                              </div>
+                          <div className="flex flex-col min-w-0">
+                            <span className="font-medium truncate">{`${client.firstName} ${client.lastName}`}</span>
+                            <div className="flex items-center gap-1 md:hidden">
+                              <Badge variant="outline" className="text-[10px] h-4">{client.document}</Badge>
                             </div>
                           </div>
                         </TableCell>

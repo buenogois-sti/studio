@@ -233,14 +233,14 @@ export function ClientForm({
           ...clientData,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
-          avatar: `https://picsum.photos/seed/c${Math.random()}/40/40`,
+          avatar: '', // No avatar
         }
         const docRef = await addDoc(clientsCollection, newClientPayload);
         const newClient: Client = {
             id: docRef.id,
             ...clientData,
             createdAt: Timestamp.now(),
-            avatar: newClientPayload.avatar
+            avatar: ''
         };
 
         toast({ title: 'Cliente cadastrado!', description: `${displayName} foi adicionado com sucesso.` });

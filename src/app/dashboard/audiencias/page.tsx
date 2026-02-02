@@ -32,7 +32,6 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { searchProcesses } from '@/lib/process-actions';
 import { createHearing, deleteHearing } from '@/lib/hearing-actions';
 import { cn } from '@/lib/utils';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   Table,
   TableBody,
@@ -353,13 +352,12 @@ export default function AudienciasPage() {
 
   const getHearingInfo = (hearing: Hearing) => {
     const process = processesMap.get(hearing.processId);
-    if (!process) return { processName: 'Processo não encontrado', clientName: 'Cliente não encontrado', clientAvatar: '' };
+    if (!process) return { processName: 'Processo não encontrado', clientName: 'Cliente não encontrado' };
 
     const client = clientsMap.get(process.clientId);
     return {
       processName: process.name,
       clientName: client ? `${client.firstName} ${client.lastName}` : 'Cliente não encontrado',
-      clientAvatar: client?.avatar || '',
     };
   };
 
@@ -450,7 +448,7 @@ export default function AudienciasPage() {
                                             </TableHeader>
                                             <TableBody>
                                                  {dailyHearings.map(hearing => {
-                                                    const { processName, clientName, clientAvatar } = getHearingInfo(hearing);
+                                                    const { processName, clientName } = getHearingInfo(hearing);
                                                     return (
                                                         <TableRow key={hearing.id} className="hover:bg-muted/50">
                                                             <TableCell>
@@ -481,10 +479,6 @@ export default function AudienciasPage() {
                                                             <TableCell>
                                                                 <div className="font-bold text-base">{processName}</div>
                                                                 <div className="flex items-center gap-2 mt-1">
-                                                                    <Avatar className="h-6 w-6 border">
-                                                                        <AvatarImage src={clientAvatar} />
-                                                                        <AvatarFallback>{clientName.charAt(0)}</AvatarFallback>
-                                                                    </Avatar>
                                                                     <span className="text-sm text-muted-foreground">{clientName}</span>
                                                                 </div>
                                                             </TableCell>

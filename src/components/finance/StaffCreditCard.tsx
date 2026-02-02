@@ -5,7 +5,6 @@ import { collection } from 'firebase/firestore';
 import type { Staff, LawyerCredit } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { Separator } from '../ui/separator';
 import { Button } from '../ui/button';
 import { DollarSign } from 'lucide-react';
@@ -40,7 +39,6 @@ export function StaffCreditCard({ staffMember }: { staffMember: Staff }) {
       return (
         <Card>
             <CardHeader className="flex-row items-center gap-4">
-                <Skeleton className="h-12 w-12 rounded-full" />
                 <div className="space-y-2">
                     <Skeleton className="h-5 w-32" />
                     <Skeleton className="h-4 w-20" />
@@ -61,10 +59,6 @@ export function StaffCreditCard({ staffMember }: { staffMember: Staff }) {
     return (
         <Card className="flex flex-col">
             <CardHeader className="flex-row items-center gap-4">
-                <Avatar className="h-12 w-12 border">
-                    <AvatarImage src={`https://picsum.photos/seed/staff${staffMember.id}/100/100`} alt={staffMember.firstName} data-ai-hint="person portrait" />
-                    <AvatarFallback>{staffMember.firstName?.charAt(0) ?? 'S'}</AvatarFallback>
-                </Avatar>
                 <div>
                     <CardTitle className="text-lg">{staffMember.firstName} {staffMember.lastName}</CardTitle>
                     <CardDescription>{staffMember.role === 'lawyer' ? 'Advogado(a)' : 'Estagiário(a)'}</CardDescription>
@@ -96,4 +90,3 @@ export function StaffCreditCard({ staffMember }: { staffMember: Staff }) {
         </Card>
     );
 }
-    
