@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -7,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/tabs";
 import {
   Palette,
   Users,
@@ -55,14 +56,7 @@ function IntegrationsTab() {
 
   const handleDisconnect = async () => {
     setIsDisconnecting(true);
-    // This will just sign the user out of the application.
-    // A true "disconnect" would involve revoking the Google token, which is more complex.
     try {
-        if (userProfile?.googleRefreshToken) {
-             // Ideally, you'd call an API route here to revoke the token on Google's side
-             // For now, we'll just sign out.
-            console.log("Revoke token logic would go here.");
-        }
         await signOut({ callbackUrl: '/login' });
         toast({
             title: 'Desconectado',
@@ -171,7 +165,7 @@ function InviteUserDialog({ onInvite, userToEdit }: { onInvite: () => void, user
     const handleOpenChange = (isOpen: boolean) => {
         if (!isOpen) {
              form.reset({ email: '', role: 'lawyer'});
-             onInvite(); // To reset the userToEdit state in parent
+             onInvite();
         }
         setOpen(isOpen);
     }
@@ -209,7 +203,7 @@ function InviteUserDialog({ onInvite, userToEdit }: { onInvite: () => void, user
                             render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Email</FormLabel>
-                                    <FormControl><Input placeholder="email@buenogoisadvogado.com.br" {...field} disabled={!!userToEdit} /></FormControl>
+                                    <FormControl><Input placeholder="usuario@buenogoisadvogado.com.br" {...field} disabled={!!userToEdit} /></FormControl>
                                     <FormMessage />
                                 </FormItem>
                             )}
@@ -220,7 +214,7 @@ function InviteUserDialog({ onInvite, userToEdit }: { onInvite: () => void, user
                             render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Perfil de Acesso</FormLabel>
-                                     <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                     <Select onValueChange={field.onChange} value={field.value}>
                                         <FormControl>
                                             <SelectTrigger><SelectValue placeholder="Selecione um perfil..." /></SelectTrigger>
                                         </FormControl>
@@ -266,8 +260,8 @@ function UsersTab() {
             const invitedUsers = await getUserRoles();
             const existingUsers = activeUsers || [];
             
-            const existingUserEmails = new Set(existingUsers.map(u => u.email));
-            const pendingInvites = invitedUsers.filter(r => !existingUserEmails.has(r.email));
+            const existingUserEmails = new Set(existingUsers.map(u => u.email.toLowerCase()));
+            const pendingInvites = invitedUsers.filter(r => !existingUserEmails.has(r.email.toLowerCase()));
 
             const combined = [...existingUsers, ...pendingInvites];
             setCombinedUsers(combined);
