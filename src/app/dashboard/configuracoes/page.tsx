@@ -349,32 +349,19 @@ export default function ConfiguracoesPage() {
           <Card>
             <CardHeader>
                 <CardTitle>Aparência</CardTitle>
-                <CardDescription>Personalize o tema e a aparência do sistema.</CardDescription>
+                <CardDescription>Ajuste o tema de aparência do sistema.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-                <div className="space-y-2">
-                    <Label htmlFor="primary-color">Cor Primária</Label>
-                    <div className="flex items-center gap-2">
-                        <Input id="primary-color" defaultValue="#F5D030" className="w-32" />
-                        <div className="w-8 h-8 rounded-md border" style={{ backgroundColor: '#F5D030' }}></div>
-                    </div>
-                    <p className="text-xs text-muted-foreground">Altere a cor de destaque do sistema. Use um valor hexadecimal.</p>
+            <CardContent className="space-y-4">
+                <div className="flex items-center space-x-3 rounded-lg border p-4">
+                    <Switch id="dark-mode" defaultChecked />
+                    <Label htmlFor="dark-mode" className="cursor-pointer">
+                        Modo Escuro
+                    </Label>
                 </div>
-                <div className="flex items-center space-x-2">
-                    <Switch id="dark-mode" defaultChecked disabled />
-                    <Label htmlFor="dark-mode">Modo Escuro (Padrão)</Label>
-                </div>
-                <Alert>
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Atualização do Tema</AlertTitle>
-                    <AlertDescription>
-                        A alteração da cor primária requer a recompilação dos estilos e pode levar alguns instantes para ser aplicada em todo o sistema.
-                    </AlertDescription>
-                </Alert>
+                 <p className="text-sm text-muted-foreground">
+                    Ative o modo escuro para uma experiência visual mais confortável. A troca de tema em tempo real será implementada em breve.
+                </p>
             </CardContent>
-            <CardFooter>
-                <Button>Salvar Aparência</Button>
-            </CardFooter>
           </Card>
         </TabsContent>
 
