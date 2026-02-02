@@ -57,6 +57,14 @@ export type Client = {
   updatedAt?: Timestamp | string;
 };
 
+export type TimelineEvent = {
+  id: string;
+  type: 'note' | 'decision' | 'petition' | 'hearing' | 'system';
+  description: string;
+  date: Timestamp;
+  authorName: string;
+};
+
 export type Process = {
   id: string;
   clientId: string;
@@ -70,6 +78,7 @@ export type Process = {
   status: 'Ativo' | 'Arquivado' | 'Pendente';
   responsibleStaffIds?: string[];
   driveFolderId?: string;
+  timeline?: TimelineEvent[];
   createdAt: Timestamp;
   updatedAt?: Timestamp;
 };

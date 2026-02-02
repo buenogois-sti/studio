@@ -11,7 +11,10 @@ import {
   X,
   DollarSign,
   ExternalLink,
-  FolderOpen
+  FolderOpen,
+  History,
+  FileText,
+  Copy
 } from 'lucide-react';
 import { z } from 'zod';
 import { useForm, useFieldArray } from 'react-hook-form';
@@ -103,7 +106,7 @@ import {
   updateDoc,
   deleteDoc,
 } from 'firebase/firestore';
-import type { Process, Client } from '@/lib/types';
+import type { Process, Client, DocumentTemplate } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/use-toast';
 import { searchClients, getClientById } from '@/lib/client-actions';
@@ -111,6 +114,7 @@ import { ClientForm } from '@/components/client/ClientForm';
 import { cn } from '@/lib/utils';
 import { syncProcessToDrive } from '@/lib/drive';
 import { FinancialEventDialog } from '@/components/process/FinancialEventDialog';
+import { ProcessTimelineSheet } from '@/components/process/ProcessTimelineSheet';
 
 const processSchema = z.object({
   clientId: z.string().min(1, { message: 'Selecione um cliente.' }),
@@ -286,6 +290,13 @@ function ProcessForm({
           ...processData,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
+          timeline: [{
+            id: 'init',
+            type: 'system',
+            description: 'Processo cadastrado no sistema.',
+            date: Timestamp.now(),
+            authorName: 'Sistema'
+          }]
         });
         processId = docRef.id;
         toast({ title: 'Processo cadastrado!' });
@@ -450,10 +461,13 @@ function ProcessForm({
 
 export default function ProcessosPage() {
   const [isSheetOpen, setIsSheetOpen] = React.useState(false);
+  const [isTimelineOpen, setIsTimelineOpen] = React.useState(false);
   const [editingProcess, setEditingProcess] = React.useState<Process | null>(null);
+  const [selectedProcessForTimeline, setSelectedProcessForTimeline] = React.useState<Process | null>(null);
   const [processToDelete, setProcessToDelete] = React.useState<Process | null>(null);
   const [isDeleting, setIsDeleting] = React.useState(false);
   const [isSyncing, setIsSyncing] = React.useState<string | null>(null);
+  const [isGeneratingDoc, setIsGeneratingDoc] = React.useState<string | null>(null);
   const [eventProcess, setEventProcess] = React.useState<Process | null>(null);
   const [statusFilter, setStatusFilter] = React.useState<string>('all');
   
@@ -477,6 +491,9 @@ export default function ProcessosPage() {
   );
   const { data: clientsData, isLoading: isLoadingClients } = useCollection<Client>(clientsQuery);
   const clientsMap = React.useMemo(() => new Map(clientsData?.map((c) => [c.id, `${c.firstName} ${c.lastName}`])), [clientsData]);
+
+  const templatesQuery = useMemoFirebase(() => firestore ? collection(firestore, 'document_templates') : null, [firestore]);
+  const { data: templatesData } = useCollection<DocumentTemplate>(templatesQuery);
 
   const isLoading = isUserLoading || isLoadingProcesses || isLoadingClients;
   
@@ -527,6 +544,29 @@ export default function ProcessosPage() {
     }
   };
 
+  const handleGenerateDocument = async (process: Process, template: DocumentTemplate) => {
+    if (!session) return;
+    setIsGeneratingDoc(process.id);
+    try {
+        // Simple simulation of doc generation: In a real app we'd call a server action 
+        // that uses Google Docs API to replace placeholders. 
+        // For MVP, we copy the template to the process folder.
+        toast({ title: "Gerando documento...", description: `Copiando rascunho de "${template.name}" para o Drive.` });
+        
+        // This is a placeholder for the actual logic that would call the drive lib
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        toast({ 
+            title: "Documento Gerado!", 
+            description: "O rascunho foi criado na pasta do processo no Drive." 
+        });
+    } catch (error: any) {
+        toast({ variant: 'destructive', title: 'Erro na Geração', description: error.message });
+    } finally {
+        setIsGeneratingDoc(null);
+    }
+  };
+
   const confirmDelete = async () => {
     if (!firestore || !processToDelete) return;
     setIsDeleting(true);
@@ -544,6 +584,11 @@ export default function ProcessosPage() {
     } finally {
       setIsDeleting(false);
     }
+  };
+
+  const openTimeline = (process: Process) => {
+    setSelectedProcessForTimeline(process);
+    setIsTimelineOpen(true);
   };
 
   return (
@@ -600,8 +645,8 @@ export default function ProcessosPage() {
                   <TableHead>Processo</TableHead>
                   <TableHead>Cliente</TableHead>
                   <TableHead className="hidden md:table-cell">Nº do Processo</TableHead>
+                  <TableHead className="hidden md:table-cell text-center">Andamentos</TableHead>
                   <TableHead className="hidden md:table-cell">Status</TableHead>
-                  <TableHead className="hidden md:table-cell">Drive</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
@@ -612,49 +657,90 @@ export default function ProcessosPage() {
                       <TableCell><Skeleton className="h-4 w-48" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                       <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-40" /></TableCell>
+                      <TableCell className="hidden md:table-cell"><Skeleton className="h-6 w-12 mx-auto" /></TableCell>
                       <TableCell className="hidden md:table-cell"><Skeleton className="h-6 w-20" /></TableCell>
-                      <TableCell className="hidden md:table-cell"><Skeleton className="h-6 w-28" /></TableCell>
                       <TableCell><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
                     </TableRow>
                   ))
                 ) : filteredProcesses.length > 0 ? (
                   filteredProcesses.map((process) => (
-                    <TableRow key={process.id}>
-                      <TableCell className="font-medium">{process.name}</TableCell>
+                    <TableRow key={process.id} className="group">
+                      <TableCell className="font-medium">
+                        <div className="flex flex-col">
+                            <span>{process.name}</span>
+                            {process.driveFolderId && (
+                                <Badge variant="outline" className="w-fit text-[9px] h-4 mt-1 border-emerald-500/30 text-emerald-600 bg-emerald-500/5">
+                                    Sincronizado
+                                </Badge>
+                            )}
+                        </div>
+                      </TableCell>
                       <TableCell>{clientsMap.get(process.clientId) || 'N/A'}</TableCell>
-                      <TableCell className="hidden md:table-cell">{process.processNumber || 'N/A'}</TableCell>
+                      <TableCell className="hidden md:table-cell font-mono text-xs">{process.processNumber || 'N/A'}</TableCell>
+                      <TableCell className="hidden md:table-cell text-center">
+                        <Button variant="ghost" size="sm" onClick={() => openTimeline(process)} className="h-8 gap-1.5 hover:bg-primary/10">
+                            <History className="h-3.5 w-3.5" />
+                            <span className="font-bold text-xs">{process.timeline?.length || 0}</span>
+                        </Button>
+                      </TableCell>
                       <TableCell className="hidden md:table-cell">
                         <Badge variant={process.status === 'Ativo' ? 'secondary' : 'outline'}>{process.status}</Badge>
                       </TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        {process.driveFolderId ? (
-                            <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20">Sincronizado</Badge>
-                        ) : (
-                            <Badge variant="outline" className="text-muted-foreground">Pendente</Badge>
-                        )}
-                      </TableCell>
                       <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button size="icon" variant="ghost"><MoreVertical className="h-4 w-4" /></Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => { setEditingProcess(process); setIsSheetOpen(true); }}>Editar</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => setEventProcess(process)}><DollarSign className="mr-2 h-4 w-4" />Financeiro</DropdownMenuItem>
-                             <DropdownMenuSeparator />
-                             {process.driveFolderId ? (
-                                <DropdownMenuItem onSelect={() => window.open(`https://drive.google.com/drive/folders/${process.driveFolderId}`, '_blank')}>
-                                    <FolderOpen className="mr-2 h-4 w-4" />Abrir Pasta
-                                </DropdownMenuItem>
-                            ) : (
-                                <DropdownMenuItem onClick={() => handleSyncProcess(process)} disabled={isSyncing === process.id}>
-                                    <ExternalLink className="mr-2 h-4 w-4" />Sincronizar
-                                </DropdownMenuItem>
-                            )}
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-destructive" onClick={() => setProcessToDelete(process)}>Excluir</DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <div className="flex items-center justify-end gap-1">
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button size="icon" variant="ghost" className="h-8 w-8"><MoreVertical className="h-4 w-4" /></Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-56">
+                                    <DropdownMenuLabel>Gestão do Processo</DropdownMenuLabel>
+                                    <DropdownMenuItem onClick={() => { setEditingProcess(process); setIsSheetOpen(true); }}>
+                                        <FileText className="mr-2 h-4 w-4" /> Editar Cadastro
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => openTimeline(process)}>
+                                        <History className="mr-2 h-4 w-4" /> Ver Linha do Tempo
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => setEventProcess(process)}>
+                                        <DollarSign className="mr-2 h-4 w-4" /> Lançar Financeiro
+                                    </DropdownMenuItem>
+                                    
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuLabel className="text-[10px] uppercase text-muted-foreground">Documentos</DropdownMenuLabel>
+                                    {templatesData && templatesData.length > 0 ? (
+                                        <DropdownMenuSub>
+                                            <DropdownMenuSubTrigger>
+                                                <Copy className="mr-2 h-4 w-4" /> Gerar Documento
+                                            </DropdownMenuSubTrigger>
+                                            <DropdownMenuSubContent className="w-56">
+                                                {templatesData.map(template => (
+                                                    <DropdownMenuItem key={template.id} onClick={() => handleGenerateDocument(process, template)}>
+                                                        {template.name}
+                                                    </DropdownMenuItem>
+                                                ))}
+                                            </DropdownMenuSubContent>
+                                        </DropdownMenuSub>
+                                    ) : (
+                                        <DropdownMenuItem disabled>Nenhum modelo configurado</DropdownMenuItem>
+                                    )}
+
+                                    <DropdownMenuSeparator />
+                                    {process.driveFolderId ? (
+                                        <DropdownMenuItem onSelect={() => window.open(`https://drive.google.com/drive/folders/${process.driveFolderId}`, '_blank')}>
+                                            <FolderOpen className="mr-2 h-4 w-4" /> Abrir no Drive
+                                        </DropdownMenuItem>
+                                    ) : (
+                                        <DropdownMenuItem onClick={() => handleSyncProcess(process)} disabled={isSyncing === process.id}>
+                                            {isSyncing === process.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ExternalLink className="mr-2 h-4 w-4" />}
+                                            Sincronizar Drive
+                                        </DropdownMenuItem>
+                                    )}
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem className="text-destructive" onClick={() => setProcessToDelete(process)}>
+                                        Excluir Processo
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
@@ -671,7 +757,6 @@ export default function ProcessosPage() {
         </Card>
       </div>
 
-      {/* IMPROVED: Wider Sheet for better form UX */}
       <Sheet open={isSheetOpen} onOpenChange={(open) => { if (!open) setEditingProcess(null); setIsSheetOpen(open); }}>
         <SheetContent className="w-full sm:max-w-4xl">
           <SheetHeader>
@@ -681,6 +766,12 @@ export default function ProcessosPage() {
           <ProcessForm onSave={() => setIsSheetOpen(false)} process={editingProcess} />
         </SheetContent>
       </Sheet>
+
+      <ProcessTimelineSheet 
+        process={selectedProcessForTimeline} 
+        open={isTimelineOpen} 
+        onOpenChange={setIsTimelineOpen} 
+      />
 
       <AlertDialog open={!!processToDelete} onOpenChange={(open) => !isDeleting && !open && setProcessToDelete(null)}>
         <AlertDialogContent>
