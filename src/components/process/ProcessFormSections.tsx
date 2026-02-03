@@ -38,10 +38,6 @@ export function SectionHeader({ icon, title }: SectionHeaderProps) {
   );
 }
 
-// ============================================================================
-// IDENTIFICATION AND STATUS SECTION
-// ============================================================================
-
 interface IdentificationSectionProps {
   control: Control<ProcessFormValues>;
   onClientSelect: (client: Client) => void;
@@ -104,9 +100,9 @@ export function IdentificationSection({
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  <SelectItem value="Ativo">🟢 Ativo</SelectItem>
-                  <SelectItem value="Pendente">🟡 Pendente</SelectItem>
-                  <SelectItem value="Arquivado">⚪ Arquivado</SelectItem>
+                  <SelectItem value="Ativo">Ativo</SelectItem>
+                  <SelectItem value="Pendente">Pendente</SelectItem>
+                  <SelectItem value="Arquivado">Arquivado</SelectItem>
                 </SelectContent>
               </Select>
               <FormMessage />
@@ -156,10 +152,6 @@ export function IdentificationSection({
     </section>
   );
 }
-
-// ============================================================================
-// COURT AND LOCATION SECTION
-// ============================================================================
 
 interface CourtSectionProps {
   control: Control<ProcessFormValues>;
@@ -233,10 +225,6 @@ export function CourtSection({ control }: CourtSectionProps) {
     </section>
   );
 }
-
-// ============================================================================
-// TEAM AND RESPONSIBLE SECTION
-// ============================================================================
 
 interface TeamSectionProps {
   control: Control<ProcessFormValues>;
@@ -318,10 +306,6 @@ export function TeamSection({ control, staff }: TeamSectionProps) {
     </section>
   );
 }
-
-// ============================================================================
-// PARTIES AND STRATEGY SECTION
-// ============================================================================
 
 interface PartiesSectionProps {
   control: Control<ProcessFormValues>;

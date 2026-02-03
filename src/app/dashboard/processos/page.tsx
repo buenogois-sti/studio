@@ -18,10 +18,9 @@ import {
   CheckCircle2,
   TrendingUp,
   FilePlus2,
-  Users as UsersIcon
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
-import { useSearchParams } from 'next-auth/next';
+import { useSearchParams } from 'next/navigation';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -81,7 +80,6 @@ export default function ProcessosPage() {
   const clientsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'clients') : null), [firestore]);
   const { data: clientsData } = useCollection<Client>(clientsQuery);
   
-  // Performance Optimization: O(1) Lookup Map for Clients
   const clientsMap = React.useMemo(() => new Map(clientsData?.map(c => [c.id, c])), [clientsData]);
 
   const filteredProcesses = React.useMemo(() => {

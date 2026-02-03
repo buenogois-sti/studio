@@ -1,13 +1,14 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Loader2, User, Check, ChevronsUpDown, Search, CreditCard } from 'lucide-react';
+import { Loader2, User, Check, ChevronsUpDown, Search } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/components/ui/use-toast';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { searchClients, getClientById } from '@/lib/client-actions';
 import type { Client } from '@/lib/types';
@@ -26,9 +27,8 @@ export function ClientSearchInput({ onSelect, selectedClientId }: ClientSearchIn
   const inputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  // Load selected client on mount
   useEffect(() => {
-    if (selectedClientId && !selectedClient) {
+    if (selectedClientId && (!selectedClient || selectedClient.id !== selectedClientId)) {
       getClientById(selectedClientId)
         .then(setSelectedClient)
         .catch((error) => {
@@ -37,7 +37,6 @@ export function ClientSearchInput({ onSelect, selectedClientId }: ClientSearchIn
     }
   }, [selectedClientId, selectedClient]);
 
-  // Focus isolation effect
   useEffect(() => {
     if (open) {
       const timer = setTimeout(() => {
@@ -47,7 +46,6 @@ export function ClientSearchInput({ onSelect, selectedClientId }: ClientSearchIn
     }
   }, [open]);
 
-  // Search logic with debounce
   useEffect(() => {
     if (search.length < 2) {
       setResults([]);
@@ -121,7 +119,6 @@ export function ClientSearchInput({ onSelect, selectedClientId }: ClientSearchIn
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={(e) => {
-                // Key event isolation to prevent parent sheets from hijacking focus
                 e.stopPropagation();
               }}
               className="border-none focus-visible:ring-0 focus-visible:ring-offset-0 h-11 bg-transparent"
@@ -143,7 +140,7 @@ export function ClientSearchInput({ onSelect, selectedClientId }: ClientSearchIn
               </div>
             )}
 
-            {search.length < 2 && (
+            {search.length < 2 && !isLoading && (
               <div className="p-6 text-center text-[10px] uppercase font-black tracking-widest text-muted-foreground/50">
                 Aguardando digitação...
               </div>
@@ -155,7 +152,6 @@ export function ClientSearchInput({ onSelect, selectedClientId }: ClientSearchIn
                   key={client.id}
                   type="button"
                   onMouseDown={(e) => {
-                    // Prevent blur before click
                     e.preventDefault();
                   }}
                   onClick={() => handleSelect(client)}

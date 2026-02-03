@@ -48,20 +48,18 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
 
-  // Fetch staff data memoized
   const staffQuery = useMemoFirebase(
     () => (firestore ? collection(firestore, 'staff') : null),
     [firestore]
   );
-  const { data: staff } = useCollection<Staff>(staffQuery);
+  const { data: staffData } = useCollection<Staff>(staffQuery);
+  const staff = staffData || [];
 
-  // Initialize form with robust default values
   const form = useForm<ProcessFormValues>({
     resolver: zodResolver(processSchema),
     defaultValues: React.useMemo(() => getDefaultValues(process), [process]),
   });
 
-  // Manage opposing parties field array
   const { fields: partyFields, append: addParty, remove: removeParty } = useFieldArray({
     control: form.control,
     name: 'opposingParties',
@@ -72,7 +70,6 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
     setIsSaving(true);
 
     try {
-      // Map object array back to string array for Firestore
       const data = {
         ...values,
         opposingParties: values.opposingParties.map(p => p.name),
@@ -116,7 +113,7 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
 
           <CourtSection control={form.control} />
 
-          <TeamSection control={form.control} staff={staff || []} />
+          <TeamSection control={form.control} staff={staff} />
 
           <PartiesSection
             control={form.control}
@@ -161,7 +158,6 @@ function getDefaultValues(process?: Process | null): ProcessFormValues {
     name: process.name || '',
     processNumber: process.processNumber || '',
     status: (process.status as 'Ativo' | 'Arquivado' | 'Pendente') || 'Ativo',
-    // Convert string array to object array for the form
     opposingParties: process.opposingParties?.map(name => ({ name })) || [],
     responsibleStaffIds: process.responsibleStaffIds || [],
     leadLawyerId: process.leadLawyerId || '',
