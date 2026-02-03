@@ -50,9 +50,12 @@ export function LocationSearch({ value, onSelect, placeholder = "Pesquisar local
   const [isSearching, setIsSearching] = React.useState(false);
   const inputRef = React.useRef<HTMLInputElement>(null);
 
+  // Forçar foco no input ao abrir
   React.useEffect(() => {
     if (open) {
-      const timer = setTimeout(() => inputRef.current?.focus(), 150);
+      const timer = setTimeout(() => {
+        inputRef.current?.focus();
+      }, 150);
       return () => clearTimeout(timer);
     }
   }, [open]);
@@ -106,6 +109,7 @@ export function LocationSearch({ value, onSelect, placeholder = "Pesquisar local
         className="w-[var(--radix-popover-trigger-width)] p-0 z-[100]" 
         align="start"
         onOpenAutoFocus={(e) => e.preventDefault()}
+        onKeyDown={(e) => e.stopPropagation()} // Impede bloqueio pela Sheet
       >
         <div className="flex flex-col h-full bg-popover border shadow-xl rounded-md">
           <div className="flex items-center border-b px-3">
@@ -116,7 +120,7 @@ export function LocationSearch({ value, onSelect, placeholder = "Pesquisar local
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={(e) => {
-                e.stopPropagation();
+                e.stopPropagation(); // Garante digitação
               }}
               className="border-none focus-visible:ring-0 focus-visible:ring-offset-0 h-11 bg-transparent"
             />

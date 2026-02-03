@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -22,10 +21,6 @@ import {
   Check,
   ChevronsUpDown,
   Search,
-  Video,
-  Building2,
-  Globe,
-  User
 } from 'lucide-react';
 import { format, addDays, isToday, isSameDay, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, addMonths, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -119,7 +114,9 @@ function ProcessSearch({ onSelect, selectedProcess }: { onSelect: (process: Proc
 
   React.useEffect(() => {
     if (open) {
-      const timer = setTimeout(() => inputRef.current?.focus(), 150);
+      const timer = setTimeout(() => {
+        inputRef.current?.focus();
+      }, 150);
       return () => clearTimeout(timer);
     }
   }, [open]);
@@ -160,6 +157,7 @@ function ProcessSearch({ onSelect, selectedProcess }: { onSelect: (process: Proc
         className="w-[var(--radix-popover-trigger-width)] p-0 z-[100]" 
         align="start"
         onOpenAutoFocus={(e) => e.preventDefault()}
+        onKeyDown={(e) => e.stopPropagation()}
       >
         <div className="flex flex-col h-full bg-popover border shadow-xl rounded-md">
           <div className="flex items-center border-b px-3">

@@ -37,11 +37,12 @@ export function ClientSearchInput({ onSelect, selectedClientId }: ClientSearchIn
     }
   }, [selectedClientId, selectedClient]);
 
+  // Forçar o foco no input quando o popover abrir
   useEffect(() => {
     if (open) {
       const timer = setTimeout(() => {
         inputRef.current?.focus();
-      }, 100);
+      }, 150);
       return () => clearTimeout(timer);
     }
   }, [open]);
@@ -109,6 +110,7 @@ export function ClientSearchInput({ onSelect, selectedClientId }: ClientSearchIn
         className="w-[var(--radix-popover-trigger-width)] p-0 z-[100]" 
         align="start"
         onOpenAutoFocus={(e) => e.preventDefault()}
+        onKeyDown={(e) => e.stopPropagation()} // Impede que a Sheet intercepte teclas
       >
         <div className="flex flex-col bg-popover border shadow-2xl rounded-xl overflow-hidden">
           <div className="flex items-center border-b px-3 bg-muted/10">
@@ -119,7 +121,7 @@ export function ClientSearchInput({ onSelect, selectedClientId }: ClientSearchIn
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={(e) => {
-                e.stopPropagation();
+                e.stopPropagation(); // Garante que o teclado funcione
               }}
               className="border-none focus-visible:ring-0 focus-visible:ring-offset-0 h-11 bg-transparent"
               autoComplete="off"
