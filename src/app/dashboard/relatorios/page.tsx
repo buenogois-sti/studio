@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -9,10 +10,7 @@ import {
   DollarSign, 
   Download, 
   Calendar,
-  ChevronDown,
   PieChart as PieChartIcon,
-  Activity,
-  FileText
 } from 'lucide-react';
 import { 
   Bar, 
@@ -23,26 +21,19 @@ import {
   CartesianGrid, 
   Tooltip, 
   Legend, 
-  PieChart, 
-  Pie, 
-  Cell,
   AreaChart,
   Area
 } from 'recharts';
-import { format, subMonths, startOfMonth, isAfter } from 'date-fns';
+import { format, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { H1 } from '@/components/ui/typography';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, Timestamp } from 'firebase/firestore';
 import type { Process, Client, FinancialTitle, Staff } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
-
-const COLORS = ['#F5D030', '#152c4b', '#10b981', '#ef4444', '#8b5cf6', '#f97316'];
 
 interface FinancialStat {
   month: string;
@@ -72,16 +63,6 @@ export default function RelatoriosPage() {
 
   const staffQuery = useMemoFirebase(() => firestore ? collection(firestore, 'staff') : null, [firestore]);
   const { data: staffData } = useCollection<Staff>(staffQuery);
-
-  // Memoized calculations to prevent UI Freezing
-  const processStatusData = React.useMemo(() => {
-    if (!processesData) return [];
-    const counts = processesData.reduce((acc: any, p) => {
-      acc[p.status] = (acc[p.status] || 0) + 1;
-      return acc;
-    }, {});
-    return Object.entries(counts).map(([name, value]) => ({ name, value }));
-  }, [processesData]);
 
   const financialData = React.useMemo((): FinancialStat[] => {
     if (!titlesData) return [];

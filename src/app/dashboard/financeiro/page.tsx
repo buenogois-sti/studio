@@ -1,3 +1,4 @@
+
 'use client';
 import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,17 +10,13 @@ import {
   ArrowDownRight,
   DollarSign,
   PlusCircle,
-  File,
   Loader2,
   MoreVertical,
   Check,
   Calendar as CalendarIcon,
-  User,
-  FileText,
-  TrendingUp,
-  AlertCircle,
   Search,
-  X
+  TrendingUp,
+  AlertCircle
 } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, Timestamp, query, orderBy } from 'firebase/firestore';
@@ -30,28 +27,17 @@ import { cn } from '@/lib/utils';
 import { H1 } from '@/components/ui/typography';
 import { useToast } from '@/components/ui/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format, startOfMonth, subMonths, isAfter, isBefore } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { createFinancialTitle, updateFinancialTitleStatus } from '@/lib/finance-actions';
-import { searchProcesses } from '@/lib/process-actions';
+import { createFinancialTitle } from '@/lib/finance-actions';
 import { StaffCreditCard } from '@/components/finance/StaffCreditCard';
-import { Textarea } from '@/components/ui/textarea';
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
-
-const allOrigins = [
-  'ACORDO', 'SENTENCA', 'HONORARIOS_CONTRATUAIS', 'SUCUMBENCIA', 'CUSTAS_PROCESSUAIS', 'HONORARIOS_PAGOS',
-  'SALARIOS_PROLABORE', 'ALUGUEL_CONTAS', 'INFRAESTRUTURA_TI', 'MARKETING_PUBLICIDADE', 
-  'IMPOSTOS_TAXAS', 'MATERIAL_ESCRITORIO', 'SERVICOS_TERCEIROS', 'OUTRAS_DESPESAS'
-] as const;
 
 const titleSchema = z.object({
   processId: z.string().optional(),
@@ -60,10 +46,7 @@ const titleSchema = z.object({
   origin: z.string().min(1, 'Selecione a origem.'),
   value: z.coerce.number().positive('O valor deve ser maior que zero.'),
   dueDate: z.coerce.date({ required_error: 'A data de vencimento é obrigatória.' }),
-  paymentDate: z.coerce.date().optional(),
   status: z.enum(['PENDENTE', 'PAGO', 'ATRASADO']).default('PENDENTE'),
-  paidToStaffId: z.string().optional(),
-  notes: z.string().optional(),
 });
 
 type TitleFormValues = z.infer<typeof titleSchema>;
@@ -92,9 +75,7 @@ const expenseOrigins = [
     { value: 'OUTRAS_DESPESAS', label: 'Outras Despesas' },
 ];
 
-const allOriginLabels = new Map([...revenueOrigins, ...expenseOrigins].map(o => [o.value, o.label]));
-
-function NewTitleDialog({ onTitleCreated, staffData }: { onTitleCreated: () => void; staffData: Staff[] | null }) {
+function NewTitleDialog({ onTitleCreated }: { onTitleCreated: () => void }) {
   const [open, setOpen] = React.useState(false);
   const [isSaving, setIsSaving] = React.useState(false);
   const { toast } = useToast();
@@ -107,7 +88,7 @@ function NewTitleDialog({ onTitleCreated, staffData }: { onTitleCreated: () => v
   async function onSubmit(values: TitleFormValues) {
     setIsSaving(true);
     try {
-      // Type casting to bypass Zod schema to action mismatch
+      // Use type casting to match the strict origin union in createFinancialTitle
       await createFinancialTitle(values as any);
       toast({ title: 'Título Lançado!' });
       form.reset();
@@ -140,7 +121,7 @@ function NewTitleDialog({ onTitleCreated, staffData }: { onTitleCreated: () => v
                 <FormField control={form.control} name="value" render={({ field }) => (<FormItem><FormLabel>Valor (R$)</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl></FormItem>)}/>
                 <FormField control={form.control} name="dueDate" render={({ field }) => (<FormItem><FormLabel>Vencimento</FormLabel><FormControl><Input type="date" value={field.value instanceof Date ? format(field.value, 'yyyy-MM-dd') : ''} onChange={e => field.onChange(e.target.valueAsDate)} /></FormControl></FormItem>)}/>
             </div>
-            <DialogFooter><Button type="submit" disabled={isSaving}>{isSaving ? <Loader2 className="animate-spin" /> : 'Lançar'}</Button></DialogFooter>
+            <DialogFooter><Button type="submit" disabled={isSaving}>{isSaving ? <Loader2 className="animate-spin h-4 w-4" /> : 'Lançar'}</Button></DialogFooter>
           </form>
         </Form>
       </DialogContent>
@@ -154,9 +135,6 @@ export default function FinanceiroPage() {
 
   const titlesQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'financial_titles'), orderBy('dueDate', 'desc')) : null), [firestore, refreshKey]);
   const { data: titlesData, isLoading: isLoadingTitles } = useCollection<FinancialTitle>(titlesQuery);
-
-  const clientsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'clients') : null), [firestore]);
-  const { data: clientsData } = useCollection<Client>(clientsQuery);
   
   const staffQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'staff') : null), [firestore]);
   const { data: staffData } = useCollection<Staff>(staffQuery);
@@ -183,7 +161,7 @@ export default function FinanceiroPage() {
   }, [titlesData]);
 
   const chartData = React.useMemo(() => {
-    const data: any[] = [];
+    const data: { month: string; key: string; receita: number; despesa: number }[] = [];
     const now = new Date();
     for (let i = 5; i >= 0; i--) {
         const d = subMonths(now, i);
@@ -209,7 +187,7 @@ export default function FinanceiroPage() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div><H1>Painel Financeiro</H1><p className="text-sm text-muted-foreground">Gestão de faturamento e custos.</p></div>
-        <NewTitleDialog onTitleCreated={() => setRefreshKey(k => k+1)} staffData={staffData} />
+        <NewTitleDialog onTitleCreated={() => setRefreshKey(k => k+1)} />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

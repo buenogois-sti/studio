@@ -1,3 +1,4 @@
+
 'use client';
 import * as React from 'react';
 import {
@@ -118,7 +119,7 @@ function AIAdvisor({ stats, activities, isLoading }: { stats: any, activities: s
                 ) : (
                     <div className="flex flex-col items-center justify-center py-6 text-center space-y-4">
                         <p className="text-sm text-muted-foreground max-w-xs">
-                            Clique abaixo para que a IA analise o status atual do seu escritório e forneça recomendações.
+                            Clique abaixo para que a IA analise o status atual do seu escritório.
                         </p>
                         <Button onClick={handleAnalyze} disabled={isAnalyzing}>
                             {isAnalyzing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Sparkles className="h-4 w-4 mr-2" />}
@@ -135,7 +136,6 @@ export default function Dashboard() {
   const { firestore } = useFirebase();
   const { data: session, status } = useSession();
 
-  // Data Fetching
   const titlesQuery = useMemoFirebase(() => firestore ? collection(firestore, 'financial_titles') : null, [firestore]);
   const { data: titlesData, isLoading: isLoadingTitles } = useCollection<FinancialTitle>(titlesQuery);
 
@@ -153,7 +153,6 @@ export default function Dashboard() {
 
   const isLoading = status === 'loading' || isLoadingTitles || isLoadingClients || isLoadingProcesses || isLoadingHearings || isLoadingLogs;
 
-  // Optimized Data Processing
   const dashboardStats = React.useMemo(() => {
     if (!titlesData || !processesData || !hearingsData) return { totalRevenue: 0, pendingReceivables: 0, totalOverdue: 0, activeProcessesCount: 0, upcomingHearingsCount: 0 };
     
@@ -373,7 +372,7 @@ export default function Dashboard() {
                     <div className="flex flex-col items-center justify-center text-center text-muted-foreground py-20 border border-dashed rounded-xl bg-muted/5">
                         <Calendar className="h-12 w-12 mb-4 opacity-20" />
                         <p className="font-bold text-lg">Agenda Limpa</p>
-                        <p className="text-xs max-w-[180px] mt-1">Nenhuma audiência agendada para os próximos dias.</p>
+                        <p className="text-xs max-w-[180px] mt-1">Nenhuma audiência agendada.</p>
                     </div>
                     )}
                 </CardContent>

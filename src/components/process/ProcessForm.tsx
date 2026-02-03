@@ -1,9 +1,10 @@
+
 'use client';
 import * as React from 'react';
 import { z } from 'zod';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Loader2, Plus, Trash2, User, Building, Gavel, Check, ChevronsUpDown, Search as SearchIcon } from 'lucide-react';
+import { Loader2, Plus, Trash2, User, Building, Gavel, Check, ChevronsUpDown } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -29,7 +30,7 @@ import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, serverTimestamp, doc, addDoc, updateDoc } from 'firebase/firestore';
 import type { Process, Client, Staff } from '@/lib/types';
 import { useToast } from '@/components/ui/use-toast';
-import { Badge } from '../ui/badge';
+import { Badge } from '@/components/ui/badge';
 import { LocationSearch } from '@/components/shared/LocationSearch';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
@@ -66,7 +67,6 @@ function ClientSearch({ onSelect, selectedClientId }: { onSelect: (client: Clien
   const [selectedClient, setSelectedClient] = React.useState<Client | null>(null);
   const { toast } = useToast();
 
-  // Load initial client if editing
   React.useEffect(() => {
     if (selectedClientId && !selectedClient) {
         getClientById(selectedClientId).then(setSelectedClient).catch(console.error);
@@ -214,7 +214,6 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-10 py-4">
         <fieldset disabled={isSaving} className="space-y-10">
             
-            {/* Sessão 1: Identificação */}
             <section className="space-y-6">
                 <div className="flex items-center gap-2 border-b pb-2">
                     <Gavel className="h-5 w-5 text-primary" />
@@ -295,7 +294,6 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
                 </div>
             </section>
 
-            {/* Sessão 2: Fórum e Localização */}
             <section className="space-y-6">
                 <div className="flex items-center gap-2 border-b pb-2">
                     <Building className="h-5 w-5 text-primary" />
@@ -346,7 +344,6 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
                 </div>
             </section>
 
-            {/* Sessão 3: Equipe Estratégica */}
             <section className="space-y-6">
                 <div className="flex items-center gap-2 border-b pb-2">
                     <User className="h-5 w-5 text-primary" />
@@ -409,7 +406,6 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
                 </div>
             </section>
 
-            {/* Sessão 4: Partes e Observações */}
             <section className="space-y-6">
                 <div className="flex items-center gap-2 border-b pb-2">
                     <Building className="h-5 w-5 text-primary" />
@@ -443,8 +439,8 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
                     name="description"
                     render={({ field }) => (
                     <FormItem>
-                        <FormLabel>Estratégia e Observações</H2>
-                        <FormControl><Textarea placeholder="Descreva detalhes estratégicos, teses ou lembretes importantes deste caso..." className="min-h-[120px] resize-none text-sm" {...field} /></FormControl>
+                        <FormLabel>Estratégia e Observações</FormLabel>
+                        <FormControl><Textarea placeholder="Descreva detalhes estratégicos..." className="min-h-[120px] resize-none text-sm" {...field} /></FormControl>
                         <FormMessage />
                     </FormItem>
                     )}
