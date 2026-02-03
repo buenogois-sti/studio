@@ -80,6 +80,8 @@ export type Process = {
   description?: string;
   status: 'Ativo' | 'Arquivado' | 'Pendente';
   responsibleStaffIds?: string[];
+  leadLawyerId?: string;
+  defaultLocation?: string;
   driveFolderId?: string;
   timeline?: TimelineEvent[];
   createdAt: Timestamp;

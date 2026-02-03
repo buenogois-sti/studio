@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -37,7 +36,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection } from 'firebase/firestore';
-import type { Hearing, Process, Client, HearingStatus, HearingType } from '@/lib/types';
+import type { Hearing, Process, Client, HearingStatus, HearingType, Staff } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -49,6 +48,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { searchProcesses } from '@/lib/process-actions';
 import { createHearing, deleteHearing, updateHearingStatus, syncHearings } from '@/lib/hearing-actions';
 import { cn } from '@/lib/utils';
+import { LocationSearch } from '@/components/shared/LocationSearch';
 import {
   Table,
   TableBody,
@@ -98,41 +98,6 @@ const hearingTypes: { value: HearingType; label: string }[] = [
     { value: 'UNA', label: 'Una' },
     { value: 'JULGAMENTO', label: 'Julgamento' },
     { value: 'OUTRA', label: 'Outra' },
-];
-
-const groupedLocations = [
-  {
-    label: "Fóruns Trabalhistas (ABC)",
-    items: [
-      { name: "Fórum Trabalhista de São Bernardo do Campo", icon: MapPin },
-      { name: "Fórum Trabalhista de Santo André", icon: MapPin },
-      { name: "Fórum Trabalhista de Diadema", icon: MapPin },
-      { name: "Fórum Trabalhista de Mauá", icon: MapPin },
-      { name: "Fórum Trabalhista de São Caetano do Sul", icon: MapPin },
-    ]
-  },
-  {
-    label: "Tribunais e Sedes (SP)",
-    items: [
-      { name: "TRT-2 - Sede Barra Funda (São Paulo)", icon: Building2 },
-      { name: "TRT-2 - Fórum Trabalhista da Zona Sul", icon: Building2 },
-      { name: "TRT-2 - Fórum Trabalhista da Zona Leste", icon: Building2 },
-    ]
-  },
-  {
-    label: "Audiências Virtuais",
-    items: [
-      { name: "Audiência Virtual (Google Meet)", icon: Video },
-      { name: "Audiência Virtual (Zoom)", icon: Video },
-      { name: "Audiência Virtual (Microsoft Teams)", icon: Video },
-    ]
-  },
-  {
-    label: "Interno",
-    items: [
-      { name: "Escritório Bueno Gois", icon: Globe },
-    ]
-  }
 ];
 
 const statusConfig: Record<HearingStatus, { label: string; icon: any; color: string }> = {
@@ -197,111 +162,15 @@ function ProcessSearch({ onSelect, selectedProcess }: { onSelect: (process: Proc
   );
 }
 
-function LocationSearch({ value, onSelect }: { value: string; onSelect: (val: string) => void }) {
-  const [open, setOpen] = React.useState(false);
-  const [search, setSearch] = React.useState("");
-
-  const allItems = React.useMemo(() => groupedLocations.flatMap(g => g.items.map(i => i.name)), []);
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          className="w-full justify-between h-11 font-normal"
-        >
-          {value ? (
-            <div className="flex items-center gap-2">
-              <MapPin className="h-4 w-4 text-primary" />
-              <span className="truncate">{value}</span>
-            </div>
-          ) : "Pesquisar ou digitar local..."}
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
-        <Command>
-          <CommandInput 
-            placeholder="Ex: Fórum SBC ou Link..." 
-            value={search}
-            onValueChange={setSearch}
-          />
-          <CommandList>
-            <CommandEmpty>
-              <div className="p-4 flex flex-col items-center gap-2">
-                <p className="text-xs text-muted-foreground">Nenhum local encontrado.</p>
-                <Button 
-                  size="sm" 
-                  variant="secondary" 
-                  className="h-7 text-[10px] uppercase font-bold"
-                  onClick={() => {
-                    onSelect(search);
-                    setOpen(false);
-                  }}
-                >
-                  Usar: "{search}"
-                </Button>
-              </div>
-            </CommandEmpty>
-            {groupedLocations.map((group) => (
-              <CommandGroup key={group.label} heading={group.label}>
-                {group.items.map((item) => (
-                  <CommandItem
-                    key={item.name}
-                    value={item.name}
-                    onSelect={(currentValue) => {
-                      onSelect(currentValue);
-                      setOpen(false);
-                    }}
-                    className="flex items-center gap-2 py-2.5"
-                  >
-                    <item.icon className="h-4 w-4 text-muted-foreground" />
-                    <span className="flex-1 truncate">{item.name}</span>
-                    <Check
-                      className={cn(
-                        "h-4 w-4",
-                        value === item.name ? "opacity-100" : "opacity-0"
-                      )}
-                    />
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            ))}
-            
-            {search && !allItems.some(name => name.toLowerCase() === search.toLowerCase()) && (
-              <>
-                <CommandSeparator />
-                <CommandGroup heading="Novo Local">
-                  <CommandItem
-                    value={search}
-                    onSelect={(val) => {
-                      onSelect(val);
-                      setOpen(false);
-                    }}
-                    className="py-3"
-                  >
-                    <div className="flex items-center gap-2 text-primary font-bold">
-                      <PlusCircle className="h-4 w-4" />
-                      <span>Usar personalizado: "{search}"</span>
-                    </div>
-                  </CommandItem>
-                </CommandGroup>
-              </>
-            )}
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
-  );
-}
-
 function NewHearingDialog({ onHearingCreated, hearingsData }: { onHearingCreated: () => void; hearingsData: Hearing[] | null }) {
   const [open, setOpen] = React.useState(false);
   const [isSaving, setIsSaving] = React.useState(false);
   const { toast } = useToast();
+  const { firestore } = useFirebase();
   const [selectedProcess, setSelectedProcess] = React.useState<Process | null>(null);
+
+  const staffQuery = useMemoFirebase(() => firestore ? collection(firestore, 'staff') : null, [firestore]);
+  const { data: staffData } = useCollection<Staff>(staffQuery);
 
   const form = useForm<z.infer<typeof hearingSchema>>({
     resolver: zodResolver(hearingSchema),
@@ -324,6 +193,25 @@ function NewHearingDialog({ onHearingCreated, hearingsData }: { onHearingCreated
         return hDate.getTime() === checkDate.getTime();
     });
   }, [watchedDate, watchedTime, hearingsData]);
+
+  // Handle Process Selection and Auto-fill Defaults
+  const handleProcessSelect = (process: Process) => {
+    setSelectedProcess(process);
+    form.setValue('processId', process.id);
+    form.setValue('processName', process.name);
+    
+    // Auto-fill defaults from process
+    if (process.defaultLocation) {
+        form.setValue('location', process.defaultLocation);
+    }
+    
+    if (process.leadLawyerId && staffData) {
+        const leader = staffData.find(s => s.id === process.leadLawyerId);
+        if (leader) {
+            form.setValue('responsibleParty', `Dr(a). ${leader.firstName} ${leader.lastName}`);
+        }
+    }
+  };
 
   const onSubmit = async (values: z.infer<typeof hearingSchema>) => {
     if (!selectedProcess) {
@@ -377,11 +265,7 @@ function NewHearingDialog({ onHearingCreated, hearingsData }: { onHearingCreated
                   <FormLabel>Processo Vinculado *</FormLabel>
                    <ProcessSearch 
                       selectedProcess={selectedProcess}
-                      onSelect={(process) => {
-                          setSelectedProcess(process);
-                          field.onChange(process.id);
-                          form.setValue('processName', process.name);
-                      }}
+                      onSelect={handleProcessSelect}
                    />
                   <FormMessage />
                 </FormItem>
@@ -480,7 +364,7 @@ function NewHearingDialog({ onHearingCreated, hearingsData }: { onHearingCreated
             />
 
             <DialogFooter className="gap-2 border-t pt-6">
-                <DialogClose asChild><Button type="button" variant="ghost" disabled={isSaving}>Cancelar</Button></DialogClose>
+                <DialogClose asChild><Button type="button" variant="outline" disabled={isSaving}>Cancelar</Button></DialogClose>
                 <Button type="submit" disabled={isSaving}>
                     {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     {isSaving ? "Gravando..." : "Confirmar Agendamento"}
