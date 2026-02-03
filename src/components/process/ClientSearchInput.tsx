@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Loader2, User, Check, ChevronsUpDown, Search } from 'lucide-react';
+import { Loader2, User, Check, ChevronsUpDown, Search, CreditCard } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,30 +26,28 @@ export function ClientSearchInput({ onSelect, selectedClientId }: ClientSearchIn
   const inputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  // Load selected client on mount or when selectedClientId changes
+  // Load selected client on mount
   useEffect(() => {
     if (selectedClientId && !selectedClient) {
       getClientById(selectedClientId)
         .then(setSelectedClient)
         .catch((error) => {
-          toast({
-            variant: 'destructive',
-            title: 'Erro ao carregar cliente',
-            description: error.message,
-          });
+          console.error("Error fetching client:", error);
         });
     }
-  }, [selectedClientId, selectedClient, toast]);
+  }, [selectedClientId, selectedClient]);
 
-  // Auto-focus input when popover opens
+  // Focus isolation effect
   useEffect(() => {
     if (open) {
-      const timer = setTimeout(() => inputRef.current?.focus(), 150);
+      const timer = setTimeout(() => {
+        inputRef.current?.focus();
+      }, 100);
       return () => clearTimeout(timer);
     }
   }, [open]);
 
-  // Search clients as user types
+  // Search logic with debounce
   useEffect(() => {
     if (search.length < 2) {
       setResults([]);
@@ -64,111 +62,127 @@ export function ClientSearchInput({ onSelect, selectedClientId }: ClientSearchIn
       } catch (error: any) {
         toast({
           variant: 'destructive',
-          title: 'Erro ao Buscar Cliente',
+          title: 'Erro na busca',
           description: error.message,
         });
       } finally {
         setIsLoading(false);
       }
-    }, 500);
+    }, 400);
 
     return () => clearTimeout(timer);
   }, [search, toast]);
 
-  const handleSelectClient = (client: Client) => {
+  const handleSelect = (client: Client) => {
     setSelectedClient(client);
     onSelect(client);
     setOpen(false);
+    setSearch('');
   };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen} modal={false}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
           role="combobox"
-          aria-expanded={open}
-          className="w-full justify-between h-11 font-normal bg-background"
+          className="w-full justify-between h-11 font-normal bg-background border-2 hover:border-primary/50 transition-all"
         >
           {selectedClient ? (
             <div className="flex items-center gap-2 overflow-hidden">
-              <User className="h-4 w-4 text-primary shrink-0" />
+              <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                <User className="h-3 w-3 text-primary" />
+              </div>
               <span className="truncate font-bold">
                 {selectedClient.firstName} {selectedClient.lastName}
               </span>
-              <span className="text-[10px] text-muted-foreground font-mono shrink-0 hidden sm:inline">
-                ({selectedClient.document})
-              </span>
+              <Badge variant="secondary" className="text-[9px] font-mono shrink-0 hidden sm:inline px-1.5 h-4">
+                {selectedClient.document}
+              </Badge>
             </div>
           ) : (
-            'Buscar cliente por nome ou CPF...'
+            <span className="text-muted-foreground italic">Pesquisar cliente por Nome ou CPF/CNPJ...</span>
           )}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
 
-      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-        <div className="flex flex-col bg-popover border rounded-md">
-          {/* Search Input Header */}
-          <div className="flex items-center border-b px-3 py-2">
+      <PopoverContent 
+        className="w-[var(--radix-popover-trigger-width)] p-0 z-[100]" 
+        align="start"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
+        <div className="flex flex-col bg-popover border shadow-2xl rounded-xl overflow-hidden">
+          <div className="flex items-center border-b px-3 bg-muted/10">
             <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
             <Input
               ref={inputRef}
-              placeholder="Digite nome ou documento..."
+              placeholder="Digite o nome ou documento..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="border-none focus-visible:ring-0 focus-visible:ring-offset-0 h-10 bg-transparent"
+              onKeyDown={(e) => {
+                // Key event isolation to prevent parent sheets from hijacking focus
+                e.stopPropagation();
+              }}
+              className="border-none focus-visible:ring-0 focus-visible:ring-offset-0 h-11 bg-transparent"
               autoComplete="off"
             />
           </div>
 
-          {/* Results List */}
-          <ScrollArea className="max-h-[300px] overflow-y-auto">
+          <ScrollArea className="max-h-[350px] overflow-y-auto">
             {isLoading && (
-              <div className="p-4 text-center text-xs text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" />
-                Buscando na base...
+              <div className="p-6 text-center text-xs text-muted-foreground flex flex-col items-center gap-2">
+                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                <span>Buscando na base de dados...</span>
               </div>
             )}
 
             {!isLoading && search.length >= 2 && results.length === 0 && (
-              <div className="p-4 text-center text-sm text-muted-foreground">
-                Nenhum cliente encontrado.
+              <div className="p-8 text-center text-sm text-muted-foreground italic">
+                Nenhum cliente encontrado com estes dados.
               </div>
             )}
 
             {search.length < 2 && (
-              <div className="p-4 text-center text-xs text-muted-foreground">
-                Digite pelo menos 2 caracteres...
+              <div className="p-6 text-center text-[10px] uppercase font-black tracking-widest text-muted-foreground/50">
+                Aguardando digitação...
               </div>
             )}
 
-            <div className="p-1">
+            <div className="p-1.5">
               {results.map((client) => (
                 <button
                   key={client.id}
                   type="button"
-                  onClick={() => handleSelectClient(client)}
+                  onMouseDown={(e) => {
+                    // Prevent blur before click
+                    e.preventDefault();
+                  }}
+                  onClick={() => handleSelect(client)}
                   className={cn(
-                    'flex items-start gap-3 w-full px-3 py-2.5 text-sm rounded-md transition-colors text-left',
-                    'hover:bg-accent hover:text-accent-foreground cursor-pointer',
-                    selectedClientId === client.id &&
-                      'bg-accent text-accent-foreground font-bold'
+                    'flex items-center gap-3 w-full px-3 py-2.5 text-sm rounded-lg transition-all text-left group',
+                    'hover:bg-primary/5 cursor-pointer',
+                    selectedClientId === client.id && 'bg-primary/10 border border-primary/20'
                   )}
                 >
-                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                    <User className="h-4 w-4 text-primary" />
+                  <div className="h-9 w-9 rounded-full bg-muted flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors">
+                    <User className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <span className="block truncate font-bold">
+                    <span className="block truncate font-bold group-hover:text-primary transition-colors">
                       {client.firstName} {client.lastName}
                     </span>
-                    <span className="block text-[10px] text-muted-foreground font-mono uppercase tracking-tighter">
-                      Doc: {client.document}
-                    </span>
+                    <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-[10px] text-muted-foreground font-mono uppercase tracking-tighter">
+                          Doc: {client.document}
+                        </span>
+                        {client.legalArea && (
+                            <Badge variant="outline" className="text-[8px] h-3.5 px-1 uppercase">{client.legalArea}</Badge>
+                        )}
+                    </div>
                   </div>
                   {selectedClientId === client.id && (
-                    <Check className="ml-2 h-4 w-4 shrink-0 self-center" />
+                    <Check className="ml-2 h-4 w-4 shrink-0 text-primary" />
                   )}
                 </button>
               ))}

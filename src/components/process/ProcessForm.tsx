@@ -48,17 +48,17 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
 
-  // Fetch staff data
+  // Fetch staff data memoized
   const staffQuery = useMemoFirebase(
     () => (firestore ? collection(firestore, 'staff') : null),
     [firestore]
   );
   const { data: staff } = useCollection<Staff>(staffQuery);
 
-  // Initialize form
+  // Initialize form with robust default values
   const form = useForm<ProcessFormValues>({
     resolver: zodResolver(processSchema),
-    defaultValues: getDefaultValues(process),
+    defaultValues: React.useMemo(() => getDefaultValues(process), [process]),
   });
 
   // Manage opposing parties field array
@@ -67,7 +67,6 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
     name: 'opposingParties',
   });
 
-  // Form submission handler
   async function onSubmit(values: ProcessFormValues) {
     if (!firestore) return;
     setIsSaving(true);
@@ -79,22 +78,20 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
       };
 
       if (process?.id) {
-        // Update existing process
         const ref = doc(firestore, 'processes', process.id);
         await updateDoc(ref, data);
-        toast({ title: 'Processo atualizado!' });
+        toast({ title: 'Processo atualizado!', description: 'As alterações foram salvas com sucesso.' });
       } else {
-        // Create new process
         const col = collection(firestore, 'processes');
         await addDoc(col, { ...data, createdAt: serverTimestamp() });
-        toast({ title: 'Processo criado!' });
+        toast({ title: 'Processo criado!', description: 'O novo caso foi registrado na plataforma.' });
       }
       onSave();
     } catch (error: any) {
       toast({
         variant: 'destructive',
         title: 'Erro ao salvar',
-        description: error.message,
+        description: error.message || 'Não foi possível salvar os dados do processo.',
       });
     } finally {
       setIsSaving(false);
@@ -102,27 +99,23 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
   }
 
   const handleClientSelect = (client: Client) => {
-    form.setValue('clientId', client.id);
+    form.setValue('clientId', client.id, { shouldValidate: true });
   };
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-10 py-4 pr-6">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-10 py-4">
         <fieldset disabled={isSaving} className="space-y-10">
-          {/* Identification and Status Section */}
           <IdentificationSection
             control={form.control}
             onClientSelect={handleClientSelect}
             selectedClientId={form.watch('clientId')}
           />
 
-          {/* Court and Location Section */}
           <CourtSection control={form.control} />
 
-          {/* Team Section */}
-          <TeamSection control={form.control} staff={staff} />
+          <TeamSection control={form.control} staff={staff || []} />
 
-          {/* Opposing Parties Section */}
           <PartiesSection
             control={form.control}
             partyFields={partyFields as any}
@@ -131,12 +124,11 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
           />
         </fieldset>
 
-        {/* Form Footer */}
-        <SheetFooter className="border-t pt-6">
+        <SheetFooter className="border-t pt-8">
           <Button type="button" variant="outline" onClick={onSave} disabled={isSaving}>
             Cancelar
           </Button>
-          <Button type="submit" disabled={isSaving} className="min-w-[150px]">
+          <Button type="submit" disabled={isSaving} className="min-w-[180px] font-bold">
             {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {process ? 'Salvar Alterações' : 'Cadastrar Processo'}
           </Button>
@@ -145,10 +137,6 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
     </Form>
   );
 }
-
-// ============================================================================
-// HELPERS
-// ============================================================================
 
 function getDefaultValues(process?: Process | null): ProcessFormValues {
   if (!process) {
@@ -162,14 +150,20 @@ function getDefaultValues(process?: Process | null): ProcessFormValues {
       leadLawyerId: '',
       defaultLocation: '',
       caseValue: 0,
+      description: '',
     };
   }
 
   return {
-    ...process,
+    clientId: process.clientId || '',
+    name: process.name || '',
+    processNumber: process.processNumber || '',
+    status: process.status || 'Ativo',
     opposingParties: process.opposingParties || [],
     responsibleStaffIds: process.responsibleStaffIds || [],
     leadLawyerId: process.leadLawyerId || '',
     defaultLocation: process.defaultLocation || '',
+    caseValue: process.caseValue || 0,
+    description: process.description || '',
   };
 }
