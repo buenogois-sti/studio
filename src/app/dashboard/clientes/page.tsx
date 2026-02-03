@@ -79,7 +79,7 @@ export default function ClientsPage() {
   const { data: processesData, isLoading: isLoadingProcesses } = useCollection<Process>(processesQuery);
   const processes = processesData || [];
 
-  // Optimized O(1) Lookup Map
+  // Optimized O(1) Lookup Map to prevent nested loops in render
   const processesByClientMap = React.useMemo(() => {
     const map = new Map<string, Process[]>();
     processes.forEach(p => {
@@ -268,7 +268,11 @@ export default function ClientsPage() {
                         </TableCell>
                         <TableCell className="text-center"><Badge variant="outline" className={cn("text-[9px] font-bold uppercase", STATUS_CONFIG[client.status || 'active'].color)}>{STATUS_CONFIG[client.status || 'active'].label}</Badge></TableCell>
                         <TableCell className="font-mono text-xs text-muted-foreground">{client.document}</TableCell>
-                        <TableCell className="text-right"><Button variant="ghost" size="icon" onClick={() => handleViewDetails(client)}><UserCheck className="h-4 w-4" /></Button></TableCell>
+                        <TableCell className="text-right">
+                            <div className="flex justify-end items-center gap-2">
+                                <Button variant="ghost" size="icon" onClick={() => handleViewDetails(client)}><UserCheck className="h-4 w-4" /></Button>
+                            </div>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

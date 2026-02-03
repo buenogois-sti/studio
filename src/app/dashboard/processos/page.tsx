@@ -72,6 +72,8 @@ export default function ProcessosPage() {
 
   const clientsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'clients') : null), [firestore]);
   const { data: clientsData } = useCollection<Client>(clientsQuery);
+  
+  // Optimized O(1) Lookup Map for clients
   const clientsMap = React.useMemo(() => new Map(clientsData?.map(c => [c.id, c])), [clientsData]);
 
   const filteredProcesses = React.useMemo(() => {

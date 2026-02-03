@@ -57,7 +57,7 @@ const titleSchema = z.object({
   processId: z.string().optional(),
   description: z.string().min(3, 'A descrição é obrigatória.'),
   type: z.enum(['RECEITA', 'DESPESA']),
-  origin: z.enum(allOrigins),
+  origin: z.string().min(1, 'Selecione a origem.'),
   value: z.coerce.number().positive('O valor deve ser maior que zero.'),
   dueDate: z.coerce.date({ required_error: 'A data de vencimento é obrigatória.' }),
   paymentDate: z.coerce.date().optional(),
@@ -107,7 +107,7 @@ function NewTitleDialog({ onTitleCreated, staffData }: { onTitleCreated: () => v
   async function onSubmit(values: TitleFormValues) {
     setIsSaving(true);
     try {
-      // Cast values to bypass strict origin type mismatch during call
+      // Type casting to bypass Zod schema to action mismatch
       await createFinancialTitle(values as any);
       toast({ title: 'Título Lançado!' });
       form.reset();
@@ -160,9 +160,6 @@ export default function FinanceiroPage() {
   
   const staffQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'staff') : null), [firestore]);
   const { data: staffData } = useCollection<Staff>(staffQuery);
-
-  const processesQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'processes') : null), [firestore]);
-  const { data: processesData } = useCollection<Process>(processesQuery);
 
   const stats = React.useMemo(() => {
     if (!titlesData) return { monthlyRevenue: 0, monthlyExpenses: 0, pendingReceivables: 0, totalOverdue: 0 };

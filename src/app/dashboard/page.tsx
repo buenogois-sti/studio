@@ -140,20 +140,20 @@ export default function Dashboard() {
   const { data: titlesData, isLoading: isLoadingTitles } = useCollection<FinancialTitle>(titlesQuery);
 
   const clientsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'clients') : null, [firestore]);
-  const { data: clientsData, isLoading: isLoadingClients } = useCollection<Client>(clientsQuery);
+  const { data: clientsData } = useCollection<Client>(clientsQuery);
   
   const processesQuery = useMemoFirebase(() => firestore ? collection(firestore, 'processes') : null, [firestore]);
-  const { data: processesData, isLoading: isLoadingProcesses } = useCollection<Process>(processesQuery);
+  const { data: processesData } = useCollection<Process>(processesQuery);
 
   const hearingsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'hearings') : null, [firestore]);
-  const { data: hearingsData, isLoading: isLoadingHearings } = useCollection<Hearing>(hearingsQuery);
+  const { data: hearingsData } = useCollection<Hearing>(hearingsQuery);
 
   const logsQuery = useMemoFirebase(() => (firestore && session?.user?.id ? query(collection(firestore, `users/${session.user.id}/logs`), orderBy('timestamp', 'desc'), limit(5)) : null), [firestore, session]);
-  const { data: logsData, isLoading: isLoadingLogs } = useCollection<Log>(logsQuery);
+  const { data: logsData } = useCollection<Log>(logsQuery);
 
   const isLoading = status === 'loading' || isLoadingTitles || isLoadingClients || isLoadingProcesses || isLoadingHearings || isLoadingLogs;
 
-  // Data Processing
+  // Optimized Data Processing
   const dashboardStats = React.useMemo(() => {
     if (!titlesData || !processesData || !hearingsData) return { totalRevenue: 0, pendingReceivables: 0, totalOverdue: 0, activeProcessesCount: 0, upcomingHearingsCount: 0 };
     
