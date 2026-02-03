@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Loader2, User, Check, ChevronsUpDown, Search, Briefcase } from 'lucide-react';
+import { Loader2, User, Check, ChevronsUpDown, Search, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,14 +27,15 @@ export function ClientSearchInput({ onSelect, selectedClientId }: ClientSearchIn
   const inputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  // Initialize selected client
   useEffect(() => {
     if (selectedClientId && (!selectedClient || selectedClient.id !== selectedClientId)) {
       getClientById(selectedClientId).then(setSelectedClient);
+    } else if (!selectedClientId) {
+      setSelectedClient(null);
     }
   }, [selectedClientId, selectedClient]);
 
-  // Focus management: Ensure keyboard works inside Sheets/Modals
+  // Foco manual para evitar conflitos com janelas laterais (Sheet)
   useEffect(() => {
     if (open) {
       const timer = setTimeout(() => {
@@ -82,22 +83,22 @@ export function ClientSearchInput({ onSelect, selectedClientId }: ClientSearchIn
         <Button
           variant="outline"
           role="combobox"
-          className="w-full justify-between h-11 font-normal bg-background border-2 hover:border-primary/50 transition-all"
+          className="w-full justify-between h-11 font-normal bg-background border-2 hover:border-primary/50 transition-all text-left px-3"
         >
           {selectedClient ? (
-            <div className="flex items-center gap-2 overflow-hidden">
+            <div className="flex items-center gap-2 overflow-hidden w-full">
               <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                 <User className="h-3 w-3 text-primary" />
               </div>
-              <span className="truncate font-bold">
+              <span className="truncate font-bold text-sm">
                 {selectedClient.firstName} {selectedClient.lastName}
               </span>
-              <Badge variant="secondary" className="text-[9px] font-mono shrink-0 px-1.5 h-4">
+              <Badge variant="secondary" className="text-[9px] font-mono shrink-0 px-1.5 h-4 ml-auto">
                 {selectedClient.document}
               </Badge>
             </div>
           ) : (
-            <span className="text-muted-foreground italic">Pesquisar cliente por Nome ou CPF/CNPJ...</span>
+            <span className="text-muted-foreground italic text-sm">Pesquisar cliente por Nome ou CPF/CNPJ...</span>
           )}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
@@ -110,33 +111,38 @@ export function ClientSearchInput({ onSelect, selectedClientId }: ClientSearchIn
       >
         <div 
           className="flex flex-col bg-popover border shadow-2xl rounded-xl overflow-hidden"
-          onKeyDown={(e) => e.stopPropagation()} // BLOCK Sheet from stealing keyboard events
+          onKeyDown={(e) => e.stopPropagation()} // IMPEDE que a Sheet roube o teclado
         >
           <div className="flex items-center border-b px-3 bg-muted/10">
             <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
             <Input
               ref={inputRef}
-              placeholder="Digite para buscar..."
+              placeholder="Digite Nome ou CPF/CNPJ..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="border-none focus-visible:ring-0 focus-visible:ring-offset-0 h-11 bg-transparent"
               autoComplete="off"
             />
+            {search && (
+              <button onClick={() => setSearch('')} className="ml-auto hover:text-primary p-1">
+                <X className="h-4 w-4 text-muted-foreground" />
+              </button>
+            )}
           </div>
 
-          <ScrollArea className="max-h-[350px] overflow-y-auto">
+          <ScrollArea className="max-h-[300px] overflow-y-auto">
             {isLoading ? (
               <div className="p-8 text-center flex flex-col items-center gap-2">
                 <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                <span className="text-xs text-muted-foreground font-medium">Buscando na base...</span>
+                <span className="text-xs text-muted-foreground font-medium uppercase tracking-widest">Consultando Base...</span>
               </div>
             ) : search.length >= 2 && results.length === 0 ? (
               <div className="p-8 text-center text-sm text-muted-foreground italic">
-                Nenhum cliente encontrado.
+                Nenhum cliente encontrado para "{search}".
               </div>
             ) : search.length < 2 ? (
               <div className="p-6 text-center text-[10px] uppercase font-black tracking-widest text-muted-foreground/40">
-                Digite Nome ou CPF/CNPJ
+                Mínimo 2 caracteres para buscar
               </div>
             ) : (
               <div className="p-1.5">
@@ -144,7 +150,7 @@ export function ClientSearchInput({ onSelect, selectedClientId }: ClientSearchIn
                   <button
                     key={client.id}
                     type="button"
-                    onMouseDown={(e) => e.preventDefault()} // Keep focus on input while clicking
+                    onMouseDown={(e) => e.preventDefault()} 
                     onClick={() => handleSelect(client)}
                     className={cn(
                       'flex items-center gap-3 w-full px-3 py-2.5 text-sm rounded-lg transition-all text-left group',
@@ -152,12 +158,8 @@ export function ClientSearchInput({ onSelect, selectedClientId }: ClientSearchIn
                       selectedClientId === client.id && 'bg-primary/10 border border-primary/20'
                     )}
                   >
-                    <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors relative overflow-hidden">
-                      {client.avatar ? (
-                          <img src={client.avatar} className="object-cover w-full h-full" alt="" />
-                      ) : (
-                          <User className="h-5 w-5 text-muted-foreground group-hover:text-primary" />
-                      )}
+                    <div className="h-9 w-9 rounded-full bg-muted flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors">
+                      <User className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <span className="block truncate font-bold group-hover:text-primary transition-colors leading-tight">
@@ -168,7 +170,7 @@ export function ClientSearchInput({ onSelect, selectedClientId }: ClientSearchIn
                             {client.document}
                           </span>
                           {client.legalArea && (
-                              <Badge variant="secondary" className="text-[8px] h-3.5 px-1 uppercase leading-none border-none bg-primary/5 text-primary">
+                              <Badge variant="secondary" className="text-[8px] h-3.5 px-1 uppercase leading-none bg-primary/5 text-primary">
                                   {client.legalArea}
                               </Badge>
                           )}

@@ -1,8 +1,25 @@
 'use client';
 
 import React from 'react';
-import { Building, Gavel, User, LayoutGrid, Plus, Trash2, ShieldCheck, Scale, Users, Mail, Phone, Percent } from 'lucide-react';
-import { Control, FieldArrayWithId } from 'react-hook-form';
+import { 
+  Building, 
+  User, 
+  Plus, 
+  Trash2, 
+  ShieldCheck, 
+  Users, 
+  Mail, 
+  Phone, 
+  Percent,
+  UserPlus,
+  Scale,
+  Sparkles,
+  Search,
+  LayoutGrid,
+  AtSign,
+  Smartphone
+} from 'lucide-react';
+import { Control, FieldArrayWithId, useFieldArray } from 'react-hook-form';
 
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
@@ -38,28 +55,29 @@ export function SectionHeader({ icon, title }: SectionHeaderProps) {
   );
 }
 
-interface IdentificationSectionProps {
+// STEP 1: CLIENTS
+interface ClientsSectionProps {
   control: Control<ProcessFormValues>;
   onClientSelect: (client: Client) => void;
-  selectedClientId: string;
 }
 
-export function IdentificationSection({
-  control,
-  onClientSelect,
-  selectedClientId,
-}: IdentificationSectionProps) {
-  return (
-    <section>
-      <SectionHeader icon={<Users className="h-4 w-4" />} title="Identificação do Caso" />
+export function ClientsSection({ control, onClientSelect }: ClientsSectionProps) {
+  const { fields: secondaryFields, append: addSecondary, remove: removeSecondary } = useFieldArray({
+    control,
+    name: 'secondaryClientIds' as any,
+  });
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-muted/20 p-6 rounded-2xl border border-border/50">
+  return (
+    <div className="space-y-8">
+      <SectionHeader icon={<Users className="h-4 w-4" />} title="Autores do Processo" />
+      
+      <div className="space-y-6 bg-muted/20 p-6 rounded-2xl border border-border/50">
         <FormField
           control={control}
           name="clientId"
           render={({ field }) => (
-            <FormItem className="md:col-span-2">
-              <FormLabel>Cliente Principal *</FormLabel>
+            <FormItem>
+              <FormLabel className="text-sm font-bold">Cliente Principal (Autor Titular) *</FormLabel>
               <FormControl>
                 <ClientSearchInput selectedClientId={field.value} onSelect={onClientSelect} />
               </FormControl>
@@ -68,12 +86,168 @@ export function IdentificationSection({
           )}
         />
 
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <FormLabel className="text-sm font-bold">Autores Secundários / Co-autores</FormLabel>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => addSecondary('')}
+              className="h-8 text-[10px] font-black uppercase border-primary/30 text-primary"
+            >
+              <UserPlus className="h-3 w-3 mr-1" /> Adicionar Autor
+            </Button>
+          </div>
+
+          <div className="grid gap-3">
+            {secondaryFields.map((field, index) => (
+              <div key={field.id} className="flex items-center gap-2 bg-background p-2 rounded-xl border-2 animate-in fade-in">
+                <div className="flex-1">
+                  <FormField
+                    control={control}
+                    name={`secondaryClientIds.${index}` as any}
+                    render={({ field: subField }) => (
+                      <ClientSearchInput 
+                        selectedClientId={subField.value} 
+                        onSelect={(c) => subField.onChange(c.id)} 
+                      />
+                    )}
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => removeSecondary(index)}
+                  className="text-destructive hover:bg-destructive/10 shrink-0"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// STEP 2: DEFENDANTS
+interface PartiesSectionProps {
+  control: Control<ProcessFormValues>;
+  partyFields: FieldArrayWithId<ProcessFormValues, "opposingParties", "id">[];
+  onAddParty: () => void;
+  onRemoveParty: (index: number) => void;
+}
+
+export function PartiesSection({ control, partyFields, onAddParty, onRemoveParty }: PartiesSectionProps) {
+  return (
+    <div className="space-y-8">
+      <SectionHeader icon={<Scale className="h-4 w-4" />} title="Parte Contrária (Réus)" />
+
+      <div className="space-y-6 bg-muted/20 p-6 rounded-2xl border border-border/50">
+        <div className="flex items-center justify-between">
+          <FormLabel className="text-sm font-bold">Réus Registrados</FormLabel>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onAddParty}
+            className="h-8 text-[10px] font-black uppercase border-primary/30 text-primary"
+          >
+            <Plus className="h-3 w-3 mr-1" /> Novo Réu
+          </Button>
+        </div>
+
+        <div className="grid gap-4">
+          {partyFields.map((field, index) => (
+            <div key={field.id} className="p-4 rounded-xl border-2 bg-background space-y-3 animate-in fade-in">
+              <div className="flex items-start justify-between gap-4">
+                <FormField
+                  control={control}
+                  name={`opposingParties.${index}.name`}
+                  render={({ field: nameField }) => (
+                    <FormItem className="flex-1">
+                      <FormLabel className="text-[10px] uppercase font-bold">Nome do Réu / Empresa *</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Digite o nome completo..."
+                          className="h-10"
+                          onKeyDown={(e) => e.stopPropagation()}
+                          {...nameField}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => onRemoveParty(index)}
+                  className="mt-6 text-destructive hover:bg-destructive/10"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <FormField
+                  control={control}
+                  name={`opposingParties.${index}.email`}
+                  render={({ field: emailField }) => (
+                    <FormItem>
+                      <FormControl>
+                        <div className="relative">
+                          <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                          <Input placeholder="E-mail de contato" className="pl-9 h-9 text-xs" {...emailField} onKeyDown={(e) => e.stopPropagation()} />
+                        </div>
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={control}
+                  name={`opposingParties.${index}.phone`}
+                  render={({ field: phoneField }) => (
+                    <FormItem>
+                      <FormControl>
+                        <div className="relative">
+                          <Smartphone className="absolute left-3 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                          <Input placeholder="Telefone / WhatsApp" className="pl-9 h-9 text-xs" {...phoneField} onKeyDown={(e) => e.stopPropagation()} />
+                        </div>
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
+          ))}
+          {partyFields.length === 0 && (
+            <div className="text-center py-10 border-2 border-dashed rounded-xl text-muted-foreground text-sm italic">
+              Nenhum réu adicionado ainda.
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// STEP 3: IDENTIFICATION
+export function IdentificationSection({ control }: { control: Control<ProcessFormValues> }) {
+  return (
+    <div className="space-y-8">
+      <SectionHeader icon={<LayoutGrid className="h-4 w-4" />} title="Dados do Processo" />
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-muted/20 p-6 rounded-2xl border border-border/50">
         <FormField
           control={control}
           name="name"
           render={({ field }) => (
             <FormItem className="md:col-span-2">
-              <FormLabel>Título do Processo *</FormLabel>
+              <FormLabel className="text-sm font-bold">Título / Nome do Processo *</FormLabel>
               <FormControl>
                 <Input
                   placeholder="Ex: Reclamatória Trabalhista - João Silva"
@@ -92,10 +266,10 @@ export function IdentificationSection({
           name="status"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Status Operacional *</FormLabel>
+              <FormLabel className="text-sm font-bold">Status Operacional *</FormLabel>
               <Select onValueChange={field.onChange} value={field.value}>
                 <FormControl>
-                  <SelectTrigger className="h-11">
+                  <SelectTrigger className="h-11 border-2">
                     <SelectValue placeholder="Status..." />
                   </SelectTrigger>
                 </FormControl>
@@ -115,10 +289,10 @@ export function IdentificationSection({
           name="legalArea"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Área Jurídica (Organização Drive) *</FormLabel>
+              <FormLabel className="text-sm font-bold">Área Jurídica *</FormLabel>
               <Select onValueChange={field.onChange} value={field.value}>
                 <FormControl>
-                  <SelectTrigger className="h-11">
+                  <SelectTrigger className="h-11 border-2">
                     <SelectValue placeholder="Tipo de Ação..." />
                   </SelectTrigger>
                 </FormControl>
@@ -141,7 +315,7 @@ export function IdentificationSection({
           name="processNumber"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Número do Processo (CNJ)</FormLabel>
+              <FormLabel className="text-sm font-bold">Número CNJ (Se houver)</FormLabel>
               <FormControl>
                 <Input 
                   placeholder="0000000-00.0000.0.00.0000" 
@@ -160,7 +334,7 @@ export function IdentificationSection({
           name="caseValue"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Valor da Causa (R$)</FormLabel>
+              <FormLabel className="text-sm font-bold">Valor da Causa (R$)</FormLabel>
               <FormControl>
                 <Input 
                   type="number" 
@@ -175,21 +349,15 @@ export function IdentificationSection({
           )}
         />
       </div>
-    </section>
+    </div>
   );
 }
 
-interface CourtSectionProps {
-  control: Control<ProcessFormValues>;
-}
-
-export function CourtSection({ control }: CourtSectionProps) {
+// STEP 4: COURT
+export function CourtSection({ control }: { control: Control<ProcessFormValues> }) {
   return (
-    <section>
-      <SectionHeader
-        icon={<Building className="h-4 w-4" />}
-        title="Juízo e Localização"
-      />
+    <div className="space-y-8">
+      <SectionHeader icon={<Building className="h-4 w-4" />} title="Juízo e Localização" />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-muted/20 p-6 rounded-2xl border border-border/50">
         <div className="md:col-span-2">
@@ -198,15 +366,12 @@ export function CourtSection({ control }: CourtSectionProps) {
             name="court"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Pesquisar Tribunal / Fórum (Mapas) *</FormLabel>
+                <FormLabel className="text-sm font-bold">Busca de Tribunal / Fórum (Mapas)</FormLabel>
                 <FormControl>
                   <LocationSearch
                     value={field.value || ''}
-                    onSelect={(val) => {
-                        field.onChange(val);
-                        // Optional: trigger address update if val matches an OSM result
-                    }}
-                    placeholder="Busque o nome do fórum ou tribunal..."
+                    onSelect={(val) => field.onChange(val)}
+                    placeholder="Digite o nome do fórum ou tribunal..."
                   />
                 </FormControl>
                 <FormMessage />
@@ -217,29 +382,10 @@ export function CourtSection({ control }: CourtSectionProps) {
 
         <FormField
           control={control}
-          name="courtAddress"
-          render={({ field }) => (
-            <FormItem className="md:col-span-2">
-              <FormLabel>Endereço Completo</FormLabel>
-              <FormControl>
-                <Input 
-                  placeholder="Rua, número, cidade..." 
-                  className="h-11 border-2" 
-                  onKeyDown={(e) => e.stopPropagation()}
-                  {...field} 
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={control}
           name="courtBranch"
           render={({ field }) => (
             <FormItem className="md:col-span-2">
-              <FormLabel>Vara / Câmara / Turma</FormLabel>
+              <FormLabel className="text-sm font-bold">Vara / Câmara / Turma</FormLabel>
               <FormControl>
                 <Input 
                   placeholder="Ex: 2ª Vara do Trabalho de SBC" 
@@ -253,10 +399,11 @@ export function CourtSection({ control }: CourtSectionProps) {
           )}
         />
       </div>
-    </section>
+    </div>
   );
 }
 
+// STEP 5: TEAM
 interface TeamSectionProps {
   control: Control<ProcessFormValues>;
   staff: Staff[];
@@ -269,11 +416,8 @@ export function TeamSection({ control, staff, teamFields, onAddMember, onRemoveM
   const lawyers = staff.filter((s) => s.role === 'lawyer');
 
   return (
-    <section>
-      <SectionHeader
-        icon={<ShieldCheck className="h-4 w-4" />}
-        title="Equipe Jurídica e Honorários"
-      />
+    <div className="space-y-8">
+      <SectionHeader icon={<ShieldCheck className="h-4 w-4" />} title="Equipe e Honorários" />
 
       <div className="space-y-6 bg-muted/20 p-6 rounded-2xl border border-border/50">
         <FormField
@@ -281,7 +425,7 @@ export function TeamSection({ control, staff, teamFields, onAddMember, onRemoveM
           name="leadLawyerId"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Advogado Responsável (Titular) *</FormLabel>
+              <FormLabel className="text-sm font-bold">Advogado Responsável (Titular) *</FormLabel>
               <Select onValueChange={field.onChange} value={field.value}>
                 <FormControl>
                   <SelectTrigger className="h-11 border-2">
@@ -303,7 +447,7 @@ export function TeamSection({ control, staff, teamFields, onAddMember, onRemoveM
 
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <FormLabel className="text-foreground font-bold">Colaboradores e Apoio</FormLabel>
+            <FormLabel className="text-sm font-bold">Advogados de Apoio / Parcerias</FormLabel>
             <Button
               type="button"
               variant="outline"
@@ -380,122 +524,27 @@ export function TeamSection({ control, staff, teamFields, onAddMember, onRemoveM
           </div>
         </div>
       </div>
-    </section>
+    </div>
   );
 }
 
-interface PartiesSectionProps {
-  control: Control<ProcessFormValues>;
-  partyFields: FieldArrayWithId<ProcessFormValues, "opposingParties", "id">[];
-  onAddParty: () => void;
-  onRemoveParty: (index: number) => void;
-}
-
-export function PartiesSection({
-  control,
-  partyFields,
-  onAddParty,
-  onRemoveParty,
-}: PartiesSectionProps) {
+// STEP 6: STRATEGY
+export function StrategySection({ control }: { control: Control<ProcessFormValues> }) {
   return (
-    <section>
-      <SectionHeader
-        icon={<Scale className="h-4 w-4" />}
-        title="Parte Contrária (Réus)"
-      />
+    <div className="space-y-8">
+      <SectionHeader icon={<Sparkles className="h-4 w-4" />} title="Notas e Estratégia Jurídica" />
 
-      <div className="space-y-6 bg-muted/20 p-6 rounded-2xl border border-border/50">
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <FormLabel className="text-foreground font-bold">Réus Registrados</FormLabel>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={onAddParty}
-              className="h-8 text-[10px] font-black uppercase border-primary/30 text-primary"
-            >
-              <Plus className="h-3 w-3 mr-1" /> Novo Réu
-            </Button>
-          </div>
-
-          <div className="grid gap-4">
-            {partyFields.map((field, index) => (
-              <div key={field.id} className="p-4 rounded-xl border-2 bg-background space-y-3 animate-in fade-in">
-                <div className="flex items-start justify-between gap-4">
-                  <FormField
-                    control={control}
-                    name={`opposingParties.${index}.name`}
-                    render={({ field: nameField }) => (
-                      <FormItem className="flex-1">
-                        <FormLabel className="text-[10px] uppercase font-bold">Nome da Parte *</FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="Empresa ou Pessoa..."
-                            className="h-10"
-                            onKeyDown={(e) => e.stopPropagation()}
-                            {...nameField}
-                          />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => onRemoveParty(index)}
-                    className="mt-6 text-destructive hover:bg-destructive/10"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <FormField
-                    control={control}
-                    name={`opposingParties.${index}.email`}
-                    render={({ field: emailField }) => (
-                      <FormItem>
-                        <FormControl>
-                          <div className="relative">
-                            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
-                            <Input placeholder="E-mail" className="pl-9 h-9 text-xs" {...emailField} onKeyDown={(e) => e.stopPropagation()} />
-                          </div>
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={control}
-                    name={`opposingParties.${index}.phone`}
-                    render={({ field: phoneField }) => (
-                      <FormItem>
-                        <FormControl>
-                          <div className="relative">
-                            <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
-                            <Input placeholder="Telefone" className="pl-9 h-9 text-xs" {...phoneField} onKeyDown={(e) => e.stopPropagation()} />
-                          </div>
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
+      <div className="bg-muted/20 p-6 rounded-2xl border border-border/50">
         <FormField
           control={control}
           name="description"
           render={({ field }) => (
             <FormItem>
-              <FormLabel className="text-foreground font-bold">Tese e Notas Estratégicas</FormLabel>
+              <FormLabel className="text-sm font-bold">Ideias, Prazos e Observações Internas</FormLabel>
               <FormControl>
                 <Textarea
-                  placeholder="Detalhamento estratégico para o advogado responsável..."
-                  className="min-h-[120px] resize-none text-sm bg-background border-2"
+                  placeholder="Detalhamento estratégico para o advogado responsável e equipe de apoio..."
+                  className="min-h-[250px] resize-none text-sm bg-background border-2 p-4 leading-relaxed"
                   onKeyDown={(e) => e.stopPropagation()}
                   {...field}
                 />
@@ -505,6 +554,6 @@ export function PartiesSection({
           )}
         />
       </div>
-    </section>
+    </div>
   );
 }

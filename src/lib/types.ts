@@ -82,6 +82,7 @@ export type TeamParticipant = {
 export type Process = {
   id: string;
   clientId: string;
+  secondaryClientIds?: string[];
   name: string;
   processNumber?: string;
   court?: string;

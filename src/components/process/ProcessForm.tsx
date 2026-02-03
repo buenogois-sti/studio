@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { z } from 'zod';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ChevronRight, ChevronLeft, CheckCircle2 } from 'lucide-react';
 
 import { Form } from '@/components/ui/form';
 import { Button } from '@/components/ui/button';
@@ -12,18 +12,22 @@ import { SheetFooter } from '@/components/ui/sheet';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, serverTimestamp, doc, addDoc, updateDoc } from 'firebase/firestore';
 import { useToast } from '@/components/ui/use-toast';
+import { cn } from '@/lib/utils';
 
 import type { Process, Client, Staff } from '@/lib/types';
 import {
+  ClientsSection,
+  PartiesSection,
   IdentificationSection,
   CourtSection,
   TeamSection,
-  PartiesSection,
+  StrategySection,
 } from './ProcessFormSections';
 
 const processSchema = z.object({
-  clientId: z.string().min(1, 'Selecione um cliente.'),
-  name: z.string().min(3, 'Nome do processo é obrigatório.'),
+  clientId: z.string().min(1, 'Selecione um cliente principal.'),
+  secondaryClientIds: z.array(z.string()).default([]),
+  name: z.string().min(3, 'O título do processo é obrigatório.'),
   processNumber: z.string().optional(),
   status: z.enum(['Ativo', 'Arquivado', 'Pendente']).default('Ativo'),
   legalArea: z.string().min(1, 'Selecione a área jurídica.'),
@@ -51,10 +55,20 @@ interface ProcessFormProps {
   process?: Process | null;
 }
 
+const STEPS = [
+  { id: 'clients', label: 'Autores' },
+  { id: 'defendants', label: 'Réus' },
+  { id: 'details', label: 'Processo' },
+  { id: 'court', label: 'Juízo' },
+  { id: 'team', label: 'Equipe' },
+  { id: 'strategy', label: 'Estratégia' },
+];
+
 export function ProcessForm({ onSave, process }: ProcessFormProps) {
   const { firestore } = useFirebase();
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
+  const [currentStep, setCurrentStep] = useState(0);
 
   const staffQuery = useMemoFirebase(
     () => (firestore ? collection(firestore, 'staff') : null),
@@ -69,6 +83,7 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
       if (!process) {
         return {
           clientId: '',
+          secondaryClientIds: [],
           name: '',
           processNumber: '',
           status: 'Ativo' as const,
@@ -85,6 +100,7 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
       }
       return {
         clientId: process.clientId || '',
+        secondaryClientIds: process.secondaryClientIds || [],
         name: process.name || '',
         processNumber: process.processNumber || '',
         status: (process.status as 'Ativo' | 'Arquivado' | 'Pendente') || 'Ativo',
@@ -111,6 +127,33 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
     name: 'teamParticipants',
   });
 
+  const validateStep = async () => {
+    let fieldsToValidate: (keyof ProcessFormValues)[] = [];
+    
+    if (currentStep === 0) fieldsToValidate = ['clientId'];
+    if (currentStep === 2) fieldsToValidate = ['name', 'legalArea'];
+    if (currentStep === 4) fieldsToValidate = ['leadLawyerId'];
+
+    if (fieldsToValidate.length > 0) {
+      const result = await form.trigger(fieldsToValidate);
+      return result;
+    }
+    return true;
+  };
+
+  const handleNext = async () => {
+    const isValid = await validateStep();
+    if (isValid && currentStep < STEPS.length - 1) {
+      setCurrentStep(prev => prev + 1);
+    }
+  };
+
+  const handlePrev = () => {
+    if (currentStep > 0) {
+      setCurrentStep(prev => prev - 1);
+    }
+  };
+
   async function onSubmit(values: ProcessFormValues) {
     if (!firestore) return;
     setIsSaving(true);
@@ -128,7 +171,7 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
       } else {
         const col = collection(firestore, 'processes');
         await addDoc(col, { ...data, createdAt: serverTimestamp() });
-        toast({ title: 'Processo criado!', description: 'O novo caso foi registrado e será sincronizado com o Drive.' });
+        toast({ title: 'Processo criado!', description: 'O novo caso foi registrado e organizado no Drive.' });
       }
       onSave();
     } catch (error: any) {
@@ -143,46 +186,94 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
     }
   }
 
-  const handleClientSelect = (client: Client) => {
-    form.setValue('clientId', client.id, { shouldValidate: true });
-  };
+  const stepComponents = [
+    <ClientsSection 
+      key="step-0"
+      control={form.control} 
+      onClientSelect={(client) => form.setValue('clientId', client.id, { shouldValidate: true })} 
+    />,
+    <PartiesSection
+      key="step-1"
+      control={form.control}
+      partyFields={partyFields}
+      onAddParty={() => addParty({ name: '', email: '', phone: '' })}
+      onRemoveParty={removeParty}
+    />,
+    <IdentificationSection
+      key="step-2"
+      control={form.control}
+    />,
+    <CourtSection key="step-3" control={form.control} />,
+    <TeamSection 
+      key="step-4"
+      control={form.control} 
+      staff={staff} 
+      teamFields={teamFields}
+      onAddMember={() => addMember({ staffId: '', percentage: 0 })}
+      onRemoveMember={removeMember}
+    />,
+    <StrategySection key="step-5" control={form.control} />,
+  ];
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-10 py-4">
-        <fieldset disabled={isSaving} className="space-y-10">
-          <IdentificationSection
-            control={form.control}
-            onClientSelect={handleClientSelect}
-            selectedClientId={form.watch('clientId')}
-          />
+      <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col h-full space-y-6">
+        {/* Stepper Header */}
+        <div className="flex items-center justify-between px-1 mb-2">
+          {STEPS.map((step, index) => (
+            <div key={step.id} className="flex flex-col items-center gap-1.5 flex-1 relative">
+              <div className={cn(
+                "w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-black transition-all z-10",
+                currentStep === index ? "bg-primary text-primary-foreground scale-110 shadow-lg" : 
+                currentStep > index ? "bg-emerald-500 text-white" : "bg-muted text-muted-foreground"
+              )}>
+                {currentStep > index ? <CheckCircle2 className="h-4 w-4" /> : index + 1}
+              </div>
+              <span className={cn(
+                "text-[9px] font-bold uppercase tracking-tighter",
+                currentStep === index ? "text-primary" : "text-muted-foreground"
+              )}>{step.label}</span>
+              
+              {/* Line between steps */}
+              {index < STEPS.length - 1 && (
+                <div className={cn(
+                  "absolute top-4 left-1/2 w-full h-[2px] -z-0 transition-colors",
+                  currentStep > index ? "bg-emerald-500" : "bg-muted"
+                )} />
+              )}
+            </div>
+          ))}
+        </div>
 
-          <CourtSection control={form.control} />
+        <div className="flex-1 overflow-y-auto px-1">
+          <fieldset disabled={isSaving} className="animate-in fade-in slide-in-from-right-2 duration-300">
+            {stepComponents[currentStep]}
+          </fieldset>
+        </div>
 
-          <TeamSection 
-            control={form.control} 
-            staff={staff} 
-            teamFields={teamFields}
-            onAddMember={() => addMember({ staffId: '', percentage: 0 })}
-            onRemoveMember={removeMember}
-          />
+        <SheetFooter className="border-t pt-6 bg-background">
+          <div className="flex items-center justify-between w-full">
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={handlePrev} 
+              disabled={currentStep === 0 || isSaving}
+              className="gap-2"
+            >
+              <ChevronLeft className="h-4 w-4" /> Anterior
+            </Button>
 
-          <PartiesSection
-            control={form.control}
-            partyFields={partyFields}
-            onAddParty={() => addParty({ name: '', email: '', phone: '' })}
-            onRemoveParty={removeParty}
-          />
-        </fieldset>
-
-        <SheetFooter className="border-t pt-8">
-          <Button type="button" variant="outline" onClick={onSave} disabled={isSaving}>
-            Cancelar
-          </Button>
-          <Button type="submit" disabled={isSaving} className="min-w-[180px] font-bold">
-            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {process ? 'Salvar Alterações' : 'Cadastrar Processo'}
-          </Button>
+            {currentStep < STEPS.length - 1 ? (
+              <Button type="button" onClick={handleNext} className="gap-2 min-w-[120px]">
+                Próximo <ChevronRight className="h-4 w-4" />
+              </Button>
+            ) : (
+              <Button type="submit" disabled={isSaving} className="gap-2 min-w-[120px] bg-emerald-600 hover:bg-emerald-700">
+                {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                Finalizar Cadastro
+              </Button>
+            )}
+          </div>
         </SheetFooter>
       </form>
     </Form>
