@@ -17,7 +17,10 @@ import {
   Filter,
   ChevronLeft,
   ChevronRight,
-  Gavel
+  Gavel,
+  Check,
+  ChevronsUpDown,
+  Search
 } from 'lucide-react';
 import { format, addDays, isToday, isSameDay, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, addMonths, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -93,6 +96,21 @@ const hearingTypes: { value: HearingType; label: string }[] = [
     { value: 'OUTRA', label: 'Outra' },
 ];
 
+const commonLocations = [
+  "Fórum Trabalhista de São Bernardo do Campo",
+  "Fórum Trabalhista de Santo André",
+  "Fórum Trabalhista de Diadema",
+  "Fórum Trabalhista de Mauá",
+  "Fórum Trabalhista de São Caetano do Sul",
+  "TRT-2 - Sede Barra Funda (São Paulo)",
+  "TRT-2 - Fórum Trabalhista da Zona Sul",
+  "TRT-2 - Fórum Trabalhista da Zona Leste",
+  "Audiência Virtual (Google Meet)",
+  "Audiência Virtual (Zoom)",
+  "Audiência Virtual (Microsoft Teams)",
+  "Escritório Bueno Gois",
+];
+
 const statusConfig: Record<HearingStatus, { label: string; icon: any; color: string }> = {
     PENDENTE: { label: 'Pendente', icon: Clock3, color: 'text-blue-500 bg-blue-500/10' },
     REALIZADA: { label: 'Realizada', icon: CheckCircle2, color: 'text-emerald-500 bg-emerald-500/10' },
@@ -131,21 +149,92 @@ function ProcessSearch({ onSelect, selectedProcess }: { onSelect: (process: Proc
       <PopoverTrigger asChild>
         <Button variant="outline" role="combobox" className="w-full justify-between h-11 font-normal">
           {selectedProcess ? selectedProcess.name : "Selecione um processo..."}
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
         <Command>
           <CommandInput placeholder="Buscar processo..." value={search} onValueChange={setSearch} />
           <CommandList>
-            {isLoading && <CommandEmpty>Buscando...</CommandEmpty>}
+            {isLoading && <div className="p-4 text-center text-xs text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" />Buscando...</div>}
             <CommandEmpty>Nenhum processo encontrado.</CommandEmpty>
             <CommandGroup>
               {results.map((process) => (
                 <CommandItem key={process.id} value={process.name} onSelect={() => { onSelect(process); setOpen(false); }}>
+                  <Check className={cn("mr-2 h-4 w-4", selectedProcess?.id === process.id ? "opacity-100" : "opacity-0")} />
                   {process.name}
                 </CommandItem>
               ))}
             </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function LocationSearch({ value, onSelect }: { value: string; onSelect: (val: string) => void }) {
+  const [open, setOpen] = React.useState(false);
+  const [search, setSearch] = React.useState("");
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-full justify-between h-11 font-normal"
+        >
+          {value ? value : "Pesquisar ou digitar local..."}
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+        <Command>
+          <CommandInput 
+            placeholder="Ex: Fórum SBC..." 
+            value={search}
+            onValueChange={(val) => {
+              setSearch(val);
+              // Allow typing custom value if no match is found
+            }}
+          />
+          <CommandList>
+            <CommandGroup heading="Locais Sugeridos">
+              {commonLocations.map((loc) => (
+                <CommandItem
+                  key={loc}
+                  value={loc}
+                  onSelect={(currentValue) => {
+                    onSelect(currentValue);
+                    setOpen(false);
+                  }}
+                >
+                  <Check
+                    className={cn(
+                      "mr-2 h-4 w-4",
+                      value === loc ? "opacity-100" : "opacity-0"
+                    )}
+                  />
+                  {loc}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+            {search && !commonLocations.some(l => l.toLowerCase() === search.toLowerCase()) && (
+              <CommandGroup heading="Novo Local">
+                <CommandItem
+                  value={search}
+                  onSelect={(currentValue) => {
+                    onSelect(currentValue);
+                    setOpen(false);
+                  }}
+                >
+                  <PlusCircle className="mr-2 h-4 w-4 text-primary" />
+                  Usar: "{search}"
+                </CommandItem>
+              </CommandGroup>
+            )}
           </CommandList>
         </Command>
       </PopoverContent>
@@ -161,7 +250,7 @@ function NewHearingDialog({ onHearingCreated, hearingsData }: { onHearingCreated
 
   const form = useForm<z.infer<typeof hearingSchema>>({
     resolver: zodResolver(hearingSchema),
-    defaultValues: { time: '09:00', type: 'UNA', status: 'PENDENTE' }
+    defaultValues: { time: '09:00', type: 'UNA', status: 'PENDENTE', location: '' }
   });
 
   const watchedDate = form.watch('date');
@@ -296,7 +385,12 @@ function NewHearingDialog({ onHearingCreated, hearingsData }: { onHearingCreated
                 render={({ field }) => (
                     <FormItem>
                     <FormLabel>Local da Audiência *</FormLabel>
-                    <FormControl><Input placeholder="Ex: Sala 02 - Fórum Trabalhista de SBC" className="h-11" {...field} /></FormControl>
+                    <FormControl>
+                      <LocationSearch 
+                        value={field.value} 
+                        onSelect={field.onChange} 
+                      />
+                    </FormControl>
                     <FormMessage />
                     </FormItem>
                 )}
