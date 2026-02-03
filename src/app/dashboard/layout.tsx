@@ -104,7 +104,7 @@ const navItems = [
     href: '/dashboard/arquivo',
     label: 'Arquivo',
     icon: Archive,
-    roles: ['admin', 'lawyer'],
+    roles: ['admin', 'lawyer', 'assistant'],
   },
   {
     href: '/dashboard/staff',

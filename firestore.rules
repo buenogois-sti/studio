@@ -13,17 +13,15 @@ service cloud.firestore {
     }
 
     // --- Global Read Rule ---
-    // This allows any user (even unauthenticated) to read data from any collection.
-    // This is a temporary measure to prevent the app from freezing due to the
-    // ongoing server authentication issue (invalid-custom-token).
-    // Write permissions below are still secure.
+    // Temporary measure for prototype stability.
     match /{path=**} {
       allow read: if true;
     }
 
     // --- Collection-Specific Write Rules ---
     match /users/{userId} {
-      allow update: if isUser(userId) || isAdmin();
+      // User can update their profile, but CANNOT change their own role unless they are admin.
+      allow update: if (isUser(userId) && request.resource.data.role == resource.data.role) || isAdmin();
       allow create, delete: if isAdmin();
       
       match /notifications/{notificationId} {
@@ -33,36 +31,48 @@ service cloud.firestore {
 
       match /logs/{logId} {
         allow create: if isUser(userId);
-        // read is covered by global rule, write is denied by default
       }
     }
+
     match /clients/{clientId} {
-      allow write: if isOneOfRoles(['admin', 'lawyer', 'assistant']);
+      allow create, update: if isOneOfRoles(['admin', 'lawyer', 'assistant']);
+      allow delete: if isAdmin();
     }
+
     match /processes/{processId} {
-      allow write: if isOneOfRoles(['admin', 'lawyer', 'assistant']);
+      allow create, update: if isOneOfRoles(['admin', 'lawyer', 'assistant']);
+      allow delete: if isAdmin();
     }
+
     match /processes/{processId}/fee_split_rules/default {
       allow write: if isOneOfRoles(['admin', 'lawyer', 'financial']);
     }
+
     match /hearings/{hearingId} {
-      allow write: if isOneOfRoles(['admin', 'lawyer', 'assistant']);
+      allow create, update: if isOneOfRoles(['admin', 'lawyer', 'assistant']);
+      allow delete: if isAdmin();
     }
+
     match /financial_events/{eventId} {
       allow write: if isOneOfRoles(['admin', 'financial']);
     }
+
     match /financial_titles/{titleId} {
       allow write: if isOneOfRoles(['admin', 'financial']);
     }
+
     match /staff/{staffId} {
       allow write: if isAdmin();
     }
+
     match /staff/{staffId}/credits/{creditId} {
       allow write: if isOneOfRoles(['admin', 'financial']);
     }
+
     match /document_templates/{templateId} {
       allow write: if isAdmin();
     }
+
     match /system_settings/{settingId} {
       allow write: if isAdmin();
     }

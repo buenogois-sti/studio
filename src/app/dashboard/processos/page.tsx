@@ -33,9 +33,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
-import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
+import { useFirebase, useCollection, useMemoFirebase, useDoc } from '@/firebase';
 import { collection, doc, deleteDoc } from 'firebase/firestore';
-import type { Process, Client } from '@/lib/types';
+import type { Process, Client, UserProfile } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/use-toast';
 import { FinancialEventDialog } from '@/components/process/FinancialEventDialog';
@@ -63,9 +63,17 @@ export default function ProcessosPage() {
   const [eventProcess, setEventProcess] = React.useState<Process | null>(null);
 
   const { firestore, isUserLoading } = useFirebase();
+  const { data: session } = useSession();
   const { toast } = useToast();
   const searchParams = useSearchParams();
   const clientIdFilter = searchParams.get('clientId');
+
+  const userProfileRef = useMemoFirebase(
+    () => (firestore && session?.user?.id ? doc(firestore, 'users', session.user.id) : null),
+    [firestore, session?.user?.id]
+  );
+  const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
+  const userRole = userProfile?.role;
 
   const processesQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'processes') : null), [firestore]);
   const { data: processesData, isLoading: isLoadingProcesses } = useCollection<Process>(processesQuery);
@@ -73,7 +81,6 @@ export default function ProcessosPage() {
   const clientsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'clients') : null), [firestore]);
   const { data: clientsData } = useCollection<Client>(clientsQuery);
   
-  // Optimized O(1) Lookup Map for clients
   const clientsMap = React.useMemo(() => new Map(clientsData?.map(c => [c.id, c])), [clientsData]);
 
   const filteredProcesses = React.useMemo(() => {
@@ -139,7 +146,6 @@ export default function ProcessosPage() {
           </div>
         </div>
 
-        {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card className="bg-emerald-500/5 border-emerald-500/10">
                 <CardContent className="p-4 flex items-center gap-4">
@@ -248,9 +254,13 @@ export default function ProcessosPage() {
                               <DropdownMenuItem onClick={() => { setSelectedProcess(p); setIsDraftingOpen(true); }}>
                                 <FilePlus2 className="mr-2 h-4 w-4 text-emerald-500" /> Gerar Rascunho (IA/Drive)
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => setEventProcess(p)}>
-                                <DollarSign className="mr-2 h-4 w-4 text-blue-500" /> Registrar Evento Financeiro
-                              </DropdownMenuItem>
+                              
+                              {(userRole === 'admin' || userRole === 'lawyer' || userRole === 'financial') && (
+                                <DropdownMenuItem onClick={() => setEventProcess(p)}>
+                                    <DollarSign className="mr-2 h-4 w-4 text-blue-500" /> Registrar Evento Financeiro
+                                </DropdownMenuItem>
+                              )}
+
                               <DropdownMenuSeparator />
                               <DropdownMenuItem onClick={() => { setEditingProcess(p); setIsSheetOpen(true); }}>
                                 <FileText className="mr-2 h-4 w-4" /> Editar Cadastro
@@ -262,10 +272,15 @@ export default function ProcessosPage() {
                                       </a>
                                   </DropdownMenuItem>
                               )}
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem className="text-destructive" onClick={() => setProcessToDelete(p)}>
-                                <X className="mr-2 h-4 w-4" /> Excluir Processo
-                              </DropdownMenuItem>
+                              
+                              {userRole === 'admin' && (
+                                <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem className="text-destructive" onClick={() => setProcessToDelete(p)}>
+                                        <X className="mr-2 h-4 w-4" /> Excluir Processo
+                                    </DropdownMenuItem>
+                                </>
+                              )}
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
@@ -285,7 +300,6 @@ export default function ProcessosPage() {
         </Card>
       </div>
 
-      {/* Forms & Dialogs */}
       <Sheet open={isSheetOpen} onOpenChange={(open) => { if (!open) setEditingProcess(null); setIsSheetOpen(open); }}>
         <SheetContent className="sm:max-w-4xl w-full p-0 flex flex-col">
           <SheetHeader className="px-6 pt-6 pb-2">
