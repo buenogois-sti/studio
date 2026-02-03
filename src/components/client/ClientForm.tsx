@@ -1,3 +1,4 @@
+
 'use client';
 import * as React from 'react';
 import { z } from 'zod';
@@ -23,7 +24,7 @@ import {
 } from "@/components/ui/select"
 import { SheetFooter } from '@/components/ui/sheet';
 import { H2 } from '@/components/ui/typography';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Search, MapPin, CheckCircle2 } from 'lucide-react';
 
 import { useFirebase } from '@/firebase';
 import { collection, serverTimestamp, Timestamp, doc, addDoc, updateDoc } from 'firebase/firestore';
@@ -74,6 +75,7 @@ export function ClientForm({
   const { firestore } = useFirebase();
   const { toast } = useToast();
   const [isSaving, setIsSaving] = React.useState(false);
+  const [isSearchingCep, setIsSearchingCep] = React.useState(false);
 
   const form = useForm<z.infer<typeof clientSchema>>({
     resolver: zodResolver(clientSchema),
@@ -108,7 +110,9 @@ export function ClientForm({
 
   const handleCepSearch = React.useCallback(async () => {
     const cep = form.getValues('address_zipCode');
-    if (!cep || cep.replace(/\D/g, '').length !== 8) {
+    const cleanCep = cep?.replace(/\D/g, '');
+    
+    if (!cleanCep || cleanCep.length !== 8) {
         toast({
             variant: 'destructive',
             title: 'CEP Inválido',
@@ -117,8 +121,9 @@ export function ClientForm({
         return;
     }
 
+    setIsSearchingCep(true);
     try {
-        const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+        const response = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
         if (!response.ok) throw new Error('Falha na resposta da API');
         const data = await response.json();
         if (data.erro) {
@@ -131,7 +136,15 @@ export function ClientForm({
             form.setValue('address_neighborhood', data.bairro, { shouldValidate: true });
             form.setValue('address_city', data.localidade, { shouldValidate: true });
             form.setValue('address_state', data.uf, { shouldValidate: true });
-            toast({ title: 'Endereço encontrado!' });
+            toast({ 
+              title: 'Endereço encontrado!',
+              description: `${data.logradouro}, ${data.localidade}`
+            });
+            // Focus on number field after success
+            setTimeout(() => {
+              const numInput = document.getElementsByName('address_number')[0];
+              if (numInput) numInput.focus();
+            }, 100);
         }
     } catch (error) {
         toast({
@@ -139,6 +152,8 @@ export function ClientForm({
             title: 'Erro ao buscar CEP',
             description: 'Não foi possível conectar à API de CEP.',
         });
+    } finally {
+      setIsSearchingCep(false);
     }
   }, [form, toast]);
 
@@ -482,21 +497,30 @@ export function ClientForm({
                 )}
               />
               
-              <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4 items-end">
+              <div className="md:col-span-2">
                 <FormField
                     control={form.control}
                     name="address_zipCode"
                     render={({ field }) => (
                         <FormItem>
                             <FormLabel>CEP</FormLabel>
-                            <FormControl>
-                                <Input placeholder="00000-000" {...field} />
-                            </FormControl>
+                            <div className="relative">
+                              <FormControl>
+                                  <Input placeholder="00000-000" className="pr-10" {...field} />
+                              </FormControl>
+                              <button 
+                                type="button" 
+                                onClick={handleCepSearch} 
+                                disabled={isSearchingCep || isSaving}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-primary transition-colors"
+                              >
+                                {isSearchingCep ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                              </button>
+                            </div>
                             <FormMessage />
                         </FormItem>
                     )}
                 />
-                <Button type="button" onClick={handleCepSearch} disabled={isSaving}>Buscar</Button>
               </div>
 
               <FormField
@@ -506,7 +530,10 @@ export function ClientForm({
                       <FormItem className="md:col-span-2">
                       <FormLabel>Endereço</FormLabel>
                       <FormControl>
-                          <Input placeholder="Rua, avenida, etc" {...field} />
+                        <div className="relative">
+                          <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                          <Input placeholder="Rua, avenida, etc" className="pl-10" {...field} />
+                        </div>
                       </FormControl>
                       <FormMessage />
                       </FormItem>
