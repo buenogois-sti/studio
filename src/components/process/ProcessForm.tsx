@@ -64,6 +64,7 @@ function ClientSearch({ onSelect, selectedClientId }: { onSelect: (client: Clien
   const [results, setResults] = React.useState<Client[]>([]);
   const [isLoading, setIsLoading] = React.useState(false);
   const [selectedClient, setSelectedClient] = React.useState<Client | null>(null);
+  const inputRef = React.useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   React.useEffect(() => {
@@ -71,6 +72,12 @@ function ClientSearch({ onSelect, selectedClientId }: { onSelect: (client: Clien
         getClientById(selectedClientId).then(setSelectedClient).catch(console.error);
     }
   }, [selectedClientId, selectedClient]);
+
+  React.useEffect(() => {
+    if (open) {
+      setTimeout(() => inputRef.current?.focus(), 100);
+    }
+  }, [open]);
 
   React.useEffect(() => {
     if (search.length < 2) {
@@ -92,7 +99,7 @@ function ClientSearch({ onSelect, selectedClientId }: { onSelect: (client: Clien
   }, [search, toast]);
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen} modal={false}>
       <PopoverTrigger asChild>
         <Button variant="outline" role="combobox" aria-expanded={open} className="w-full justify-between h-11 font-normal bg-background">
           {selectedClient ? (
@@ -105,16 +112,23 @@ function ClientSearch({ onSelect, selectedClientId }: { onSelect: (client: Clien
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
-        <div className="flex flex-col h-full bg-popover">
+      <PopoverContent 
+        className="w-[var(--radix-popover-trigger-width)] p-0 z-[100]" 
+        align="start"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
+        <div className="flex flex-col h-full bg-popover border shadow-xl rounded-md">
           <div className="flex items-center border-b px-3">
             <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
             <Input 
+              ref={inputRef}
               placeholder="Digite nome ou documento..." 
               value={search} 
               onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key !== 'Escape') e.stopPropagation();
+              }}
               className="border-none focus-visible:ring-0 focus-visible:ring-offset-0 h-11 bg-transparent"
-              autoFocus
             />
           </div>
           <ScrollArea className="max-h-[300px] overflow-y-auto">
@@ -131,13 +145,14 @@ function ClientSearch({ onSelect, selectedClientId }: { onSelect: (client: Clien
               {results.map((client) => (
                 <button
                     key={client.id}
+                    type="button"
                     onClick={() => { 
                         setSelectedClient(client);
                         onSelect(client); 
                         setOpen(false); 
                     }}
                     className={cn(
-                      "flex flex-col items-start w-full px-2 py-2 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground text-left transition-colors",
+                      "flex flex-col items-start w-full px-3 py-2 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground text-left transition-colors",
                       selectedClientId === client.id && "bg-accent text-accent-foreground"
                     )}
                 >
@@ -325,7 +340,7 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
                         name="courtBranch"
                         render={({ field }) => (
                         <FormItem>
-                            <FormLabel>Vara / Câmara</FormLabel>
+                            <FormLabel>Vara / Câmara</H2>
                             <FormControl><Input placeholder="Ex: 2ª Vara do Trabalho" className="h-11" {...field} /></FormControl>
                             <FormMessage />
                         </FormItem>

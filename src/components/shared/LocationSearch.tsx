@@ -48,6 +48,13 @@ export function LocationSearch({ value, onSelect, placeholder = "Pesquisar local
   const [search, setSearch] = React.useState("");
   const [apiResults, setApiResults] = React.useState<string[]>([]);
   const [isSearching, setIsSearching] = React.useState(false);
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  React.useEffect(() => {
+    if (open) {
+      setTimeout(() => inputRef.current?.focus(), 100);
+    }
+  }, [open]);
 
   React.useEffect(() => {
     if (search.length < 4) {
@@ -75,7 +82,7 @@ export function LocationSearch({ value, onSelect, placeholder = "Pesquisar local
   }, [search]);
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen} modal={false}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
@@ -94,16 +101,23 @@ export function LocationSearch({ value, onSelect, placeholder = "Pesquisar local
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
-        <div className="flex flex-col h-full bg-popover">
+      <PopoverContent 
+        className="w-[var(--radix-popover-trigger-width)] p-0 z-[100]" 
+        align="start"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
+        <div className="flex flex-col h-full bg-popover border shadow-xl rounded-md">
           <div className="flex items-center border-b px-3">
             <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
             <Input 
+              ref={inputRef}
               placeholder="Digite o fórum ou um endereço..." 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key !== 'Escape') e.stopPropagation();
+              }}
               className="border-none focus-visible:ring-0 focus-visible:ring-offset-0 h-11 bg-transparent"
-              autoFocus
             />
           </div>
           
@@ -115,15 +129,15 @@ export function LocationSearch({ value, onSelect, placeholder = "Pesquisar local
               </div>
             )}
 
-            {/* Resultados da API de Endereços */}
             {apiResults.length > 0 && (
               <div className="p-1">
                 <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase">Endereços Encontrados</div>
                 {apiResults.map((address) => (
                   <button
                     key={address}
+                    type="button"
                     onClick={() => { onSelect(address); setOpen(false); }}
-                    className="flex items-start gap-2 w-full px-2 py-2.5 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground text-left"
+                    className="flex items-start gap-2 w-full px-3 py-2.5 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground text-left"
                   >
                     <Globe className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
                     <span className="flex-1 text-xs leading-tight line-clamp-2">{address}</span>
@@ -133,15 +147,15 @@ export function LocationSearch({ value, onSelect, placeholder = "Pesquisar local
               </div>
             )}
 
-            {/* Sugestões Jurídicas Locais */}
             {groupedLocations.map((group) => (
               <div key={group.label} className="p-1 border-t first:border-t-0">
                 <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase">{group.label}</div>
                 {group.items.map((item) => (
                   <button
                     key={item.name}
+                    type="button"
                     onClick={() => { onSelect(item.name); setOpen(false); }}
-                    className="flex items-center gap-2 w-full px-2 py-2 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground text-left"
+                    className="flex items-center gap-2 w-full px-3 py-2.5 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground text-left"
                   >
                     <item.icon className="h-4 w-4 text-muted-foreground shrink-0" />
                     <span className="flex-1 truncate">{item.name}</span>
@@ -154,8 +168,9 @@ export function LocationSearch({ value, onSelect, placeholder = "Pesquisar local
             {search && (
               <div className="p-1 border-t">
                 <button
+                  type="button"
                   onClick={() => { onSelect(search); setOpen(false); }}
-                  className="flex items-center gap-2 w-full px-2 py-3 text-sm rounded-sm hover:bg-accent text-primary font-bold text-left"
+                  className="flex items-center gap-2 w-full px-3 py-3 text-sm rounded-sm hover:bg-accent text-primary font-bold text-left"
                 >
                   <PlusCircle className="h-4 w-4" />
                   <span>Usar: "{search}"</span>

@@ -96,7 +96,7 @@ const hearingTypes: { value: HearingType; label: string }[] = [
     { value: 'CONCILIACAO', label: 'Conciliação' },
     { value: 'INSTRUCAO', label: 'Instrução' },
     { value: 'UNA', label: 'Una' },
-    { value: 'JULGAMENTO', label: 'Julgamento' },
+    { value: 'JULGAMENTO', label: 'Judgamento' },
     { value: 'OUTRA', label: 'Outra' },
 ];
 
@@ -112,7 +112,14 @@ function ProcessSearch({ onSelect, selectedProcess }: { onSelect: (process: Proc
   const [results, setResults] = React.useState<Process[]>([]);
   const [isLoading, setIsLoading] = React.useState(false);
   const [open, setOpen] = React.useState(false);
+  const inputRef = React.useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+
+  React.useEffect(() => {
+    if (open) {
+      setTimeout(() => inputRef.current?.focus(), 100);
+    }
+  }, [open]);
 
   React.useEffect(() => {
     if (search.length < 2) {
@@ -134,23 +141,30 @@ function ProcessSearch({ onSelect, selectedProcess }: { onSelect: (process: Proc
   }, [search, toast]);
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen} modal={false}>
       <PopoverTrigger asChild>
         <Button variant="outline" role="combobox" className="w-full justify-between h-11 font-normal bg-background">
           {selectedProcess ? selectedProcess.name : "Selecione um processo..."}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
-        <div className="flex flex-col h-full bg-popover">
+      <PopoverContent 
+        className="w-[var(--radix-popover-trigger-width)] p-0 z-[100]" 
+        align="start"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
+        <div className="flex flex-col h-full bg-popover border shadow-xl rounded-md">
           <div className="flex items-center border-b px-3">
             <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
             <Input 
+              ref={inputRef}
               placeholder="Buscar processo..." 
               value={search} 
               onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key !== 'Escape') e.stopPropagation();
+              }}
               className="border-none focus-visible:ring-0 focus-visible:ring-offset-0 h-11 bg-transparent"
-              autoFocus
             />
           </div>
           <ScrollArea className="max-h-[300px] overflow-y-auto">
@@ -167,9 +181,10 @@ function ProcessSearch({ onSelect, selectedProcess }: { onSelect: (process: Proc
               {results.map((process) => (
                 <button
                   key={process.id}
+                  type="button"
                   onClick={() => { onSelect(process); setOpen(false); }}
                   className={cn(
-                    "flex items-center w-full px-2 py-2 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground text-left transition-colors",
+                    "flex items-center w-full px-3 py-2.5 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground text-left transition-colors",
                     selectedProcess?.id === process.id && "bg-accent text-accent-foreground"
                   )}
                 >
@@ -217,13 +232,11 @@ function NewHearingDialog({ onHearingCreated, hearingsData }: { onHearingCreated
     });
   }, [watchedDate, watchedTime, hearingsData]);
 
-  // Handle Process Selection and Auto-fill Defaults
   const handleProcessSelect = (process: Process) => {
     setSelectedProcess(process);
     form.setValue('processId', process.id);
     form.setValue('processName', process.name);
     
-    // Auto-fill defaults from process
     if (process.defaultLocation) {
         form.setValue('location', process.defaultLocation);
     }
@@ -738,7 +751,7 @@ export default function AudienciasPage() {
             </Tabs>
         </div>
         
-        <AlertDialog open={!!hearingToDelete} onValueChange={(open) => !isDeleting && !open && setHearingToDelete(null)}>
+        <AlertDialog open={!!hearingToDelete} onOpenChange={(open) => !isDeleting && !open && setHearingToDelete(null)}>
             <AlertDialogContent>
                 <AlertDialogHeader>
                     <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
