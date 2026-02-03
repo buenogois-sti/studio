@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Building, Gavel, User, LayoutGrid, Plus, Trash2, ShieldCheck, Scale, Users } from 'lucide-react';
+import { Building, Gavel, User, LayoutGrid, Plus, Trash2, ShieldCheck, Scale, Users, Mail, Phone, Percent } from 'lucide-react';
 import { Control, FieldArrayWithId } from 'react-hook-form';
 
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -77,7 +77,7 @@ export function IdentificationSection({
               <FormControl>
                 <Input
                   placeholder="Ex: Reclamatória Trabalhista - João Silva"
-                  className="h-11 border-2 focus:border-primary/50 transition-all"
+                  className="h-11 border-2"
                   onKeyDown={(e) => e.stopPropagation()}
                   {...field}
                 />
@@ -95,7 +95,7 @@ export function IdentificationSection({
               <FormLabel>Status Operacional *</FormLabel>
               <Select onValueChange={field.onChange} value={field.value}>
                 <FormControl>
-                  <SelectTrigger className="h-11 border-2">
+                  <SelectTrigger className="h-11">
                     <SelectValue placeholder="Status..." />
                   </SelectTrigger>
                 </FormControl>
@@ -112,6 +112,32 @@ export function IdentificationSection({
 
         <FormField
           control={control}
+          name="legalArea"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Área Jurídica (Organização Drive) *</FormLabel>
+              <Select onValueChange={field.onChange} value={field.value}>
+                <FormControl>
+                  <SelectTrigger className="h-11">
+                    <SelectValue placeholder="Tipo de Ação..." />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="Trabalhista">Trabalhista</SelectItem>
+                  <SelectItem value="Cível">Cível</SelectItem>
+                  <SelectItem value="Criminal">Criminal</SelectItem>
+                  <SelectItem value="Previdenciário">Previdenciário</SelectItem>
+                  <SelectItem value="Família">Família</SelectItem>
+                  <SelectItem value="Outro">Outro</SelectItem>
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={control}
           name="processNumber"
           render={({ field }) => (
             <FormItem>
@@ -119,7 +145,7 @@ export function IdentificationSection({
               <FormControl>
                 <Input 
                   placeholder="0000000-00.0000.0.00.0000" 
-                  className="h-11 font-mono border-2 focus:border-primary/50 transition-all" 
+                  className="h-11 font-mono border-2" 
                   onKeyDown={(e) => e.stopPropagation()}
                   {...field} 
                 />
@@ -134,12 +160,12 @@ export function IdentificationSection({
           name="caseValue"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Valor Estimado da Causa (R$)</FormLabel>
+              <FormLabel>Valor da Causa (R$)</FormLabel>
               <FormControl>
                 <Input 
                   type="number" 
                   step="0.01" 
-                  className="h-11 border-2 focus:border-primary/50 transition-all" 
+                  className="h-11 border-2" 
                   onKeyDown={(e) => e.stopPropagation()}
                   {...field} 
                 />
@@ -166,16 +192,39 @@ export function CourtSection({ control }: CourtSectionProps) {
       />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-muted/20 p-6 rounded-2xl border border-border/50">
+        <div className="md:col-span-2">
+          <FormField
+            control={control}
+            name="court"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Pesquisar Tribunal / Fórum (Mapas) *</FormLabel>
+                <FormControl>
+                  <LocationSearch
+                    value={field.value || ''}
+                    onSelect={(val) => {
+                        field.onChange(val);
+                        // Optional: trigger address update if val matches an OSM result
+                    }}
+                    placeholder="Busque o nome do fórum ou tribunal..."
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
         <FormField
           control={control}
-          name="court"
+          name="courtAddress"
           render={({ field }) => (
-            <FormItem>
-              <FormLabel>Tribunal / Fórum</FormLabel>
+            <FormItem className="md:col-span-2">
+              <FormLabel>Endereço Completo</FormLabel>
               <FormControl>
                 <Input 
-                  placeholder="Ex: TRT-2 / Fórum SBC" 
-                  className="h-11 border-2 focus:border-primary/50 transition-all" 
+                  placeholder="Rua, número, cidade..." 
+                  className="h-11 border-2" 
                   onKeyDown={(e) => e.stopPropagation()}
                   {...field} 
                 />
@@ -189,35 +238,14 @@ export function CourtSection({ control }: CourtSectionProps) {
           control={control}
           name="courtBranch"
           render={({ field }) => (
-            <FormItem>
-              <FormLabel>Vara / Câmara</FormLabel>
+            <FormItem className="md:col-span-2">
+              <FormLabel>Vara / Câmara / Turma</FormLabel>
               <FormControl>
                 <Input 
-                  placeholder="Ex: 2ª Vara do Trabalho" 
-                  className="h-11 border-2 focus:border-primary/50 transition-all" 
+                  placeholder="Ex: 2ª Vara do Trabalho de SBC" 
+                  className="h-11 border-2" 
                   onKeyDown={(e) => e.stopPropagation()}
                   {...field} 
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={control}
-          name="defaultLocation"
-          render={({ field }) => (
-            <FormItem className="md:col-span-2">
-              <FormLabel className="flex items-center gap-2">
-                Local Sugerido para Audiências
-                <Badge variant="outline" className="text-[8px] font-black uppercase px-1.5 h-4">API Maps</Badge>
-              </FormLabel>
-              <FormControl>
-                <LocationSearch
-                  value={field.value || ''}
-                  onSelect={field.onChange}
-                  placeholder="Busque o endereço do fórum ou local da audiência..."
                 />
               </FormControl>
               <FormMessage />
@@ -232,16 +260,19 @@ export function CourtSection({ control }: CourtSectionProps) {
 interface TeamSectionProps {
   control: Control<ProcessFormValues>;
   staff: Staff[];
+  teamFields: FieldArrayWithId<ProcessFormValues, "teamParticipants", "id">[];
+  onAddMember: () => void;
+  onRemoveMember: (index: number) => void;
 }
 
-export function TeamSection({ control, staff }: TeamSectionProps) {
+export function TeamSection({ control, staff, teamFields, onAddMember, onRemoveMember }: TeamSectionProps) {
   const lawyers = staff.filter((s) => s.role === 'lawyer');
 
   return (
     <section>
       <SectionHeader
         icon={<ShieldCheck className="h-4 w-4" />}
-        title="Equipe Jurídica"
+        title="Equipe Jurídica e Honorários"
       />
 
       <div className="space-y-6 bg-muted/20 p-6 rounded-2xl border border-border/50">
@@ -250,11 +281,11 @@ export function TeamSection({ control, staff }: TeamSectionProps) {
           name="leadLawyerId"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Advogado Responsável (Líder) *</FormLabel>
+              <FormLabel>Advogado Responsável (Titular) *</FormLabel>
               <Select onValueChange={field.onChange} value={field.value}>
                 <FormControl>
                   <SelectTrigger className="h-11 border-2">
-                    <SelectValue placeholder="Selecione o advogado titular deste caso..." />
+                    <SelectValue placeholder="Selecione o advogado líder..." />
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
@@ -270,41 +301,84 @@ export function TeamSection({ control, staff }: TeamSectionProps) {
           )}
         />
 
-        <FormField
-          control={control}
-          name="responsibleStaffIds"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Equipe de Apoio (Colaboradores / Estagiários)</FormLabel>
-              <div className="flex flex-wrap gap-2 p-4 rounded-xl border-2 bg-background/50">
-                {staff.map((s) => {
-                  const isSelected = field.value?.includes(s.id);
-                  return (
-                    <Badge
-                      key={s.id}
-                      variant={isSelected ? 'default' : 'outline'}
-                      className={cn(
-                        'cursor-pointer py-1.5 px-4 transition-all border-2',
-                        isSelected ? 'bg-primary border-primary text-primary-foreground' : 'hover:border-primary/50'
-                      )}
-                      onClick={() => {
-                        const currentValue = field.value || [];
-                        const newValue = isSelected
-                          ? currentValue.filter((id) => id !== s.id)
-                          : [...currentValue, s.id];
-                        field.onChange(newValue);
-                      }}
-                    >
-                      {s.firstName} {s.lastName}
-                    </Badge>
-                  );
-                })}
-                {staff.length === 0 && <span className="text-xs text-muted-foreground italic">Nenhum membro cadastrado na equipe.</span>}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <FormLabel className="text-foreground font-bold">Colaboradores e Apoio</FormLabel>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onAddMember}
+              className="h-8 text-[10px] font-black uppercase text-primary border-primary/30"
+            >
+              <Plus className="h-3 w-3 mr-1" /> Adicionar Membro
+            </Button>
+          </div>
+
+          <div className="grid gap-3">
+            {teamFields.map((field, index) => (
+              <div key={field.id} className="grid grid-cols-12 gap-3 items-end p-3 rounded-xl border-2 bg-background animate-in slide-in-from-right-2">
+                <div className="col-span-7">
+                  <FormField
+                    control={control}
+                    name={`teamParticipants.${index}.staffId`}
+                    render={({ field: memberField }) => (
+                      <FormItem>
+                        <Select onValueChange={memberField.onChange} value={memberField.value}>
+                          <FormControl>
+                            <SelectTrigger className="h-10">
+                              <SelectValue placeholder="Selecionar..." />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {staff.map((s) => (
+                              <SelectItem key={s.id} value={s.id}>
+                                {s.firstName} {s.lastName}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <div className="col-span-3">
+                  <FormField
+                    control={control}
+                    name={`teamParticipants.${index}.percentage`}
+                    render={({ field: pctField }) => (
+                      <FormItem>
+                        <FormControl>
+                          <div className="relative">
+                            <Percent className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                            <Input 
+                              type="number" 
+                              placeholder="0" 
+                              className="h-10 pl-7 text-xs" 
+                              onKeyDown={(e) => e.stopPropagation()}
+                              {...pctField} 
+                            />
+                          </div>
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <div className="col-span-2 flex justify-end">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => onRemoveMember(index)}
+                    className="h-10 w-10 text-destructive hover:bg-destructive/10"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+            ))}
+          </div>
+        </div>
       </div>
     </section>
   );
@@ -327,58 +401,88 @@ export function PartiesSection({
     <section>
       <SectionHeader
         icon={<Scale className="h-4 w-4" />}
-        title="Partes e Estratégia Interna"
+        title="Parte Contrária (Réus)"
       />
 
       <div className="space-y-6 bg-muted/20 p-6 rounded-2xl border border-border/50">
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <FormLabel className="text-foreground font-bold">Réus / Partes Contrárias</FormLabel>
+            <FormLabel className="text-foreground font-bold">Réus Registrados</FormLabel>
             <Button
               type="button"
               variant="outline"
               size="sm"
               onClick={onAddParty}
-              className="h-8 text-[10px] font-black uppercase border-primary/30 text-primary hover:bg-primary/10"
+              className="h-8 text-[10px] font-black uppercase border-primary/30 text-primary"
             >
-              <Plus className="h-3 w-3 mr-1" /> Adicionar Réu
+              <Plus className="h-3 w-3 mr-1" /> Novo Réu
             </Button>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+
+          <div className="grid gap-4">
             {partyFields.map((field, index) => (
-              <div key={field.id} className="flex gap-2 animate-in fade-in slide-in-from-left-2 duration-300">
-                <FormField
-                  control={control}
-                  name={`opposingParties.${index}.name`}
-                  render={({ field: partyField }) => (
-                    <FormItem className="flex-1">
-                      <FormControl>
-                        <Input
-                          placeholder="Nome da empresa ou pessoa"
-                          className="h-11 bg-background border-2"
-                          onKeyDown={(e) => e.stopPropagation()}
-                          {...partyField}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => onRemoveParty(index)}
-                  className="shrink-0 text-destructive hover:bg-destructive/10 h-11"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+              <div key={field.id} className="p-4 rounded-xl border-2 bg-background space-y-3 animate-in fade-in">
+                <div className="flex items-start justify-between gap-4">
+                  <FormField
+                    control={control}
+                    name={`opposingParties.${index}.name`}
+                    render={({ field: nameField }) => (
+                      <FormItem className="flex-1">
+                        <FormLabel className="text-[10px] uppercase font-bold">Nome da Parte *</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="Empresa ou Pessoa..."
+                            className="h-10"
+                            onKeyDown={(e) => e.stopPropagation()}
+                            {...nameField}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => onRemoveParty(index)}
+                    className="mt-6 text-destructive hover:bg-destructive/10"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <FormField
+                    control={control}
+                    name={`opposingParties.${index}.email`}
+                    render={({ field: emailField }) => (
+                      <FormItem>
+                        <FormControl>
+                          <div className="relative">
+                            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                            <Input placeholder="E-mail" className="pl-9 h-9 text-xs" {...emailField} onKeyDown={(e) => e.stopPropagation()} />
+                          </div>
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={control}
+                    name={`opposingParties.${index}.phone`}
+                    render={({ field: phoneField }) => (
+                      <FormItem>
+                        <FormControl>
+                          <div className="relative">
+                            <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                            <Input placeholder="Telefone" className="pl-9 h-9 text-xs" {...phoneField} onKeyDown={(e) => e.stopPropagation()} />
+                          </div>
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                </div>
               </div>
             ))}
-            {partyFields.length === 0 && (
-                <div className="md:col-span-2 text-center py-6 border-2 border-dashed rounded-xl opacity-40">
-                    <p className="text-xs font-bold uppercase tracking-widest">Nenhuma parte contrária registrada.</p>
-                </div>
-            )}
           </div>
         </div>
 
@@ -387,11 +491,11 @@ export function PartiesSection({
           name="description"
           render={({ field }) => (
             <FormItem>
-              <FormLabel className="text-foreground font-bold">Tese Jurídica e Notas Estratégicas</FormLabel>
+              <FormLabel className="text-foreground font-bold">Tese e Notas Estratégicas</FormLabel>
               <FormControl>
                 <Textarea
                   placeholder="Detalhamento estratégico para o advogado responsável..."
-                  className="min-h-[150px] resize-none text-sm bg-background border-2 focus:border-primary/50"
+                  className="min-h-[120px] resize-none text-sm bg-background border-2"
                   onKeyDown={(e) => e.stopPropagation()}
                   {...field}
                 />

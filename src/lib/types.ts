@@ -68,21 +68,36 @@ export type TimelineEvent = {
   authorName: string;
 };
 
+export type OpposingParty = {
+  name: string;
+  email?: string;
+  phone?: string;
+};
+
+export type TeamParticipant = {
+  staffId: string;
+  percentage: number;
+};
+
 export type Process = {
   id: string;
   clientId: string;
   name: string;
   processNumber?: string;
   court?: string;
+  courtAddress?: string;
   courtBranch?: string;
   caseValue?: number;
-  opposingParties?: string[];
+  opposingParties?: OpposingParty[];
   description?: string;
   status: 'Ativo' | 'Arquivado' | 'Pendente';
-  responsibleStaffIds?: string[];
+  legalArea: string;
+  responsibleStaffIds?: string[]; // Legacy compatibility
+  teamParticipants?: TeamParticipant[];
   leadLawyerId?: string;
   defaultLocation?: string;
   driveFolderId?: string;
+  globalDriveFolderId?: string;
   timeline?: TimelineEvent[];
   createdAt: Timestamp;
   updatedAt?: Timestamp;

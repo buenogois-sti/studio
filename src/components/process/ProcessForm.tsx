@@ -10,7 +10,7 @@ import { Form } from '@/components/ui/form';
 import { Button } from '@/components/ui/button';
 import { SheetFooter } from '@/components/ui/sheet';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, serverTimestamp, doc, addDoc, updateDoc, Timestamp } from 'firebase/firestore';
+import { collection, serverTimestamp, doc, addDoc, updateDoc } from 'firebase/firestore';
 import { useToast } from '@/components/ui/use-toast';
 
 import type { Process, Client, Staff } from '@/lib/types';
@@ -25,15 +25,23 @@ const processSchema = z.object({
   clientId: z.string().min(1, 'Selecione um cliente.'),
   name: z.string().min(3, 'Nome do processo é obrigatório.'),
   processNumber: z.string().optional(),
-  court: z.string().optional(),
-  courtBranch: z.string().optional(),
-  caseValue: z.coerce.number().min(0).default(0),
-  opposingParties: z.array(z.object({ name: z.string().min(1, 'Nome da parte é obrigatório') })).default([]),
-  description: z.string().optional(),
   status: z.enum(['Ativo', 'Arquivado', 'Pendente']).default('Ativo'),
-  responsibleStaffIds: z.array(z.string()).default([]),
+  legalArea: z.string().min(1, 'Selecione a área jurídica.'),
+  caseValue: z.coerce.number().min(0).default(0),
+  court: z.string().optional(),
+  courtAddress: z.string().optional(),
+  courtBranch: z.string().optional(),
   leadLawyerId: z.string().min(1, 'Defina o advogado responsável.'),
-  defaultLocation: z.string().optional(),
+  teamParticipants: z.array(z.object({
+    staffId: z.string().min(1),
+    percentage: z.coerce.number().min(0).max(100),
+  })).default([]),
+  opposingParties: z.array(z.object({
+    name: z.string().min(1, 'Nome é obrigatório'),
+    email: z.string().email('E-mail inválido').optional().or(z.literal('')),
+    phone: z.string().optional(),
+  })).default([]),
+  description: z.string().optional(),
 });
 
 export type ProcessFormValues = z.infer<typeof processSchema>;
@@ -64,11 +72,14 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
           name: '',
           processNumber: '',
           status: 'Ativo' as const,
-          opposingParties: [],
-          responsibleStaffIds: [],
-          leadLawyerId: '',
-          defaultLocation: '',
+          legalArea: 'Trabalhista',
           caseValue: 0,
+          court: '',
+          courtAddress: '',
+          courtBranch: '',
+          leadLawyerId: '',
+          teamParticipants: [],
+          opposingParties: [],
           description: '',
         };
       }
@@ -77,11 +88,14 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
         name: process.name || '',
         processNumber: process.processNumber || '',
         status: (process.status as 'Ativo' | 'Arquivado' | 'Pendente') || 'Ativo',
-        opposingParties: process.opposingParties?.map(name => ({ name })) || [],
-        responsibleStaffIds: process.responsibleStaffIds || [],
-        leadLawyerId: process.leadLawyerId || '',
-        defaultLocation: process.defaultLocation || '',
+        legalArea: process.legalArea || 'Trabalhista',
         caseValue: process.caseValue || 0,
+        court: process.court || '',
+        courtAddress: process.courtAddress || '',
+        courtBranch: process.courtBranch || '',
+        leadLawyerId: process.leadLawyerId || '',
+        teamParticipants: process.teamParticipants || [],
+        opposingParties: process.opposingParties || [],
         description: process.description || '',
       };
     }, [process]),
@@ -92,6 +106,11 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
     name: 'opposingParties',
   });
 
+  const { fields: teamFields, append: addMember, remove: removeMember } = useFieldArray({
+    control: form.control,
+    name: 'teamParticipants',
+  });
+
   async function onSubmit(values: ProcessFormValues) {
     if (!firestore) return;
     setIsSaving(true);
@@ -99,7 +118,6 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
     try {
       const data = {
         ...values,
-        opposingParties: values.opposingParties.map(p => p.name),
         updatedAt: serverTimestamp(),
       };
 
@@ -110,7 +128,7 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
       } else {
         const col = collection(firestore, 'processes');
         await addDoc(col, { ...data, createdAt: serverTimestamp() });
-        toast({ title: 'Processo criado!', description: 'O novo caso foi registrado na plataforma.' });
+        toast({ title: 'Processo criado!', description: 'O novo caso foi registrado e será sincronizado com o Drive.' });
       }
       onSave();
     } catch (error: any) {
@@ -141,12 +159,18 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
 
           <CourtSection control={form.control} />
 
-          <TeamSection control={form.control} staff={staff} />
+          <TeamSection 
+            control={form.control} 
+            staff={staff} 
+            teamFields={teamFields}
+            onAddMember={() => addMember({ staffId: '', percentage: 0 })}
+            onRemoveMember={removeMember}
+          />
 
           <PartiesSection
             control={form.control}
             partyFields={partyFields}
-            onAddParty={() => addParty({ name: '' })}
+            onAddParty={() => addParty({ name: '', email: '', phone: '' })}
             onRemoveParty={removeParty}
           />
         </fieldset>
