@@ -27,16 +27,14 @@ export function ClientSearchInput({ onSelect, selectedClientId }: ClientSearchIn
   const inputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
+  // Initialize selected client
   useEffect(() => {
     if (selectedClientId && (!selectedClient || selectedClient.id !== selectedClientId)) {
-      getClientById(selectedClientId)
-        .then(setSelectedClient)
-        .catch((error) => {
-          console.error("Error fetching client:", error);
-        });
+      getClientById(selectedClientId).then(setSelectedClient);
     }
   }, [selectedClientId, selectedClient]);
 
+  // Focus management: Ensure keyboard works inside Sheets/Modals
   useEffect(() => {
     if (open) {
       const timer = setTimeout(() => {
@@ -61,7 +59,7 @@ export function ClientSearchInput({ onSelect, selectedClientId }: ClientSearchIn
         toast({
           variant: 'destructive',
           title: 'Erro na busca',
-          description: error.message,
+          description: 'Não foi possível consultar a base de dados.',
         });
       } finally {
         setIsLoading(false);
@@ -94,7 +92,7 @@ export function ClientSearchInput({ onSelect, selectedClientId }: ClientSearchIn
               <span className="truncate font-bold">
                 {selectedClient.firstName} {selectedClient.lastName}
               </span>
-              <Badge variant="secondary" className="text-[9px] font-mono shrink-0 hidden sm:inline px-1.5 h-4">
+              <Badge variant="secondary" className="text-[9px] font-mono shrink-0 px-1.5 h-4">
                 {selectedClient.document}
               </Badge>
             </div>
@@ -109,83 +107,80 @@ export function ClientSearchInput({ onSelect, selectedClientId }: ClientSearchIn
         className="w-[var(--radix-popover-trigger-width)] p-0 z-[100]" 
         align="start"
         onOpenAutoFocus={(e) => e.preventDefault()}
-        onKeyDown={(e) => e.stopPropagation()}
       >
-        <div className="flex flex-col bg-popover border shadow-2xl rounded-xl overflow-hidden">
+        <div 
+          className="flex flex-col bg-popover border shadow-2xl rounded-xl overflow-hidden"
+          onKeyDown={(e) => e.stopPropagation()} // BLOCK Sheet from stealing keyboard events
+        >
           <div className="flex items-center border-b px-3 bg-muted/10">
             <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
             <Input
               ref={inputRef}
-              placeholder="Digite o nome ou documento..."
+              placeholder="Digite para buscar..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => e.stopPropagation()}
               className="border-none focus-visible:ring-0 focus-visible:ring-offset-0 h-11 bg-transparent"
               autoComplete="off"
             />
           </div>
 
           <ScrollArea className="max-h-[350px] overflow-y-auto">
-            {isLoading && (
-              <div className="p-6 text-center text-xs text-muted-foreground flex flex-col items-center gap-2">
+            {isLoading ? (
+              <div className="p-8 text-center flex flex-col items-center gap-2">
                 <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                <span>Buscando na base de dados...</span>
+                <span className="text-xs text-muted-foreground font-medium">Buscando na base...</span>
               </div>
-            )}
-
-            {!isLoading && search.length >= 2 && results.length === 0 && (
+            ) : search.length >= 2 && results.length === 0 ? (
               <div className="p-8 text-center text-sm text-muted-foreground italic">
                 Nenhum cliente encontrado.
               </div>
-            )}
-
-            {search.length < 2 && !isLoading && (
-              <div className="p-6 text-center text-[10px] uppercase font-black tracking-widest text-muted-foreground/50">
-                Aguardando digitação...
+            ) : search.length < 2 ? (
+              <div className="p-6 text-center text-[10px] uppercase font-black tracking-widest text-muted-foreground/40">
+                Digite Nome ou CPF/CNPJ
+              </div>
+            ) : (
+              <div className="p-1.5">
+                {results.map((client) => (
+                  <button
+                    key={client.id}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()} // Keep focus on input while clicking
+                    onClick={() => handleSelect(client)}
+                    className={cn(
+                      'flex items-center gap-3 w-full px-3 py-2.5 text-sm rounded-lg transition-all text-left group',
+                      'hover:bg-primary/5 cursor-pointer',
+                      selectedClientId === client.id && 'bg-primary/10 border border-primary/20'
+                    )}
+                  >
+                    <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors relative overflow-hidden">
+                      {client.avatar ? (
+                          <img src={client.avatar} className="object-cover w-full h-full" alt="" />
+                      ) : (
+                          <User className="h-5 w-5 text-muted-foreground group-hover:text-primary" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <span className="block truncate font-bold group-hover:text-primary transition-colors leading-tight">
+                        {client.firstName} {client.lastName}
+                      </span>
+                      <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-[10px] text-muted-foreground font-mono uppercase tracking-tighter">
+                            {client.document}
+                          </span>
+                          {client.legalArea && (
+                              <Badge variant="secondary" className="text-[8px] h-3.5 px-1 uppercase leading-none border-none bg-primary/5 text-primary">
+                                  {client.legalArea}
+                              </Badge>
+                          )}
+                      </div>
+                    </div>
+                    {selectedClientId === client.id && (
+                      <Check className="ml-2 h-4 w-4 shrink-0 text-primary" />
+                    )}
+                  </button>
+                ))}
               </div>
             )}
-
-            <div className="p-1.5">
-              {results.map((client) => (
-                <button
-                  key={client.id}
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => handleSelect(client)}
-                  className={cn(
-                    'flex items-center gap-3 w-full px-3 py-2.5 text-sm rounded-lg transition-all text-left group',
-                    'hover:bg-primary/5 cursor-pointer',
-                    selectedClientId === client.id && 'bg-primary/10 border border-primary/20'
-                  )}
-                >
-                  <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors relative overflow-hidden">
-                    {client.avatar ? (
-                        <img src={client.avatar} className="object-cover w-full h-full" alt="" />
-                    ) : (
-                        <User className="h-5 w-5 text-muted-foreground group-hover:text-primary" />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <span className="block truncate font-bold group-hover:text-primary transition-colors leading-tight">
-                      {client.firstName} {client.lastName}
-                    </span>
-                    <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-[10px] text-muted-foreground font-mono uppercase tracking-tighter">
-                          {client.document}
-                        </span>
-                        {client.legalArea && (
-                            <Badge variant="secondary" className="text-[8px] h-3.5 px-1 uppercase leading-none border-none bg-primary/5 text-primary">
-                                <Briefcase className="h-2 w-2 mr-1" /> {client.legalArea}
-                            </Badge>
-                        )}
-                    </div>
-                  </div>
-                  {selectedClientId === client.id && (
-                    <Check className="ml-2 h-4 w-4 shrink-0 text-primary" />
-                  )}
-                </button>
-              ))}
-            </div>
           </ScrollArea>
         </div>
       </PopoverContent>
