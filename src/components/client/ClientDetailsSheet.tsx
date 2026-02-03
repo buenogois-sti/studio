@@ -24,7 +24,8 @@ import {
   Smartphone,
   Hash,
   ShieldCheck,
-  AlertCircle
+  AlertCircle,
+  MessageSquare
 } from 'lucide-react';
 import type { Client } from '@/lib/types';
 import { useToast } from '@/components/ui/use-toast';
@@ -65,6 +66,15 @@ export function ClientDetailsSheet({ client, open, onOpenChange }: ClientDetails
     } catch (e) {
       return 'Data inválida';
     }
+  };
+
+  const copyToClipboard = (text: string, label: string) => {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    toast({
+      title: "Copiado!",
+      description: `${label} copiado para a área de transferência.`,
+    });
   };
 
   const handleCopyAll = () => {
@@ -113,15 +123,87 @@ Gerado em: ${format(new Date(), "dd/MM/yyyy HH:mm")}
     window.print();
   };
 
-  const InfoRow = ({ icon: Icon, label, value, className = "" }: { icon: any, label: string, value?: string, className?: string }) => (
-    <div className={`flex items-start gap-3 py-2 ${className}`}>
-      <Icon className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-      <div className="flex flex-col">
-        <span className="text-[10px] uppercase font-black text-muted-foreground leading-none mb-1 tracking-widest">{label}</span>
-        <span className={cn("text-sm font-medium", !value && "text-muted-foreground italic font-normal")}>{value || 'Pendente'}</span>
-      </div>
-    </div>
-  );
+  const InfoRow = ({ 
+    icon: Icon, 
+    label, 
+    value, 
+    className = "", 
+    actionType,
+    copyValue 
+  }: { 
+    icon: any, 
+    label: string, 
+    value?: string, 
+    className?: string,
+    actionType?: 'email' | 'phone' | 'whatsapp' | 'copy',
+    copyValue?: string
+  }) => {
+    const isInteractive = !!value && !!actionType;
+    
+    const getHref = () => {
+        if (!value) return undefined;
+        const cleanValue = value.replace(/\D/g, '');
+        switch(actionType) {
+            case 'email': return `mailto:${value}`;
+            case 'phone': return `tel:${cleanValue}`;
+            case 'whatsapp': return `https://wa.me/${cleanValue}`;
+            default: return undefined;
+        }
+    };
+
+    const href = getHref();
+
+    const Content = () => (
+        <div className="flex flex-col text-left">
+            <span className="text-[10px] uppercase font-black text-muted-foreground leading-none mb-1 tracking-widest">{label}</span>
+            <span className={cn(
+                "text-sm font-medium", 
+                !value && "text-muted-foreground italic font-normal",
+                isInteractive && "group-hover:text-primary transition-colors"
+            )}>
+                {value || 'Não informado'}
+            </span>
+        </div>
+    );
+
+    return (
+        <div className={cn(
+            "flex items-start gap-3 py-2 group transition-all rounded-lg",
+            isInteractive && "cursor-pointer hover:bg-muted/50 -mx-2 px-2",
+            className
+        )}
+        onClick={() => {
+            if (actionType === 'copy' && value) {
+                copyToClipboard(copyValue || value, label);
+            }
+        }}
+        >
+            <div className={cn(
+                "mt-0.5 shrink-0 transition-transform",
+                isInteractive && "group-hover:scale-110"
+            )}>
+                <Icon className="h-4 w-4 text-muted-foreground" />
+            </div>
+            
+            {href ? (
+                <a href={href} target={actionType === 'whatsapp' ? '_blank' : undefined} className="flex-1">
+                    <Content />
+                </a>
+            ) : (
+                <div className="flex-1">
+                    <Content />
+                </div>
+            )}
+
+            {isInteractive && actionType === 'copy' && (
+                <Copy className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity ml-auto self-center" />
+            )}
+            {isInteractive && actionType === 'whatsapp' && (
+                <MessageSquare className="h-3 w-3 text-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity ml-auto self-center" />
+            )}
+        </div>
+    );
+  };
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -138,7 +220,7 @@ Gerado em: ${format(new Date(), "dd/MM/yyyy HH:mm")}
                 <SheetTitle className="text-2xl font-headline font-bold">{client.firstName} {client.lastName}</SheetTitle>
                 <div className="flex items-center gap-2 mt-1">
                     <Progress value={integrity} className="h-1.5 w-24" />
-                    <span className="text-[10px] font-black text-muted-foreground uppercase">{integrity}% Integritade</span>
+                    <span className="text-[10px] font-black text-muted-foreground uppercase">{integrity}% Integridade</span>
                 </div>
             </div>
             <div className="flex gap-2 shrink-0">
@@ -172,15 +254,15 @@ Gerado em: ${format(new Date(), "dd/MM/yyyy HH:mm")}
                 </div>
                 <h3 className="font-black text-xs uppercase tracking-widest text-muted-foreground">Dados Pessoais</h3>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 bg-muted/20 p-6 rounded-2xl border border-border/50">
-                <InfoRow icon={Hash} label="Documento Principal" value={client.document} />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 bg-muted/20 p-6 rounded-2xl border border-border/50">
+                <InfoRow icon={Hash} label="Documento Principal" value={client.document} actionType="copy" />
                 <InfoRow icon={FileText} label="Tipo de Cliente" value={client.clientType} />
-                <InfoRow icon={FileText} label="RG" value={client.rg} />
+                <InfoRow icon={FileText} label="RG" value={client.rg} actionType="copy" />
                 <InfoRow icon={Briefcase} label="Área Jurídica" value={client.legalArea} />
                 <InfoRow icon={User} label="Nome da Mãe" value={client.motherName} className="col-span-1 sm:col-span-2" />
                 <div className="grid grid-cols-2 gap-4 col-span-1 sm:col-span-2">
-                    <InfoRow icon={FileText} label="CTPS" value={client.ctps} />
-                    <InfoRow icon={FileText} label="PIS/PASEP" value={client.pis} />
+                    <InfoRow icon={FileText} label="CTPS" value={client.ctps} actionType="copy" />
+                    <InfoRow icon={FileText} label="PIS/PASEP" value={client.pis} actionType="copy" />
                 </div>
             </div>
           </section>
@@ -193,11 +275,11 @@ Gerado em: ${format(new Date(), "dd/MM/yyyy HH:mm")}
                 </div>
                 <h3 className="font-black text-xs uppercase tracking-widest text-muted-foreground">Canais de Contato</h3>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 bg-muted/20 p-6 rounded-2xl border border-border/50">
-                <InfoRow icon={AtSign} label="E-mail" value={client.email} className="col-span-1 sm:col-span-2" />
-                <InfoRow icon={Smartphone} label="Celular / WhatsApp" value={client.mobile} />
-                <InfoRow icon={Phone} label="Telefone Fixo" value={client.phone} />
-                <InfoRow icon={Smartphone} label="Contato Emergência" value={client.emergencyContact} className="col-span-1 sm:col-span-2" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 bg-muted/20 p-6 rounded-2xl border border-border/50">
+                <InfoRow icon={AtSign} label="E-mail" value={client.email} actionType="email" className="col-span-1 sm:col-span-2" />
+                <InfoRow icon={Smartphone} label="Celular / WhatsApp" value={client.mobile} actionType="whatsapp" />
+                <InfoRow icon={Phone} label="Telefone Fixo" value={client.phone} actionType="phone" />
+                <InfoRow icon={Smartphone} label="Contato Emergência" value={client.emergencyContact} actionType="phone" className="col-span-1 sm:col-span-2" />
             </div>
           </section>
 
@@ -209,12 +291,18 @@ Gerado em: ${format(new Date(), "dd/MM/yyyy HH:mm")}
                 </div>
                 <h3 className="font-black text-xs uppercase tracking-widest text-muted-foreground">Endereço Residencial</h3>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 bg-muted/20 p-6 rounded-2xl border border-border/50">
-                <InfoRow icon={MapPin} label="Logradouro" value={client.address?.street ? `${client.address.street}, ${client.address.number || 'S/N'}` : undefined} className="col-span-1 sm:col-span-2" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 bg-muted/20 p-6 rounded-2xl border border-border/50">
+                <InfoRow 
+                    icon={MapPin} 
+                    label="Logradouro" 
+                    value={client.address?.street ? `${client.address.street}, ${client.address.number || 'S/N'}` : undefined} 
+                    actionType="copy"
+                    className="col-span-1 sm:col-span-2" 
+                />
                 <InfoRow icon={MapPin} label="Complemento" value={client.address?.complement} />
                 <InfoRow icon={MapPin} label="Bairro" value={client.address?.neighborhood} />
                 <InfoRow icon={MapPin} label="Cidade / UF" value={client.address?.city ? `${client.address.city} - ${client.address.state || ''}` : undefined} />
-                <InfoRow icon={Hash} label="CEP" value={client.address?.zipCode} />
+                <InfoRow icon={Hash} label="CEP" value={client.address?.zipCode} actionType="copy" />
             </div>
           </section>
 
@@ -226,10 +314,10 @@ Gerado em: ${format(new Date(), "dd/MM/yyyy HH:mm")}
                 </div>
                 <h3 className="font-black text-xs uppercase tracking-widest text-muted-foreground">Dados Financeiros</h3>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 bg-muted/20 p-6 rounded-2xl border border-border/50">
-                <InfoRow icon={CreditCard} label="Banco" value={client.bankInfo?.bankName} />
-                <InfoRow icon={CreditCard} label="Agência / Conta" value={client.bankInfo?.agency ? `${client.bankInfo.agency} / ${client.bankInfo.account || ''}` : undefined} />
-                <InfoRow icon={Smartphone} label="Chave PIX" value={client.bankInfo?.pixKey} className="col-span-1 sm:col-span-2" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 bg-muted/20 p-6 rounded-2xl border border-border/50">
+                <InfoRow icon={CreditCard} label="Banco" value={client.bankInfo?.bankName} actionType="copy" />
+                <InfoRow icon={CreditCard} label="Agência / Conta" value={client.bankInfo?.agency ? `${client.bankInfo.agency} / ${client.bankInfo.account || ''}` : undefined} actionType="copy" />
+                <InfoRow icon={Smartphone} label="Chave PIX" value={client.bankInfo?.pixKey} actionType="copy" className="col-span-1 sm:col-span-2" />
             </div>
           </section>
 

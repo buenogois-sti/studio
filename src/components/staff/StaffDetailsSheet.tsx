@@ -24,13 +24,15 @@ import {
   Hash,
   ShieldCheck,
   AlertCircle,
-  GraduationCap
+  GraduationCap,
+  MessageSquare
 } from 'lucide-react';
 import type { Staff, Process } from '@/lib/types';
 import { useToast } from '@/components/ui/use-toast';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { Badge } from '../ui/badge';
 
 interface StaffDetailsSheetProps {
   staff: Staff | null;
@@ -61,6 +63,15 @@ export function StaffDetailsSheet({ staff, processes, open, onOpenChange }: Staf
     } catch (e) {
       return 'Data inválida';
     }
+  };
+
+  const copyToClipboard = (text: string, label: string) => {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    toast({
+      title: "Copiado!",
+      description: `${label} copiado para a área de transferência.`,
+    });
   };
 
   const handleCopyAll = () => {
@@ -95,15 +106,87 @@ Gerado em: ${format(new Date(), "dd/MM/yyyy HH:mm")}
     });
   };
 
-  const InfoRow = ({ icon: Icon, label, value, className = "" }: { icon: any, label: string, value?: string, className?: string }) => (
-    <div className={`flex items-start gap-3 py-2 ${className}`}>
-      <Icon className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-      <div className="flex flex-col">
-        <span className="text-[10px] uppercase font-black text-muted-foreground leading-none mb-1 tracking-widest">{label}</span>
-        <span className={cn("text-sm font-medium", !value && "text-muted-foreground italic font-normal")}>{value || 'Não informado'}</span>
-      </div>
-    </div>
-  );
+  const InfoRow = ({ 
+    icon: Icon, 
+    label, 
+    value, 
+    className = "",
+    actionType,
+    copyValue
+  }: { 
+    icon: any, 
+    label: string, 
+    value?: string, 
+    className?: string,
+    actionType?: 'email' | 'phone' | 'whatsapp' | 'copy',
+    copyValue?: string
+  }) => {
+    const isInteractive = !!value && !!actionType;
+
+    const getHref = () => {
+        if (!value) return undefined;
+        const cleanValue = value.replace(/\D/g, '');
+        switch(actionType) {
+            case 'email': return `mailto:${value}`;
+            case 'phone': return `tel:${cleanValue}`;
+            case 'whatsapp': return `https://wa.me/${cleanValue}`;
+            default: return undefined;
+        }
+    };
+
+    const href = getHref();
+
+    const Content = () => (
+        <div className="flex flex-col text-left">
+            <span className="text-[10px] uppercase font-black text-muted-foreground leading-none mb-1 tracking-widest">{label}</span>
+            <span className={cn(
+                "text-sm font-medium break-all", 
+                !value && "text-muted-foreground italic font-normal",
+                isInteractive && "group-hover:text-primary transition-colors"
+            )}>
+                {value || 'Não informado'}
+            </span>
+        </div>
+    );
+
+    return (
+        <div className={cn(
+            "flex items-start gap-3 py-2 group transition-all rounded-lg",
+            isInteractive && "cursor-pointer hover:bg-muted/50 -mx-2 px-2",
+            className
+        )}
+        onClick={() => {
+            if (actionType === 'copy' && value) {
+                copyToClipboard(copyValue || value, label);
+            }
+        }}
+        >
+            <div className={cn(
+                "mt-0.5 shrink-0 transition-transform",
+                isInteractive && "group-hover:scale-110"
+            )}>
+                <Icon className="h-4 w-4 text-muted-foreground" />
+            </div>
+            
+            {href ? (
+                <a href={href} target={actionType === 'whatsapp' ? '_blank' : undefined} className="flex-1">
+                    <Content />
+                </a>
+            ) : (
+                <div className="flex-1">
+                    <Content />
+                </div>
+            )}
+
+            {isInteractive && actionType === 'copy' && (
+                <Copy className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity ml-auto self-center" />
+            )}
+            {isInteractive && actionType === 'whatsapp' && (
+                <MessageSquare className="h-3 w-3 text-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity ml-auto self-center" />
+            )}
+        </div>
+    );
+  };
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -152,10 +235,10 @@ Gerado em: ${format(new Date(), "dd/MM/yyyy HH:mm")}
                 </div>
                 <h3 className="font-black text-xs uppercase tracking-widest text-muted-foreground">Dados Profissionais</h3>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 bg-muted/20 p-6 rounded-2xl border border-border/50">
-                <InfoRow icon={Hash} label="Nº da OAB" value={staff.oabNumber} />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 bg-muted/20 p-6 rounded-2xl border border-border/50">
+                <InfoRow icon={Hash} label="Nº da OAB" value={staff.oabNumber} actionType="copy" />
                 <InfoRow icon={AlertCircle} label="Situação OAB" value={staff.oabStatus} />
-                <InfoRow icon={AtSign} label="E-mail Corporativo" value={staff.email} className="col-span-1 sm:col-span-2" />
+                <InfoRow icon={AtSign} label="E-mail Corporativo" value={staff.email} actionType="email" className="col-span-1 sm:col-span-2" />
             </div>
           </section>
 
@@ -167,10 +250,10 @@ Gerado em: ${format(new Date(), "dd/MM/yyyy HH:mm")}
                 </div>
                 <h3 className="font-black text-xs uppercase tracking-widest text-muted-foreground">Canais de Contato</h3>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 bg-muted/20 p-6 rounded-2xl border border-border/50">
-                <InfoRow icon={Smartphone} label="WhatsApp / Celular" value={staff.whatsapp} />
-                <InfoRow icon={Phone} label="Telefone Fixo" value={staff.phone} />
-                <InfoRow icon={MapPin} label="Endereço" value={staff.address?.street} className="col-span-1 sm:col-span-2" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 bg-muted/20 p-6 rounded-2xl border border-border/50">
+                <InfoRow icon={Smartphone} label="WhatsApp / Celular" value={staff.whatsapp} actionType="whatsapp" />
+                <InfoRow icon={Phone} label="Telefone Fixo" value={staff.phone} actionType="phone" />
+                <InfoRow icon={MapPin} label="Endereço" value={staff.address?.street} actionType="copy" className="col-span-1 sm:col-span-2" />
             </div>
           </section>
 
@@ -182,10 +265,16 @@ Gerado em: ${format(new Date(), "dd/MM/yyyy HH:mm")}
                 </div>
                 <h3 className="font-black text-xs uppercase tracking-widest text-muted-foreground">Dados Bancários para Repasse</h3>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 bg-muted/20 p-6 rounded-2xl border border-border/50">
-                <InfoRow icon={CreditCard} label="Banco" value={staff.bankInfo?.bankName} />
-                <InfoRow icon={CreditCard} label="Agência / Conta" value={staff.bankInfo?.agency ? `${staff.bankInfo.agency} / ${staff.bankInfo.account || ''}` : undefined} />
-                <InfoRow icon={Smartphone} label="Chave PIX" value={staff.bankInfo?.pixKey} className="col-span-1 sm:col-span-2" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 bg-muted/20 p-6 rounded-2xl border border-border/50">
+                <InfoRow icon={CreditCard} label="Banco" value={staff.bankInfo?.bankName} actionType="copy" />
+                <InfoRow 
+                    icon={CreditCard} 
+                    label="Agência / Conta" 
+                    value={staff.bankInfo?.agency ? `${staff.bankInfo.agency} / ${staff.bankInfo.account || ''}` : undefined} 
+                    copyValue={staff.bankInfo?.agency ? `${staff.bankInfo.agency} ${staff.bankInfo.account || ''}` : undefined}
+                    actionType="copy" 
+                />
+                <InfoRow icon={Smartphone} label="Chave PIX" value={staff.bankInfo?.pixKey} actionType="copy" className="col-span-1 sm:col-span-2" />
             </div>
           </section>
 
@@ -203,5 +292,3 @@ Gerado em: ${format(new Date(), "dd/MM/yyyy HH:mm")}
     </Sheet>
   );
 }
-
-import { Badge } from '../ui/badge';
