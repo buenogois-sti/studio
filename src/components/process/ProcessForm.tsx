@@ -127,9 +127,6 @@ function ClientSearch({ onSelect, selectedClientId }: { onSelect: (client: Clien
               placeholder="Digite nome ou documento..." 
               value={search} 
               onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => {
-                e.stopPropagation();
-              }}
               className="border-none focus-visible:ring-0 focus-visible:ring-offset-0 h-11 bg-transparent"
             />
           </div>
