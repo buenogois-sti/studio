@@ -3,23 +3,19 @@
 import React from 'react';
 import { 
   Building, 
-  User, 
   Plus, 
   Trash2, 
   ShieldCheck, 
   Users, 
-  Mail, 
-  Phone, 
   Percent,
   UserPlus,
   Scale,
-  Sparkles,
-  Search,
   LayoutGrid,
   AtSign,
-  Smartphone
+  Smartphone,
+  Sparkles
 } from 'lucide-react';
-import { Control, FieldArrayWithId, useFieldArray } from 'react-hook-form';
+import { Control, useFieldArray } from 'react-hook-form';
 
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
@@ -31,13 +27,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { LocationSearch } from '@/components/shared/LocationSearch';
 import { ClientSearchInput } from './ClientSearchInput';
-import { cn } from '@/lib/utils';
 import type { Client, Staff } from '@/lib/types';
-import type { ProcessFormValues } from './ProcessForm';
+import type { ProcessFormValues } from '@/hooks/use-process-form';
 
 interface SectionHeaderProps {
   icon: React.ReactNode;
@@ -136,7 +130,7 @@ export function ClientsSection({ control, onClientSelect }: ClientsSectionProps)
 // STEP 2: DEFENDANTS
 interface PartiesSectionProps {
   control: Control<ProcessFormValues>;
-  partyFields: FieldArrayWithId<ProcessFormValues, "opposingParties", "id">[];
+  partyFields: any[];
   onAddParty: () => void;
   onRemoveParty: (index: number) => void;
 }
@@ -407,7 +401,7 @@ export function CourtSection({ control }: { control: Control<ProcessFormValues> 
 interface TeamSectionProps {
   control: Control<ProcessFormValues>;
   staff: Staff[];
-  teamFields: FieldArrayWithId<ProcessFormValues, "teamParticipants", "id">[];
+  teamFields: any[];
   onAddMember: () => void;
   onRemoveMember: (index: number) => void;
 }
