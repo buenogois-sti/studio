@@ -21,440 +21,25 @@ import { useSearchParams } from 'next/navigation';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from '@/components/ui/card';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-  DropdownMenuSub,
-  DropdownMenuSubTrigger,
-  DropdownMenuSubContent,
-} from '@/components/ui/dropdown-menu';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-  SheetFooter,
-} from '@/components/ui/sheet';
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-  CommandSeparator,
-} from '@/components/ui/command';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { H2 } from '@/components/ui/typography';
-import { Textarea } from '@/components/ui/textarea';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
-import {
-  collection,
-  serverTimestamp,
-  Timestamp,
-  doc,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-} from 'firebase/firestore';
+import { collection, serverTimestamp, Timestamp, doc, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import type { Process, Client, DocumentTemplate } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/use-toast';
-import { searchClients, getClientById } from '@/lib/client-actions';
-import { ClientForm } from '@/components/client/ClientForm';
 import { syncProcessToDrive } from '@/lib/drive';
 import { FinancialEventDialog } from '@/components/process/FinancialEventDialog';
 import { ProcessTimelineSheet } from '@/components/process/ProcessTimelineSheet';
-
-const processSchema = z.object({
-  clientId: z.string().min(1, { message: 'Selecione um cliente.' }),
-  name: z.string().min(3, { message: 'O nome do processo é obrigatório.' }),
-  processNumber: z.string().optional(),
-  court: z.string().optional(),
-  courtBranch: z.string().optional(),
-  caseValue: z.coerce.number().optional(),
-  opposingParties: z
-    .array(z.object({ value: z.string().min(1, { message: 'O nome não pode ser vazio.' }) }))
-    .optional(),
-  description: z.string().optional(),
-  status: z.enum(['Ativo', 'Arquivado', 'Pendente']),
-});
-
-function ClientSearch({
-  onSelect,
-  onAddNew,
-}: {
-  onSelect: (client: Client) => void;
-  onAddNew: () => void;
-}) {
-  const [search, setSearch] = React.useState('');
-  const [results, setResults] = React.useState<Client[]>([]);
-  const [isLoading, setIsLoading] = React.useState(false);
-  const { toast } = useToast();
-
-  React.useEffect(() => {
-    if (search.length < 2) {
-      setResults([]);
-      return;
-    }
-    const timer = setTimeout(async () => {
-      setIsLoading(true);
-      try {
-        const clients = await searchClients(search);
-        setResults(clients);
-      } catch (error: any) {
-        toast({
-          variant: 'destructive',
-          title: 'Erro ao Buscar Clientes',
-          description: error.message || 'Não foi possível completar a busca.',
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [search, toast]);
-
-  return (
-    <Command className="rounded-lg border bg-background shadow-sm">
-      <CommandInput
-        placeholder="Buscar cliente por nome ou CPF..."
-        value={search}
-        onValueChange={setSearch}
-      />
-      <CommandList>
-        {isLoading && <CommandEmpty>Buscando...</CommandEmpty>}
-        {!isLoading && !results.length && search.length > 1 && (
-          <CommandEmpty>Nenhum cliente encontrado.</CommandEmpty>
-        )}
-        <CommandGroup>
-          {results.map((client) => (
-            <CommandItem
-              key={client.id}
-              value={`${client.firstName} ${client.lastName} ${client.document}`}
-              onSelect={() => onSelect(client)}
-            >
-              <div className="flex flex-col">
-                <span>{client.firstName} {client.lastName}</span>
-                <span className="text-xs text-muted-foreground">{client.document}</span>
-              </div>
-            </CommandItem>
-          ))}
-        </CommandGroup>
-        <CommandSeparator />
-        <CommandGroup>
-          <CommandItem onSelect={onAddNew} className="text-primary cursor-pointer">
-            <PlusCircle className="mr-2 h-4 w-4" />
-            Cadastrar novo cliente
-          </CommandItem>
-        </CommandGroup>
-      </CommandList>
-    </Command>
-  );
-}
-
-function ProcessForm({
-  onSave,
-  process,
-}: {
-  onSave: () => void;
-  process?: Process | null;
-}) {
-  const { firestore } = useFirebase();
-  const { toast } = useToast();
-  const { data: session } = useSession();
-  const [isSaving, setIsSaving] = React.useState(false);
-  const [isClientSheetOpen, setIsClientSheetOpen] = React.useState(false);
-
-  const form = useForm<z.infer<typeof processSchema>>({
-    resolver: zodResolver(processSchema),
-    defaultValues: process
-      ? {
-          ...process,
-          caseValue: process.caseValue ?? undefined,
-          opposingParties: process.opposingParties?.map((p) => ({ value: p })) ?? [],
-        }
-      : {
-          clientId: '',
-          name: '',
-          processNumber: '',
-          court: '',
-          courtBranch: '',
-          caseValue: undefined,
-          opposingParties: [],
-          description: '',
-          status: 'Pendente',
-        },
-  });
-
-  const { fields, append, remove } = useFieldArray({
-    control: form.control,
-    name: 'opposingParties',
-  });
-  const [newParty, setNewParty] = React.useState('');
-  const [selectedClient, setSelectedClient] = React.useState<Client | null>(null);
-
-  React.useEffect(() => {
-    if (process?.clientId && !selectedClient) {
-      const fetchClient = async () => {
-        try {
-          const client = await getClientById(process.clientId);
-          if (client) {
-            setSelectedClient(client);
-            form.setValue('clientId', client.id);
-          }
-        } catch (error: any) {
-          console.error("Failed to fetch client for process:", error);
-        }
-      };
-      fetchClient();
-    }
-  }, [process, form, selectedClient]);
-
-  const handleNewClientSaved = (newClient: Client) => {
-    setSelectedClient(newClient);
-    form.setValue('clientId', newClient.id);
-    setIsClientSheetOpen(false);
-  };
-
-  async function onSubmit(values: z.infer<typeof processSchema>) {
-    if (!firestore) return;
-    setIsSaving(true);
-
-    try {
-      const processData = {
-        ...values,
-        opposingParties: values.opposingParties?.map((p) => p.value),
-      };
-
-      let processId = process?.id;
-
-      if (processId) {
-        await updateDoc(doc(firestore, 'processes', processId), {
-          ...processData,
-          updatedAt: serverTimestamp(),
-        });
-        toast({ title: 'Processo atualizado!' });
-      } else {
-        const docRef = await addDoc(collection(firestore, 'processes'), {
-          ...processData,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-          timeline: [{
-            id: 'init',
-            type: 'system',
-            description: 'Processo cadastrado no sistema.',
-            date: Timestamp.now(),
-            authorName: 'Sistema'
-          }]
-        });
-        processId = docRef.id;
-        toast({ title: 'Processo cadastrado!' });
-
-        // Auto-sync with Drive if client is synced
-        if (selectedClient?.driveFolderId && session) {
-            try {
-                await syncProcessToDrive(processId);
-                toast({ title: "Drive Sincronizado!", description: `Estrutura de pastas criada no Drive.` });
-            } catch (e) {
-                console.warn("Drive auto-sync failed:", e);
-            }
-        }
-      }
-      onSave();
-    } catch (error: any) {
-      toast({ variant: 'destructive', title: 'Erro ao Salvar', description: error.message });
-    } finally {
-      setIsSaving(false);
-    }
-  }
-
-  return (
-    <>
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-          <ScrollArea className="h-[calc(100vh-10rem)] p-4">
-            <div className="space-y-8">
-              <section>
-                <H2>1. Cliente do Processo</H2>
-                 <div className="mt-4">
-                  {selectedClient ? (
-                    <div className="flex items-center gap-4 rounded-lg border bg-card p-4">
-                      <div className="flex-grow">
-                        <p className="font-semibold">{`${selectedClient.firstName} ${selectedClient.lastName}`}</p>
-                        <p className="text-sm text-muted-foreground">{selectedClient.document}</p>
-                      </div>
-                      <Button variant="outline" onClick={() => {
-                        setSelectedClient(null);
-                        form.setValue('clientId', '', { shouldValidate: true });
-                      }}>Alterar</Button>
-                    </div>
-                  ) : (
-                    <FormField
-                      control={form.control}
-                      name="clientId"
-                      render={({ field }) => (
-                        <FormItem>
-                          <ClientSearch
-                            onSelect={(client) => {
-                              setSelectedClient(client);
-                              field.onChange(client.id);
-                            }}
-                            onAddNew={() => setIsClientSheetOpen(true)}
-                          />
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  )}
-                </div>
-              </section>
-
-              <section>
-                <H2>2. Dados do Processo</H2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
-                  <FormField
-                    control={form.control}
-                    name="name"
-                    render={({ field }) => (
-                      <FormItem className="md:col-span-2">
-                        <FormLabel>Nome do Processo *</FormLabel>
-                        <FormControl><Input placeholder="Ex: Reclamação Trabalhista vs Empresa X" {...field} /></FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="status"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Status *</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
-                          <SelectContent>
-                            <SelectItem value="Pendente">Pendente</SelectItem>
-                            <SelectItem value="Ativo">Ativo</SelectItem>
-                            <SelectItem value="Arquivado">Arquivado</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="processNumber"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Nº do Processo</FormLabel>
-                        <FormControl><Input placeholder="0000000-00.0000.0.00.0000" {...field} /></FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              </section>
-              
-              <section>
-                <H2>3. Parte Contrária</H2>
-                <div className="space-y-2 mt-4">
-                  {fields.map((field, index) => (
-                    <div key={field.id} className="flex items-center gap-2">
-                      <FormField
-                        control={form.control}
-                        name={`opposingParties.${index}.value`}
-                        render={({ field }) => (
-                          <FormItem className="flex-1">
-                            <FormControl><Input placeholder="Nome da parte" {...field} /></FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)}>
-                        <X className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                  ))}
-                  <div className="flex items-center gap-2 pt-2">
-                    <Input placeholder="Adicionar parte..." value={newParty} onChange={(e) => setNewParty(e.target.value)} />
-                    <Button type="button" onClick={() => { if (newParty.trim()) { append({ value: newParty.trim() }); setNewParty(''); } }}>Adicionar</Button>
-                  </div>
-                </div>
-              </section>
-            </div>
-          </ScrollArea>
-          <SheetFooter className="pt-4 pr-4">
-            <Button type="button" variant="outline" onClick={onSave} disabled={isSaving}>Cancelar</Button>
-            <Button type="submit" disabled={isSaving}>
-              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isSaving ? 'Salvando...' : 'Salvar Processo'}
-            </Button>
-          </SheetFooter>
-        </form>
-      </Form>
-
-      <Sheet open={isClientSheetOpen} onOpenChange={setIsClientSheetOpen}>
-        <SheetContent className="w-full sm:max-w-2xl">
-          <SheetHeader>
-            <SheetTitle>Adicionar Novo Cliente</SheetTitle>
-            <SheetDescription>O cliente será selecionado automaticamente após o cadastro.</SheetDescription>
-          </SheetHeader>
-          <ScrollArea className="h-[calc(100vh-8rem)]">
-            <ClientForm onSave={() => setIsClientSheetOpen(false)} onSaveSuccess={handleNewClientSaved} />
-          </ScrollArea>
-        </SheetContent>
-      </Sheet>
-    </>
-  );
-}
 
 export default function ProcessosPage() {
   const [isSheetOpen, setIsSheetOpen] = React.useState(false);
@@ -463,106 +48,29 @@ export default function ProcessosPage() {
   const [selectedProcessForTimeline, setSelectedProcessForTimeline] = React.useState<Process | null>(null);
   const [processToDelete, setProcessToDelete] = React.useState<Process | null>(null);
   const [isDeleting, setIsDeleting] = React.useState(false);
-  const [isSyncing, setIsSyncing] = React.useState<string | null>(null);
-  const [isGeneratingDoc, setIsGeneratingDoc] = React.useState<string | null>(null);
-  const [eventProcess, setEventProcess] = React.useState<Process | null>(null);
-  const [statusFilter, setStatusFilter] = React.useState<string>('all');
-  
-  const searchParams = useSearchParams();
   const [searchTerm, setSearchTerm] = React.useState('');
-  const [clientFilterName, setClientFilterName] = React.useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = React.useState('all');
+  const [eventProcess, setEventProcess] = React.useState<Process | null>(null);
 
   const { firestore, isUserLoading } = useFirebase();
   const { data: session } = useSession();
   const { toast } = useToast();
 
-  const processesQuery = useMemoFirebase(
-    () => (firestore ? collection(firestore, 'processes') : null),
-    [firestore]
-  );
+  const processesQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'processes') : null), [firestore]);
   const { data: processesData, isLoading: isLoadingProcesses } = useCollection<Process>(processesQuery);
 
-  const clientsQuery = useMemoFirebase(
-    () => (firestore ? collection(firestore, 'clients') : null),
-    [firestore]
-  );
-  const { data: clientsData, isLoading: isLoadingClients } = useCollection<Client>(clientsQuery);
-  const clientsMap = React.useMemo(() => new Map(clientsData?.map((c) => [c.id, `${c.firstName} ${c.lastName}`])), [clientsData]);
-
-  const templatesQuery = useMemoFirebase(() => firestore ? collection(firestore, 'document_templates') : null, [firestore]);
-  const { data: templatesData } = useCollection<DocumentTemplate>(templatesQuery);
-
-  const isLoading = isUserLoading || isLoadingProcesses || isLoadingClients;
-  
-  const clientIdFilter = searchParams.get('clientId');
-
-  React.useEffect(() => {
-      if (clientIdFilter) {
-          getClientById(clientIdFilter).then(client => {
-              if (client) setClientFilterName(`${client.firstName} ${client.lastName}`);
-          });
-      } else {
-          setClientFilterName(null);
-      }
-  }, [clientIdFilter]);
+  const clientsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'clients') : null), [firestore]);
+  const { data: clientsData } = useCollection<Client>(clientsQuery);
+  const clientsMap = React.useMemo(() => new Map(clientsData?.map(c => [c.id, `${c.firstName} ${c.lastName}`])), [clientsData]);
 
   const filteredProcesses = React.useMemo(() => {
     if (!processesData) return [];
-    let data = [...processesData];
-    
-    if (clientIdFilter) data = data.filter(p => p.clientId === clientIdFilter);
-    
-    if (statusFilter !== 'all') {
-        data = data.filter(p => p.status === statusFilter);
-    }
-
-    if (searchTerm.trim()) {
-        const queryStr = searchTerm.toLowerCase();
-        data = data.filter(p => {
-            const clientName = clientsMap.get(p.clientId)?.toLowerCase() || '';
-            const processName = p.name.toLowerCase();
-            const processNumber = p.processNumber?.toLowerCase() || '';
-            return processName.includes(queryStr) || processNumber.includes(queryStr) || clientName.includes(queryStr);
-        });
-    }
-    return data;
-  }, [processesData, clientIdFilter, searchTerm, statusFilter, clientsMap]);
-
-  const handleSyncProcess = async (process: Process) => {
-    if (!session) return;
-    setIsSyncing(process.id);
-    try {
-        await syncProcessToDrive(process.id);
-        toast({ title: "Sincronização Concluída!" });
-    } catch (error: any) {
-        toast({ variant: 'destructive', title: 'Erro na Sincronização', description: error.message });
-    } finally {
-        setIsSyncing(null);
-    }
-  };
-
-  const handleGenerateDocument = async (process: Process, template: DocumentTemplate) => {
-    if (!session) return;
-    setIsGeneratingDoc(process.id);
-    try {
-        // Simple simulation of doc generation: In a real app we'd call a server action 
-        // that uses Google Docs API to replace placeholders. 
-        // For MVP, we copy the template to the process folder.
-        toast({ title: "Gerando documento...", description: `Copiando rascunho de "${template.name}" para o Drive.` });
-        
-        // This is a placeholder for the actual logic that would call the drive lib
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        toast({ 
-            title: "Documento Gerado!", 
-            description: "O rascunho foi criado na pasta do processo no Drive." 
-        });
-    } catch (error: any) {
-        toast({ variant: 'destructive', title: 'Erro na Geração', description: error.message });
-    } finally {
-        setIsGeneratingDoc(null);
-    }
-  };
+    return processesData.filter(p => {
+        const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.processNumber?.includes(searchTerm);
+        const matchesStatus = statusFilter === 'all' || p.status === statusFilter;
+        return matchesSearch && matchesStatus;
+    });
+  }, [processesData, searchTerm, statusFilter]);
 
   const confirmDelete = async () => {
     if (!firestore || !processToDelete) return;
@@ -572,220 +80,48 @@ export default function ProcessosPage() {
       toast({ title: 'Processo excluído!' });
       setProcessToDelete(null);
     } catch (error: any) {
-      console.error("Erro ao excluir processo:", error);
-      toast({ 
-        variant: 'destructive', 
-        title: 'Erro ao excluir', 
-        description: error.message || 'Não foi possível excluir the processo.' 
-      });
-    } finally {
-      setIsDeleting(false);
-    }
+      toast({ variant: 'destructive', title: 'Erro', description: error.message });
+    } finally { setIsDeleting(false); }
   };
 
-  const openTimeline = (process: Process) => {
-    setSelectedProcessForTimeline(process);
-    setIsTimelineOpen(true);
-  };
+  const isLoading = isUserLoading || isLoadingProcesses;
 
   return (
     <>
-      <div className="grid flex-1 items-start gap-4 auto-rows-max">
-        <div className="flex flex-col md:flex-row md:items-center gap-4">
-          <h1 className="flex-1 shrink-0 whitespace-nowrap text-xl font-semibold tracking-tight sm:grow-0 font-headline">
-             {clientFilterName ? `Processos de ${clientFilterName}` : 'Processos'}
-          </h1>
-          
-          <div className="flex flex-wrap items-center gap-2 md:ml-auto">
-             <div className="relative w-full max-w-sm">
-                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input 
-                    placeholder="Processo, Nº ou Cliente..." 
-                    className="pl-8 pr-8 h-9" 
-                    value={searchTerm} 
-                    onChange={(e) => setSearchTerm(e.target.value)} 
-                  />
-                  {searchTerm && (
-                    <button onClick={() => setSearchTerm('')} className="absolute right-2.5 top-2.5 text-muted-foreground">
-                      <X className="h-4 w-4" />
-                    </button>
-                  )}
-              </div>
-
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[140px] h-9">
-                  <SelectValue placeholder="Filtrar Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos Status</SelectItem>
-                  <SelectItem value="Ativo">Ativos</SelectItem>
-                  <SelectItem value="Pendente">Pendentes</SelectItem>
-                  <SelectItem value="Arquivado">Arquivados</SelectItem>
-                </SelectContent>
-              </Select>
-
-            <Button size="sm" className="h-9 gap-1" onClick={() => { setEditingProcess(null); setIsSheetOpen(true); }}>
-              <PlusCircle className="h-3.5 w-3.5" />
-              <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">Novo Processo</span>
-            </Button>
+      <div className="flex flex-col gap-4">
+        <div className="flex justify-between items-center">
+          <h1 className="text-xl font-bold font-headline">Processos</h1>
+          <div className="flex gap-2">
+            <Input placeholder="Buscar..." className="w-64" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+            <Button size="sm" onClick={() => { setEditingProcess(null); setIsSheetOpen(true); }}><PlusCircle className="mr-2 h-4 w-4" /> Novo</Button>
           </div>
         </div>
-        <Card>
-          <CardHeader>
-            <CardTitle>Gerenciador de Processos</CardTitle>
-            <CardDescription>Visualize e gerencie todos os processos jurídicos.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Processo</TableHead>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead className="hidden md:table-cell">Nº do Processo</TableHead>
-                  <TableHead className="hidden md:table-cell text-center">Andamentos</TableHead>
-                  <TableHead className="hidden md:table-cell">Status</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  Array.from({ length: 5 }).map((_, i) => (
-                    <TableRow key={i}>
-                      <TableCell><Skeleton className="h-4 w-48" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                      <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-40" /></TableCell>
-                      <TableCell className="hidden md:table-cell"><Skeleton className="h-6 w-12 mx-auto" /></TableCell>
-                      <TableCell className="hidden md:table-cell"><Skeleton className="h-6 w-20" /></TableCell>
-                      <TableCell><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
-                    </TableRow>
-                  ))
-                ) : filteredProcesses.length > 0 ? (
-                  filteredProcesses.map((process) => (
-                    <TableRow key={process.id} className="group">
-                      <TableCell className="font-medium">
-                        <div className="flex flex-col">
-                            <span>{process.name}</span>
-                            {process.driveFolderId && (
-                                <Badge variant="outline" className="w-fit text-[9px] h-4 mt-1 border-emerald-500/30 text-emerald-600 bg-emerald-500/5">
-                                    Sincronizado
-                                </Badge>
-                            )}
-                        </div>
-                      </TableCell>
-                      <TableCell>{clientsMap.get(process.clientId) || 'N/A'}</TableCell>
-                      <TableCell className="hidden md:table-cell font-mono text-xs">{process.processNumber || 'N/A'}</TableCell>
-                      <TableCell className="hidden md:table-cell text-center">
-                        <Button variant="ghost" size="sm" onClick={() => openTimeline(process)} className="h-8 gap-1.5 hover:bg-primary/10">
-                            <History className="h-3.5 w-3.5" />
-                            <span className="font-bold text-xs">{process.timeline?.length || 0}</span>
-                        </Button>
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        <Badge variant={process.status === 'Ativo' ? 'secondary' : 'outline'}>{process.status}</Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button size="icon" variant="ghost" className="h-8 w-8"><MoreVertical className="h-4 w-4" /></Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-56">
-                                    <DropdownMenuLabel>Gestão do Processo</DropdownMenuLabel>
-                                    <DropdownMenuItem onClick={() => { setEditingProcess(process); setIsSheetOpen(true); }}>
-                                        <FileText className="mr-2 h-4 w-4" /> Editar Cadastro
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => openTimeline(process)}>
-                                        <History className="mr-2 h-4 w-4" /> Ver Linha do Tempo
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => setEventProcess(process)}>
-                                        <DollarSign className="mr-2 h-4 w-4" /> Lançar Financeiro
-                                    </DropdownMenuItem>
-                                    
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuLabel className="text-[10px] uppercase text-muted-foreground">Documentos</DropdownMenuLabel>
-                                    {templatesData && templatesData.length > 0 ? (
-                                        <DropdownMenuSub>
-                                            <DropdownMenuSubTrigger>
-                                                <Copy className="mr-2 h-4 w-4" /> Gerar Documento
-                                            </DropdownMenuSubTrigger>
-                                            <DropdownMenuSubContent className="w-56">
-                                                {templatesData.map(template => (
-                                                    <DropdownMenuItem key={template.id} onClick={() => handleGenerateDocument(process, template)}>
-                                                        {template.name}
-                                                    </DropdownMenuItem>
-                                                ))}
-                                            </DropdownMenuSubContent>
-                                        </DropdownMenuSub>
-                                    ) : (
-                                        <DropdownMenuItem disabled>Nenhum modelo configurado</DropdownMenuItem>
-                                    )}
 
-                                    <DropdownMenuSeparator />
-                                    {process.driveFolderId ? (
-                                        <DropdownMenuItem onSelect={() => window.open(`https://drive.google.com/drive/folders/${process.driveFolderId}`, '_blank')}>
-                                            <FolderOpen className="mr-2 h-4 w-4" /> Abrir no Drive
-                                        </DropdownMenuItem>
-                                    ) : (
-                                        <DropdownMenuItem onClick={() => handleSyncProcess(process)} disabled={isSyncing === process.id}>
-                                            {isSyncing === process.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ExternalLink className="mr-2 h-4 w-4" />}
-                                            Sincronizar Drive
-                                        </DropdownMenuItem>
-                                    )}
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem className="text-destructive" onClick={() => setProcessToDelete(process)}>
-                                        Excluir Processo
-                                    </DropdownMenuItem>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                      Nenhum processo encontrado com esses filtros.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+        <Card><CardContent className="p-0">
+          <Table><TableHeader><TableRow><TableHead>Processo</TableHead><TableHead>Cliente</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Ações</TableHead></TableRow></TableHeader>
+          <TableBody>
+            {isLoading ? [...Array(3)].map((_, i) => <TableRow key={i}><TableCell colSpan={4}><Skeleton className="h-8 w-full" /></TableCell></TableRow>) : 
+            filteredProcesses.map(p => (
+                <TableRow key={p.id}><TableCell>{p.name}</TableCell><TableCell>{clientsMap.get(p.clientId)}</TableCell><TableCell><Badge variant="outline">{p.status}</Badge></TableCell>
+                <TableCell className="text-right">
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => { setSelectedProcessForTimeline(p); setIsTimelineOpen(true); }}><History className="mr-2 h-4 w-4" /> Timeline</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setEventProcess(p)}><DollarSign className="mr-2 h-4 w-4" /> Financeiro</DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem className="text-destructive" onClick={() => setProcessToDelete(p)}>Excluir</DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </TableCell></TableRow>
+            ))}
+          </TableBody></Table>
+        </CardContent></Card>
       </div>
 
-      <Sheet open={isSheetOpen} onOpenChange={(open) => { if (!open) setEditingProcess(null); setIsSheetOpen(open); }}>
-        <SheetContent className="w-full sm:max-w-4xl">
-          <SheetHeader>
-            <SheetTitle>{editingProcess ? 'Editar Processo' : 'Adicionar Novo Processo'}</SheetTitle>
-            <SheetDescription>Preencha os dados do processo abaixo.</SheetDescription>
-          </SheetHeader>
-          <ProcessForm onSave={() => setIsSheetOpen(false)} process={editingProcess} />
-        </SheetContent>
-      </Sheet>
-
-      <ProcessTimelineSheet 
-        process={selectedProcessForTimeline} 
-        open={isTimelineOpen} 
-        onOpenChange={setIsTimelineOpen} 
-      />
-
-      <AlertDialog open={!!processToDelete} onOpenChange={(open) => !isDeleting && !open && setProcessToDelete(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
-            <AlertDialogDescription>Esta ação excluirá permanentemente o processo "{processToDelete?.name}".</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
-              {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Excluir'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <FinancialEventDialog process={eventProcess} open={!!eventProcess} onOpenChange={(open) => { if (!open) setEventProcess(null); }} onEventCreated={() => {}} />
+      <ProcessTimelineSheet process={selectedProcessForTimeline} open={isTimelineOpen} onOpenChange={setIsTimelineOpen} />
+      <FinancialEventDialog process={eventProcess} open={!!eventProcess} onOpenChange={o => !o && setEventProcess(null)} onEventCreated={() => {}} />
+      <AlertDialog open={!!processToDelete} onOpenChange={o => !o && setProcessToDelete(null)}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Excluir Processo?</AlertDialogTitle></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel><AlertDialogAction onClick={confirmDelete} disabled={isDeleting}>{isDeleting ? <Loader2 className="animate-spin" /> : 'Excluir'}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
     </>
   );
 }

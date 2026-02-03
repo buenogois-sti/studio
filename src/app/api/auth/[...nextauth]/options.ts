@@ -1,27 +1,20 @@
-
-import type { NextAuthOptions, User, Account, Session } from 'next-auth';
+import type { NextAuthOptions } from 'next-auth';
 import type { JWT } from 'next-auth/jwt';
 import GoogleProvider from 'next-auth/providers/google';
-import { firebaseAdmin, firestoreAdmin, authAdmin, firebaseAdminInitializationError } from '@/firebase/admin';
+import { firestoreAdmin, authAdmin, firebaseAdminInitializationError } from '@/firebase/admin';
 import type { UserProfile, UserRole } from '@/lib/types';
 
-// --- Environment Variable Validation ---
 const googleClientId = process.env.GOOGLE_CLIENT_ID;
 const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
 const nextAuthSecret = process.env.NEXTAUTH_SECRET;
 
 if (!googleClientId || !googleClientSecret) {
-  throw new Error('CRITICAL_ERROR: Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET environment variables. Please check your .env.local or deployment settings.');
+  throw new Error('CRITICAL_ERROR: Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET.');
 }
 if (!nextAuthSecret) {
     throw new Error('CRITICAL_ERROR: Missing NEXTAUTH_SECRET variable.');
 }
-// --- End Validation ---
 
-/**
- * Takes a token, and returns a new token with updated
- * `accessToken` and `accessTokenExpires`.
- */
 async function refreshAccessToken(token: JWT): Promise<JWT> {
     try {
         if (!token.id) throw new Error("Token is missing user ID.");
@@ -37,9 +30,7 @@ async function refreshAccessToken(token: JWT): Promise<JWT> {
         const url = "https://oauth2.googleapis.com/token";
         const response = await fetch(url, {
             method: "POST",
-            headers: {
-                "Content-Type": "application/x-www-form-urlencoded",
-            },
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
             body: new URLSearchParams({
                 client_id: googleClientId!,
                 client_secret: googleClientSecret!,
@@ -62,13 +53,9 @@ async function refreshAccessToken(token: JWT): Promise<JWT> {
         };
     } catch (error) {
         console.error("Error refreshing access token:", error);
-        return {
-            ...token,
-            error: "RefreshAccessTokenError",
-        };
+        return { ...token, error: "RefreshAccessTokenError" };
     }
 }
-
 
 export const authOptions: NextAuthOptions = {
     providers: [
@@ -86,23 +73,16 @@ export const authOptions: NextAuthOptions = {
         }),
     ],
     secret: nextAuthSecret,
-    session: {
-        strategy: 'jwt',
-    },
+    session: { strategy: 'jwt' },
     callbacks: {
-        async signIn({ user, account }) {
-            if (!user.email || !user.id) {
-                return false;
-            }
-            return true;
+        async signIn({ user }) {
+            return !!(user.email && user.id);
         },
-
         async jwt({ token, user, account }) {
             if (firebaseAdminInitializationError) {
                 token.error = `ServerConfigError: ${firebaseAdminInitializationError}`;
                 return token;
             }
-            
             if (!firestoreAdmin || !authAdmin) {
                 token.error = "DatabaseError";
                 return token;
@@ -116,14 +96,11 @@ export const authOptions: NextAuthOptions = {
                     let role: UserRole = 'lawyer';
 
                     if (!userDoc.exists) {
-                        const usersCollection = db.collection('users');
-                        const existingUsersSnapshot = await usersCollection.limit(1).get();
-                        
+                        const existingUsersSnapshot = await db.collection('users').limit(1).get();
                         if (existingUsersSnapshot.empty) {
                             role = 'admin';
                         } else {
-                            const userRoleRef = db.collection('user_roles').doc(user.email);
-                            const userRoleDoc = await userRoleRef.get();
+                            const userRoleDoc = await db.collection('user_roles').doc(user.email).get();
                             if (userRoleDoc.exists) {
                                 role = (userRoleDoc.data()?.role as UserRole) || 'lawyer';
                             }
@@ -134,9 +111,9 @@ export const authOptions: NextAuthOptions = {
                             id: user.id,
                             googleId: user.id,
                             email: user.email,
-                            firstName: firstName,
+                            firstName,
                             lastName: lastNameParts.join(' '),
-                            role: role,
+                            role,
                             createdAt: new Date(),
                             updatedAt: new Date(),
                             ...(account.refresh_token && { googleRefreshToken: account.refresh_token }),
@@ -155,9 +132,9 @@ export const authOptions: NextAuthOptions = {
                     token.id = user.id;
                     token.role = role;
                     token.accessToken = account.access_token;
-                    token.accessTokenExpires = account.expires_at ? account.expires_at * 1000 : Date.now() + (Number(account.expires_in ?? 3600)) * 1000;
+                    const expiresIn = Number(account.expires_in || 3600);
+                    token.accessTokenExpires = account.expires_at ? account.expires_at * 1000 : Date.now() + (expiresIn * 1000);
                     token.customToken = await authAdmin.createCustomToken(user.id, { role });
-
                 } catch (error) {
                     console.error("JWT Callback Error:", error);
                     token.error = "DatabaseError";
@@ -168,17 +145,12 @@ export const authOptions: NextAuthOptions = {
             if (Date.now() < (token.accessTokenExpires ?? 0)) {
                 return token;
             }
-
             return refreshAccessToken(token);
         },
-
         async session({ session, token }) {
             if (token) {
                 session.user.id = token.id;
-                if (token.role) {
-                    // @ts-ignore
-                    session.user.role = token.role;
-                }
+                if (token.role) session.user.role = token.role;
                 session.accessToken = token.accessToken;
                 session.error = token.error;
                 session.customToken = token.customToken;
@@ -186,7 +158,5 @@ export const authOptions: NextAuthOptions = {
             return session;
         },
     },
-    pages: {
-        error: '/login',
-    }
+    pages: { error: '/login' }
 };
