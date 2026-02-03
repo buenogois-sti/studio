@@ -270,8 +270,16 @@ export default function ClientsPage() {
       </div>
 
       <Sheet open={isSheetOpen} onOpenChange={(open) => { if (!open) setEditingClient(null); setIsSheetOpen(open); }}>
-        <SheetContent className="sm:max-w-4xl w-full"><SheetHeader><SheetTitle>{editingClient ? 'Editar Cadastro' : 'Novo Cliente'}</SheetTitle><SheetDescription>Mantenha a integridade dos dados para automação.</SheetDescription></SheetHeader>
-          <ScrollArea className="h-[calc(100vh-8rem)]"><ClientForm onSave={() => { setIsSheetOpen(false); setEditingClient(null); }} client={editingClient} /></ScrollArea>
+        <SheetContent className="sm:max-w-4xl w-full p-0 flex flex-col">
+          <SheetHeader className="px-6 pt-6 pb-2">
+            <SheetTitle>{editingClient ? 'Editar Cadastro' : 'Novo Cliente'}</SheetTitle>
+            <SheetDescription>Mantenha a integridade dos dados para automação.</SheetDescription>
+          </SheetHeader>
+          <ScrollArea className="flex-1 px-6">
+            <div className="pr-6 pb-8">
+              <ClientForm onSave={() => { setIsSheetOpen(false); setEditingClient(null); }} client={editingClient} />
+            </div>
+          </ScrollArea>
         </SheetContent>
       </Sheet>
 

@@ -285,13 +285,15 @@ export default function ProcessosPage() {
 
       {/* Forms & Dialogs */}
       <Sheet open={isSheetOpen} onOpenChange={(open) => { if (!open) setEditingProcess(null); setIsSheetOpen(open); }}>
-        <SheetContent className="sm:max-w-4xl w-full">
-          <SheetHeader>
+        <SheetContent className="sm:max-w-4xl w-full p-0 flex flex-col">
+          <SheetHeader className="px-6 pt-6 pb-2">
             <SheetTitle>{editingProcess ? 'Editar Processo' : 'Novo Processo'}</SheetTitle>
             <SheetDescription>Centralize todos os dados do caso para automação e relatórios.</SheetDescription>
           </SheetHeader>
-          <ScrollArea className="h-[calc(100vh-8rem)]">
-            <ProcessForm onSave={() => setIsSheetOpen(false)} process={editingProcess} />
+          <ScrollArea className="flex-1 px-6">
+            <div className="pr-6 pb-8">
+              <ProcessForm onSave={() => setIsSheetOpen(false)} process={editingProcess} />
+            </div>
           </ScrollArea>
         </SheetContent>
       </Sheet>
