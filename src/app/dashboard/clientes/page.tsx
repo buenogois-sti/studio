@@ -228,10 +228,28 @@ export default function ClientsPage() {
                     </CardContent>
                     <CardFooter className="border-t bg-muted/5 py-3 flex items-center justify-between">
                         <span className="text-[9px] text-muted-foreground font-bold uppercase">Cadastrado: {typeof client.createdAt === 'string' ? client.createdAt.split('T')[0] : client.createdAt.toDate().toLocaleDateString()}</span>
-                        {client.driveFolderId ? <div className="text-emerald-600 font-bold text-[9px] uppercase flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> Drive OK</div> : 
-                        <Button variant="ghost" size="sm" className="h-6 text-[9px] font-bold uppercase text-rose-500 p-0 px-2" onClick={() => handleSyncClient(client)} disabled={isSyncing === client.id}>
+                        
+                        {client.driveFolderId ? (
+                          <a 
+                            href={`https://drive.google.com/drive/folders/${client.driveFolderId}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-emerald-600 font-bold text-[9px] uppercase flex items-center gap-1 hover:bg-emerald-500/10 px-2 py-1 rounded-md transition-all cursor-pointer"
+                            title="Abrir pasta no Google Drive"
+                          >
+                            <CheckCircle2 className="h-3 w-3" /> Drive OK
+                          </a>
+                        ) : (
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-6 text-[9px] font-bold uppercase text-rose-500 p-0 px-2 animate-pulse hover:animate-none transition-all" 
+                            onClick={() => handleSyncClient(client)} 
+                            disabled={isSyncing === client.id}
+                          >
                             {isSyncing === client.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Info className="h-3 w-3 mr-1" />} Pendente Drive
-                        </Button>}
+                          </Button>
+                        )}
                     </CardFooter>
                   </Card>
                 );
