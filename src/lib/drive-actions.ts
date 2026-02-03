@@ -122,3 +122,22 @@ export async function createFolder(parentId: string, folderName: string): Promis
         throw new Error(error.message || 'Ocorreu um erro desconhecido ao criar a pasta no Google Drive.');
     }
 }
+
+export async function copyFile(fileId: string, name: string, parentId: string): Promise<drive_v3.Schema$File> {
+    try {
+        const { drive } = await getGoogleApiClientsForUser();
+        const res = await drive.files.copy({
+            fileId,
+            requestBody: {
+                name,
+                parents: [parentId],
+            },
+            fields: 'id, name, webViewLink',
+            supportsAllDrives: true,
+        });
+        return res.data;
+    } catch (error: any) {
+        console.error('Error copying file in Drive:', error);
+        throw new Error(error.message || 'Erro ao copiar arquivo no Drive.');
+    }
+}
