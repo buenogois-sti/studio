@@ -101,9 +101,14 @@ function ClientSearch({ onSelect, selectedClientId }: { onSelect: (client: Clien
   }, [search, toast]);
 
   return (
-    <Popover open={open} onOpenChange={setOpen} modal={false}>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" role="combobox" aria-expanded={open} className="w-full justify-between h-11 font-normal bg-background">
+        <Button 
+          variant="outline" 
+          role="combobox" 
+          aria-expanded={open} 
+          className="w-full justify-between h-11 font-normal bg-background"
+        >
           {selectedClient ? (
             <div className="flex items-center gap-2 overflow-hidden">
               <User className="h-4 w-4 text-primary shrink-0" />
@@ -115,47 +120,49 @@ function ClientSearch({ onSelect, selectedClientId }: { onSelect: (client: Clien
         </Button>
       </PopoverTrigger>
       <PopoverContent 
-        className="w-[var(--radix-popover-trigger-width)] p-0 z-[100]" 
+        className="w-[--radix-popover-trigger-width] p-0" 
         align="start"
-        onOpenAutoFocus={(e) => e.preventDefault()}
       >
-        <div className="flex flex-col h-full bg-popover border shadow-xl rounded-md">
-          <div className="flex items-center border-b px-3">
+        <div className="flex flex-col bg-popover border rounded-md">
+          <div className="flex items-center border-b px-3 py-2">
             <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
             <Input 
               ref={inputRef}
               placeholder="Digite nome ou documento..." 
               value={search} 
               onChange={(e) => setSearch(e.target.value)}
-              className="border-none focus-visible:ring-0 focus-visible:ring-offset-0 h-11 bg-transparent"
+              className="border-none focus-visible:ring-0 focus-visible:ring-offset-0 h-10 bg-transparent"
+              autoComplete="off"
             />
           </div>
           <ScrollArea className="max-h-[300px] overflow-y-auto">
             {isLoading && (
-                <div className="p-4 text-center text-xs text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" />
-                    Buscando na base...
-                </div>
+              <div className="p-4 text-center text-xs text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" />
+                Buscando na base...
+              </div>
             )}
             {!isLoading && search.length >= 2 && results.length === 0 && (
               <div className="p-4 text-center text-sm text-muted-foreground">Nenhum cliente encontrado.</div>
             )}
+            {search.length < 2 && (
+              <div className="p-4 text-center text-xs text-muted-foreground">Digite pelo menos 2 caracteres...</div>
+            )}
             <div className="p-1">
               {results.map((client) => (
                 <button
-                    key={client.id}
-                    type="button"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => { 
-                        setSelectedClient(client);
-                        onSelect(client); 
-                        setOpen(false); 
-                    }}
-                    className={cn(
-                      "flex items-start gap-3 w-full px-3 py-2.5 text-sm rounded-md transition-colors text-left",
-                      "hover:bg-accent hover:text-accent-foreground",
-                      selectedClientId === client.id && "bg-accent text-accent-foreground font-bold"
-                    )}
+                  key={client.id}
+                  type="button"
+                  onClick={() => { 
+                    setSelectedClient(client);
+                    onSelect(client); 
+                    setOpen(false); 
+                  }}
+                  className={cn(
+                    "flex items-start gap-3 w-full px-3 py-2.5 text-sm rounded-md transition-colors text-left",
+                    "hover:bg-accent hover:text-accent-foreground cursor-pointer",
+                    selectedClientId === client.id && "bg-accent text-accent-foreground font-bold"
+                  )}
                 >
                   <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                     <User className="h-4 w-4 text-primary" />
@@ -204,9 +211,9 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
     },
   });
 
-  const { fields: partyFields, append: addParty, remove: removeParty } = useFieldArray({
+  const { fields: partyFields, append: addParty, remove: removeParty } = useFieldArray<ProcessFormValues, "opposingParties">({
     control: form.control,
-    name: "opposingParties" as any,
+    name: "opposingParties",
   });
 
   async function onSubmit(values: ProcessFormValues) {
