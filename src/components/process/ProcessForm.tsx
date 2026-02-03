@@ -3,7 +3,7 @@ import * as React from 'react';
 import { z } from 'zod';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Loader2, Plus, Trash2, User, Building, Gavel, DollarSign, Calendar, MapPin } from 'lucide-react';
+import { Loader2, Plus, Trash2, User, Building, Gavel, Check, ChevronsUpDown, Search as SearchIcon } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -31,6 +31,10 @@ import type { Process, Client, Staff } from '@/lib/types';
 import { useToast } from '@/components/ui/use-toast';
 import { Badge } from '../ui/badge';
 import { LocationSearch } from '@/components/shared/LocationSearch';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { searchClients, getClientById } from '@/lib/client-actions';
+import { cn } from '@/lib/utils';
 
 const processSchema = z.object({
   clientId: z.string().min(1, 'Selecione um cliente.'),
@@ -54,13 +58,100 @@ interface ProcessFormProps {
   process?: Process | null;
 }
 
+function ClientSearch({ onSelect, selectedClientId }: { onSelect: (client: Client) => void; selectedClientId: string }) {
+  const [open, setOpen] = React.useState(false);
+  const [search, setSearch] = React.useState('');
+  const [results, setResults] = React.useState<Client[]>([]);
+  const [isLoading, setIsLoading] = React.useState(false);
+  const [selectedClient, setSelectedClient] = React.useState<Client | null>(null);
+  const { toast } = useToast();
+
+  // Load initial client if editing
+  React.useEffect(() => {
+    if (selectedClientId && !selectedClient) {
+        getClientById(selectedClientId).then(setSelectedClient).catch(console.error);
+    }
+  }, [selectedClientId, selectedClient]);
+
+  React.useEffect(() => {
+    if (search.length < 2) {
+      setResults([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setIsLoading(true);
+      try {
+        const clients = await searchClients(search);
+        setResults(clients);
+      } catch (error: any) {
+        toast({ variant: 'destructive', title: 'Erro ao Buscar Cliente', description: error.message });
+      } finally {
+        setIsLoading(false);
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [search, toast]);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" role="combobox" aria-expanded={open} className="w-full justify-between h-11 font-normal bg-background">
+          {selectedClient ? (
+            <div className="flex items-center gap-2 overflow-hidden">
+              <User className="h-4 w-4 text-primary shrink-0" />
+              <span className="truncate font-bold">{selectedClient.firstName} {selectedClient.lastName}</span>
+              <span className="text-[10px] text-muted-foreground font-mono shrink-0 hidden sm:inline">({selectedClient.document})</span>
+            </div>
+          ) : "Buscar cliente por nome ou CPF..."}
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+        <Command shouldFilter={false}>
+          <CommandInput 
+            placeholder="Digite nome ou documento..." 
+            value={search} 
+            onValueChange={setSearch} 
+          />
+          <CommandList>
+            {isLoading && (
+                <div className="p-4 text-center text-xs text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" />
+                    Buscando na base...
+                </div>
+            )}
+            <CommandEmpty>Nenhum cliente encontrado.</CommandEmpty>
+            <CommandGroup>
+              {results.map((client) => (
+                <CommandItem 
+                    key={client.id} 
+                    value={client.id} 
+                    onSelect={() => { 
+                        setSelectedClient(client);
+                        onSelect(client); 
+                        setOpen(false); 
+                    }}
+                    className="flex flex-col items-start py-3 cursor-pointer"
+                >
+                  <div className="flex items-center w-full">
+                    <span className="font-bold flex-1">{client.firstName} {client.lastName}</span>
+                    <Check className={cn("ml-2 h-4 w-4", selectedClientId === client.id ? "opacity-100" : "opacity-0")} />
+                  </div>
+                  <span className="text-[10px] text-muted-foreground font-mono uppercase tracking-tighter">Doc: {client.document}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export function ProcessForm({ onSave, process }: ProcessFormProps) {
   const { firestore } = useFirebase();
   const { toast } = useToast();
   const [isSaving, setIsSaving] = React.useState(false);
-
-  const clientsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'clients') : null, [firestore]);
-  const { data: clients } = useCollection<Client>(clientsQuery);
 
   const staffQuery = useMemoFirebase(() => firestore ? collection(firestore, 'staff') : null, [firestore]);
   const { data: staff } = useCollection<Staff>(staffQuery);
@@ -134,14 +225,14 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
                         control={form.control}
                         name="clientId"
                         render={({ field }) => (
-                        <FormItem>
+                        <FormItem className="md:col-span-2">
                             <FormLabel>Cliente Principal *</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl><SelectTrigger className="h-11"><SelectValue placeholder="Selecione o cliente" /></SelectTrigger></FormControl>
-                            <SelectContent>
-                                {clients?.map(c => <SelectItem key={c.id} value={c.id}>{c.firstName} {c.lastName}</SelectItem>)}
-                            </SelectContent>
-                            </Select>
+                            <FormControl>
+                                <ClientSearch 
+                                    selectedClientId={field.value} 
+                                    onSelect={(client) => field.onChange(client.id)} 
+                                />
+                            </FormControl>
                             <FormMessage />
                         </FormItem>
                         )}
@@ -170,7 +261,7 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
                         control={form.control}
                         name="name"
                         render={({ field }) => (
-                        <FormItem className="md:col-span-2">
+                        <FormItem>
                             <FormLabel>Título do Processo *</FormLabel>
                             <FormControl><Input placeholder="Ex: Reclamatória Trabalhista - João Silva" className="h-11" {...field} /></FormControl>
                             <FormMessage />
@@ -352,7 +443,7 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
                     name="description"
                     render={({ field }) => (
                     <FormItem>
-                        <FormLabel>Estratégia e Observações</FormLabel>
+                        <FormLabel>Estratégia e Observações</H2>
                         <FormControl><Textarea placeholder="Descreva detalhes estratégicos, teses ou lembretes importantes deste caso..." className="min-h-[120px] resize-none text-sm" {...field} /></FormControl>
                         <FormMessage />
                     </FormItem>
