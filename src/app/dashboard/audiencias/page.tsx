@@ -141,10 +141,15 @@ function ProcessSearch({ onSelect, selectedProcess }: { onSelect: (process: Proc
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
-        <Command>
-          <CommandInput placeholder="Buscar processo..." value={search} onValueChange={setSearch} />
-          <CommandList>
+      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start" onOpenAutoFocus={(e) => e.preventDefault()}>
+        <Command className="flex flex-col h-full">
+          <CommandInput 
+            placeholder="Buscar processo..." 
+            value={search} 
+            onValueChange={setSearch} 
+            autoFocus
+          />
+          <CommandList className="flex-1 overflow-y-auto">
             {isLoading && <div className="p-4 text-center text-xs text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" />Buscando...</div>}
             <CommandEmpty>Nenhum processo encontrado.</CommandEmpty>
             <CommandGroup>

@@ -72,14 +72,15 @@ export function LocationSearch({ value, onSelect, placeholder = "Pesquisar ou di
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
-        <Command>
+      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start" onOpenAutoFocus={(e) => e.preventDefault()}>
+        <Command className="flex flex-col h-full">
           <CommandInput 
             placeholder="Ex: Fórum SBC ou Link..." 
             value={search}
             onValueChange={setSearch}
+            autoFocus
           />
-          <CommandList>
+          <CommandList className="flex-1 overflow-y-auto">
             <CommandEmpty>
               <div className="p-4 flex flex-col items-center gap-2">
                 <p className="text-xs text-muted-foreground">Nenhum local encontrado.</p>
