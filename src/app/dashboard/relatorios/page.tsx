@@ -44,6 +44,20 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 const COLORS = ['#F5D030', '#152c4b', '#10b981', '#ef4444', '#8b5cf6', '#f97316'];
 
+interface FinancialStat {
+  month: string;
+  key: string;
+  receita: number;
+  despesa: number;
+}
+
+interface GrowthStat {
+  month: string;
+  key: string;
+  clientes: number;
+  processos: number;
+}
+
 export default function RelatoriosPage() {
   const { firestore, isUserLoading } = useFirebase();
 
@@ -69,9 +83,9 @@ export default function RelatoriosPage() {
     return Object.entries(counts).map(([name, value]) => ({ name, value }));
   }, [processesData]);
 
-  const financialData = React.useMemo(() => {
+  const financialData = React.useMemo((): FinancialStat[] => {
     if (!titlesData) return [];
-    const months = [];
+    const months: FinancialStat[] = [];
     const now = new Date();
     for (let i = 5; i >= 0; i--) {
       const d = subMonths(now, i);
@@ -91,9 +105,9 @@ export default function RelatoriosPage() {
     return months;
   }, [titlesData]);
 
-  const growthData = React.useMemo(() => {
+  const growthData = React.useMemo((): GrowthStat[] => {
     if (!clientsData || !processesData) return [];
-    const months = [];
+    const months: GrowthStat[] = [];
     const now = new Date();
     for (let i = 5; i >= 0; i--) {
       const d = subMonths(now, i);
