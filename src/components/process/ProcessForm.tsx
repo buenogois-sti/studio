@@ -3,7 +3,7 @@ import * as React from 'react';
 import { z } from 'zod';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Loader2, Plus, Trash2, User, Building, Gavel, Check, ChevronsUpDown } from 'lucide-react';
+import { Loader2, Plus, Trash2, User, Building, Gavel, Check, ChevronsUpDown, Search } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -32,9 +32,9 @@ import { useToast } from '@/components/ui/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { LocationSearch } from '@/components/shared/LocationSearch';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { searchClients, getClientById } from '@/lib/client-actions';
 import { cn } from '@/lib/utils';
+import { ScrollArea } from '../ui/scroll-area';
 
 const processSchema = z.object({
   clientId: z.string().min(1, 'Selecione um cliente.'),
@@ -105,44 +105,52 @@ function ClientSearch({ onSelect, selectedClientId }: { onSelect: (client: Clien
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start" onOpenAutoFocus={(e) => e.preventDefault()}>
-        <Command shouldFilter={false} className="flex flex-col h-full">
-          <CommandInput 
-            placeholder="Digite nome ou documento..." 
-            value={search} 
-            onValueChange={setSearch} 
-            autoFocus
-          />
-          <CommandList className="flex-1 overflow-y-auto">
+      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+        <div className="flex flex-col h-full bg-popover">
+          <div className="flex items-center border-b px-3">
+            <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+            <Input 
+              placeholder="Digite nome ou documento..." 
+              value={search} 
+              onChange={(e) => setSearch(e.target.value)}
+              className="border-none focus-visible:ring-0 focus-visible:ring-offset-0 h-11 bg-transparent"
+              autoFocus
+            />
+          </div>
+          <ScrollArea className="max-h-[300px] overflow-y-auto">
             {isLoading && (
                 <div className="p-4 text-center text-xs text-muted-foreground">
                     <Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" />
                     Buscando na base...
                 </div>
             )}
-            <CommandEmpty>Nenhum cliente encontrado.</CommandEmpty>
-            <CommandGroup>
+            {!isLoading && search.length >= 2 && results.length === 0 && (
+              <div className="p-4 text-center text-sm text-muted-foreground">Nenhum cliente encontrado.</div>
+            )}
+            <div className="p-1">
               {results.map((client) => (
-                <CommandItem 
-                    key={client.id} 
-                    value={client.id} 
-                    onSelect={() => { 
+                <button
+                    key={client.id}
+                    onClick={() => { 
                         setSelectedClient(client);
                         onSelect(client); 
                         setOpen(false); 
                     }}
-                    className="flex flex-col items-start py-3 cursor-pointer"
+                    className={cn(
+                      "flex flex-col items-start w-full px-2 py-2 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground text-left transition-colors",
+                      selectedClientId === client.id && "bg-accent text-accent-foreground"
+                    )}
                 >
                   <div className="flex items-center w-full">
                     <span className="font-bold flex-1">{client.firstName} {client.lastName}</span>
-                    <Check className={cn("ml-2 h-4 w-4", selectedClientId === client.id ? "opacity-100" : "opacity-0")} />
+                    {selectedClientId === client.id && <Check className="ml-2 h-4 w-4" />}
                   </div>
                   <span className="text-[10px] text-muted-foreground font-mono uppercase tracking-tighter">Doc: {client.document}</span>
-                </CommandItem>
+                </button>
               ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
+            </div>
+          </ScrollArea>
+        </div>
       </PopoverContent>
     </Popover>
   );
@@ -211,7 +219,7 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-10 py-4">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-10 py-4 pr-6">
         <fieldset disabled={isSaving} className="space-y-10">
             
             <section className="space-y-6">
@@ -246,9 +254,9 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
                             <Select onValueChange={field.onChange} defaultValue={field.value}>
                             <FormControl><SelectTrigger className="h-11"><SelectValue placeholder="Status..." /></SelectTrigger></FormControl>
                             <SelectContent>
-                                <SelectItem value="Ativo">🟢 Ativo</SelectItem>
-                                <SelectItem value="Pendente">🟡 Pendente</SelectItem>
-                                <SelectItem value="Arquivado">⚪ Arquivado</SelectItem>
+                                <SelectItem value="Ativo">Ativo</SelectItem>
+                                <SelectItem value="Pendente">Pendente</SelectItem>
+                                <SelectItem value="Arquivado">Arquivado</SelectItem>
                             </SelectContent>
                             </Select>
                             <FormMessage />

@@ -45,8 +45,10 @@ const CommandInput = React.forwardRef<
     <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
     <CommandPrimitive.Input
       ref={ref}
+      autoComplete="off"
+      autoCorrect="off"
+      spellCheck={false}
       onKeyDown={(e) => {
-        // ESSENCIAL: Impede que o Popover ou Sheet pai intercepte as teclas
         e.stopPropagation();
       }}
       className={cn(

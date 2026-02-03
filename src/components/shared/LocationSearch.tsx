@@ -1,11 +1,12 @@
 'use client';
 
 import * as React from 'react';
-import { MapPin, Building2, Video, Globe, Check, ChevronsUpDown, PlusCircle, Loader2 } from 'lucide-react';
+import { MapPin, Building2, Video, Globe, Check, ChevronsUpDown, PlusCircle, Loader2, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from '@/components/ui/command';
+import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { ScrollArea } from '../ui/scroll-area';
 
 export const groupedLocations = [
   {
@@ -48,7 +49,6 @@ export function LocationSearch({ value, onSelect, placeholder = "Pesquisar local
   const [apiResults, setApiResults] = React.useState<string[]>([]);
   const [isSearching, setIsSearching] = React.useState(false);
 
-  // Busca de endereços reais via API (Nominatim OpenStreetMap)
   React.useEffect(() => {
     if (search.length < 4) {
       setApiResults([]);
@@ -94,112 +94,76 @@ export function LocationSearch({ value, onSelect, placeholder = "Pesquisar local
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent 
-        className="w-[var(--radix-popover-trigger-width)] p-0" 
-        align="start" 
-        onOpenAutoFocus={(e) => e.preventDefault()}
-        onKeyDown={(e) => e.stopPropagation()}
-      >
-        <Command className="flex flex-col h-full" shouldFilter={false}>
-          <CommandInput 
-            placeholder="Digite o fórum ou um endereço real..." 
-            value={search}
-            onValueChange={setSearch}
-            autoFocus
-          />
-          <CommandList className="flex-1 overflow-y-auto">
+      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+        <div className="flex flex-col h-full bg-popover">
+          <div className="flex items-center border-b px-3">
+            <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+            <Input 
+              placeholder="Digite o fórum ou um endereço..." 
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="border-none focus-visible:ring-0 focus-visible:ring-offset-0 h-11 bg-transparent"
+              autoFocus
+            />
+          </div>
+          
+          <ScrollArea className="max-h-[350px] overflow-y-auto">
             {isSearching && (
               <div className="p-4 flex items-center justify-center gap-2 text-xs text-muted-foreground">
                 <Loader2 className="h-3 w-3 animate-spin" />
                 Buscando endereços...
               </div>
             )}
-            
-            <CommandEmpty>
-              <div className="p-4 flex flex-col items-center gap-2">
-                <p className="text-xs text-muted-foreground">Nenhum local sugerido encontrado.</p>
-                {search && (
-                  <Button 
-                    size="sm" 
-                    variant="secondary" 
-                    className="h-7 text-[10px] uppercase font-bold"
-                    onClick={() => {
-                      onSelect(search);
-                      setOpen(false);
-                    }}
-                  >
-                    Usar texto livre: "{search}"
-                  </Button>
-                )}
-              </div>
-            </CommandEmpty>
 
             {/* Resultados da API de Endereços */}
             {apiResults.length > 0 && (
-              <CommandGroup heading="Endereços Encontrados (Maps)">
+              <div className="p-1">
+                <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase">Endereços Encontrados</div>
                 {apiResults.map((address) => (
-                  <CommandItem
+                  <button
                     key={address}
-                    value={address}
-                    onSelect={() => {
-                      onSelect(address);
-                      setOpen(false);
-                    }}
-                    className="flex items-start gap-2 py-3"
+                    onClick={() => { onSelect(address); setOpen(false); }}
+                    className="flex items-start gap-2 w-full px-2 py-2.5 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground text-left"
                   >
                     <Globe className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
                     <span className="flex-1 text-xs leading-tight line-clamp-2">{address}</span>
-                    <Check className={cn("h-4 w-4 shrink-0", value === address ? "opacity-100" : "opacity-0")} />
-                  </CommandItem>
+                    {value === address && <Check className="h-4 w-4 shrink-0 ml-2" />}
+                  </button>
                 ))}
-              </CommandGroup>
+              </div>
             )}
-
-            <CommandSeparator />
 
             {/* Sugestões Jurídicas Locais */}
             {groupedLocations.map((group) => (
-              <CommandGroup key={group.label} heading={group.label}>
+              <div key={group.label} className="p-1 border-t first:border-t-0">
+                <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase">{group.label}</div>
                 {group.items.map((item) => (
-                  <CommandItem
+                  <button
                     key={item.name}
-                    value={item.name}
-                    onSelect={(currentValue) => {
-                      onSelect(currentValue);
-                      setOpen(false);
-                    }}
-                    className="flex items-center gap-2 py-2.5"
+                    onClick={() => { onSelect(item.name); setOpen(false); }}
+                    className="flex items-center gap-2 w-full px-2 py-2 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground text-left"
                   >
                     <item.icon className="h-4 w-4 text-muted-foreground shrink-0" />
                     <span className="flex-1 truncate">{item.name}</span>
-                    <Check className={cn("h-4 w-4 shrink-0", value === item.name ? "opacity-100" : "opacity-0")} />
-                  </CommandItem>
+                    {value === item.name && <Check className="h-4 w-4 shrink-0" />}
+                  </button>
                 ))}
-              </CommandGroup>
+              </div>
             ))}
             
-            {search && !apiResults.includes(search) && (
-              <>
-                <CommandSeparator />
-                <CommandGroup heading="Personalizado">
-                  <CommandItem
-                    value={search}
-                    onSelect={(val) => {
-                      onSelect(val);
-                      setOpen(false);
-                    }}
-                    className="py-3"
-                  >
-                    <div className="flex items-center gap-2 text-primary font-bold">
-                      <PlusCircle className="h-4 w-4" />
-                      <span>Usar: "{search}"</span>
-                    </div>
-                  </CommandItem>
-                </CommandGroup>
-              </>
+            {search && (
+              <div className="p-1 border-t">
+                <button
+                  onClick={() => { onSelect(search); setOpen(false); }}
+                  className="flex items-center gap-2 w-full px-2 py-3 text-sm rounded-sm hover:bg-accent text-primary font-bold text-left"
+                >
+                  <PlusCircle className="h-4 w-4" />
+                  <span>Usar: "{search}"</span>
+                </button>
+              </div>
             )}
-          </CommandList>
-        </Command>
+          </ScrollArea>
+        </div>
       </PopoverContent>
     </Popover>
   );

@@ -44,7 +44,6 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from '@/components/ui/command';
 import { searchProcesses } from '@/lib/process-actions';
 import { createHearing, deleteHearing, updateHearingStatus, syncHearings } from '@/lib/hearing-actions';
 import { cn } from '@/lib/utils';
@@ -79,6 +78,7 @@ import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/
 import { H1 } from '@/components/ui/typography';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const hearingSchema = z.object({
   processId: z.string().min(1, 'É obrigatório selecionar um processo.'),
@@ -136,32 +136,50 @@ function ProcessSearch({ onSelect, selectedProcess }: { onSelect: (process: Proc
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" role="combobox" className="w-full justify-between h-11 font-normal">
+        <Button variant="outline" role="combobox" className="w-full justify-between h-11 font-normal bg-background">
           {selectedProcess ? selectedProcess.name : "Selecione um processo..."}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start" onOpenAutoFocus={(e) => e.preventDefault()}>
-        <Command className="flex flex-col h-full">
-          <CommandInput 
-            placeholder="Buscar processo..." 
-            value={search} 
-            onValueChange={setSearch} 
-            autoFocus
-          />
-          <CommandList className="flex-1 overflow-y-auto">
-            {isLoading && <div className="p-4 text-center text-xs text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" />Buscando...</div>}
-            <CommandEmpty>Nenhum processo encontrado.</CommandEmpty>
-            <CommandGroup>
+      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+        <div className="flex flex-col h-full bg-popover">
+          <div className="flex items-center border-b px-3">
+            <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+            <Input 
+              placeholder="Buscar processo..." 
+              value={search} 
+              onChange={(e) => setSearch(e.target.value)}
+              className="border-none focus-visible:ring-0 focus-visible:ring-offset-0 h-11 bg-transparent"
+              autoFocus
+            />
+          </div>
+          <ScrollArea className="max-h-[300px] overflow-y-auto">
+            {isLoading && (
+              <div className="p-4 text-center text-xs text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" />
+                Buscando...
+              </div>
+            )}
+            {!isLoading && search.length >= 2 && results.length === 0 && (
+              <div className="p-4 text-center text-sm text-muted-foreground">Nenhum processo encontrado.</div>
+            )}
+            <div className="p-1">
               {results.map((process) => (
-                <CommandItem key={process.id} value={process.name} onSelect={() => { onSelect(process); setOpen(false); }}>
-                  <Check className={cn("mr-2 h-4 w-4", selectedProcess?.id === process.id ? "opacity-100" : "opacity-0")} />
-                  {process.name}
-                </CommandItem>
+                <button
+                  key={process.id}
+                  onClick={() => { onSelect(process); setOpen(false); }}
+                  className={cn(
+                    "flex items-center w-full px-2 py-2 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground text-left transition-colors",
+                    selectedProcess?.id === process.id && "bg-accent text-accent-foreground"
+                  )}
+                >
+                  <span className="flex-1 truncate font-bold">{process.name}</span>
+                  {selectedProcess?.id === process.id && <Check className="ml-2 h-4 w-4" />}
+                </button>
               ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
+            </div>
+          </ScrollArea>
+        </div>
       </PopoverContent>
     </Popover>
   );
@@ -720,7 +738,7 @@ export default function AudienciasPage() {
             </Tabs>
         </div>
         
-        <AlertDialog open={!!hearingToDelete} onOpenChange={(open) => !isDeleting && !open && setHearingToDelete(null)}>
+        <AlertDialog open={!!hearingToDelete} onValueChange={(open) => !isDeleting && !open && setHearingToDelete(null)}>
             <AlertDialogContent>
                 <AlertDialogHeader>
                     <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
