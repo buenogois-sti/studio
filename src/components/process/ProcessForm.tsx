@@ -28,7 +28,7 @@ const processSchema = z.object({
   court: z.string().optional(),
   courtBranch: z.string().optional(),
   caseValue: z.coerce.number().min(0).default(0),
-  opposingParties: z.array(z.string()).default([]),
+  opposingParties: z.array(z.object({ name: z.string() })).default([]),
   description: z.string().optional(),
   status: z.enum(['Ativo', 'Arquivado', 'Pendente']).default('Ativo'),
   responsibleStaffIds: z.array(z.string()).default([]),
@@ -72,8 +72,10 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
     setIsSaving(true);
 
     try {
+      // Map object array back to string array for Firestore
       const data = {
         ...values,
+        opposingParties: values.opposingParties.map(p => p.name),
         updatedAt: serverTimestamp(),
       };
 
@@ -118,8 +120,8 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
 
           <PartiesSection
             control={form.control}
-            partyFields={partyFields as any}
-            onAddParty={() => addParty('')}
+            partyFields={partyFields}
+            onAddParty={() => addParty({ name: '' })}
             onRemoveParty={removeParty}
           />
         </fieldset>
@@ -158,8 +160,9 @@ function getDefaultValues(process?: Process | null): ProcessFormValues {
     clientId: process.clientId || '',
     name: process.name || '',
     processNumber: process.processNumber || '',
-    status: process.status || 'Ativo',
-    opposingParties: process.opposingParties || [],
+    status: (process.status as 'Ativo' | 'Arquivado' | 'Pendente') || 'Ativo',
+    // Convert string array to object array for the form
+    opposingParties: process.opposingParties?.map(name => ({ name })) || [],
     responsibleStaffIds: process.responsibleStaffIds || [],
     leadLawyerId: process.leadLawyerId || '',
     defaultLocation: process.defaultLocation || '',

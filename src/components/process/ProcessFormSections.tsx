@@ -1,8 +1,8 @@
 'use client';
 
 import React from 'react';
-import { Building, Gavel, User, LayoutGrid, Users as UsersIcon, Plus, Trash2 } from 'lucide-react';
-import { Control, FieldArray } from 'react-hook-form';
+import { Building, Gavel, User, LayoutGrid, Plus, Trash2 } from 'lucide-react';
+import { Control, FieldArrayWithId } from 'react-hook-form';
 
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
@@ -16,7 +16,6 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { H2 } from '@/components/ui/typography';
 import { LocationSearch } from '@/components/shared/LocationSearch';
 import { ClientSearchInput } from './ClientSearchInput';
 import { cn } from '@/lib/utils';
@@ -83,6 +82,7 @@ export function IdentificationSection({
                 <Input
                   placeholder="Ex: Reclamatória Trabalhista - João Silva"
                   className="h-11"
+                  onKeyDown={(e) => e.stopPropagation()}
                   {...field}
                 />
               </FormControl>
@@ -121,7 +121,12 @@ export function IdentificationSection({
             <FormItem>
               <FormLabel>Número do Processo (CNJ)</FormLabel>
               <FormControl>
-                <Input placeholder="0000000-00.0000.0.00.0000" className="h-11 font-mono" {...field} />
+                <Input 
+                  placeholder="0000000-00.0000.0.00.0000" 
+                  className="h-11 font-mono" 
+                  onKeyDown={(e) => e.stopPropagation()}
+                  {...field} 
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -135,7 +140,13 @@ export function IdentificationSection({
             <FormItem>
               <FormLabel>Valor da Causa (R$)</FormLabel>
               <FormControl>
-                <Input type="number" step="0.01" className="h-11" {...field} />
+                <Input 
+                  type="number" 
+                  step="0.01" 
+                  className="h-11" 
+                  onKeyDown={(e) => e.stopPropagation()}
+                  {...field} 
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -170,7 +181,12 @@ export function CourtSection({ control }: CourtSectionProps) {
             <FormItem>
               <FormLabel>Tribunal / Fórum</FormLabel>
               <FormControl>
-                <Input placeholder="Ex: TRT-2 / Fórum SBC" className="h-11" {...field} />
+                <Input 
+                  placeholder="Ex: TRT-2 / Fórum SBC" 
+                  className="h-11" 
+                  onKeyDown={(e) => e.stopPropagation()}
+                  {...field} 
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -184,7 +200,12 @@ export function CourtSection({ control }: CourtSectionProps) {
             <FormItem>
               <FormLabel>Vara / Câmara</FormLabel>
               <FormControl>
-                <Input placeholder="Ex: 2ª Vara do Trabalho" className="h-11" {...field} />
+                <Input 
+                  placeholder="Ex: 2ª Vara do Trabalho" 
+                  className="h-11" 
+                  onKeyDown={(e) => e.stopPropagation()}
+                  {...field} 
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -304,7 +325,7 @@ export function TeamSection({ control, staff }: TeamSectionProps) {
 
 interface PartiesSectionProps {
   control: Control<ProcessFormValues>;
-  partyFields: FieldArray<ProcessFormValues, 'opposingParties'>;
+  partyFields: FieldArrayWithId<ProcessFormValues, "opposingParties", "id">[];
   onAddParty: () => void;
   onRemoveParty: (index: number) => void;
 }
@@ -339,17 +360,28 @@ export function PartiesSection({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {partyFields.map((field, index) => (
               <div key={field.id} className="flex gap-2 animate-in fade-in slide-in-from-left-2 duration-300">
-                <Input
-                  placeholder="Nome da empresa ou pessoa"
-                  className="h-11 bg-background"
-                  {...control.register(`opposingParties.${index}`)}
+                <FormField
+                  control={control}
+                  name={`opposingParties.${index}.name`}
+                  render={({ field: partyField }) => (
+                    <FormItem className="flex-1">
+                      <FormControl>
+                        <Input
+                          placeholder="Nome da empresa ou pessoa"
+                          className="h-11 bg-background"
+                          onKeyDown={(e) => e.stopPropagation()}
+                          {...partyField}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
                 />
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
                   onClick={() => onRemoveParty(index)}
-                  className="shrink-0 text-destructive hover:bg-destructive/10"
+                  className="shrink-0 text-destructive hover:bg-destructive/10 h-11"
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -373,6 +405,7 @@ export function PartiesSection({
                 <Textarea
                   placeholder="Descreva detalhes estratégicos, teses jurídicas ou notas importantes..."
                   className="min-h-[150px] resize-none text-sm bg-background"
+                  onKeyDown={(e) => e.stopPropagation()}
                   {...field}
                 />
               </FormControl>
