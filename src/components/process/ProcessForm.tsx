@@ -1,41 +1,25 @@
-
 'use client';
-import * as React from 'react';
+
+import React, { useState } from 'react';
 import { z } from 'zod';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Loader2, Plus, Trash2, User, Building, Gavel, Check, ChevronsUpDown, Search } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
+import { Form } from '@/components/ui/form';
 import { Button } from '@/components/ui/button';
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
 import { SheetFooter } from '@/components/ui/sheet';
-import { H2 } from '@/components/ui/typography';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, serverTimestamp, doc, addDoc, updateDoc } from 'firebase/firestore';
-import type { Process, Client, Staff } from '@/lib/types';
 import { useToast } from '@/components/ui/use-toast';
-import { Badge } from '@/components/ui/badge';
-import { LocationSearch } from '@/components/shared/LocationSearch';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { searchClients, getClientById } from '@/lib/client-actions';
-import { cn } from '@/lib/utils';
-import { ScrollArea } from '../ui/scroll-area';
+
+import type { Process, Client, Staff } from '@/lib/types';
+import {
+  IdentificationSection,
+  CourtSection,
+  TeamSection,
+  PartiesSection,
+} from './ProcessFormSections';
 
 const processSchema = z.object({
   clientId: z.string().min(1, 'Selecione um cliente.'),
@@ -52,174 +36,42 @@ const processSchema = z.object({
   defaultLocation: z.string().optional(),
 });
 
-type ProcessFormValues = z.infer<typeof processSchema>;
+export type ProcessFormValues = z.infer<typeof processSchema>;
 
 interface ProcessFormProps {
   onSave: () => void;
   process?: Process | null;
 }
 
-function ClientSearch({ onSelect, selectedClientId }: { onSelect: (client: Client) => void; selectedClientId: string }) {
-  const [open, setOpen] = React.useState(false);
-  const [search, setSearch] = React.useState('');
-  const [results, setResults] = React.useState<Client[]>([]);
-  const [isLoading, setIsLoading] = React.useState(false);
-  const [selectedClient, setSelectedClient] = React.useState<Client | null>(null);
-  const inputRef = React.useRef<HTMLInputElement>(null);
-  const { toast } = useToast();
-
-  React.useEffect(() => {
-    if (selectedClientId && !selectedClient) {
-        getClientById(selectedClientId).then(setSelectedClient).catch(console.error);
-    }
-  }, [selectedClientId, selectedClient]);
-
-  React.useEffect(() => {
-    if (open) {
-      const timer = setTimeout(() => inputRef.current?.focus(), 150);
-      return () => clearTimeout(timer);
-    }
-  }, [open]);
-
-  React.useEffect(() => {
-    if (search.length < 2) {
-      setResults([]);
-      return;
-    }
-    const timer = setTimeout(async () => {
-      setIsLoading(true);
-      try {
-        const clients = await searchClients(search);
-        setResults(clients);
-      } catch (error: any) {
-        toast({ variant: 'destructive', title: 'Erro ao Buscar Cliente', description: error.message });
-      } finally {
-        setIsLoading(false);
-      }
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [search, toast]);
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button 
-          variant="outline" 
-          role="combobox" 
-          aria-expanded={open} 
-          className="w-full justify-between h-11 font-normal bg-background"
-        >
-          {selectedClient ? (
-            <div className="flex items-center gap-2 overflow-hidden">
-              <User className="h-4 w-4 text-primary shrink-0" />
-              <span className="truncate font-bold">{selectedClient.firstName} {selectedClient.lastName}</span>
-              <span className="text-[10px] text-muted-foreground font-mono shrink-0 hidden sm:inline">({selectedClient.document})</span>
-            </div>
-          ) : "Buscar cliente por nome ou CPF..."}
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent 
-        className="w-[--radix-popover-trigger-width] p-0" 
-        align="start"
-      >
-        <div className="flex flex-col bg-popover border rounded-md">
-          <div className="flex items-center border-b px-3 py-2">
-            <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-            <Input 
-              ref={inputRef}
-              placeholder="Digite nome ou documento..." 
-              value={search} 
-              onChange={(e) => setSearch(e.target.value)}
-              className="border-none focus-visible:ring-0 focus-visible:ring-offset-0 h-10 bg-transparent"
-              autoComplete="off"
-            />
-          </div>
-          <ScrollArea className="max-h-[300px] overflow-y-auto">
-            {isLoading && (
-              <div className="p-4 text-center text-xs text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" />
-                Buscando na base...
-              </div>
-            )}
-            {!isLoading && search.length >= 2 && results.length === 0 && (
-              <div className="p-4 text-center text-sm text-muted-foreground">Nenhum cliente encontrado.</div>
-            )}
-            {search.length < 2 && (
-              <div className="p-4 text-center text-xs text-muted-foreground">Digite pelo menos 2 caracteres...</div>
-            )}
-            <div className="p-1">
-              {results.map((client) => (
-                <button
-                  key={client.id}
-                  type="button"
-                  onClick={() => { 
-                    setSelectedClient(client);
-                    onSelect(client); 
-                    setOpen(false); 
-                  }}
-                  className={cn(
-                    "flex items-start gap-3 w-full px-3 py-2.5 text-sm rounded-md transition-colors text-left",
-                    "hover:bg-accent hover:text-accent-foreground cursor-pointer",
-                    selectedClientId === client.id && "bg-accent text-accent-foreground font-bold"
-                  )}
-                >
-                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                    <User className="h-4 w-4 text-primary" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <span className="block truncate font-bold">{client.firstName} {client.lastName}</span>
-                    <span className="block text-[10px] text-muted-foreground font-mono uppercase tracking-tighter">Doc: {client.document}</span>
-                  </div>
-                  {selectedClientId === client.id && <Check className="ml-2 h-4 w-4 shrink-0 self-center" />}
-                </button>
-              ))}
-            </div>
-          </ScrollArea>
-        </div>
-      </PopoverContent>
-    </Popover>
-  );
-}
-
 export function ProcessForm({ onSave, process }: ProcessFormProps) {
   const { firestore } = useFirebase();
   const { toast } = useToast();
-  const [isSaving, setIsSaving] = React.useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
-  const staffQuery = useMemoFirebase(() => firestore ? collection(firestore, 'staff') : null, [firestore]);
+  // Fetch staff data
+  const staffQuery = useMemoFirebase(
+    () => (firestore ? collection(firestore, 'staff') : null),
+    [firestore]
+  );
   const { data: staff } = useCollection<Staff>(staffQuery);
 
+  // Initialize form
   const form = useForm<ProcessFormValues>({
     resolver: zodResolver(processSchema),
-    defaultValues: process ? {
-        ...process,
-        opposingParties: process.opposingParties || [],
-        responsibleStaffIds: process.responsibleStaffIds || [],
-        leadLawyerId: process.leadLawyerId || '',
-        defaultLocation: process.defaultLocation || '',
-    } : {
-        clientId: '',
-        name: '',
-        processNumber: '',
-        status: 'Ativo',
-        opposingParties: [],
-        responsibleStaffIds: [],
-        leadLawyerId: '',
-        defaultLocation: '',
-        caseValue: 0,
-    },
+    defaultValues: getDefaultValues(process),
   });
 
-  const { fields: partyFields, append: addParty, remove: removeParty } = useFieldArray<ProcessFormValues, "opposingParties">({
+  // Manage opposing parties field array
+  const { fields: partyFields, append: addParty, remove: removeParty } = useFieldArray({
     control: form.control,
-    name: "opposingParties",
+    name: 'opposingParties',
   });
 
+  // Form submission handler
   async function onSubmit(values: ProcessFormValues) {
     if (!firestore) return;
     setIsSaving(true);
-    
+
     try {
       const data = {
         ...values,
@@ -227,270 +79,97 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
       };
 
       if (process?.id) {
+        // Update existing process
         const ref = doc(firestore, 'processes', process.id);
         await updateDoc(ref, data);
         toast({ title: 'Processo atualizado!' });
       } else {
+        // Create new process
         const col = collection(firestore, 'processes');
         await addDoc(col, { ...data, createdAt: serverTimestamp() });
         toast({ title: 'Processo criado!' });
       }
       onSave();
     } catch (error: any) {
-        toast({ variant: 'destructive', title: 'Erro ao salvar', description: error.message });
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao salvar',
+        description: error.message,
+      });
     } finally {
-        setIsSaving(false);
+      setIsSaving(false);
     }
   }
+
+  const handleClientSelect = (client: Client) => {
+    form.setValue('clientId', client.id);
+  };
 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-10 py-4 pr-6">
         <fieldset disabled={isSaving} className="space-y-10">
-            
-            <section className="space-y-6">
-                <div className="flex items-center gap-2 border-b pb-2">
-                    <Gavel className="h-5 w-5 text-primary" />
-                    <H2 className="border-none pb-0">Identificação e Status</H2>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <FormField
-                        control={form.control}
-                        name="clientId"
-                        render={({ field }) => (
-                        <FormItem className="md:col-span-2">
-                            <FormLabel>Cliente Principal *</FormLabel>
-                            <FormControl>
-                                <ClientSearch 
-                                    selectedClientId={field.value} 
-                                    onSelect={(client) => field.onChange(client.id)} 
-                                />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                        )}
-                    />
+          {/* Identification and Status Section */}
+          <IdentificationSection
+            control={form.control}
+            onClientSelect={handleClientSelect}
+            selectedClientId={form.watch('clientId')}
+          />
 
-                    <FormField
-                        control={form.control}
-                        name="status"
-                        render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Status Operacional *</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl><SelectTrigger className="h-11"><SelectValue placeholder="Status..." /></SelectTrigger></FormControl>
-                            <SelectContent>
-                                <SelectItem value="Ativo">Ativo</SelectItem>
-                                <SelectItem value="Pendente">Pendente</SelectItem>
-                                <SelectItem value="Arquivado">Arquivado</SelectItem>
-                            </SelectContent>
-                            </Select>
-                            <FormMessage />
-                        </FormItem>
-                        )}
-                    />
+          {/* Court and Location Section */}
+          <CourtSection control={form.control} />
 
-                    <FormField
-                        control={form.control}
-                        name="name"
-                        render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Título do Processo *</FormLabel>
-                            <FormControl><Input placeholder="Ex: Reclamatória Trabalhista - João Silva" className="h-11" {...field} /></FormControl>
-                            <FormMessage />
-                        </FormItem>
-                        )}
-                    />
+          {/* Team Section */}
+          <TeamSection control={form.control} staff={staff} />
 
-                    <FormField
-                        control={form.control}
-                        name="processNumber"
-                        render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Número do Processo (CNJ)</FormLabel>
-                            <FormControl><Input placeholder="0000000-00.0000.0.00.0000" className="h-11" {...field} /></FormControl>
-                            <FormMessage />
-                        </FormItem>
-                        )}
-                    />
-
-                    <FormField
-                        control={form.control}
-                        name="caseValue"
-                        render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Valor da Causa (R$)</FormLabel>
-                            <FormControl><Input type="number" step="0.01" className="h-11" {...field} /></FormControl>
-                            <FormMessage />
-                        </FormItem>
-                        )}
-                    />
-                </div>
-            </section>
-
-            <section className="space-y-6">
-                <div className="flex items-center gap-2 border-b pb-2">
-                    <Building className="h-5 w-5 text-primary" />
-                    <H2 className="border-none pb-0">Juízo e Localização</H2>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <FormField
-                        control={form.control}
-                        name="court"
-                        render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Tribunal / Fórum</FormLabel>
-                            <FormControl><Input placeholder="Ex: TRT-2 / Fórum SBC" className="h-11" {...field} /></FormControl>
-                            <FormMessage />
-                        </FormItem>
-                        )}
-                    />
-
-                    <FormField
-                        control={form.control}
-                        name="courtBranch"
-                        render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Vara / Câmara</FormLabel>
-                            <FormControl><Input placeholder="Ex: 2ª Vara do Trabalho" className="h-11" {...field} /></FormControl>
-                            <FormMessage />
-                        </FormItem>
-                        )}
-                    />
-
-                    <FormField
-                        control={form.control}
-                        name="defaultLocation"
-                        render={({ field }) => (
-                        <FormItem className="md:col-span-2">
-                            <FormLabel>Local Padrão de Audiências (Sugerido)</FormLabel>
-                            <FormControl>
-                                <LocationSearch 
-                                    value={field.value || ''} 
-                                    onSelect={field.onChange} 
-                                    placeholder="Defina o local onde este processo costuma ter audiências..."
-                                />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                        )}
-                    />
-                </div>
-            </section>
-
-            <section className="space-y-6">
-                <div className="flex items-center gap-2 border-b pb-2">
-                    <User className="h-5 w-5 text-primary" />
-                    <H2 className="border-none pb-0">Equipe e Responsáveis</H2>
-                </div>
-                
-                <div className="space-y-6">
-                    <FormField
-                        control={form.control}
-                        name="leadLawyerId"
-                        render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Advogado Responsável (Líder) *</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                <FormControl><SelectTrigger className="h-11"><SelectValue placeholder="Selecione o advogado líder..." /></SelectTrigger></FormControl>
-                                <SelectContent>
-                                    {staff?.filter(s => s.role === 'lawyer').map(s => (
-                                        <SelectItem key={s.id} value={s.id}>{s.firstName} {s.lastName}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            <FormMessage />
-                        </FormItem>
-                        )}
-                    />
-
-                    <FormField
-                        control={form.control}
-                        name="responsibleStaffIds"
-                        render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Outros Membros da Equipe (Apoio/Estagiários)</FormLabel>
-                            <div className="flex flex-wrap gap-2 p-3 rounded-xl border bg-muted/20">
-                                {staff?.map(s => {
-                                    const isSelected = field.value.includes(s.id);
-                                    return (
-                                        <Badge 
-                                            key={s.id} 
-                                            variant={isSelected ? "default" : "outline"}
-                                            className={cn(
-                                                "cursor-pointer py-1.5 px-4 transition-all",
-                                                isSelected ? "bg-primary text-primary-foreground" : "hover:bg-primary/10"
-                                            )}
-                                            onClick={() => {
-                                                const newValue = isSelected 
-                                                    ? field.value.filter(id => id !== s.id)
-                                                    : [...field.value, s.id];
-                                                field.onChange(newValue);
-                                            }}
-                                        >
-                                            {s.firstName} {s.lastName}
-                                        </Badge>
-                                    );
-                                })}
-                            </div>
-                            <FormMessage />
-                        </FormItem>
-                        )}
-                    />
-                </div>
-            </section>
-
-            <section className="space-y-6">
-                <div className="flex items-center gap-2 border-b pb-2">
-                    <Building className="h-5 w-5 text-primary" />
-                    <H2 className="border-none pb-0">Partes Contrárias e Notas</H2>
-                </div>
-                <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                        <FormLabel>Réus / Opostos</FormLabel>
-                        <Button type="button" variant="outline" size="sm" onClick={() => addParty('')} className="h-8 text-xs font-bold uppercase">
-                            <Plus className="h-3 w-3 mr-1" /> Adicionar Parte
-                        </Button>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {partyFields.map((field, index) => (
-                            <div key={field.id} className="flex gap-2 animate-in fade-in slide-in-from-left-2 duration-300">
-                                <Input 
-                                    placeholder="Nome da empresa ou pessoa" 
-                                    className="h-11"
-                                    {...form.register(`opposingParties.${index}` as any)} 
-                                />
-                                <Button type="button" variant="ghost" size="icon" onClick={() => removeParty(index)} className="shrink-0 text-destructive hover:bg-destructive/10">
-                                    <Trash2 className="h-4 w-4" />
-                                </Button>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-
-                <FormField
-                    control={form.control}
-                    name="description"
-                    render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Estratégia e Observações</FormLabel>
-                        <FormControl><Textarea placeholder="Descreva detalhes estratégicos..." className="min-h-[120px] resize-none text-sm" {...field} /></FormControl>
-                        <FormMessage />
-                    </FormItem>
-                    )}
-                />
-            </section>
-
+          {/* Opposing Parties Section */}
+          <PartiesSection
+            control={form.control}
+            partyFields={partyFields as any}
+            onAddParty={() => addParty('')}
+            onRemoveParty={removeParty}
+          />
         </fieldset>
 
+        {/* Form Footer */}
         <SheetFooter className="border-t pt-6">
-            <Button type="button" variant="outline" onClick={onSave} disabled={isSaving}>Cancelar</Button>
-            <Button type="submit" disabled={isSaving} className="min-w-[150px]">
-                {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {process ? 'Salvar Alterações' : 'Cadastrar Processo'}
-            </Button>
+          <Button type="button" variant="outline" onClick={onSave} disabled={isSaving}>
+            Cancelar
+          </Button>
+          <Button type="submit" disabled={isSaving} className="min-w-[150px]">
+            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {process ? 'Salvar Alterações' : 'Cadastrar Processo'}
+          </Button>
         </SheetFooter>
       </form>
     </Form>
   );
+}
+
+// ============================================================================
+// HELPERS
+// ============================================================================
+
+function getDefaultValues(process?: Process | null): ProcessFormValues {
+  if (!process) {
+    return {
+      clientId: '',
+      name: '',
+      processNumber: '',
+      status: 'Ativo',
+      opposingParties: [],
+      responsibleStaffIds: [],
+      leadLawyerId: '',
+      defaultLocation: '',
+      caseValue: 0,
+    };
+  }
+
+  return {
+    ...process,
+    opposingParties: process.opposingParties || [],
+    responsibleStaffIds: process.responsibleStaffIds || [],
+    leadLawyerId: process.leadLawyerId || '',
+    defaultLocation: process.defaultLocation || '',
+  };
 }
