@@ -35,7 +35,7 @@ export function ClientSearchInput({ onSelect, selectedClientId }: ClientSearchIn
     }
   }, [selectedClientId, selectedClient]);
 
-  // Foco manual para evitar conflitos com janelas laterais (Sheet)
+  // Foco manual com pequeno atraso para burlar o focus-trap da Sheet/Modal do Radix
   useEffect(() => {
     if (open) {
       const timer = setTimeout(() => {
@@ -111,7 +111,7 @@ export function ClientSearchInput({ onSelect, selectedClientId }: ClientSearchIn
       >
         <div 
           className="flex flex-col bg-popover border shadow-2xl rounded-xl overflow-hidden"
-          onKeyDown={(e) => e.stopPropagation()} // IMPEDE que a Sheet roube o teclado
+          onKeyDown={(e) => e.stopPropagation()} // IMPEDE que a Sheet pai capture o teclado
         >
           <div className="flex items-center border-b px-3 bg-muted/10">
             <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
@@ -122,6 +122,7 @@ export function ClientSearchInput({ onSelect, selectedClientId }: ClientSearchIn
               onChange={(e) => setSearch(e.target.value)}
               className="border-none focus-visible:ring-0 focus-visible:ring-offset-0 h-11 bg-transparent"
               autoComplete="off"
+              onKeyDown={(e) => e.stopPropagation()} // PROTEÇÃO ADICIONAL PARA DIGITAÇÃO
             />
             {search && (
               <button onClick={() => setSearch('')} className="ml-auto hover:text-primary p-1">
@@ -150,7 +151,7 @@ export function ClientSearchInput({ onSelect, selectedClientId }: ClientSearchIn
                   <button
                     key={client.id}
                     type="button"
-                    onMouseDown={(e) => e.preventDefault()} 
+                    onMouseDown={(e) => e.preventDefault()} // Evita perda de foco do input ao clicar
                     onClick={() => handleSelect(client)}
                     className={cn(
                       'flex items-center gap-3 w-full px-3 py-2.5 text-sm rounded-lg transition-all text-left group',

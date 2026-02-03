@@ -108,9 +108,11 @@ export function LocationSearch({ value, onSelect, placeholder = "Pesquisar local
         className="w-[var(--radix-popover-trigger-width)] p-0 z-[100]" 
         align="start"
         onOpenAutoFocus={(e) => e.preventDefault()}
-        onKeyDown={(e) => e.stopPropagation()}
       >
-        <div className="flex flex-col h-full bg-popover border shadow-xl rounded-xl overflow-hidden">
+        <div 
+          className="flex flex-col h-full bg-popover border shadow-xl rounded-xl overflow-hidden"
+          onKeyDown={(e) => e.stopPropagation()} // IMPEDE que a Sheet pai capture o teclado
+        >
           <div className="flex items-center border-b px-3 bg-muted/10">
             <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
             <Input 
@@ -118,7 +120,7 @@ export function LocationSearch({ value, onSelect, placeholder = "Pesquisar local
               placeholder="Digite o fórum ou um endereço..." 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.stopPropagation()} // PROTEÇÃO PARA DIGITAÇÃO
               className="border-none focus-visible:ring-0 focus-visible:ring-offset-0 h-11 bg-transparent"
             />
           </div>

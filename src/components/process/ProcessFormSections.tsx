@@ -274,9 +274,9 @@ export function IdentificationSection({ control }: { control: Control<ProcessFor
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  <SelectItem value="Ativo">🟢 Ativo</SelectItem>
-                  <SelectItem value="Pendente">🟡 Pendente</SelectItem>
-                  <SelectItem value="Arquivado">⚪ Arquivado</SelectItem>
+                  <SelectItem value="Ativo">Ativo</SelectItem>
+                  <SelectItem value="Pendente">Pendente</SelectItem>
+                  <SelectItem value="Arquivado">Arquivado</SelectItem>
                 </SelectContent>
               </Select>
               <FormMessage />
