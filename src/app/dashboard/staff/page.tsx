@@ -15,7 +15,8 @@ import {
   UserCheck,
   GraduationCap,
   DollarSign,
-  AlertCircle
+  AlertCircle,
+  UserCircle
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 
@@ -25,7 +26,6 @@ import {
   Card,
   CardContent,
   CardHeader,
-  CardTitle,
 } from '@/components/ui/card';
 import {
   DropdownMenu,
@@ -54,6 +54,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { StaffForm } from '@/components/staff/StaffForm';
+import { StaffDetailsSheet } from '@/components/staff/StaffDetailsSheet';
 import { Input } from '@/components/ui/input';
 
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
@@ -97,6 +98,8 @@ function StaffBalance({ staffId }: { staffId: string }) {
 
 export default function StaffPage() {
   const [isSheetOpen, setIsSheetOpen] = React.useState(false);
+  const [isDetailsOpen, setIsDetailsOpen] = React.useState(false);
+  const [selectedStaffForDetails, setSelectedStaffForDetails] = React.useState<Staff | null>(null);
   const [editingStaff, setEditingStaff] = React.useState<Staff | null>(null);
   const [staffToDelete, setStaffToDelete] = React.useState<Staff | null>(null);
   const [isDeleting, setIsDeleting] = React.useState(false);
@@ -111,7 +114,7 @@ export default function StaffPage() {
     [firestore]
   );
   const { data: staffData, isLoading: isLoadingStaff } = useCollection<Staff>(staffQuery);
-  const staff = staffData || [];
+  const staffList = staffData || [];
   
   const processesQuery = useMemoFirebase(
     () => (firestore ? collection(firestore, 'processes') : null),
@@ -123,25 +126,25 @@ export default function StaffPage() {
   const isLoading = status === 'loading' || isLoadingStaff || isLoadingProcesses;
 
   const stats = React.useMemo(() => {
-      const total = staff.length;
-      const lawyers = staff.filter(s => s.role === 'lawyer').length;
-      const interns = staff.filter(s => s.role === 'intern').length;
+      const total = staffList.length;
+      const lawyers = staffList.filter(s => s.role === 'lawyer').length;
+      const interns = staffList.filter(s => s.role === 'intern').length;
       const activeProcesses = processes.filter(p => p.status === 'Ativo').length;
       const avgWorkload = lawyers > 0 ? (activeProcesses / lawyers).toFixed(1) : '0';
 
       return { total, lawyers, interns, avgWorkload };
-  }, [staff, processes]);
+  }, [staffList, processes]);
 
   const filteredStaff = React.useMemo(() => {
-    if (!searchTerm.trim()) return staff;
+    if (!searchTerm.trim()) return staffList;
     const queryStr = searchTerm.toLowerCase();
-    return staff.filter(member => {
+    return staffList.filter(member => {
       const fullName = `${member.firstName} ${member.lastName}`.toLowerCase();
       const email = member.email.toLowerCase();
       const role = (roleLabels[member.role] || member.role).toLowerCase();
       return fullName.includes(queryStr) || email.includes(queryStr) || role.includes(queryStr);
     });
-  }, [staff, searchTerm]);
+  }, [staffList, searchTerm]);
 
   const handleAddNew = () => {
     setEditingStaff(null);
@@ -151,6 +154,11 @@ export default function StaffPage() {
   const handleEdit = (member: Staff) => {
     setEditingStaff(member);
     setIsSheetOpen(true);
+  };
+
+  const handleViewDetails = (member: Staff) => {
+    setSelectedStaffForDetails(member);
+    setIsDetailsOpen(true);
   };
 
   const handleDeleteTrigger = (member: Staff) => {
@@ -297,8 +305,15 @@ export default function StaffPage() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-48">
                                 <DropdownMenuLabel>Ações de Equipe</DropdownMenuLabel>
-                                <DropdownMenuItem onClick={() => handleEdit(member)} className="cursor-pointer">Editar Cadastro</DropdownMenuItem>
-                                <DropdownMenuItem className="cursor-pointer">Relatório de Atividades</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleViewDetails(member)} className="cursor-pointer">
+                                    <UserCircle className="mr-2 h-4 w-4 text-primary" /> Ver Detalhes
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleEdit(member)} className="cursor-pointer">
+                                    Editar Cadastro
+                                </DropdownMenuItem>
+                                <DropdownMenuItem className="cursor-pointer">
+                                    Relatório de Atividades
+                                </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem className="text-destructive cursor-pointer" onClick={() => handleDeleteTrigger(member)}>Excluir Membro</DropdownMenuItem>
                             </DropdownMenuContent>
@@ -406,6 +421,13 @@ export default function StaffPage() {
             </ScrollArea>
             </SheetContent>
         </Sheet>
+
+        <StaffDetailsSheet 
+            staff={selectedStaffForDetails} 
+            processes={processes}
+            open={isDetailsOpen} 
+            onOpenChange={setIsDetailsOpen} 
+        />
 
         <AlertDialog open={!!staffToDelete} onOpenChange={(open) => !isDeleting && !open && setStaffToDelete(null)}>
             <AlertDialogContent className="sm:max-w-xl">

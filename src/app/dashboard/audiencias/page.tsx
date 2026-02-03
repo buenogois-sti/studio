@@ -32,7 +32,7 @@ import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection } from 'firebase/firestore';
 import type { Hearing, Process, Client, HearingStatus, HearingType } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -208,12 +208,12 @@ function NewHearingDialog({ onHearingCreated, hearingsData }: { onHearingCreated
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm" className="h-9 gap-1 shadow-md bg-primary hover:bg-primary/90 text-primary-foreground">
+      <Button asChild size="sm" className="h-9 gap-1 shadow-md bg-primary hover:bg-primary/90 text-primary-foreground">
+        <button onClick={() => setOpen(true)}>
           <PlusCircle className="h-4 w-4" />
           <span>Novo Agendamento</span>
-        </Button>
-      </DialogTrigger>
+        </button>
+      </Button>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Agendar Nova Audiência</DialogTitle>

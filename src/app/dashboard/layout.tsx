@@ -43,6 +43,7 @@ import {
   AlertCircle,
   Loader2,
   Library,
+  BarChart,
 } from 'lucide-react';
 import type { UserProfile } from '@/lib/types';
 import {
@@ -87,6 +88,12 @@ const navItems = [
     roles: ['admin', 'financial'],
   },
   {
+    href: '/dashboard/relatorios',
+    label: 'Relatórios',
+    icon: BarChart,
+    roles: ['admin', 'financial'],
+  },
+  {
     href: '/dashboard/acervo',
     label: 'Acervo',
     icon: Library,
@@ -112,6 +119,7 @@ const BreadcrumbMap: { [key: string]: string } = {
   '/dashboard/processos': 'Processos',
   '/dashboard/audiencias': 'Audiências',
   '/dashboard/financeiro': 'Financeiro',
+  '/dashboard/relatorios': 'Relatórios Gerenciais',
   '/dashboard/acervo': 'Acervo de Modelos',
   '/dashboard/staff': 'Equipe',
   '/dashboard/configuracoes': 'Configurações',
@@ -242,8 +250,6 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
     const currentNavItem = getBestNavItemForPath(pathname);
     const hasPermission = userProfile && currentNavItem && currentNavItem.roles.includes(userProfile.role);
 
-    // If there's a server config error, show a specific error page instead of the content.
-    // This prevents the app from crashing and shows a clear message.
     if (session?.error && session.error.startsWith('ServerConfigError:')) {
         return (
              <div className="flex flex-1 h-screen w-screen items-center justify-center rounded-lg bg-background">
@@ -298,7 +304,6 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
             </SidebarContent>
             <SidebarFooter className="justify-center h-14 border-t group-data-[collapsible=icon]:justify-center">
             <div className="group-data-[collapsible=icon]:hidden w-full">
-                {/* User info can go here if needed in footer as well */}
             </div>
             </SidebarFooter>
         </Sidebar>
