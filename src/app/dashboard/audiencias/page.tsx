@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -23,7 +24,8 @@ import {
   Search,
   Video,
   Building2,
-  Globe
+  Globe,
+  User
 } from 'lucide-react';
 import { format, addDays, isToday, isSameDay, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, addMonths, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -145,7 +147,12 @@ function ProcessSearch({ onSelect, selectedProcess }: { onSelect: (process: Proc
     <Popover open={open} onOpenChange={setOpen} modal={false}>
       <PopoverTrigger asChild>
         <Button variant="outline" role="combobox" className="w-full justify-between h-11 font-normal bg-background">
-          {selectedProcess ? selectedProcess.name : "Selecione um processo..."}
+          {selectedProcess ? (
+            <div className="flex items-center gap-2 overflow-hidden">
+              <Gavel className="h-4 w-4 text-primary shrink-0" />
+              <span className="truncate font-bold">{selectedProcess.name}</span>
+            </div>
+          ) : "Selecione um processo..."}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
@@ -183,14 +190,22 @@ function ProcessSearch({ onSelect, selectedProcess }: { onSelect: (process: Proc
                 <button
                   key={process.id}
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => { onSelect(process); setOpen(false); }}
                   className={cn(
-                    "flex items-center w-full px-3 py-2.5 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground text-left transition-colors",
-                    selectedProcess?.id === process.id && "bg-accent text-accent-foreground"
+                    "flex items-start gap-3 w-full px-3 py-2.5 text-sm rounded-md transition-colors text-left",
+                    "hover:bg-accent hover:text-accent-foreground",
+                    selectedProcess?.id === process.id && "bg-accent text-accent-foreground font-bold"
                   )}
                 >
-                  <span className="flex-1 truncate font-bold">{process.name}</span>
-                  {selectedProcess?.id === process.id && <Check className="ml-2 h-4 w-4" />}
+                  <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                    <Gavel className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <span className="block truncate font-bold">{process.name}</span>
+                    <span className="block text-[10px] text-muted-foreground font-mono tracking-tighter">{process.processNumber || 'Sem número'}</span>
+                  </div>
+                  {selectedProcess?.id === process.id && <Check className="ml-2 h-4 w-4 shrink-0 self-center" />}
                 </button>
               ))}
             </div>

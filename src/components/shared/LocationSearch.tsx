@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -132,13 +133,18 @@ export function LocationSearch({ value, onSelect, placeholder = "Pesquisar local
 
             {apiResults.length > 0 && (
               <div className="p-1">
-                <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase">Endereços Encontrados</div>
+                <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-widest">Endereços Encontrados</div>
                 {apiResults.map((address) => (
                   <button
                     key={address}
                     type="button"
+                    onMouseDown={(e) => e.preventDefault()}
                     onClick={() => { onSelect(address); setOpen(false); }}
-                    className="flex items-start gap-2 w-full px-3 py-2.5 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground text-left"
+                    className={cn(
+                      "flex items-start gap-2 w-full px-3 py-2.5 text-sm rounded-md transition-colors text-left",
+                      "hover:bg-accent hover:text-accent-foreground",
+                      value === address && "bg-accent text-accent-foreground font-bold"
+                    )}
                   >
                     <Globe className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
                     <span className="flex-1 text-xs leading-tight line-clamp-2">{address}</span>
@@ -150,15 +156,22 @@ export function LocationSearch({ value, onSelect, placeholder = "Pesquisar local
 
             {groupedLocations.map((group) => (
               <div key={group.label} className="p-1 border-t first:border-t-0">
-                <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase">{group.label}</div>
+                <div className="px-2 py-1.5 text-[10px] font-black text-muted-foreground uppercase tracking-widest">{group.label}</div>
                 {group.items.map((item) => (
                   <button
                     key={item.name}
                     type="button"
+                    onMouseDown={(e) => e.preventDefault()}
                     onClick={() => { onSelect(item.name); setOpen(false); }}
-                    className="flex items-center gap-2 w-full px-3 py-2.5 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground text-left"
+                    className={cn(
+                      "flex items-center gap-3 w-full px-3 py-2 text-sm rounded-md transition-colors text-left",
+                      "hover:bg-accent hover:text-accent-foreground",
+                      value === item.name && "bg-accent text-accent-foreground font-bold"
+                    )}
                   >
-                    <item.icon className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <div className="h-7 w-7 rounded-md bg-muted flex items-center justify-center shrink-0">
+                      <item.icon className="h-4 w-4 text-muted-foreground" />
+                    </div>
                     <span className="flex-1 truncate">{item.name}</span>
                     {value === item.name && <Check className="h-4 w-4 shrink-0" />}
                   </button>
@@ -170,8 +183,9 @@ export function LocationSearch({ value, onSelect, placeholder = "Pesquisar local
               <div className="p-1 border-t">
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => { onSelect(search); setOpen(false); }}
-                  className="flex items-center gap-2 w-full px-3 py-3 text-sm rounded-sm hover:bg-accent text-primary font-bold text-left"
+                  className="flex items-center gap-2 w-full px-3 py-3 text-sm rounded-md hover:bg-accent text-primary font-bold text-left"
                 >
                   <PlusCircle className="h-4 w-4" />
                   <span>Usar: "{search}"</span>

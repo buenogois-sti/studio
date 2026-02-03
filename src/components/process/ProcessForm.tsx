@@ -1,3 +1,4 @@
+
 'use client';
 import * as React from 'react';
 import { z } from 'zod';
@@ -147,21 +148,26 @@ function ClientSearch({ onSelect, selectedClientId }: { onSelect: (client: Clien
                 <button
                     key={client.id}
                     type="button"
+                    onMouseDown={(e) => e.preventDefault()}
                     onClick={() => { 
                         setSelectedClient(client);
                         onSelect(client); 
                         setOpen(false); 
                     }}
                     className={cn(
-                      "flex flex-col items-start w-full px-3 py-2 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground text-left transition-colors",
-                      selectedClientId === client.id && "bg-accent text-accent-foreground"
+                      "flex items-start gap-3 w-full px-3 py-2.5 text-sm rounded-md transition-colors text-left",
+                      "hover:bg-accent hover:text-accent-foreground",
+                      selectedClientId === client.id && "bg-accent text-accent-foreground font-bold"
                     )}
                 >
-                  <div className="flex items-center w-full">
-                    <span className="font-bold flex-1">{client.firstName} {client.lastName}</span>
-                    {selectedClientId === client.id && <Check className="ml-2 h-4 w-4" />}
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <User className="h-4 w-4 text-primary" />
                   </div>
-                  <span className="text-[10px] text-muted-foreground font-mono uppercase tracking-tighter">Doc: {client.document}</span>
+                  <div className="flex-1 min-w-0">
+                    <span className="block truncate font-bold">{client.firstName} {client.lastName}</span>
+                    <span className="block text-[10px] text-muted-foreground font-mono uppercase tracking-tighter">Doc: {client.document}</span>
+                  </div>
+                  {selectedClientId === client.id && <Check className="ml-2 h-4 w-4 shrink-0 self-center" />}
                 </button>
               ))}
             </div>
