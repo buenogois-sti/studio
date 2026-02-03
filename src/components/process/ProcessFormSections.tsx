@@ -58,7 +58,7 @@ interface ClientsSectionProps {
 export function ClientsSection({ control, onClientSelect }: ClientsSectionProps) {
   const { fields: secondaryFields, append: addSecondary, remove: removeSecondary } = useFieldArray({
     control,
-    name: 'secondaryClientIds' as any,
+    name: 'secondaryClientIds',
   });
 
   return (
@@ -100,7 +100,7 @@ export function ClientsSection({ control, onClientSelect }: ClientsSectionProps)
                 <div className="flex-1">
                   <FormField
                     control={control}
-                    name={`secondaryClientIds.${index}` as any}
+                    name={`secondaryClientIds.${index}`}
                     render={({ field: subField }) => (
                       <ClientSearchInput 
                         selectedClientId={subField.value} 
@@ -365,7 +365,7 @@ export function CourtSection({ control }: { control: Control<ProcessFormValues> 
                   <LocationSearch
                     value={field.value || ''}
                     onSelect={(val) => field.onChange(val)}
-                    placeholder="Digite o nome do fórum ou tribunal..."
+                    placeholder="Digite o nome do fórum ou um endereço..."
                   />
                 </FormControl>
                 <FormMessage />

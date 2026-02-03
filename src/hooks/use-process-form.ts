@@ -1,9 +1,3 @@
-'use server';
-/**
- * @fileOverview Hook customizado para gerenciar a lógica do formulário de processos.
- * Centraliza validação, valores padrão e submissão para o Firestore.
- */
-
 import { useCallback, useMemo } from 'react';
 import { z } from 'zod';
 import { useToast } from '@/components/ui/use-toast';
