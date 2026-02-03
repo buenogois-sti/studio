@@ -117,7 +117,8 @@ function ProcessSearch({ onSelect, selectedProcess }: { onSelect: (process: Proc
 
   React.useEffect(() => {
     if (open) {
-      setTimeout(() => inputRef.current?.focus(), 100);
+      const timer = setTimeout(() => inputRef.current?.focus(), 150);
+      return () => clearTimeout(timer);
     }
   }, [open]);
 
@@ -162,7 +163,7 @@ function ProcessSearch({ onSelect, selectedProcess }: { onSelect: (process: Proc
               value={search} 
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key !== 'Escape') e.stopPropagation();
+                e.stopPropagation();
               }}
               className="border-none focus-visible:ring-0 focus-visible:ring-offset-0 h-11 bg-transparent"
             />

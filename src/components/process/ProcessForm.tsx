@@ -75,7 +75,8 @@ function ClientSearch({ onSelect, selectedClientId }: { onSelect: (client: Clien
 
   React.useEffect(() => {
     if (open) {
-      setTimeout(() => inputRef.current?.focus(), 100);
+      const timer = setTimeout(() => inputRef.current?.focus(), 150);
+      return () => clearTimeout(timer);
     }
   }, [open]);
 
@@ -126,7 +127,7 @@ function ClientSearch({ onSelect, selectedClientId }: { onSelect: (client: Clien
               value={search} 
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key !== 'Escape') e.stopPropagation();
+                e.stopPropagation();
               }}
               className="border-none focus-visible:ring-0 focus-visible:ring-offset-0 h-11 bg-transparent"
             />
@@ -340,7 +341,7 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
                         name="courtBranch"
                         render={({ field }) => (
                         <FormItem>
-                            <FormLabel>Vara / Câmara</H2>
+                            <FormLabel>Vara / Câmara</FormLabel>
                             <FormControl><Input placeholder="Ex: 2ª Vara do Trabalho" className="h-11" {...field} /></FormControl>
                             <FormMessage />
                         </FormItem>
