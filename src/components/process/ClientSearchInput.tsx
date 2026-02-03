@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Loader2, User, Check, ChevronsUpDown, Search } from 'lucide-react';
+import { Loader2, User, Check, ChevronsUpDown, Search, Briefcase } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,7 +37,6 @@ export function ClientSearchInput({ onSelect, selectedClientId }: ClientSearchIn
     }
   }, [selectedClientId, selectedClient]);
 
-  // Forçar o foco no input quando o popover abrir
   useEffect(() => {
     if (open) {
       const timer = setTimeout(() => {
@@ -110,7 +109,7 @@ export function ClientSearchInput({ onSelect, selectedClientId }: ClientSearchIn
         className="w-[var(--radix-popover-trigger-width)] p-0 z-[100]" 
         align="start"
         onOpenAutoFocus={(e) => e.preventDefault()}
-        onKeyDown={(e) => e.stopPropagation()} // Impede que a Sheet intercepte teclas
+        onKeyDown={(e) => e.stopPropagation()}
       >
         <div className="flex flex-col bg-popover border shadow-2xl rounded-xl overflow-hidden">
           <div className="flex items-center border-b px-3 bg-muted/10">
@@ -120,9 +119,7 @@ export function ClientSearchInput({ onSelect, selectedClientId }: ClientSearchIn
               placeholder="Digite o nome ou documento..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => {
-                e.stopPropagation(); // Garante que o teclado funcione
-              }}
+              onKeyDown={(e) => e.stopPropagation()}
               className="border-none focus-visible:ring-0 focus-visible:ring-offset-0 h-11 bg-transparent"
               autoComplete="off"
             />
@@ -138,7 +135,7 @@ export function ClientSearchInput({ onSelect, selectedClientId }: ClientSearchIn
 
             {!isLoading && search.length >= 2 && results.length === 0 && (
               <div className="p-8 text-center text-sm text-muted-foreground italic">
-                Nenhum cliente encontrado com estes dados.
+                Nenhum cliente encontrado.
               </div>
             )}
 
@@ -153,9 +150,7 @@ export function ClientSearchInput({ onSelect, selectedClientId }: ClientSearchIn
                 <button
                   key={client.id}
                   type="button"
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                  }}
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => handleSelect(client)}
                   className={cn(
                     'flex items-center gap-3 w-full px-3 py-2.5 text-sm rounded-lg transition-all text-left group',
@@ -163,19 +158,25 @@ export function ClientSearchInput({ onSelect, selectedClientId }: ClientSearchIn
                     selectedClientId === client.id && 'bg-primary/10 border border-primary/20'
                   )}
                 >
-                  <div className="h-9 w-9 rounded-full bg-muted flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors">
-                    <User className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+                  <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors relative overflow-hidden">
+                    {client.avatar ? (
+                        <img src={client.avatar} className="object-cover w-full h-full" alt="" />
+                    ) : (
+                        <User className="h-5 w-5 text-muted-foreground group-hover:text-primary" />
+                    )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <span className="block truncate font-bold group-hover:text-primary transition-colors">
+                    <span className="block truncate font-bold group-hover:text-primary transition-colors leading-tight">
                       {client.firstName} {client.lastName}
                     </span>
                     <div className="flex items-center gap-2 mt-0.5">
                         <span className="text-[10px] text-muted-foreground font-mono uppercase tracking-tighter">
-                          Doc: {client.document}
+                          {client.document}
                         </span>
                         {client.legalArea && (
-                            <Badge variant="outline" className="text-[8px] h-3.5 px-1 uppercase">{client.legalArea}</Badge>
+                            <Badge variant="secondary" className="text-[8px] h-3.5 px-1 uppercase leading-none border-none bg-primary/5 text-primary">
+                                <Briefcase className="h-2 w-2 mr-1" /> {client.legalArea}
+                            </Badge>
                         )}
                     </div>
                   </div>

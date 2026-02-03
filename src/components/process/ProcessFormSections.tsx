@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Building, Gavel, User, LayoutGrid, Plus, Trash2 } from 'lucide-react';
+import { Building, Gavel, User, LayoutGrid, Plus, Trash2, ShieldCheck, Scale, Users } from 'lucide-react';
 import { Control, FieldArrayWithId } from 'react-hook-form';
 
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -51,7 +51,7 @@ export function IdentificationSection({
 }: IdentificationSectionProps) {
   return (
     <section>
-      <SectionHeader icon={<Gavel className="h-4 w-4" />} title="Identificação do Caso" />
+      <SectionHeader icon={<Users className="h-4 w-4" />} title="Identificação do Caso" />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-muted/20 p-6 rounded-2xl border border-border/50">
         <FormField
@@ -77,7 +77,7 @@ export function IdentificationSection({
               <FormControl>
                 <Input
                   placeholder="Ex: Reclamatória Trabalhista - João Silva"
-                  className="h-11"
+                  className="h-11 border-2 focus:border-primary/50 transition-all"
                   onKeyDown={(e) => e.stopPropagation()}
                   {...field}
                 />
@@ -95,14 +95,14 @@ export function IdentificationSection({
               <FormLabel>Status Operacional *</FormLabel>
               <Select onValueChange={field.onChange} value={field.value}>
                 <FormControl>
-                  <SelectTrigger className="h-11">
+                  <SelectTrigger className="h-11 border-2">
                     <SelectValue placeholder="Status..." />
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  <SelectItem value="Ativo">Ativo</SelectItem>
-                  <SelectItem value="Pendente">Pendente</SelectItem>
-                  <SelectItem value="Arquivado">Arquivado</SelectItem>
+                  <SelectItem value="Ativo">🟢 Ativo</SelectItem>
+                  <SelectItem value="Pendente">🟡 Pendente</SelectItem>
+                  <SelectItem value="Arquivado">⚪ Arquivado</SelectItem>
                 </SelectContent>
               </Select>
               <FormMessage />
@@ -119,7 +119,7 @@ export function IdentificationSection({
               <FormControl>
                 <Input 
                   placeholder="0000000-00.0000.0.00.0000" 
-                  className="h-11 font-mono" 
+                  className="h-11 font-mono border-2 focus:border-primary/50 transition-all" 
                   onKeyDown={(e) => e.stopPropagation()}
                   {...field} 
                 />
@@ -134,12 +134,12 @@ export function IdentificationSection({
           name="caseValue"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Valor da Causa (R$)</FormLabel>
+              <FormLabel>Valor Estimado da Causa (R$)</FormLabel>
               <FormControl>
                 <Input 
                   type="number" 
                   step="0.01" 
-                  className="h-11" 
+                  className="h-11 border-2 focus:border-primary/50 transition-all" 
                   onKeyDown={(e) => e.stopPropagation()}
                   {...field} 
                 />
@@ -175,7 +175,7 @@ export function CourtSection({ control }: CourtSectionProps) {
               <FormControl>
                 <Input 
                   placeholder="Ex: TRT-2 / Fórum SBC" 
-                  className="h-11" 
+                  className="h-11 border-2 focus:border-primary/50 transition-all" 
                   onKeyDown={(e) => e.stopPropagation()}
                   {...field} 
                 />
@@ -194,7 +194,7 @@ export function CourtSection({ control }: CourtSectionProps) {
               <FormControl>
                 <Input 
                   placeholder="Ex: 2ª Vara do Trabalho" 
-                  className="h-11" 
+                  className="h-11 border-2 focus:border-primary/50 transition-all" 
                   onKeyDown={(e) => e.stopPropagation()}
                   {...field} 
                 />
@@ -209,12 +209,15 @@ export function CourtSection({ control }: CourtSectionProps) {
           name="defaultLocation"
           render={({ field }) => (
             <FormItem className="md:col-span-2">
-              <FormLabel>Local Sugerido para Audiências</FormLabel>
+              <FormLabel className="flex items-center gap-2">
+                Local Sugerido para Audiências
+                <Badge variant="outline" className="text-[8px] font-black uppercase px-1.5 h-4">API Maps</Badge>
+              </FormLabel>
               <FormControl>
                 <LocationSearch
                   value={field.value || ''}
                   onSelect={field.onChange}
-                  placeholder="Defina o local habitual deste processo..."
+                  placeholder="Busque o endereço do fórum ou local da audiência..."
                 />
               </FormControl>
               <FormMessage />
@@ -237,8 +240,8 @@ export function TeamSection({ control, staff }: TeamSectionProps) {
   return (
     <section>
       <SectionHeader
-        icon={<User className="h-4 w-4" />}
-        title="Equipe e Responsáveis"
+        icon={<ShieldCheck className="h-4 w-4" />}
+        title="Equipe Jurídica"
       />
 
       <div className="space-y-6 bg-muted/20 p-6 rounded-2xl border border-border/50">
@@ -250,8 +253,8 @@ export function TeamSection({ control, staff }: TeamSectionProps) {
               <FormLabel>Advogado Responsável (Líder) *</FormLabel>
               <Select onValueChange={field.onChange} value={field.value}>
                 <FormControl>
-                  <SelectTrigger className="h-11">
-                    <SelectValue placeholder="Selecione o advogado líder..." />
+                  <SelectTrigger className="h-11 border-2">
+                    <SelectValue placeholder="Selecione o advogado titular deste caso..." />
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
@@ -272,8 +275,8 @@ export function TeamSection({ control, staff }: TeamSectionProps) {
           name="responsibleStaffIds"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Membros de Apoio (Estagiários / Assistentes)</FormLabel>
-              <div className="flex flex-wrap gap-2 p-4 rounded-xl border bg-background/50">
+              <FormLabel>Equipe de Apoio (Colaboradores / Estagiários)</FormLabel>
+              <div className="flex flex-wrap gap-2 p-4 rounded-xl border-2 bg-background/50">
                 {staff.map((s) => {
                   const isSelected = field.value?.includes(s.id);
                   return (
@@ -323,8 +326,8 @@ export function PartiesSection({
   return (
     <section>
       <SectionHeader
-        icon={<LayoutGrid className="h-4 w-4" />}
-        title="Partes e Estratégia"
+        icon={<Scale className="h-4 w-4" />}
+        title="Partes e Estratégia Interna"
       />
 
       <div className="space-y-6 bg-muted/20 p-6 rounded-2xl border border-border/50">
@@ -352,7 +355,7 @@ export function PartiesSection({
                       <FormControl>
                         <Input
                           placeholder="Nome da empresa ou pessoa"
-                          className="h-11 bg-background"
+                          className="h-11 bg-background border-2"
                           onKeyDown={(e) => e.stopPropagation()}
                           {...partyField}
                         />
@@ -372,8 +375,8 @@ export function PartiesSection({
               </div>
             ))}
             {partyFields.length === 0 && (
-                <div className="md:col-span-2 text-center py-4 border-2 border-dashed rounded-xl opacity-40">
-                    <p className="text-xs font-bold">Nenhuma parte contrária registrada.</p>
+                <div className="md:col-span-2 text-center py-6 border-2 border-dashed rounded-xl opacity-40">
+                    <p className="text-xs font-bold uppercase tracking-widest">Nenhuma parte contrária registrada.</p>
                 </div>
             )}
           </div>
@@ -384,11 +387,11 @@ export function PartiesSection({
           name="description"
           render={({ field }) => (
             <FormItem>
-              <FormLabel className="text-foreground font-bold">Estratégia e Observações Internas</FormLabel>
+              <FormLabel className="text-foreground font-bold">Tese Jurídica e Notas Estratégicas</FormLabel>
               <FormControl>
                 <Textarea
-                  placeholder="Descreva detalhes estratégicos, teses jurídicas ou notas importantes..."
-                  className="min-h-[150px] resize-none text-sm bg-background"
+                  placeholder="Detalhamento estratégico para o advogado responsável..."
+                  className="min-h-[150px] resize-none text-sm bg-background border-2 focus:border-primary/50"
                   onKeyDown={(e) => e.stopPropagation()}
                   {...field}
                 />

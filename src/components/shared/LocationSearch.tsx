@@ -50,7 +50,6 @@ export function LocationSearch({ value, onSelect, placeholder = "Pesquisar local
   const [isSearching, setIsSearching] = React.useState(false);
   const inputRef = React.useRef<HTMLInputElement>(null);
 
-  // Forçar foco no input ao abrir
   React.useEffect(() => {
     if (open) {
       const timer = setTimeout(() => {
@@ -92,7 +91,7 @@ export function LocationSearch({ value, onSelect, placeholder = "Pesquisar local
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="w-full justify-between h-11 font-normal bg-background"
+          className="w-full justify-between h-11 font-normal bg-background border-2"
         >
           {value ? (
             <div className="flex items-center gap-2 overflow-hidden">
@@ -109,19 +108,17 @@ export function LocationSearch({ value, onSelect, placeholder = "Pesquisar local
         className="w-[var(--radix-popover-trigger-width)] p-0 z-[100]" 
         align="start"
         onOpenAutoFocus={(e) => e.preventDefault()}
-        onKeyDown={(e) => e.stopPropagation()} // Impede bloqueio pela Sheet
+        onKeyDown={(e) => e.stopPropagation()}
       >
-        <div className="flex flex-col h-full bg-popover border shadow-xl rounded-md">
-          <div className="flex items-center border-b px-3">
+        <div className="flex flex-col h-full bg-popover border shadow-xl rounded-xl overflow-hidden">
+          <div className="flex items-center border-b px-3 bg-muted/10">
             <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
             <Input 
               ref={inputRef}
               placeholder="Digite o fórum ou um endereço..." 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => {
-                e.stopPropagation(); // Garante digitação
-              }}
+              onKeyDown={(e) => e.stopPropagation()}
               className="border-none focus-visible:ring-0 focus-visible:ring-offset-0 h-11 bg-transparent"
             />
           </div>
@@ -136,7 +133,7 @@ export function LocationSearch({ value, onSelect, placeholder = "Pesquisar local
 
             {apiResults.length > 0 && (
               <div className="p-1">
-                <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-widest">Endereços Encontrados</div>
+                <div className="px-2 py-1.5 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Endereços Encontrados</div>
                 {apiResults.map((address) => (
                   <button
                     key={address}
@@ -191,7 +188,7 @@ export function LocationSearch({ value, onSelect, placeholder = "Pesquisar local
                   className="flex items-center gap-2 w-full px-3 py-3 text-sm rounded-md hover:bg-accent text-primary font-bold text-left"
                 >
                   <PlusCircle className="h-4 w-4" />
-                  <span>Usar: "{search}"</span>
+                  <span>Usar personalizado: "{search}"</span>
                 </button>
               </div>
             )}

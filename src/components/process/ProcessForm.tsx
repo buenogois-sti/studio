@@ -10,7 +10,7 @@ import { Form } from '@/components/ui/form';
 import { Button } from '@/components/ui/button';
 import { SheetFooter } from '@/components/ui/sheet';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, serverTimestamp, doc, addDoc, updateDoc } from 'firebase/firestore';
+import { collection, serverTimestamp, doc, addDoc, updateDoc, Timestamp } from 'firebase/firestore';
 import { useToast } from '@/components/ui/use-toast';
 
 import type { Process, Client, Staff } from '@/lib/types';
@@ -28,11 +28,11 @@ const processSchema = z.object({
   court: z.string().optional(),
   courtBranch: z.string().optional(),
   caseValue: z.coerce.number().min(0).default(0),
-  opposingParties: z.array(z.object({ name: z.string() })).default([]),
+  opposingParties: z.array(z.object({ name: z.string().min(1, 'Nome da parte é obrigatório') })).default([]),
   description: z.string().optional(),
   status: z.enum(['Ativo', 'Arquivado', 'Pendente']).default('Ativo'),
   responsibleStaffIds: z.array(z.string()).default([]),
-  leadLawyerId: z.string().optional(),
+  leadLawyerId: z.string().min(1, 'Defina o advogado responsável.'),
   defaultLocation: z.string().optional(),
 });
 
@@ -57,7 +57,34 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
 
   const form = useForm<ProcessFormValues>({
     resolver: zodResolver(processSchema),
-    defaultValues: React.useMemo(() => getDefaultValues(process), [process]),
+    defaultValues: React.useMemo(() => {
+      if (!process) {
+        return {
+          clientId: '',
+          name: '',
+          processNumber: '',
+          status: 'Ativo' as const,
+          opposingParties: [],
+          responsibleStaffIds: [],
+          leadLawyerId: '',
+          defaultLocation: '',
+          caseValue: 0,
+          description: '',
+        };
+      }
+      return {
+        clientId: process.clientId || '',
+        name: process.name || '',
+        processNumber: process.processNumber || '',
+        status: (process.status as 'Ativo' | 'Arquivado' | 'Pendente') || 'Ativo',
+        opposingParties: process.opposingParties?.map(name => ({ name })) || [],
+        responsibleStaffIds: process.responsibleStaffIds || [],
+        leadLawyerId: process.leadLawyerId || '',
+        defaultLocation: process.defaultLocation || '',
+        caseValue: process.caseValue || 0,
+        description: process.description || '',
+      };
+    }, [process]),
   });
 
   const { fields: partyFields, append: addParty, remove: removeParty } = useFieldArray({
@@ -87,6 +114,7 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
       }
       onSave();
     } catch (error: any) {
+      console.error("Save process error:", error);
       toast({
         variant: 'destructive',
         title: 'Erro ao salvar',
@@ -135,34 +163,4 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
       </form>
     </Form>
   );
-}
-
-function getDefaultValues(process?: Process | null): ProcessFormValues {
-  if (!process) {
-    return {
-      clientId: '',
-      name: '',
-      processNumber: '',
-      status: 'Ativo',
-      opposingParties: [],
-      responsibleStaffIds: [],
-      leadLawyerId: '',
-      defaultLocation: '',
-      caseValue: 0,
-      description: '',
-    };
-  }
-
-  return {
-    clientId: process.clientId || '',
-    name: process.name || '',
-    processNumber: process.processNumber || '',
-    status: (process.status as 'Ativo' | 'Arquivado' | 'Pendente') || 'Ativo',
-    opposingParties: process.opposingParties?.map(name => ({ name })) || [],
-    responsibleStaffIds: process.responsibleStaffIds || [],
-    leadLawyerId: process.leadLawyerId || '',
-    defaultLocation: process.defaultLocation || '',
-    caseValue: process.caseValue || 0,
-    description: process.description || '',
-  };
 }
