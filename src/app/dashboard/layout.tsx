@@ -44,6 +44,7 @@ import {
   Loader2,
   Library,
   BarChart,
+  Archive,
 } from 'lucide-react';
 import type { UserProfile } from '@/lib/types';
 import {
@@ -100,6 +101,12 @@ const navItems = [
     roles: ['admin', 'lawyer', 'assistant'],
   },
   {
+    href: '/dashboard/arquivo',
+    label: 'Arquivo',
+    icon: Archive,
+    roles: ['admin', 'lawyer'],
+  },
+  {
     href: '/dashboard/staff',
     label: 'Equipe',
     icon: Briefcase,
@@ -121,6 +128,7 @@ const BreadcrumbMap: { [key: string]: string } = {
   '/dashboard/financeiro': 'Financeiro',
   '/dashboard/relatorios': 'Relatórios Gerenciais',
   '/dashboard/acervo': 'Acervo de Modelos',
+  '/dashboard/arquivo': 'Arquivo Digital',
   '/dashboard/staff': 'Equipe',
   '/dashboard/configuracoes': 'Configurações',
 };
