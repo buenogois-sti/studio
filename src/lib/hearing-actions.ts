@@ -82,6 +82,57 @@ export async function createHearing(data: CreateHearingData) {
   }
 }
 
+export async function syncHearings() {
+  if (!firestoreAdmin) throw new Error('A conexão com o servidor de dados falhou.');
+  
+  try {
+    const hearingsSnapshot = await firestoreAdmin.collection('hearings')
+      .where('status', '==', 'PENDENTE')
+      .get();
+    
+    const { calendar } = await getGoogleApiClientsForUser();
+    let syncedCount = 0;
+
+    for (const doc of hearingsSnapshot.docs) {
+      const hearing = doc.data();
+      // Only try to sync if it doesn't have an ID yet
+      if (!hearing.googleCalendarEventId) {
+        const processDoc = await firestoreAdmin.collection('processes').doc(hearing.processId).get();
+        const processName = processDoc.exists ? processDoc.data()?.name : 'Processo';
+
+        const startDateTime = hearing.date.toDate();
+        const endDateTime = add(startDateTime, { hours: 1 });
+
+        const event = {
+          summary: `Audiência [${hearing.type}]: ${processName}`,
+          location: hearing.location,
+          description: `Status: ${hearing.status}\nTipo: ${hearing.type}\nResponsável: ${hearing.responsibleParty}\n\nSincronização Manual LexFlow\nID Interno: ${doc.id}`,
+          start: { dateTime: formatISO(startDateTime), timeZone: 'America/Sao_Paulo' },
+          end: { dateTime: formatISO(endDateTime), timeZone: 'America/Sao_Paulo' },
+        };
+
+        try {
+          const createdEvent = await calendar.events.insert({
+            calendarId: 'primary',
+            requestBody: event,
+          });
+
+          if (createdEvent.data.id) {
+            await doc.ref.update({ googleCalendarEventId: createdEvent.data.id, updatedAt: new Date() });
+            syncedCount++;
+          }
+        } catch (e) {
+          console.error(`Failed to sync hearing ${doc.id}:`, e);
+        }
+      }
+    }
+    return { success: true, syncedCount };
+  } catch (error: any) {
+    console.error('Error in syncHearings action:', error);
+    throw new Error(error.message || 'Erro na comunicação com o Google Calendar.');
+  }
+}
+
 export async function updateHearingStatus(hearingId: string, status: HearingStatus) {
     if (!firestoreAdmin) throw new Error('A conexão com o servidor de dados falhou.');
     try {

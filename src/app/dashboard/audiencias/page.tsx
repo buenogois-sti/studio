@@ -43,7 +43,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { searchProcesses } from '@/lib/process-actions';
-import { createHearing, deleteHearing, updateHearingStatus } from '@/lib/hearing-actions';
+import { createHearing, deleteHearing, updateHearingStatus, syncHearings } from '@/lib/hearing-actions';
 import { cn } from '@/lib/utils';
 import {
   Table,
@@ -197,7 +197,6 @@ function LocationSearch({ value, onSelect }: { value: string; onSelect: (val: st
             value={search}
             onValueChange={(val) => {
               setSearch(val);
-              // Allow typing custom value if no match is found
             }}
           />
           <CommandList>
@@ -508,6 +507,7 @@ function MonthCalendar({ hearings, onDateClick, processesMap }: { hearings: Hear
 export default function AudienciasPage() {
   const { firestore, isUserLoading } = useFirebase();
   const [refreshKey, setRefreshKey] = React.useState(0);
+  const [isSyncing, setIsSyncing] = React.useState(false);
   const [hearingToDelete, setHearingToDelete] = React.useState<Hearing | null>(null);
   const [isDeleting, setIsDeleting] = React.useState(false);
   const [viewMode, setViewMode] = React.useState<'list' | 'calendar'>('list');
@@ -526,6 +526,28 @@ export default function AudienciasPage() {
 
   const isLoading = isUserLoading || isLoadingHearings || isLoadingProcesses || isLoadingClients;
   
+  const handleSyncWithCalendar = async () => {
+    setIsSyncing(true);
+    try {
+        const result = await syncHearings();
+        toast({
+            title: 'Sincronização Concluída',
+            description: result.syncedCount > 0 
+                ? `${result.syncedCount} novas audiências foram adicionadas à sua agenda.` 
+                : 'Todas as audiências já estão sincronizadas com o Google Agenda.',
+        });
+        setRefreshKey(prev => prev + 1);
+    } catch (e: any) {
+        toast({
+            variant: 'destructive',
+            title: 'Falha na Sincronização',
+            description: e.message || 'Verifique se você concedeu permissão para gerenciar a agenda.',
+        });
+    } finally {
+        setIsSyncing(false);
+    }
+  };
+
   const handleUpdateStatus = async (hearingId: string, status: HearingStatus) => {
       try {
           await updateHearingStatus(hearingId, status);
@@ -572,9 +594,15 @@ export default function AudienciasPage() {
                     <p className="text-sm text-muted-foreground">Gestão integrada de compromissos judiciais.</p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" className="h-9" onClick={() => setRefreshKey(k => k+1)}>
-                        <RefreshCw className={cn("h-4 w-4 mr-2", isLoading && "animate-spin")} />
-                        Sincronizar
+                    <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="h-9" 
+                        onClick={handleSyncWithCalendar}
+                        disabled={isSyncing}
+                    >
+                        <RefreshCw className={cn("h-4 w-4 mr-2", (isLoading || isSyncing) && "animate-spin")} />
+                        {isSyncing ? 'Sincronizando...' : 'Sincronizar'}
                     </Button>
                     <NewHearingDialog onHearingCreated={() => setRefreshKey(k => k+1)} hearingsData={hearingsData} />
                 </div>
