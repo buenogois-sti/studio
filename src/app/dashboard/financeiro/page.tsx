@@ -20,11 +20,12 @@ import {
   FileText,
   DollarSign,
   Users,
-  Handshake
+  Handshake,
+  Printer
 } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, Timestamp, query, orderBy, deleteDoc, doc, getDocs } from 'firebase/firestore';
-import type { FinancialTitle, Staff, LawyerCredit } from '@/lib/types';
+import type { FinancialTitle, Staff, LawyerCredit, Client } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -46,6 +47,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { format, isBefore } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { createFinancialTitle, updateFinancialTitleStatus } from '@/lib/finance-actions';
 import {
@@ -56,6 +58,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Separator } from '@/components/ui/separator';
 
 const titleFormSchema = z.object({
   description: z.string().min(3, 'Descrição obrigatória'),
@@ -201,6 +204,76 @@ function NewTitleDialog({ onCreated }: { onCreated: () => void }) {
   );
 }
 
+function ReceiptDialog({ 
+  title, 
+  client, 
+  open, 
+  onOpenChange 
+}: { 
+  title: FinancialTitle | null; 
+  client?: Client; 
+  open: boolean; 
+  onOpenChange: (open: boolean) => void 
+}) {
+  if (!title) return null;
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const formattedValue = title.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const today = format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-2xl bg-white text-slate-900 p-0 overflow-hidden">
+        <div className="p-8 space-y-8 print:p-0">
+          <div className="flex justify-between items-start border-b pb-6">
+            <div className="space-y-1">
+              <h2 className="text-xl font-bold uppercase tracking-tighter">Bueno Gois Advogados</h2>
+              <p className="text-[10px] text-slate-500 uppercase font-medium">CNPJ: 00.000.000/0001-00</p>
+              <p className="text-[10px] text-slate-500">Rua Marechal Deodoro, 1594 - SBC/SP</p>
+            </div>
+            <div className="text-right">
+              <div className="text-2xl font-black text-slate-900">RECIBO</div>
+              <div className="text-sm font-bold text-slate-500">Nº {title.id.substring(0, 8).toUpperCase()}</div>
+            </div>
+          </div>
+
+          <div className="py-10 space-y-6 text-lg leading-relaxed">
+            <p>
+              Recebemos de <strong className="border-b-2 border-slate-900 pb-0.5">{client ? `${client.firstName} ${client.lastName}` : 'Cliente não identificado'}</strong>, 
+              inscrito no CPF/CNPJ <strong className="border-b-2 border-slate-900 pb-0.5">{client?.document || 'N/A'}</strong>, 
+              a importância de <strong className="text-2xl font-black">{formattedValue}</strong>.
+            </p>
+            
+            <p>
+              Referente a: <span className="italic text-slate-700">{title.description}</span>
+            </p>
+          </div>
+
+          <div className="pt-12 flex flex-col items-center gap-12">
+            <p className="text-sm font-medium">São Bernardo do Campo, {today}</p>
+            
+            <div className="flex flex-col items-center w-full max-w-xs pt-4">
+              <div className="w-full border-t border-slate-900 mb-2" />
+              <p className="text-xs font-bold uppercase tracking-widest">Bueno Gois Advogados e Associados</p>
+              <p className="text-[10px] text-slate-500">Representante Legal</p>
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter className="p-4 bg-slate-50 border-t print:hidden">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Fechar</Button>
+          <Button onClick={handlePrint} className="gap-2">
+            <Printer className="h-4 w-4" /> Imprimir Recibo
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function RepassesTab() {
     const { firestore } = useFirebase();
     const staffQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'staff') : null), [firestore]);
@@ -284,10 +357,15 @@ export default function FinanceiroPage() {
   const { firestore, isUserLoading } = useFirebase();
   const [refreshKey, setRefreshKey] = React.useState(0);
   const [isProcessing, setIsProcessing] = React.useState<string | null>(null);
+  const [receiptTitle, setReceiptTitle] = React.useState<FinancialTitle | null>(null);
   const { toast } = useToast();
 
   const titlesQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'financial_titles'), orderBy('dueDate', 'desc')) : null), [firestore, refreshKey]);
   const { data: titlesData, isLoading: isLoadingTitles } = useCollection<FinancialTitle>(titlesQuery);
+
+  const clientsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'clients') : null), [firestore]);
+  const { data: clientsData } = useCollection<Client>(clientsQuery);
+  const clientsMap = React.useMemo(() => new Map(clientsData?.map(c => [c.id, c])), [clientsData]);
   
   const stats = React.useMemo(() => {
     if (!titlesData) return { totalReceitas: 0, totalDespesas: 0, pendenteReceita: 0, pendenteDespesa: 0 };
@@ -382,8 +460,8 @@ export default function FinanceiroPage() {
                         {isProcessing === t.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreVertical className="h-4 w-4" />}
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="bg-card border-border">
-                      <DropdownMenuLabel className="text-white">Gerenciar Título</DropdownMenuLabel>
+                    <DropdownMenuContent align="end" className="bg-card border-border w-52">
+                      <DropdownMenuLabel className="text-white text-[10px] font-black uppercase">Gerenciar Título</DropdownMenuLabel>
                       {t.status === 'PENDENTE' ? (
                         <DropdownMenuItem onClick={() => handleUpdateStatus(t.id, 'PAGO')}>
                           <Check className="mr-2 h-4 w-4 text-emerald-500" /> Marcar como Pago
@@ -393,6 +471,13 @@ export default function FinanceiroPage() {
                           <RefreshCw className="mr-2 h-4 w-4 text-amber-500" /> Estornar Pagamento
                         </DropdownMenuItem>
                       )}
+                      
+                      {type === 'RECEITA' && t.status === 'PAGO' && (
+                        <DropdownMenuItem onClick={() => setReceiptTitle(t)}>
+                          <Receipt className="mr-2 h-4 w-4 text-primary" /> Emitir Recibo
+                        </DropdownMenuItem>
+                      )}
+
                       <DropdownMenuSeparator className="bg-white/10" />
                       <DropdownMenuItem className="text-rose-500" onClick={() => handleDelete(t.id)}>
                         <Trash2 className="mr-2 h-4 w-4" /> Excluir Registro
@@ -491,6 +576,13 @@ export default function FinanceiroPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <ReceiptDialog 
+        title={receiptTitle} 
+        client={receiptTitle?.clientId ? clientsMap.get(receiptTitle.clientId) : undefined} 
+        open={!!receiptTitle} 
+        onOpenChange={(open) => !open && setReceiptTitle(null)} 
+      />
     </div>
   );
 }
