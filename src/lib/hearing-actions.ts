@@ -9,17 +9,6 @@ import { createNotification } from './notification-actions';
 import type { HearingStatus, HearingType } from './types';
 import { summarizeAddress } from './utils';
 
-interface CreateHearingData {
-  processId: string;
-  processName: string;
-  hearingDate: string;
-  location: string;
-  responsibleParty: string;
-  status: HearingStatus;
-  type: HearingType;
-  notes?: string;
-}
-
 /**
  * Constrói a descrição detalhada para o Google Agenda seguindo o padrão Bueno Gois.
  */
@@ -64,7 +53,16 @@ function buildCalendarDescription(data: {
   ].join('\n');
 }
 
-export async function createHearing(data: CreateHearingData) {
+export async function createHearing(data: {
+  processId: string;
+  processName: string;
+  hearingDate: string;
+  location: string;
+  responsibleParty: string;
+  status: HearingStatus;
+  type: HearingType;
+  notes?: string;
+}) {
   if (!firestoreAdmin) {
     throw new Error('A conexão com o servidor de dados falhou.');
   }
@@ -238,11 +236,65 @@ export async function syncHearings() {
 
 export async function updateHearingStatus(hearingId: string, status: HearingStatus) {
     if (!firestoreAdmin) throw new Error('A conexão com o servidor de dados falhou.');
+    
     try {
-        await firestoreAdmin.collection('hearings').doc(hearingId).update({ status, updatedAt: new Date() });
+        const hearingRef = firestoreAdmin.collection('hearings').doc(hearingId);
+        const hearingDoc = await hearingRef.get();
+        if (!hearingDoc.exists) throw new Error('Audiência não encontrada.');
+        const hearing = hearingDoc.data();
+
+        // 1. Atualiza Firestore
+        await hearingRef.update({ status, updatedAt: new Date() });
+
+        // 2. Atualiza Google Calendar se houver vínculo
+        if (hearing?.googleCalendarEventId) {
+            try {
+                const { calendar } = await getGoogleApiClientsForUser();
+                
+                // Busca dados do processo para reconstruir a descrição
+                const processDoc = await firestoreAdmin.collection('processes').doc(hearing.processId).get();
+                const processData = processDoc.data();
+                
+                let clientInfo = { name: 'Não informado', phone: 'Não informado' };
+                if (processData?.clientId) {
+                    const clientDoc = await firestoreAdmin.collection('clients').doc(processData.clientId).get();
+                    const clientData = clientDoc.data();
+                    if (clientData) {
+                        clientInfo = {
+                            name: `${clientData.firstName} ${clientData.lastName}`.trim(),
+                            phone: clientData.mobile || clientData.phone || 'Não informado'
+                        };
+                    }
+                }
+
+                const newDescription = buildCalendarDescription({
+                    legalArea: processData?.legalArea || 'Não informada',
+                    processNumber: processData?.processNumber || 'Não informado',
+                    clientName: clientInfo.name,
+                    clientPhone: clientInfo.phone,
+                    location: hearing.location,
+                    responsibleParty: hearing.responsibleParty,
+                    status: status, // Status atualizado
+                    notes: hearing.notes,
+                    id: hearingId
+                });
+
+                await calendar.events.patch({
+                    calendarId: 'primary',
+                    eventId: hearing.googleCalendarEventId,
+                    requestBody: {
+                        description: newDescription,
+                    }
+                });
+            } catch (calendarError: any) {
+                console.warn("Could not update calendar event status:", calendarError.message);
+            }
+        }
+
         return { success: true };
     } catch (e: any) {
-        throw new Error('Falha ao atualizar status da audiência.');
+        console.error('Error updating hearing status:', e);
+        throw new Error(e.message || 'Falha ao atualizar status da audiência.');
     }
 }
 

@@ -22,7 +22,8 @@ import {
   ChevronsUpDown,
   Search,
   User,
-  Hash
+  Hash,
+  History
 } from 'lucide-react';
 import { format, addDays, isToday, isSameDay, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, addMonths, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -114,7 +115,6 @@ function ProcessSearch({ onSelect, selectedProcess }: { onSelect: (process: Proc
   const inputRef = React.useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  // Foco inteligente: Aguarda a animação do popover antes de focar
   React.useEffect(() => {
     if (open) {
       const timer = setTimeout(() => {
@@ -174,7 +174,6 @@ function ProcessSearch({ onSelect, selectedProcess }: { onSelect: (process: Proc
         align="start"
         onOpenAutoFocus={(e) => e.preventDefault()}
         onKeyDown={(e) => {
-          // Impede que a janela lateral intercepte o teclado
           e.stopPropagation();
         }}
       >
@@ -221,7 +220,6 @@ function ProcessSearch({ onSelect, selectedProcess }: { onSelect: (process: Proc
                   key={process.id}
                   type="button"
                   onMouseDown={(e) => {
-                    // Previne perda de foco do teclado antes da seleção
                     e.preventDefault();
                   }}
                   onClick={() => handleSelect(process)}
@@ -552,7 +550,7 @@ export default function AudienciasPage() {
   const [isSyncing, setIsSyncing] = React.useState(false);
   const [hearingToDelete, setHearingToDelete] = React.useState<Hearing | null>(null);
   const [isDeleting, setIsDeleting] = React.useState(false);
-  const [viewMode, setViewMode] = React.useState<'list' | 'calendar'>('list');
+  const [viewMode, setViewMode] = React.useState<'list' | 'calendar' | 'history'>('list');
   const { toast } = useToast();
 
   const hearingsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'hearings') : null, [firestore, refreshKey]);
@@ -593,7 +591,7 @@ export default function AudienciasPage() {
   const handleUpdateStatus = async (hearingId: string, status: HearingStatus) => {
       try {
           await updateHearingStatus(hearingId, status);
-          toast({ title: 'Status atualizado!' });
+          toast({ title: 'Status atualizado!', description: 'A alteração foi sincronizada com sua agenda.' });
           setRefreshKey(prev => prev + 1);
       } catch (e: any) {
           toast({ variant: 'destructive', title: 'Erro', description: e.message });
@@ -617,7 +615,9 @@ export default function AudienciasPage() {
 
   const todayHearings = React.useMemo(() => {
       if (!hearingsData) return [];
-      return hearingsData.filter(h => isToday(h.date.toDate())).sort((a, b) => a.date.seconds - b.date.seconds);
+      return hearingsData
+        .filter(h => isToday(h.date.toDate()) && h.status !== 'REALIZADA')
+        .sort((a, b) => a.date.seconds - b.date.seconds);
   }, [hearingsData]);
 
   const weekDays = React.useMemo(() => {
@@ -626,6 +626,13 @@ export default function AudienciasPage() {
     for (let i = 0; i < 7; i++) days.push(addDays(today, i));
     return days;
   }, []);
+
+  const historyHearings = React.useMemo(() => {
+    if (!hearingsData) return [];
+    return hearingsData
+        .filter(h => h.status === 'REALIZADA')
+        .sort((a, b) => b.date.seconds - a.date.seconds);
+  }, [hearingsData]);
 
   return (
     <>
@@ -687,10 +694,11 @@ export default function AudienciasPage() {
             )}
 
             <Tabs value={viewMode} onValueChange={v => setViewMode(v as any)} className="w-full">
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-4">
                     <TabsList className="bg-muted/50 p-1">
                         <TabsTrigger value="list" className="gap-2"><ListIcon className="h-4 w-4"/> Próximos 7 Dias</TabsTrigger>
                         <TabsTrigger value="calendar" className="gap-2"><CalendarIcon className="h-4 w-4"/> Visão Mensal</TabsTrigger>
+                        <TabsTrigger value="history" className="gap-2"><History className="h-4 w-4"/> Histórico (Realizadas)</TabsTrigger>
                     </TabsList>
                     
                     <div className="flex items-center gap-2">
@@ -714,7 +722,7 @@ export default function AudienciasPage() {
                             <Accordion type="single" collapsible defaultValue={`day-${new Date().toISOString().split('T')[0]}`} className="w-full">
                                 {weekDays.map(day => {
                                     const dayKey = `day-${day.toISOString().split('T')[0]}`;
-                                    const daily = hearingsData?.filter(h => isSameDay(h.date.toDate(), day)) || [];
+                                    const daily = hearingsData?.filter(h => isSameDay(h.date.toDate(), day) && h.status !== 'REALIZADA') || [];
                                     const isDayToday = isToday(day);
 
                                     return (
@@ -746,9 +754,9 @@ export default function AudienciasPage() {
                                                             const StatusIcon = statusConfig[h.status || 'PENDENTE'].icon;
 
                                                             return (
-                                                                <div key={h.id} className="flex items-center gap-4 p-4 rounded-xl border bg-card hover:shadow-md transition-all group">
-                                                                    <div className="flex flex-col items-center justify-center p-2 bg-muted/50 rounded-lg min-w-[70px]">
-                                                                        <Clock className="h-3 w-3 text-muted-foreground mb-1" />
+                                                                <div key={h.id} className="flex flex-col md:flex-row md:items-center gap-4 p-4 rounded-xl border bg-card hover:shadow-md transition-all group">
+                                                                    <div className="flex flex-row md:flex-col items-center justify-center p-2 bg-muted/50 rounded-lg min-w-[70px] gap-2 md:gap-0">
+                                                                        <Clock className="h-3 w-3 text-muted-foreground md:mb-1" />
                                                                         <span className="text-sm font-black">{format(h.date.toDate(), 'HH:mm')}</span>
                                                                     </div>
                                                                     <div className="flex-1 min-w-0">
@@ -760,14 +768,14 @@ export default function AudienciasPage() {
                                                                         <h4 className="font-bold text-base truncate">{p?.name}</h4>
                                                                         <p className="text-xs text-muted-foreground">{c?.firstName} {c?.lastName}</p>
                                                                     </div>
-                                                                    <div className="flex items-center gap-4">
+                                                                    <div className="flex items-center gap-2 md:gap-4 mt-2 md:mt-0">
                                                                         <Badge variant="outline" className={cn("gap-1.5 h-7 px-3", statusConfig[h.status || 'PENDENTE'].color)}>
                                                                             <StatusIcon className="h-3 w-3" />
                                                                             {statusConfig[h.status || 'PENDENTE'].label}
                                                                         </Badge>
                                                                         <DropdownMenu>
                                                                             <DropdownMenuTrigger asChild>
-                                                                                <Button variant="ghost" size="icon" className="h-8 w-8"><MoreVertical className="h-4 w-4" /></Button>
+                                                                                <Button variant="ghost" size="icon" className="h-8 w-8 ml-auto"><MoreVertical className="h-4 w-4" /></Button>
                                                                             </DropdownMenuTrigger>
                                                                             <DropdownMenuContent align="end" className="w-56">
                                                                                 <DropdownMenuLabel>Gestão da Audiência</DropdownMenuLabel>
@@ -811,6 +819,66 @@ export default function AudienciasPage() {
                             }} 
                         />
                     )}
+                </TabsContent>
+
+                <TabsContent value="history">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Histórico de Audiências Realizadas</CardTitle>
+                            <CardDescription>Compromissos concluídos e encerrados.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="p-0">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow className="bg-muted/30">
+                                        <TableHead>Data / Hora</TableHead>
+                                        <TableHead>Processo</TableHead>
+                                        <TableHead>Local</TableHead>
+                                        <TableHead>Tipo</TableHead>
+                                        <TableHead className="text-right">Ações</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {isLoading ? (
+                                        Array.from({ length: 3 }).map((_, i) => (
+                                            <TableRow key={i}><TableCell colSpan={5}><Skeleton className="h-10 w-full" /></TableCell></TableRow>
+                                        ))
+                                    ) : historyHearings.length > 0 ? (
+                                        historyHearings.map(h => (
+                                            <TableRow key={h.id}>
+                                                <TableCell>
+                                                    <div className="flex flex-col">
+                                                        <span className="font-bold">{format(h.date.toDate(), 'dd/MM/yyyy')}</span>
+                                                        <span className="text-xs text-muted-foreground">{format(h.date.toDate(), 'HH:mm')}h</span>
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell className="font-medium">{processesMap.get(h.processId)?.name}</TableCell>
+                                                <TableCell className="text-xs max-w-[200px] truncate">{h.location}</TableCell>
+                                                <TableCell><Badge variant="secondary" className="text-[10px]">{h.type}</Badge></TableCell>
+                                                <TableCell className="text-right">
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8"><MoreVertical className="h-4 w-4" /></Button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent align="end">
+                                                            <DropdownMenuItem onSelect={() => handleUpdateStatus(h.id, 'PENDENTE')}>Reverter para Pendente</DropdownMenuItem>
+                                                            <DropdownMenuItem className="text-destructive" onSelect={() => setHearingToDelete(h)}>Excluir Histórico</DropdownMenuItem>
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))
+                                    ) : (
+                                        <TableRow>
+                                            <TableCell colSpan={5} className="h-32 text-center text-muted-foreground italic">
+                                                Nenhuma audiência no histórico.
+                                            </TableCell>
+                                        </TableRow>
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </CardContent>
+                    </Card>
                 </TabsContent>
             </Tabs>
         </div>
