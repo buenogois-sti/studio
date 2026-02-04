@@ -28,7 +28,21 @@ export async function createHearing(data: CreateHearingData) {
   const session = await getServerSession(authOptions);
 
   try {
-    // 1. Save to Firestore first
+    // 1. Fetch Process and Client Info for Rich Calendar Data
+    const processDoc = await firestoreAdmin.collection('processes').doc(processId).get();
+    const processData = processDoc.data();
+    const processNumber = processData?.processNumber || 'Não informado';
+    
+    let clientFullName = 'Não informado';
+    if (processData?.clientId) {
+      const clientDoc = await firestoreAdmin.collection('clients').doc(processData.clientId).get();
+      const clientData = clientDoc.data();
+      if (clientData) {
+        clientFullName = `${clientData.firstName} ${clientData.lastName}`.trim();
+      }
+    }
+
+    // 2. Save to Firestore
     const hearingRef = await firestoreAdmin.collection('hearings').add({
       processId,
       date: new Date(hearingDate),
@@ -40,16 +54,16 @@ export async function createHearing(data: CreateHearingData) {
       createdAt: new Date(),
     });
 
-    // 2. Try to add to Google Calendar
+    // 3. Try to add to Google Calendar with full details
     try {
       const { calendar } = await getGoogleApiClientsForUser();
       const startDateTime = new Date(hearingDate);
       const endDateTime = add(startDateTime, { hours: 1 });
 
       const event = {
-        summary: `Audiência [${type}]: ${processName}`,
+        summary: `Audiência [${type}] | ${clientFullName} | Proc: ${processNumber}`,
         location: location,
-        description: `Status: ${status}\nTipo: ${type}\nResponsável: ${responsibleParty}\n\nNotas: ${notes || 'Nenhuma'}\n\nID Interno: ${hearingRef.id}`,
+        description: `📌 PROCESSO: ${processName}\n🔢 NÚMERO: ${processNumber}\n👤 CLIENTE: ${clientFullName}\n⚖️ LOCAL: ${location}\n👨‍⚖️ RESPONSÁVEL: ${responsibleParty}\n🚩 STATUS: ${status}\n\n📝 NOTAS: ${notes || 'Nenhuma'}\n\n---\nID Interno: ${hearingRef.id}`,
         start: { dateTime: formatISO(startDateTime), timeZone: 'America/Sao_Paulo' },
         end: { dateTime: formatISO(endDateTime), timeZone: 'America/Sao_Paulo' },
       };
@@ -98,15 +112,26 @@ export async function syncHearings() {
       // Only try to sync if it doesn't have an ID yet
       if (!hearing.googleCalendarEventId) {
         const processDoc = await firestoreAdmin.collection('processes').doc(hearing.processId).get();
-        const processName = processDoc.exists ? processDoc.data()?.name : 'Processo';
+        const processData = processDoc.data();
+        const processName = processDoc.exists ? processData?.name : 'Processo';
+        const processNumber = processData?.processNumber || 'Não informado';
+
+        let clientFullName = 'Não informado';
+        if (processData?.clientId) {
+          const clientDoc = await firestoreAdmin.collection('clients').doc(processData.clientId).get();
+          const clientData = clientDoc.data();
+          if (clientData) {
+            clientFullName = `${clientData.firstName} ${clientData.lastName}`.trim();
+          }
+        }
 
         const startDateTime = hearing.date.toDate();
         const endDateTime = add(startDateTime, { hours: 1 });
 
         const event = {
-          summary: `Audiência [${hearing.type}]: ${processName}`,
+          summary: `Audiência [${hearing.type}] | ${clientFullName} | Proc: ${processNumber}`,
           location: hearing.location,
-          description: `Status: ${hearing.status}\nTipo: ${hearing.type}\nResponsável: ${hearing.responsibleParty}\n\nSincronização Manual LexFlow\nID Interno: ${doc.id}`,
+          description: `📌 PROCESSO: ${processName}\n🔢 NÚMERO: ${processNumber}\n👤 CLIENTE: ${clientFullName}\n⚖️ LOCAL: ${hearing.location}\n👨‍⚖️ RESPONSÁVEL: ${hearing.responsibleParty}\n🚩 STATUS: ${hearing.status}\n\nSincronização Manual LexFlow\nID Interno: ${doc.id}`,
           start: { dateTime: formatISO(startDateTime), timeZone: 'America/Sao_Paulo' },
           end: { dateTime: formatISO(endDateTime), timeZone: 'America/Sao_Paulo' },
         };

@@ -107,7 +107,7 @@ export default function ProcessosPage() {
         const matchesSearch = 
           p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
           p.processNumber?.includes(searchTerm) ||
-          p.opposingParties?.some(party => party.name?.toLowerCase().includes(searchTerm.toLowerCase()));
+          p.opposingParties?.some(party => (typeof party === 'string' ? party : party.name)?.toLowerCase().includes(searchTerm.toLowerCase()));
         
         const matchesClient = !clientIdFilter || p.clientId === clientIdFilter;
         return matchesSearch && matchesClient;
@@ -332,10 +332,10 @@ export default function ProcessosPage() {
                       )}
                       
                       {processHearings.length > 0 && (
-                        <div className="flex items-center gap-1.5 text-amber-600 font-bold">
+                        <Link href="/dashboard/audiencias" className="flex items-center gap-1.5 text-amber-600 font-bold hover:underline">
                           <Calendar className="h-3.5 w-3.5" />
                           <span>Audiência em {format(processHearings[0].date.toDate(), 'dd/MM/yy')}</span>
-                        </div>
+                        </Link>
                       )}
                     </div>
 
@@ -355,10 +355,15 @@ export default function ProcessosPage() {
                           
                           {processHearings.length > 0 && (
                             <div className="space-y-3 p-3 rounded-lg bg-amber-500/5 border border-amber-500/10">
-                              <p className="text-[10px] font-black uppercase text-amber-600">Audiências Agendadas</p>
+                              <div className="flex items-center justify-between">
+                                <p className="text-[10px] font-black uppercase text-amber-600">Audiências Agendadas</p>
+                                <Button variant="link" size="sm" asChild className="h-auto p-0 text-[10px] font-bold text-amber-700 uppercase">
+                                  <Link href="/dashboard/audiencias">Ver na Agenda</Link>
+                                </Button>
+                              </div>
                               {processHearings.map(h => (
-                                <div key={h.id} className="flex items-center gap-3 text-xs">
-                                  <div className="flex flex-col items-center justify-center h-10 w-10 rounded bg-white border border-amber-200">
+                                <Link key={h.id} href="/dashboard/audiencias" className="flex items-center gap-3 text-xs hover:bg-amber-500/10 p-1.5 rounded-lg transition-colors">
+                                  <div className="flex flex-col items-center justify-center h-10 w-10 rounded bg-white border border-amber-200 shrink-0">
                                     <span className="text-[8px] font-black uppercase text-muted-foreground">{format(h.date.toDate(), 'MMM', { locale: ptBR })}</span>
                                     <span className="text-base font-black text-amber-600">{format(h.date.toDate(), 'dd')}</span>
                                   </div>
@@ -371,7 +376,7 @@ export default function ProcessosPage() {
                                       <MapPin className="h-3 w-3" /> {h.location}
                                     </div>
                                   </div>
-                                </div>
+                                </Link>
                               ))}
                             </div>
                           )}
