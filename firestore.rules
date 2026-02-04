@@ -1,3 +1,4 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -13,14 +14,12 @@ service cloud.firestore {
     }
 
     // --- Global Read Rule ---
-    // Temporary measure for prototype stability.
     match /{path=**} {
       allow read: if true;
     }
 
     // --- Collection-Specific Write Rules ---
     match /users/{userId} {
-      // User can update their profile, but CANNOT change their own role unless they are admin.
       allow update: if (isUser(userId) && request.resource.data.role == resource.data.role) || isAdmin();
       allow create, delete: if isAdmin();
       
@@ -32,6 +31,13 @@ service cloud.firestore {
       match /logs/{logId} {
         allow create: if isUser(userId);
       }
+    }
+
+    match /reimbursements/{reimbursementId} {
+      allow read: if isAdmin() || isUser(resource.data.userId);
+      allow create: if request.auth != null;
+      allow update: if isAdmin() || (isUser(resource.data.userId) && resource.data.status == 'SOLICITADO');
+      allow delete: if isAdmin();
     }
 
     match /clients/{clientId} {

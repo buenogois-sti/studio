@@ -1,3 +1,4 @@
+
 'use client';
 import type { Timestamp } from 'firebase/firestore';
 
@@ -160,25 +161,20 @@ export type FinancialTitle = {
   paidToStaffId?: string;
 };
 
-export type FeeSplitRule = {
-  processId: string;
-  participants: {
-    staffId: string;
-    percentage: number;
-  }[];
-};
+export type ReimbursementStatus = 'SOLICITADO' | 'APROVADO' | 'REEMBOLSADO' | 'NEGADO';
 
-export type LawyerCredit = {
+export type Reimbursement = {
   id: string;
-  staffId: string;
-  processId: string;
-  financialTitleId: string;
+  userId: string;
+  userName: string;
+  description: string;
   value: number;
-  creditDate: Timestamp;
-  status: 'DISPONIVEL' | 'RETIDO' | 'PAGO';
-  payoutDate?: Timestamp;
+  requestDate: Timestamp;
+  status: ReimbursementStatus;
+  notes?: string;
+  createdAt: Timestamp;
+  updatedAt?: Timestamp;
 };
-
 
 export type Log = {
     id: string;
