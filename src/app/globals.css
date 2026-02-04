@@ -4,14 +4,14 @@
 
 @layer base {
   :root {
-    /* Primary: Ouro Bueno Gois (#F5D030) */
-    --background: 222 47% 4%; /* Navy Ultra Profundo para dashboard */
+    /* Primary: Bueno Gois Gold (#F5D030) */
+    --background: 222 47% 4%; /* Deep Navy */
     --foreground: 210 40% 98%;
     --card: 222 47% 7%;
     --card-foreground: 210 40% 98%;
     --popover: 222 47% 5%;
     --popover-foreground: 210 40% 98%;
-    --primary: 48 91% 58%; /* Gold Premium */
+    --primary: 48 91% 58%; /* Bueno Gois Gold */
     --primary-foreground: 222.2 47.4% 11.2%;
     --secondary: 217.2 32.6% 12%;
     --secondary-foreground: 210 40% 98%;
@@ -41,7 +41,7 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground antialiased;
+    @apply bg-background text-foreground antialiased selection:bg-primary/30;
   }
 }
 
@@ -51,10 +51,6 @@
 }
 
 .animate-fadeIn { animation: fadeIn 0.5s ease-out forwards; }
-
-.bg-navy-gradient {
-  background: linear-gradient(135deg, #020617 0%, #0f172a 100%);
-}
 
 /* Custom Scrollbar for Navy Theme */
 ::-webkit-scrollbar {
@@ -69,4 +65,19 @@
 }
 ::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--primary) / 0.5);
+}
+
+/* Print Styles */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  .bg-card {
+    background: white !important;
+    border: 1px solid #ddd !important;
+  }
 }
