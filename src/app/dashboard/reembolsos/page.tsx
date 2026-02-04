@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -16,7 +15,8 @@ import {
   TrendingUp,
   History,
   User,
-  AlertCircle
+  AlertCircle,
+  Receipt
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -247,11 +247,11 @@ export default function ReembolsosPage() {
     <div className="flex flex-col gap-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-black tracking-tight font-headline flex items-center gap-3">
-            <Receipt className="h-8 w-8 text-primary" />
+          <h1 className="text-3xl font-black tracking-tight font-headline flex items-center gap-3 text-primary">
+            <Receipt className="h-8 w-8" />
             Gestão de Reembolsos
           </h1>
-          <p className="text-sm text-muted-foreground">Controle de despesas operacionais e reembolsos de equipe.</p>
+          <p className="text-sm text-muted-foreground font-medium">Controle de despesas operacionais e reembolsos de equipe.</p>
         </div>
         <NewReimbursementDialog onCreated={() => {}} isAdmin={isAdmin} />
       </div>
@@ -338,7 +338,7 @@ function ReimbursementTable({
       <Card>
         <CardContent className="p-0">
           <div className="p-8 space-y-4">
-            {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
+            {[...Array(3)].map((_, i) => <Skeleton className="h-12 w-full" key={i} />)}
           </div>
         </CardContent>
       </Card>

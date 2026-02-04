@@ -1,4 +1,3 @@
-
 'use client';
 
 import Link from 'next/link';
@@ -294,7 +293,7 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
             <SidebarHeader className="h-14 justify-center p-2 group-data-[collapsible=icon]:justify-center">
             <Link href="/dashboard" className="flex items-center gap-2">
                 <Logo />
-                <span className="font-bold text-lg text-primary group-data-[collapsible=icon]:hidden">
+                <span className="font-bold text-lg text-primary-foreground group-data-[collapsible=icon]:hidden">
                 Bueno Gois
                 </span>
             </Link>
@@ -319,13 +318,13 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
                 )}
             </SidebarMenu>
             </SidebarContent>
-            <SidebarFooter className="justify-center h-14 border-t group-data-[collapsible=icon]:justify-center">
+            <SidebarFooter className="justify-center h-14 border-t border-sidebar-border group-data-[collapsible=icon]:justify-center">
             <div className="group-data-[collapsible=icon]:hidden w-full">
             </div>
             </SidebarFooter>
         </Sidebar>
-        <SidebarInset>
-            <header className="flex h-14 items-center gap-4 border-b bg-card px-4 lg:h-[60px] lg:px-6 sticky top-0 z-30">
+        <SidebarInset className="bg-background">
+            <header className="flex h-14 items-center gap-4 border-b bg-white/80 backdrop-blur-md px-4 lg:h-[60px] lg:px-6 sticky top-0 z-30">
             <SidebarTrigger className="shrink-0 md:hidden" />
             {getBreadcrumb()}
             <div className="ml-auto flex items-center gap-2">
@@ -343,7 +342,7 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
                 <UserNav />
             </div>
             </header>
-            <main className="flex-1 p-4 sm:p-6">
+            <main className="flex-1 p-4 sm:p-6 overflow-y-auto">
               {hasPermission ? children : <AccessDenied />}
             </main>
         </SidebarInset>

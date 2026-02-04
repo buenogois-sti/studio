@@ -4,34 +4,35 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
+    /* Primary: Deep blue (#1E3A8A) -> hsl(224 64% 33%) */
+    --background: 210 31% 96%; /* #F0F4F8 - Light blue-gray */
     --foreground: 222.2 84% 4.9%;
     --card: 0 0% 100%;
     --card-foreground: 222.2 84% 4.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
-    --primary: 46 95% 57%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 224 64% 33%; /* #1E3A8A */
+    --primary-foreground: 210 40% 98%;
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
+    --accent: 83 77% 44%; /* #84CC16 - Soft Green */
     --accent-foreground: 222.2 47.4% 11.2%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 46 95% 57%;
+    --ring: 224 64% 33%;
     --radius: 0.5rem;
-    --sidebar-background: 210 40% 98%;
-    --sidebar-foreground: 222.2 47.4% 11.2%;
-    --sidebar-primary: 46 95% 57%;
-    --sidebar-primary-foreground: 222.2 47.4% 11.2%;
-    --sidebar-accent: 210 40% 96.1%;
-    --sidebar-accent-foreground: 222.2 47.4% 11.2%;
-    --sidebar-border: 214.3 31.8% 91.4%;
-    --sidebar-ring: 46 95% 57%;
+    --sidebar-background: 224 64% 15%; /* Darker Blue for sidebar */
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 224 64% 33%;
+    --sidebar-primary-foreground: 210 40% 98%;
+    --sidebar-accent: 224 64% 25%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 224 64% 20%;
+    --sidebar-ring: 224 64% 33%;
   }
 }
 
@@ -71,8 +72,8 @@
 }
 
 @keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 20px rgba(245, 208, 48, 0.2); }
-  50% { box-shadow: 0 0 40px rgba(245, 208, 48, 0.4); }
+  0%, 100% { box-shadow: 0 0 20px rgba(30, 58, 138, 0.2); }
+  50% { box-shadow: 0 0 40px rgba(30, 58, 138, 0.4); }
 }
 
 .animate-gradient { animation: gradient 6s ease infinite; }
@@ -103,7 +104,7 @@ html { scroll-behavior: smooth; }
 }
 
 .text-gradient {
-  @apply bg-gradient-to-r from-slate-900 via-primary to-slate-900 bg-clip-text text-transparent;
+  @apply bg-gradient-to-r from-primary via-blue-600 to-primary bg-clip-text text-transparent;
 }
 
 .hover-lift {

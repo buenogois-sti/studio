@@ -82,8 +82,8 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
           projectId: auth.app.options.projectId,
           customTokenProvided: !!session.customToken,
         });
-        if (error.code === 'auth/invalid-custom-token') {
-          console.error('[Firebase Auth] PROJECT ID MISMATCH DETECTED: Verify FIREBASE_SERVICE_ACCOUNT_JSON project_id matches client config');
+        if (error.code === 'auth/invalid-custom-token' || error.message.includes('400')) {
+          console.error('[Firebase Auth] PROJECT ID MISMATCH DETECTED: Verify FIREBASE_SERVICE_ACCOUNT_JSON project_id matches client config (studio-7080106838-23904)');
         }
         setUserAuthState((state) => ({ ...state, userError: error }));
       });
