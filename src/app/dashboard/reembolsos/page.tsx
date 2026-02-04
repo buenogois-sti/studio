@@ -15,7 +15,8 @@ import {
   Receipt,
   Check,
   X,
-  FileText
+  FileText,
+  Trash2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -80,7 +81,7 @@ function NewReimbursementDialog({ onCreated, isAdmin }: { onCreated: () => void;
     setIsSaving(true);
     try {
       let userName = session?.user?.name || 'Usuário';
-      if (isAdmin && values.userId !== session?.user?.id) {
+      if (isAdmin && values.userId && values.userId !== session?.user?.id) {
         const selectedUser = users?.find(u => u.id === values.userId);
         if (selectedUser) userName = `${selectedUser.firstName} ${selectedUser.lastName}`;
       }
@@ -186,7 +187,7 @@ function NewReimbursementDialog({ onCreated, isAdmin }: { onCreated: () => void;
 }
 
 export default function ReembolsosPage() {
-  const { firestore, user, isUserLoading: isFirebaseLoading } = useFirebase();
+  const { firestore, user, isUserLoading: isFirebaseLoading, userError } = useFirebase();
   const { data: session } = useSession();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = React.useState('meus');
@@ -196,24 +197,24 @@ export default function ReembolsosPage() {
   const isAdmin = session?.user?.role === 'admin' || session?.user?.role === 'financial';
 
   // LOGICA 1: Query restrita para usuários comuns (vê apenas os seus)
-  // Garantimos que a query use o filtro userId para casar com as Security Rules
+  // IMPORTANTE: O uso do WHERE 'userId' é obrigatório para não disparar erro de permissão no Firebase Rules
   const myReimbursementsQuery = useMemoFirebase(
-    () => (firestore && user && !isFirebaseLoading ? query(
+    () => (firestore && user?.uid ? query(
       collection(firestore, 'reimbursements'),
       where('userId', '==', user.uid),
       orderBy('createdAt', 'desc')
     ) : null),
-    [firestore, user?.uid, isFirebaseLoading]
+    [firestore, user?.uid]
   );
   const { data: myData, isLoading: isLoadingMy } = useCollection<Reimbursement>(myReimbursementsQuery);
 
   // LOGICA 2: Query global para Financeiro/Admin (vê tudo)
   const allReimbursementsQuery = useMemoFirebase(
-    () => (firestore && user && isAdmin && !isFirebaseLoading && activeTab === 'todos' ? query(
+    () => (firestore && isAdmin ? query(
       collection(firestore, 'reimbursements'),
       orderBy('createdAt', 'desc')
     ) : null),
-    [firestore, user?.uid, isAdmin, isFirebaseLoading, activeTab]
+    [firestore, isAdmin]
   );
   const { data: allData, isLoading: isLoadingAll } = useCollection<Reimbursement>(allReimbursementsQuery);
 
@@ -247,6 +248,23 @@ export default function ReembolsosPage() {
       toast({ variant: 'destructive', title: 'Erro ao remover', description: error.message });
     }
   };
+
+  // Se houver erro de Project ID no login, exibe um aviso amigável
+  if (userError && userError.message.includes('400')) {
+      return (
+          <div className="flex flex-col items-center justify-center py-20 text-center space-y-4">
+              <XCircle className="h-16 w-16 text-rose-500" />
+              <h2 className="text-2xl font-bold text-white">Erro de Configuração de Login</h2>
+              <p className="text-muted-foreground max-w-md">
+                  Detectamos uma incompatibilidade entre o projeto do servidor e do cliente. 
+                  Por favor, verifique a variável <strong>FIREBASE_SERVICE_ACCOUNT_JSON</strong>.
+              </p>
+          </div>
+      );
+  }
+
+  const listToUse = (isAdmin && activeTab === 'todos') ? filteredAllData : (myData || []);
+  const loadingToUse = (isAdmin && activeTab === 'todos') ? (isFirebaseLoading || isLoadingAll) : (isFirebaseLoading || isLoadingMy);
 
   const stats = React.useMemo(() => {
     const list = isAdmin && activeTab === 'todos' ? allData : myData;
@@ -331,7 +349,7 @@ export default function ReembolsosPage() {
         <TabsContent value="meus" className="mt-0">
           <ReimbursementTable 
             data={myData} 
-            isLoading={isFirebaseLoading || isLoadingMy} 
+            isLoading={loadingToUse} 
             isAdmin={false} 
             onDelete={handleDelete}
           />
@@ -341,7 +359,7 @@ export default function ReembolsosPage() {
           <TabsContent value="todos" className="mt-0">
             <ReimbursementTable 
               data={filteredAllData} 
-              isLoading={isFirebaseLoading || isLoadingAll} 
+              isLoading={loadingToUse} 
               isAdmin={true} 
               onUpdateStatus={handleStatusUpdate}
               onDelete={handleDelete}
@@ -423,12 +441,12 @@ function ReimbursementTable({
                   <div className="flex flex-col">
                     <span className="font-bold text-sm text-white">{r.description}</span>
                     <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                      <History className="h-3 w-3" /> Criado em {format(r.createdAt.toDate(), "dd/MM/yy")}
+                      <History className="h-3 w-3" /> Criado em {r.createdAt?.toDate ? format(r.createdAt.toDate(), "dd/MM/yy") : 'Recente'}
                     </span>
                   </div>
                 </TableCell>
                 <TableCell className="text-sm text-slate-300">
-                  {format(r.requestDate.toDate(), 'dd/MM/yyyy')}
+                  {r.requestDate?.toDate ? format(r.requestDate.toDate(), 'dd/MM/yyyy') : 'N/A'}
                 </TableCell>
                 <TableCell className="font-mono text-sm font-bold text-white">
                   {r.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
@@ -489,7 +507,7 @@ function ReimbursementTable({
                           <>
                             <DropdownMenuSeparator className="bg-white/10" />
                             <DropdownMenuItem className="text-rose-500" onClick={() => onDelete?.(r.id)}>
-                              Excluir Registro
+                              <Trash2 className="mr-2 h-4 w-4" /> Excluir Registro
                             </DropdownMenuItem>
                           </>
                         )}

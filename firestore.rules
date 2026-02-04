@@ -41,9 +41,14 @@ service cloud.firestore {
     }
 
     match /reimbursements/{reimbursementId} {
-      // Admins e Financeiros veem tudo. Usuários comuns veem apenas os seus.
-      allow read: if isOneOfRoles(['admin', 'financial']) || (isAuthenticated() && resource.data.userId == request.auth.uid);
+      // Admins e Financeiros podem listar e ler tudo.
+      // Usuários comuns podem apenas listar e ler se o filtro da query for seu próprio userId.
+      allow list: if isOneOfRoles(['admin', 'financial']) || (isAuthenticated() && request.query.limit <= 100 && request.query.offset == 0 && request.query.filters.userId == request.auth.uid);
+      allow get: if isOneOfRoles(['admin', 'financial']) || (isAuthenticated() && resource.data.userId == request.auth.uid);
+      
       allow create: if isAuthenticated();
+      
+      // Apenas Admin/Financeiro ou o dono (se ainda estiver pendente) podem editar/deletar
       allow update, delete: if isOneOfRoles(['admin', 'financial']) || (isAuthenticated() && resource.data.userId == request.auth.uid);
     }
 

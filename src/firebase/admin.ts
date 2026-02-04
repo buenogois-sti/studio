@@ -12,24 +12,13 @@ if (!admin.apps.length) {
     const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
 
     if (serviceAccountJson) {
-      console.log("[Firebase Admin] Initializing with Service Account from environment variable.");
+      console.log("[Firebase Admin] Initializing with Service Account.");
       const serviceAccount = JSON.parse(serviceAccountJson);
       
-      console.log('[Firebase Admin] Service Account project_id:', serviceAccount.project_id);
-      console.log('[Firebase Admin] Client config projectId:', firebaseConfig.projectId);
-
-      // Validate Project ID consistency to prevent auth/invalid-custom-token
+      // Critical check for Project ID Mismatch
       if (serviceAccount.project_id !== firebaseConfig.projectId) {
-        const error = `CRITICAL_CONFIG_ERROR: Project ID mismatch. Server: '${serviceAccount.project_id}' vs Client: '${firebaseConfig.projectId}'. Check your FIREBASE_SERVICE_ACCOUNT_JSON.`;
+        const error = `❌ PROJECT ID MISMATCH: Server is using '${serviceAccount.project_id}' but Client expects '${firebaseConfig.projectId}'. This causes status 400 errors. Please update FIREBASE_SERVICE_ACCOUNT_JSON in .env.local with the correct key from project '${firebaseConfig.projectId}'.`;
         console.error('[Firebase Admin]', error);
-        
-        console.error('\n' + '='.repeat(60));
-        console.error('❌ ERRO CRÍTICO DE CONFIGURAÇÃO FIREBASE');
-        console.error('SERVER ID:', serviceAccount.project_id);
-        console.error('CLIENT ID:', firebaseConfig.projectId);
-        console.error('AÇÃO: Baixe a chave JSON do projeto correto e atualize o .env.local');
-        console.error('='.repeat(60) + '\n');
-        
         throw new Error(error);
       }
 
@@ -43,9 +32,6 @@ if (!admin.apps.length) {
       admin.initializeApp();
       
       const adminProjectId = admin.app().options.projectId;
-      console.log('[Firebase Admin] ADC project_id:', adminProjectId);
-      console.log('[Firebase Admin] Client config projectId:', firebaseConfig.projectId);
-      
       if (adminProjectId && adminProjectId !== firebaseConfig.projectId) {
         const error = `CRITICAL_CONFIG_ERROR: Project ID mismatch in ADC. Server: '${adminProjectId}' vs Client: '${firebaseConfig.projectId}'.`;
         console.error('[Firebase Admin]', error);
