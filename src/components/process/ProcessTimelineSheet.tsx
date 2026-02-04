@@ -9,9 +9,9 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
 import { 
   History, 
   Plus, 
@@ -22,7 +22,6 @@ import {
   Loader2,
   Trash2,
   User,
-  AlertTriangle,
   Timer
 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';

@@ -8,6 +8,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection } from 'firebase/firestore';
 import type { DocumentTemplate, Process } from '@/lib/types';
@@ -16,7 +17,6 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { draftDocument } from '@/lib/process-actions';
 import { useToast } from '@/components/ui/use-toast';
-import { Badge } from '../ui/badge';
 
 interface DocumentDraftingDialogProps {
   process: Process | null;
@@ -65,11 +65,11 @@ export function DocumentDraftingDialog({ process, open, onOpenChange }: Document
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="sm:max-w-2xl bg-card border-border">
         <DialogHeader>
-          <DialogTitle>Gerar Rascunho de Documento</DialogTitle>
-          <DialogDescription>
-            Escolha um modelo do acervo para criar um novo documento para: <span className="font-bold text-foreground">{process?.name}</span>
+          <DialogTitle className="text-white">Gerar Rascunho de Documento</DialogTitle>
+          <DialogDescription className="text-slate-400">
+            Escolha um modelo do acervo para criar um novo documento para: <span className="font-bold text-white">{process?.name}</span>
           </DialogDescription>
         </DialogHeader>
 
@@ -77,7 +77,7 @@ export function DocumentDraftingDialog({ process, open, onOpenChange }: Document
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input 
                 placeholder="Pesquisar modelos (ex: Procuração, Petição...)" 
-                className="pl-8" 
+                className="pl-8 bg-background border-border text-white" 
                 value={searchTerm} 
                 onChange={(e) => setSearchTerm(e.target.value)} 
             />
@@ -89,15 +89,15 @@ export function DocumentDraftingDialog({ process, open, onOpenChange }: Document
             ) : filteredTemplates.length > 0 ? (
                 <div className="grid gap-3">
                     {filteredTemplates.map(t => (
-                        <div key={t.id} className="flex items-center justify-between p-4 rounded-xl border bg-card hover:bg-accent/50 transition-colors group">
+                        <div key={t.id} className="flex items-center justify-between p-4 rounded-xl border bg-white/5 hover:bg-white/10 transition-colors group">
                             <div className="flex items-start gap-3 flex-1 min-w-0">
                                 <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                                     <FileText className="h-5 w-5 text-primary" />
                                 </div>
                                 <div className="min-w-0">
                                     <div className="flex items-center gap-2 mb-0.5">
-                                        <h4 className="font-bold text-sm truncate">{t.name}</h4>
-                                        <Badge variant="secondary" className="text-[9px] uppercase h-4 px-1.5">{t.category}</Badge>
+                                        <h4 className="font-bold text-sm truncate text-white">{t.name}</h4>
+                                        <Badge variant="secondary" className="text-[9px] uppercase h-4 px-1.5 bg-white/10 text-slate-300">{t.category}</Badge>
                                     </div>
                                     <p className="text-xs text-muted-foreground line-clamp-1">{t.description}</p>
                                 </div>
@@ -106,7 +106,7 @@ export function DocumentDraftingDialog({ process, open, onOpenChange }: Document
                                 size="sm" 
                                 disabled={isDrafting !== null}
                                 onClick={() => handleSelectTemplate(t)}
-                                className="ml-4"
+                                className="ml-4 bg-primary text-primary-foreground"
                             >
                                 {isDrafting === t.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
                             </Button>
