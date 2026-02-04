@@ -20,12 +20,56 @@ interface CreateHearingData {
   notes?: string;
 }
 
+/**
+ * Constrói a descrição detalhada para o Google Agenda seguindo o padrão Bueno Gois.
+ */
+function buildCalendarDescription(data: {
+  legalArea: string;
+  processNumber: string;
+  clientName: string;
+  clientPhone: string;
+  location: string;
+  responsibleParty: string;
+  status: string;
+  notes?: string;
+  id: string;
+}) {
+  const cleanPhone = data.clientPhone.replace(/\D/g, '');
+  const whatsappLink = cleanPhone ? `https://wa.me/${cleanPhone.startsWith('55') ? cleanPhone : '55' + cleanPhone}` : 'Telefone não disponível';
+
+  return [
+    `📌 Processo Judicial`,
+    `Tipo: ${data.legalArea}`,
+    ``,
+    `🔢 Número do Processo:`,
+    `${data.processNumber}`,
+    ``,
+    `👤 Cliente:`,
+    `${data.clientName} - ${data.clientPhone}`,
+    `Link WhatsApp: ${whatsappLink}`,
+    ``,
+    `⚖️ Fórum / Local:`,
+    `${data.location}`,
+    ``,
+    `👨‍⚖️ Responsável:`,
+    `${data.responsibleParty}`,
+    ``,
+    `🚩 Status:`,
+    `${data.status}`,
+    ``,
+    `📝 Observações:`,
+    `${data.notes || 'Nenhuma anotação no momento.'}`,
+    ``,
+    `🔐 ID Interno: ${data.id}`
+  ].join('\n');
+}
+
 export async function createHearing(data: CreateHearingData) {
   if (!firestoreAdmin) {
     throw new Error('A conexão com o servidor de dados falhou.');
   }
 
-  const { processId, processName, hearingDate, location, responsibleParty, status, type, notes } = data;
+  const { processId, hearingDate, location, responsibleParty, status, type, notes } = data;
   const session = await getServerSession(authOptions);
 
   try {
@@ -49,7 +93,7 @@ export async function createHearing(data: CreateHearingData) {
     const hearingRef = await firestoreAdmin.collection('hearings').add({
       processId,
       date: new Date(hearingDate),
-      location,
+      location: summarizeAddress(location),
       responsibleParty,
       status: status || 'PENDENTE',
       type: type || 'OUTRA',
@@ -65,30 +109,17 @@ export async function createHearing(data: CreateHearingData) {
       const forumName = location.split('-')[0]?.trim() || location.split(',')[0]?.trim() || location;
       const summarizedLoc = summarizeAddress(location);
 
-      const description = [
-        `📌 Processo Judicial`,
-        `Tipo: ${legalArea}`,
-        ``,
-        `🔢 Número do Processo:`,
-        `${processNumber}`,
-        ``,
-        `👤 Cliente:`,
-        `${clientInfo.name} (${clientInfo.phone})`,
-        ``,
-        `⚖️ Fórum / Local:`,
-        `${summarizedLoc}`,
-        ``,
-        `👨‍⚖️ Responsável:`,
-        `${responsibleParty}`,
-        ``,
-        `🚩 Status:`,
-        `${status}`,
-        ``,
-        `📝 Observações:`,
-        `${notes || 'Nenhuma anotação no momento.'}`,
-        ``,
-        `🔐 ID Interno: ${hearingRef.id}`
-      ].join('\n');
+      const description = buildCalendarDescription({
+        legalArea,
+        processNumber,
+        clientName: clientInfo.name,
+        clientPhone: clientInfo.phone,
+        location: summarizedLoc,
+        responsibleParty,
+        status: status || 'PENDENTE',
+        notes,
+        id: hearingRef.id
+      });
 
       const event = {
         summary: `Audiência [${type}] | ${clientInfo.name}`,
@@ -160,30 +191,17 @@ export async function syncHearings() {
         const forumName = hearing.location.split('-')[0]?.trim() || hearing.location.split(',')[0]?.trim() || hearing.location;
         const summarizedLoc = summarizeAddress(hearing.location);
 
-        const description = [
-          `📌 Processo Judicial`,
-          `Tipo: ${legalArea}`,
-          ``,
-          `🔢 Número do Processo:`,
-          `${processNumber}`,
-          ``,
-          `👤 Cliente:`,
-          `${clientInfo.name} (${clientInfo.phone})`,
-          ``,
-          `⚖️ Fórum / Local:`,
-          `${summarizedLoc}`,
-          ``,
-          `👨‍⚖️ Responsável:`,
-          `${hearing.responsibleParty}`,
-          ``,
-          `🚩 Status:`,
-          `${hearing.status}`,
-          ``,
-          `📝 Observações:`,
-          `${hearing.notes || 'Nenhuma anotação no momento.'}`,
-          ``,
-          `🔐 ID Interno: ${doc.id}`
-        ].join('\n');
+        const description = buildCalendarDescription({
+          legalArea,
+          processNumber,
+          clientName: clientInfo.name,
+          clientPhone: clientInfo.phone,
+          location: summarizedLoc,
+          responsibleParty: hearing.responsibleParty,
+          status: hearing.status,
+          notes: hearing.notes,
+          id: doc.id
+        });
 
         const startDateTime = hearing.date.toDate();
         const endDateTime = add(startDateTime, { hours: 1 });
