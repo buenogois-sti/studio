@@ -27,11 +27,8 @@ service cloud.firestore {
     }
 
     match /reimbursements/{reimbursementId} {
-      // Permitir leitura se autenticado (validação fina feita via queries no frontend)
       allow read: if isAuthenticated();
-      // Permitir criação se autenticado
       allow create: if isAuthenticated();
-      // Permitir alteração apenas pelo Admin ou pelo próprio dono
       allow update, delete: if isAdmin() || (isAuthenticated() && (resource.data.userId == request.auth.uid));
     }
 
@@ -46,6 +43,12 @@ service cloud.firestore {
     }
 
     match /hearings/{hearingId} {
+      allow create, update: if isOneOfRoles(['admin', 'lawyer', 'assistant']);
+      allow delete: if isAdmin();
+    }
+
+    match /deadlines/{deadlineId} {
+      allow read: if isAuthenticated();
       allow create, update: if isOneOfRoles(['admin', 'lawyer', 'assistant']);
       allow delete: if isAdmin();
     }

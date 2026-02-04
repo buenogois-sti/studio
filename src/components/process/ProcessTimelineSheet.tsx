@@ -21,7 +21,9 @@ import {
   Calendar,
   Loader2,
   Trash2,
-  User
+  User,
+  AlertTriangle,
+  Timer
 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { useFirebase } from '@/firebase';
@@ -103,6 +105,7 @@ export function ProcessTimelineSheet({ process, open, onOpenChange }: ProcessTim
       case 'decision': return <Gavel className="h-4 w-4 text-amber-500" />;
       case 'petition': return <FileUp className="h-4 w-4 text-blue-500" />;
       case 'hearing': return <Calendar className="h-4 w-4 text-emerald-500" />;
+      case 'deadline': return <Timer className="h-4 w-4 text-rose-500" />;
       default: return <MessageSquare className="h-4 w-4 text-muted-foreground" />;
     }
   };
@@ -111,19 +114,19 @@ export function ProcessTimelineSheet({ process, open, onOpenChange }: ProcessTim
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="sm:max-w-2xl w-full flex flex-col p-0">
-        <SheetHeader className="p-6 border-b bg-muted/10">
+      <SheetContent className="sm:max-w-2xl w-full flex flex-col p-0 bg-[#020617] border-border">
+        <SheetHeader className="p-6 border-b border-border/50 bg-muted/10">
           <div className="flex items-center gap-2">
             <History className="h-5 w-5 text-primary" />
-            <SheetTitle className="font-headline text-xl">Andamentos do Processo</SheetTitle>
+            <SheetTitle className="font-headline text-xl text-white">Andamentos do Processo</SheetTitle>
           </div>
-          <SheetDescription>Histórico cronológico de eventos para: {process.name}</SheetDescription>
+          <SheetDescription className="text-slate-400">Histórico cronológico de eventos para: {process.name}</SheetDescription>
         </SheetHeader>
 
         <div className="flex-1 overflow-hidden flex flex-col">
           {/* Form Section */}
-          <div className="p-6 border-b bg-background space-y-4">
-            <div className="flex gap-2">
+          <div className="p-6 border-b border-border/50 bg-[#0f172a] space-y-4">
+            <div className="flex flex-wrap gap-2">
               <Button 
                 variant={eventType === 'note' ? 'default' : 'outline'} 
                 size="sm" 
@@ -154,7 +157,7 @@ export function ProcessTimelineSheet({ process, open, onOpenChange }: ProcessTim
                 placeholder="Descreva o andamento ou observação..." 
                 value={newNote} 
                 onChange={(e) => setNewNote(e.target.value)}
-                className="min-h-[80px] resize-none text-sm"
+                className="min-h-[80px] resize-none text-sm bg-background border-border text-white"
               />
               <Button 
                 className="h-auto" 
@@ -167,26 +170,35 @@ export function ProcessTimelineSheet({ process, open, onOpenChange }: ProcessTim
           </div>
 
           <ScrollArea className="flex-1 p-6">
-            <div className="relative space-y-8 before:absolute before:inset-0 before:ml-5 before:-translate-x-px before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-border before:to-transparent">
+            <div className="relative space-y-8 before:absolute before:inset-0 before:ml-5 before:-translate-x-px before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-border/30 before:to-transparent">
               {timeline.length > 0 ? (
                 timeline.map((event) => (
                   <div key={event.id} className="relative flex items-start gap-6 group">
                     <div className={cn(
-                        "flex items-center justify-center w-10 h-10 rounded-full bg-background border-2 z-10 shadow-sm transition-colors",
-                        "group-hover:border-primary"
+                        "flex items-center justify-center w-10 h-10 rounded-full bg-[#0f172a] border-2 border-border/50 z-10 shadow-sm transition-colors",
+                        "group-hover:border-primary",
+                        event.type === 'deadline' && "border-rose-500/50"
                     )}>
                       {getIcon(event.type)}
                     </div>
-                    <div className="flex-1 bg-muted/30 p-4 rounded-xl border border-transparent hover:border-border transition-all">
+                    <div className={cn(
+                      "flex-1 p-4 rounded-xl border border-transparent transition-all",
+                      event.type === 'deadline' ? "bg-rose-500/5 hover:border-rose-500/30" : "bg-muted/30 hover:border-border/50"
+                    )}>
                       <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-black uppercase text-muted-foreground bg-background px-2 py-0.5 rounded border">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-[10px] font-black uppercase text-muted-foreground bg-background px-2 py-0.5 rounded border border-border/50">
                                 {format(event.date.toDate(), "dd/MM/yyyy HH:mm", { locale: ptBR })}
                             </span>
                             <div className="flex items-center gap-1 text-[10px] text-muted-foreground font-bold">
-                                <User className="h-3 w-3" />
+                                <User className="h-3 w-3 text-primary" />
                                 {event.authorName}
                             </div>
+                            {event.endDate && (
+                              <Badge variant="outline" className="text-[9px] font-black uppercase bg-rose-500/10 text-rose-400 border-rose-500/20">
+                                <Timer className="h-2.5 w-2.5 mr-1" /> Vence em {format(event.endDate.toDate(), 'dd/MM/yyyy')}
+                              </Badge>
+                            )}
                         </div>
                         <Button 
                             variant="ghost" 
@@ -198,15 +210,15 @@ export function ProcessTimelineSheet({ process, open, onOpenChange }: ProcessTim
                             {isDeleting === event.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
                         </Button>
                       </div>
-                      <p className="text-sm leading-relaxed whitespace-pre-wrap">{event.description}</p>
+                      <p className="text-sm leading-relaxed whitespace-pre-wrap text-slate-300">{event.description}</p>
                     </div>
                   </div>
                 ))
               ) : (
                 <div className="flex flex-col items-center justify-center py-20 text-center opacity-30">
                     <History className="h-12 w-12 mb-4" />
-                    <p className="font-bold">Sem andamentos</p>
-                    <p className="text-xs">Registre o primeiro evento acima.</p>
+                    <p className="font-bold text-white">Sem andamentos</p>
+                    <p className="text-xs text-slate-400">Registre o primeiro evento acima.</p>
                 </div>
               )}
             </div>

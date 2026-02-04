@@ -1,4 +1,3 @@
-
 'use client';
 import * as React from 'react';
 import {
@@ -22,7 +21,8 @@ import {
   Calendar,
   Clock,
   MapPin,
-  RefreshCw
+  RefreshCw,
+  Timer
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
@@ -46,6 +46,7 @@ import { ProcessTimelineSheet } from '@/components/process/ProcessTimelineSheet'
 import { ProcessForm } from '@/components/process/ProcessForm';
 import { DocumentDraftingDialog } from '@/components/process/DocumentDraftingDialog';
 import { QuickHearingDialog } from '@/components/process/QuickHearingDialog';
+import { LegalDeadlineDialog } from '@/components/process/LegalDeadlineDialog';
 import { archiveProcess } from '@/lib/process-actions';
 import { syncProcessToDrive } from '@/lib/drive';
 import { cn } from '@/lib/utils';
@@ -64,6 +65,7 @@ export default function ProcessosPage() {
   const [isTimelineOpen, setIsTimelineOpen] = React.useState(false);
   const [isDraftingOpen, setIsDraftingOpen] = React.useState(false);
   const [isHearingOpen, setIsHearingOpen] = React.useState(false);
+  const [isDeadlineOpen, setIsDeadlineOpen] = React.useState(false);
   const [editingProcess, setEditingProcess] = React.useState<Process | null>(null);
   const [selectedProcess, setSelectedProcess] = React.useState<Process | null>(null);
   const [processToDelete, setProcessToDelete] = React.useState<Process | null>(null);
@@ -226,6 +228,7 @@ export default function ProcessosPage() {
                           <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-white/50"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-60 bg-card border-border">
                             <DropdownMenuItem onClick={() => { setSelectedProcess(p); setIsTimelineOpen(true); }}><History className="mr-2 h-4 w-4 text-primary" /> Timeline</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => { setSelectedProcess(p); setIsDeadlineOpen(true); }}><Timer className="mr-2 h-4 w-4 text-rose-400" /> Lançar Prazo</DropdownMenuItem>
                             <DropdownMenuItem onClick={() => { setSelectedProcess(p); setIsHearingOpen(true); }}><Gavel className="mr-2 h-4 w-4 text-amber-400" /> Marcar Audiência</DropdownMenuItem>
                             <DropdownMenuItem onClick={() => { setSelectedProcess(p); setIsDraftingOpen(true); }}><FilePlus2 className="mr-2 h-4 w-4 text-emerald-400" /> Gerar Rascunho</DropdownMenuItem>
                             <DropdownMenuItem onSelect={() => setEventProcess(p)}><DollarSign className="mr-2 h-4 w-4 text-blue-400" /> Evento Financeiro</DropdownMenuItem>
@@ -297,6 +300,7 @@ export default function ProcessosPage() {
       <ProcessTimelineSheet process={selectedProcess} open={isTimelineOpen} onOpenChange={setIsTimelineOpen} />
       <DocumentDraftingDialog process={selectedProcess} open={isDraftingOpen} onOpenChange={setIsDraftingOpen} />
       <QuickHearingDialog process={selectedProcess} open={isHearingOpen} onOpenChange={setIsHearingOpen} />
+      <LegalDeadlineDialog process={selectedProcess} open={isDeadlineOpen} onOpenChange={setIsDeadlineOpen} />
       <FinancialEventDialog process={eventProcess} open={!!eventProcess} onOpenChange={o => !o && setEventProcess(null)} onEventCreated={() => {}} />
     </div>
   );

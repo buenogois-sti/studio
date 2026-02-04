@@ -1,4 +1,3 @@
-
 'use client';
 import type { Timestamp } from 'firebase/firestore';
 
@@ -63,10 +62,11 @@ export type Client = {
 
 export type TimelineEvent = {
   id: string;
-  type: 'note' | 'decision' | 'petition' | 'hearing' | 'system';
+  type: 'note' | 'decision' | 'petition' | 'hearing' | 'system' | 'deadline';
   description: string;
   date: Timestamp;
   authorName: string;
+  endDate?: Timestamp; // Para prazos
 };
 
 export type OpposingParty = {
@@ -121,6 +121,24 @@ export type Hearing = {
   notes?: string;
   googleCalendarEventId?: string;
   createdAt?: Timestamp;
+};
+
+export type LegalDeadlineStatus = 'PENDENTE' | 'CUMPRIDO' | 'PERDIDO' | 'CANCELADO';
+
+export type LegalDeadline = {
+  id: string;
+  processId: string;
+  type: string;
+  startDate: Timestamp;
+  endDate: Timestamp;
+  publicationText?: string;
+  observations?: string;
+  status: LegalDeadlineStatus;
+  daysCount: number;
+  authorId: string;
+  authorName: string;
+  createdAt: Timestamp;
+  updatedAt?: Timestamp;
 };
 
 export type FinancialEvent = {
