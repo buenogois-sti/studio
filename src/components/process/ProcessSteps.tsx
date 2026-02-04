@@ -1,4 +1,4 @@
-import { UseFormControl, UseFieldArrayReturn } from 'react-hook-form';
+import { Control, UseFieldArrayReturn } from 'react-hook-form';
 import type { ProcessFormValues } from '@/hooks/use-process-form';
 import type { Client, Staff } from '@/lib/types';
 import {
@@ -11,7 +11,7 @@ import {
 } from './ProcessFormSections';
 
 export type StepComponentProps = {
-  control: UseFormControl<ProcessFormValues>;
+  control: Control<ProcessFormValues>;
 };
 
 export type PartiesSectionProps = StepComponentProps & {

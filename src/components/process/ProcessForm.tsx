@@ -21,7 +21,7 @@ interface ProcessFormProps {
 }
 
 const STEP_VALIDATIONS: Record<number, (keyof ProcessFormValues)[]> = {
-  0: ['clientId'],
+  0: ['clientId', 'clientRole'],
   2: ['name', 'legalArea'],
   4: ['leadLawyerId'],
 };
@@ -183,7 +183,7 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
 
   return (
     <Form {...form}>
-      <div onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col h-screen relative">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col h-screen relative">
         <ProcessFormHeader
           steps={STEPS}
           currentStep={currentStep}
@@ -197,7 +197,7 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
         />
 
         <div className={cn(
-          "flex-1 overflow-y-auto px-1 pb-24 transition-opacity duration-300",
+          "flex-1 overflow-y-auto px-1 pb-28 transition-opacity duration-300",
           isTransitioning ? "opacity-0" : "opacity-100"
         )}>
           <fieldset 
@@ -208,20 +208,20 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
           >
             {StepContent}
           </fieldset>
-        </div>
 
-        <div className="absolute bottom-0 left-0 right-0 border-t bg-background/95 backdrop-blur-sm z-50 shadow-lg">
-          <ProcessFormFooter
-            currentStep={currentStep}
-            totalSteps={STEPS.length}
-            isSaving={isSaving}
-            hasErrors={hasErrors}
-            onPrevious={() => handleStepChange('prev')}
-            onNext={() => handleStepChange('next')}
-            onSubmit={() => form.handleSubmit(onSubmit)()}
-          />
+          <div className="sticky bottom-0 w-full border-t bg-background/95 backdrop-blur-sm z-50 shadow-lg">
+            <ProcessFormFooter
+              currentStep={currentStep}
+              totalSteps={STEPS.length}
+              isSaving={isSaving}
+              hasErrors={hasErrors}
+              onPrevious={() => handleStepChange('prev')}
+              onNext={() => handleStepChange('next')}
+              onSubmit={() => form.handleSubmit(onSubmit)()}
+            />
+          </div>
         </div>
-      </div>
+      </form>
     </Form>
   );
 }

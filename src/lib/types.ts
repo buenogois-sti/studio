@@ -82,12 +82,14 @@ export type TeamParticipant = {
 export type Process = {
   id: string;
   clientId: string;
+  clientRole?: 'Polo Ativo' | 'Polo Passivo';
   secondaryClientIds?: string[];
   name: string;
   processNumber?: string;
   court?: string;
   courtAddress?: string;
   courtBranch?: string;
+  courtWebsite?: string;
   caseValue?: number;
   opposingParties?: OpposingParty[];
   description?: string;

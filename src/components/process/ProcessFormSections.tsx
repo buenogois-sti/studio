@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { 
   Building, 
   Plus, 
@@ -17,7 +17,7 @@ import {
   CheckCircle2,
   AlertCircle
 } from 'lucide-react';
-import { Control, useFieldArray, useWatch } from 'react-hook-form';
+import { Control, useFieldArray, useFormContext, useWatch } from 'react-hook-form';
 
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
@@ -87,7 +87,7 @@ export function ClientsSection({ control, onClientSelect }: ClientsSectionProps)
     <div className="space-y-8">
       <SectionHeader 
         icon={<Users className="h-4 w-4" />} 
-        title="Autores do Processo"
+        title="Partes do Processo"
         description="Identifique o cliente principal e, se aplicável, co-autores do processo"
       />
       
@@ -97,11 +97,33 @@ export function ClientsSection({ control, onClientSelect }: ClientsSectionProps)
       )}>
         <FormField
           control={control}
+          name="clientRole"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="text-sm font-bold">Polo Processual *</FormLabel>
+              <FormControl>
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <SelectTrigger className="h-10">
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Polo Ativo">Polo Ativo</SelectItem>
+                    <SelectItem value="Polo Passivo">Polo Passivo</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={control}
           name="clientId"
           render={({ field }) => (
             <FormItem>
               <div className="flex items-center gap-2">
-                <FormLabel className="text-sm font-bold">Cliente Principal (Autor Titular) *</FormLabel>
+                <FormLabel className="text-sm font-bold">Cliente Principal *</FormLabel>
                 {hasMainClient && <CheckCircle2 className="h-4 w-4 text-emerald-600" />}
               </div>
               <FormControl>
@@ -184,13 +206,6 @@ interface PartiesSectionProps {
 }
 
 export function PartiesSection({ control, partyFields, onAddParty, onRemoveParty }: PartiesSectionProps) {
-  const totalPercentage = useMemo(() => {
-    return partyFields.reduce((sum, field, idx) => {
-      const nameField = useWatch({ control, name: `opposingParties.${idx}.name` });
-      return sum + (nameField ? 1 : 0);
-    }, 0);
-  }, [partyFields, control]);
-
   return (
     <div className="space-y-8">
       <SectionHeader 
@@ -203,7 +218,7 @@ export function PartiesSection({ control, partyFields, onAddParty, onRemoveParty
       <div className="space-y-6 bg-muted/20 p-6 rounded-2xl border-2 border-border/50">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <FormLabel className="text-sm font-bold">Réus Registrados</FormLabel>
+            <FormLabel className="text-sm font-bold">Polo passivo</FormLabel>
             {partyFields.length > 0 && (
               <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full font-bold">
                 {partyFields.length}
@@ -318,7 +333,25 @@ export function PartiesSection({ control, partyFields, onAddParty, onRemoveParty
 export function IdentificationSection({ control }: { control: Control<ProcessFormValues> }) {
   const name = useWatch({ control, name: 'name' });
   const legalArea = useWatch({ control, name: 'legalArea' });
+  const caseValue = useWatch({ control, name: 'caseValue' });
+  const { setValue } = useFormContext<ProcessFormValues>();
   const isValid = !!name && !!legalArea;
+
+  const formatCurrencyBRL = (value?: number | string) => {
+    if (value === null || value === undefined || value === '') return '';
+    const numericValue = typeof value === 'number' ? value : Number(String(value).replace(/[^\d.-]/g, ''));
+    if (Number.isNaN(numericValue)) return '';
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(numericValue);
+  };
+
+  const handleCurrencyChange = (raw: string) => {
+    const digits = raw.replace(/\D/g, '');
+    const numericValue = Number(digits) / 100;
+    setValue('caseValue', Number.isNaN(numericValue) ? 0 : numericValue, {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+  };
 
   return (
     <div className="space-y-8">
@@ -408,8 +441,19 @@ export function IdentificationSection({ control }: { control: Control<ProcessFor
                   <SelectItem value="Trabalhista">Trabalhista</SelectItem>
                   <SelectItem value="Cível">Cível</SelectItem>
                   <SelectItem value="Criminal">Criminal</SelectItem>
+                  <SelectItem value="Tributário">Tributário</SelectItem>
+                  <SelectItem value="Empresarial">Empresarial</SelectItem>
+                  <SelectItem value="Administrativo">Administrativo</SelectItem>
+                  <SelectItem value="Consumidor">Consumidor</SelectItem>
+                  <SelectItem value="Imobiliário">Imobiliário</SelectItem>
+                  <SelectItem value="Ambiental">Ambiental</SelectItem>
+                  <SelectItem value="Eleitoral">Eleitoral</SelectItem>
+                  <SelectItem value="Bancário">Bancário</SelectItem>
                   <SelectItem value="Previdenciário">Previdenciário</SelectItem>
                   <SelectItem value="Família">Família</SelectItem>
+                  <SelectItem value="Sucessões">Sucessões</SelectItem>
+                  <SelectItem value="Propriedade Intelectual">Propriedade Intelectual</SelectItem>
+                  <SelectItem value="Trânsito">Trânsito</SelectItem>
                   <SelectItem value="Outro">Outro</SelectItem>
                 </SelectContent>
               </Select>
@@ -440,16 +484,17 @@ export function IdentificationSection({ control }: { control: Control<ProcessFor
         <FormField
           control={control}
           name="caseValue"
-          render={({ field }) => (
+          render={() => (
             <FormItem>
               <FormLabel className="text-sm font-bold">Valor da Causa (R$)</FormLabel>
               <FormControl>
                 <Input 
-                  type="number" 
-                  step="0.01" 
-                  className="h-11 border-2" 
+                  type="text"
+                  inputMode="decimal"
+                  className="h-11 border-2"
                   onKeyDown={(e) => e.stopPropagation()}
-                  {...field} 
+                  value={formatCurrencyBRL(caseValue)}
+                  onChange={(e) => handleCurrencyChange(e.target.value)}
                 />
               </FormControl>
               <FormMessage />
@@ -520,6 +565,26 @@ export function CourtSection({ control }: { control: Control<ProcessFormValues> 
             </FormItem>
           )}
         />
+
+        <FormField
+          control={control}
+          name="courtWebsite"
+          render={({ field }) => (
+            <FormItem className="md:col-span-2">
+              <FormLabel className="text-sm font-bold">Link do Tribunal</FormLabel>
+              <FormControl>
+                <Input 
+                  type="url"
+                  placeholder="https://www.tst.jus.br/" 
+                  className="h-11 border-2" 
+                  onKeyDown={(e) => e.stopPropagation()}
+                  {...field} 
+                />
+              </FormControl>
+              <p className="text-[10px] text-muted-foreground">Opcional</p>
+            </FormItem>
+          )}
+        />
       </div>
     </div>
   );
@@ -538,12 +603,6 @@ export function TeamSection({ control, staff, teamFields, onAddMember, onRemoveM
   const lawyers = staff.filter((s) => s.role === 'lawyer');
   const leadLawyerId = useWatch({ control, name: 'leadLawyerId' });
   const hasLeadLawyer = !!leadLawyerId;
-  const totalPercentage = useMemo(() => {
-    return teamFields.reduce((sum, _, idx) => {
-      const staffId = useWatch({ control, name: `teamParticipants.${idx}.staffId` });
-      return sum + (staffId ? 1 : 0);
-    }, 0);
-  }, [teamFields, control]);
 
   return (
     <div className="space-y-8">

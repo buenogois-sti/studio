@@ -29,7 +29,7 @@ export function ProcessFormFooter({
 
   return (
     <SheetFooter className="border-none pt-0 bg-transparent">
-      <div className="flex items-center justify-between w-full gap-3 px-6 py-4">
+      <div className="flex justify-between sm:w-full w-full gap-3 px-4 py-10">
         <Button 
           type="button" 
           variant="outline" 

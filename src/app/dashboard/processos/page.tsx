@@ -18,6 +18,8 @@ import {
   CheckCircle2,
   TrendingUp,
   FilePlus2,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
@@ -28,7 +30,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
@@ -60,6 +61,7 @@ export default function ProcessosPage() {
   const [isDeleting, setIsDeleting] = React.useState(false);
   const [searchTerm, setSearchTerm] = React.useState('');
   const [eventProcess, setEventProcess] = React.useState<Process | null>(null);
+  const [expandedProcessId, setExpandedProcessId] = React.useState<string | null>(null);
 
   const { firestore, isUserLoading } = useFirebase();
   const { data: session } = useSession();
@@ -86,9 +88,9 @@ export default function ProcessosPage() {
     if (!processesData) return [];
     return processesData.filter(p => {
         const matchesSearch = 
-            p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-            p.processNumber?.includes(searchTerm) ||
-            p.opposingParties?.some(party => party.toLowerCase().includes(searchTerm.toLowerCase()));
+          p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+          p.processNumber?.includes(searchTerm) ||
+          p.opposingParties?.some(party => party.name?.toLowerCase().includes(searchTerm.toLowerCase()));
         
         const matchesClient = !clientIdFilter || p.clientId === clientIdFilter;
         return matchesSearch && matchesClient;
@@ -121,6 +123,21 @@ export default function ProcessosPage() {
     if (!text) return;
     navigator.clipboard.writeText(text);
     toast({ title: "Copiado!", description: "Número do processo na área de transferência." });
+  };
+
+  const formatCurrency = (value?: number) =>
+    typeof value === 'number'
+      ? value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+      : '—';
+
+  const getForumName = (address?: string) => {
+    if (!address) return 'Não informado';
+    return address.split(',')[0]?.trim() || address;
+  };
+
+  const getMapsUrl = (address?: string) => {
+    if (!address) return '';
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
   };
 
   const isLoading = isUserLoading || isLoadingProcesses;
@@ -189,69 +206,83 @@ export default function ProcessosPage() {
           </Card>
       </div>
 
-      <Card className="border-none shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/50 hover:bg-muted/50 border-none">
-                <TableHead className="w-[350px] font-bold py-4">Processo / Identificação</TableHead>
-                <TableHead className="font-bold">Cliente</TableHead>
-                <TableHead className="font-bold text-center">Status</TableHead>
-                <TableHead className="text-right font-bold pr-6">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                [...Array(5)].map((_, i) => (
-                  <TableRow key={i}>
-                    <TableCell colSpan={4} className="py-6"><Skeleton className="h-12 w-full" /></TableCell>
-                  </TableRow>
-                ))
-              ) : filteredProcesses.length > 0 ? (
-                filteredProcesses.map((p, idx) => {
-                  const client = clientsMap.get(p.clientId);
-                  const StatusInfo = STATUS_CONFIG[p.status || 'Ativo'];
-                  
-                  return (
-                    <TableRow key={p.id} className="group hover:bg-muted/30 transition-colors animate-in fade-in duration-300" style={{ animationDelay: `${idx * 50}ms` }}>
-                      <TableCell className="py-4">
-                        <div className="flex flex-col gap-1.5">
-                          <span className="font-bold text-sm leading-tight text-foreground group-hover:text-primary transition-colors">{p.name}</span>
-                          {p.processNumber && (
-                              <div className="flex items-center gap-1 text-[10px] font-mono text-muted-foreground bg-muted/50 w-fit px-1.5 py-0.5 rounded border border-border/50">
-                                  <span>{p.processNumber}</span>
-                                  <button 
-                                    onClick={() => copyToClipboard(p.processNumber || '')}
-                                    className="ml-1 hover:text-primary transition-colors"
-                                  >
-                                      <Copy className="h-3 w-3" />
-                                  </button>
-                              </div>
-                          )}
-                          <div className='flex items-center gap-2'>
-                              <Badge variant="outline" className="text-[8px] h-4 px-1.5 uppercase font-black text-muted-foreground border-muted-foreground/20">
-                                  <Gavel className="h-2 w-2 mr-1" /> {p.court || 'Não informado'}
-                              </Badge>
-                          </div>
+      <div className="grid gap-4">
+        {isLoading ? (
+          [...Array(5)].map((_, i) => (
+            <Card key={i} className="border-none shadow-sm">
+              <CardContent className="p-4">
+                <Skeleton className="h-12 w-full" />
+              </CardContent>
+            </Card>
+          ))
+        ) : filteredProcesses.length > 0 ? (
+          filteredProcesses.map((p, idx) => {
+            const client = clientsMap.get(p.clientId);
+            const StatusInfo = STATUS_CONFIG[p.status || 'Ativo'];
+            const isExpanded = expandedProcessId === p.id;
+
+            return (
+              <Card key={p.id} className="border-none shadow-sm overflow-hidden animate-in fade-in duration-300" style={{ animationDelay: `${idx * 50}ms` }}>
+                <CardContent className="p-4">
+                  <div className="flex flex-col gap-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-bold text-sm text-foreground">{p.name}</h3>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setExpandedProcessId(isExpanded ? null : p.id)}
+                            className="h-6 w-6"
+                            aria-label={isExpanded ? 'Ocultar detalhes' : 'Ver detalhes'}
+                          >
+                            {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                          </Button>
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        {client ? (
-                          <Link href={`/dashboard/clientes?clientId=${client.id}`} className="hover:underline">
-                              <div className="flex flex-col">
-                                  <span className="font-bold text-sm text-foreground">{client.firstName} {client.lastName}</span>
-                                  <span className="text-[10px] text-muted-foreground font-mono">{client.document}</span>
-                              </div>
-                          </Link>
-                        ) : <span className="text-muted-foreground italic text-xs">Desconhecido</span>}
-                      </TableCell>
-                      <TableCell className="text-center">
+
+                        {p.processNumber && (
+                          <div className="flex items-center gap-1 text-[10px] font-mono text-muted-foreground bg-muted/50 w-fit px-1.5 py-0.5 rounded border border-border/50">
+                            <span>{p.processNumber}</span>
+                            <button
+                              onClick={() => copyToClipboard(p.processNumber || '')}
+                              className="ml-1 hover:text-primary transition-colors"
+                            >
+                              <Copy className="h-3 w-3" />
+                            </button>
+                          </div>
+                        )}
+
+                        <div className="flex flex-wrap items-center gap-2">
+                          {p.court ? (
+                            <a
+                              href={getMapsUrl(p.court)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex"
+                            >
+                              <Badge variant="outline" className="text-[8px] h-4 px-1.5 uppercase font-black text-muted-foreground border-muted-foreground/20 hover:text-primary">
+                                <Gavel className="h-2 w-2 mr-1" /> {getForumName(p.court)}
+                              </Badge>
+                            </a>
+                          ) : (
+                            <Badge variant="outline" className="text-[8px] h-4 px-1.5 uppercase font-black text-muted-foreground border-muted-foreground/20">
+                              <Gavel className="h-2 w-2 mr-1" /> Não informado
+                            </Badge>
+                          )}
+                          {p.clientRole && (
+                            <Badge variant="outline" className="text-[8px] h-4 px-1.5 uppercase font-black text-muted-foreground border-muted-foreground/20">
+                              {p.clientRole}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3">
                         <Badge variant="outline" className={cn("gap-1.5 h-6 text-[9px] font-black uppercase tracking-wider", StatusInfo.color)}>
                           <StatusInfo.icon className="h-3 w-3" />
                           {StatusInfo.label}
                         </Badge>
-                      </TableCell>
-                      <TableCell className="text-right pr-6">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-8 w-8"><MoreVertical className="h-4 w-4" /></Button>
@@ -264,13 +295,11 @@ export default function ProcessosPage() {
                             <DropdownMenuItem onSelect={() => { setSelectedProcess(p); setIsDraftingOpen(true); }}>
                               <FilePlus2 className="mr-2 h-4 w-4 text-emerald-500" /> Gerar Rascunho (IA/Drive)
                             </DropdownMenuItem>
-                            
                             {(userRole === 'admin' || userRole === 'lawyer' || userRole === 'financial') && (
                               <DropdownMenuItem onSelect={() => setEventProcess(p)}>
                                   <DollarSign className="mr-2 h-4 w-4 text-blue-500" /> Registrar Evento Financeiro
                               </DropdownMenuItem>
                             )}
-
                             <DropdownMenuSeparator />
                             <DropdownMenuItem onSelect={() => { setEditingProcess(p); setIsSheetOpen(true); }}>
                               <FileText className="mr-2 h-4 w-4" /> Editar Cadastro
@@ -282,7 +311,6 @@ export default function ProcessosPage() {
                                     </a>
                                 </DropdownMenuItem>
                             )}
-                            
                             {userRole === 'admin' && (
                               <>
                                   <DropdownMenuSeparator />
@@ -293,35 +321,76 @@ export default function ProcessosPage() {
                             )}
                           </DropdownMenuContent>
                         </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={4} className="h-48 text-center">
-                    <div className="flex flex-col items-center gap-3 opacity-50 animate-in fade-in duration-500">
-                        <div className="h-16 w-16 rounded-xl bg-muted/50 flex items-center justify-center">
-                          <FolderOpen className="h-8 w-8 text-muted-foreground" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-bold mb-1">Nenhum processo encontrado</p>
-                          <p className="text-xs text-muted-foreground">Comece criando seu primeiro processo judicial</p>
-                        </div>
-                        <Button size="sm" variant="outline" onClick={() => { setEditingProcess(null); setIsSheetOpen(true); }} className="mt-2">
-                          <PlusCircle className="mr-2 h-4 w-4" /> Criar Primeiro Processo
-                        </Button>
+                      </div>
                     </div>
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </Card>
+
+                    <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                      {client ? (
+                        <Link href={`/dashboard/clientes?clientId=${client.id}`} className="hover:underline">
+                          <span className="font-semibold text-foreground">{client.firstName} {client.lastName}</span>
+                          <span className="ml-2 font-mono">{client.document}</span>
+                        </Link>
+                      ) : (
+                        <span className="italic">Desconhecido</span>
+                      )}
+                    </div>
+
+                    {isExpanded && (
+                      <div className="mt-2 rounded-xl border border-border/60 bg-muted/10 p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="space-y-2">
+                          <p className="text-[10px] font-black uppercase text-muted-foreground">Resumo</p>
+                          <div className="text-xs">
+                            <div><span className="text-muted-foreground">Área:</span> {p.legalArea || '—'}</div>
+                            <div><span className="text-muted-foreground">Valor:</span> {formatCurrency(p.caseValue)}</div>
+                            <div><span className="text-muted-foreground">Número:</span> {p.processNumber || '—'}</div>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <p className="text-[10px] font-black uppercase text-muted-foreground">Juízo</p>
+                          <div className="text-xs">
+                            <div><span className="text-muted-foreground">Tribunal:</span> {p.court || '—'}</div>
+                            <div><span className="text-muted-foreground">Vara:</span> {p.courtBranch || '—'}</div>
+                            <div><span className="text-muted-foreground">Endereço:</span> {p.courtAddress || '—'}</div>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <p className="text-[10px] font-black uppercase text-muted-foreground">Ações rápidas</p>
+                          <div className="flex flex-wrap gap-2">
+                            <Button size="sm" variant="outline" onClick={() => { setSelectedProcess(p); setIsTimelineOpen(true); }}>
+                              <History className="mr-2 h-4 w-4" /> Histórico
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => { setEditingProcess(p); setIsSheetOpen(true); }}>
+                              <FileText className="mr-2 h-4 w-4" /> Editar
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })
+        ) : (
+          <Card className="border-none shadow-sm">
+            <CardContent className="h-48 text-center flex flex-col items-center justify-center gap-3 opacity-50">
+              <div className="h-16 w-16 rounded-xl bg-muted/50 flex items-center justify-center">
+                <FolderOpen className="h-8 w-8 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="text-sm font-bold mb-1">Nenhum processo encontrado</p>
+                <p className="text-xs text-muted-foreground">Comece criando seu primeiro processo judicial</p>
+              </div>
+              <Button size="sm" variant="outline" onClick={() => { setEditingProcess(null); setIsSheetOpen(true); }} className="mt-2">
+                <PlusCircle className="mr-2 h-4 w-4" /> Criar Primeiro Processo
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+      </div>
 
       <Sheet open={isSheetOpen} onOpenChange={(open) => { if (!open) setEditingProcess(null); setIsSheetOpen(open); }}>
-        <SheetContent className="sm:max-w-4xl w-full p-0 flex flex-col">
+        <SheetContent className="sm:max-w-4xl w-full p-1 flex flex-col">
           <SheetHeader className="px-6 pt-6 pb-2">
             <SheetTitle className="text-2xl font-black font-headline">
                 {editingProcess ? 'Editar Processo' : 'Novo Processo'}

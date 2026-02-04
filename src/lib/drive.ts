@@ -158,6 +158,10 @@ export async function syncProcessToDrive(processId: string): Promise<void> {
         if (!processDoc.exists) throw new Error('Processo não encontrado.');
         const processData = processDoc.data() as Process;
 
+        if (processData.driveFolderId && processData.globalDriveFolderId) {
+            return;
+        }
+
         const clientRef = firestoreAdmin.collection('clients').doc(processData.clientId);
         const clientDoc = await clientRef.get();
         if (!clientDoc.exists) throw new Error('Cliente não encontrado.');

@@ -7,6 +7,7 @@ import type { Process } from '@/lib/types';
 
 export const processSchema = z.object({
   clientId: z.string().min(1, 'Selecione um cliente principal.'),
+  clientRole: z.enum(['Polo Ativo', 'Polo Passivo'], { required_error: 'Selecione o papel do cliente.' }),
   secondaryClientIds: z.array(z.string()).default([]),
   name: z.string()
     .min(3, 'O título deve ter no mínimo 3 caracteres.')
@@ -18,6 +19,7 @@ export const processSchema = z.object({
   court: z.string().optional().or(z.literal('')),
   courtAddress: z.string().optional().or(z.literal('')),
   courtBranch: z.string().optional().or(z.literal('')),
+  courtWebsite: z.string().url('Link inválido').optional().or(z.literal('')),
   leadLawyerId: z.string().min(1, 'Defina o advogado responsável.'),
   teamParticipants: z.array(z.object({
     staffId: z.string().min(1, 'Selecione um membro.'),
@@ -39,10 +41,18 @@ export const useProcessForm = (process?: Process | null, onSave?: () => void) =>
   const { firestore } = useFirebase();
   const { toast } = useToast();
 
+  const normalizeClientRole = (role?: string) => {
+    if (role === 'Autor') return 'Polo Ativo';
+    if (role === 'Réu') return 'Polo Passivo';
+    if (role === 'Polo Ativo' || role === 'Polo Passivo') return role;
+    return 'Polo Ativo';
+  };
+
   const defaultValues = useMemo<ProcessFormValues>(() => {
     if (!process) {
       return {
         clientId: '',
+        clientRole: 'Polo Ativo',
         secondaryClientIds: [],
         name: '',
         processNumber: '',
@@ -52,6 +62,7 @@ export const useProcessForm = (process?: Process | null, onSave?: () => void) =>
         court: '',
         courtAddress: '',
         courtBranch: '',
+        courtWebsite: '',
         leadLawyerId: '',
         teamParticipants: [],
         opposingParties: [],
@@ -60,6 +71,7 @@ export const useProcessForm = (process?: Process | null, onSave?: () => void) =>
     }
     return {
       clientId: process.clientId || '',
+      clientRole: normalizeClientRole(process.clientRole),
       secondaryClientIds: process.secondaryClientIds || [],
       name: process.name || '',
       processNumber: process.processNumber || '',
@@ -69,6 +81,7 @@ export const useProcessForm = (process?: Process | null, onSave?: () => void) =>
       court: process.court || '',
       courtAddress: process.courtAddress || '',
       courtBranch: process.courtBranch || '',
+      courtWebsite: process.courtWebsite || '',
       leadLawyerId: process.leadLawyerId || '',
       teamParticipants: process.teamParticipants || [],
       opposingParties: process.opposingParties || [],
@@ -115,6 +128,7 @@ export const useProcessForm = (process?: Process | null, onSave?: () => void) =>
     if (!firestore) return false;
 
     try {
+      let savedProcessId = process?.id;
       const data = {
         ...values,
         updatedAt: serverTimestamp(),
@@ -133,11 +147,24 @@ export const useProcessForm = (process?: Process | null, onSave?: () => void) =>
         const col = collection(firestore, 'processes');
         const docRef = await addDoc(col, { ...data, createdAt: serverTimestamp() });
         clearDraft();
+        savedProcessId = docRef.id;
         toast({ 
           title: 'Processo criado!', 
           description: 'O novo caso foi registrado e organizado.',
           variant: 'default'
         });
+      }
+
+      if (savedProcessId) {
+        try {
+          await fetch('/api/drive/sync-process', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ processId: savedProcessId }),
+          });
+        } catch (error) {
+          console.error('Erro ao sincronizar processo no Drive:', error);
+        }
       }
       
       onSave?.();

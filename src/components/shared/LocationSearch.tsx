@@ -1,41 +1,15 @@
 'use client';
 
 import * as React from 'react';
-import { MapPin, Building2, Video, Globe, Check, ChevronsUpDown, PlusCircle, Loader2, Search } from 'lucide-react';
+import { MapPin, Globe, Check, PlusCircle, Loader2, Search, X, History } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '../ui/scroll-area';
 
-export const groupedLocations = [
-  {
-    label: "Fóruns Trabalhistas (ABC)",
-    items: [
-      { name: "Fórum Trabalhista de São Bernardo do Campo", icon: MapPin },
-      { name: "Fórum Trabalhista de Santo André", icon: MapPin },
-      { name: "Fórum Trabalhista de Diadema", icon: MapPin },
-      { name: "Fórum Trabalhista de Mauá", icon: MapPin },
-      { name: "Fórum Trabalhista de São Caetano do Sul", icon: MapPin },
-    ]
-  },
-  {
-    label: "Tribunais e Sedes (SP)",
-    items: [
-      { name: "TRT-2 - Sede Barra Funda (São Paulo)", icon: Building2 },
-      { name: "TRT-2 - Fórum Trabalhista da Zona Sul", icon: Building2 },
-      { name: "TRT-2 - Fórum Trabalhista da Zona Leste", icon: Building2 },
-    ]
-  },
-  {
-    label: "Audiências Virtuais",
-    items: [
-      { name: "Audiência Virtual (Google Meet)", icon: Video },
-      { name: "Audiência Virtual (Zoom)", icon: Video },
-      { name: "Audiência Virtual (Microsoft Teams)", icon: Video },
-    ]
-  }
-];
+const RECENT_LOCATIONS_KEY = 'recent_locations';
+const RECENT_LOCATIONS_LIMIT = 6;
+const RECENT_FALLBACK = 'Fórum de São Bernardo do Campo';
 
 interface LocationSearchProps {
   value: string;
@@ -48,14 +22,39 @@ export function LocationSearch({ value, onSelect, placeholder = "Pesquisar local
   const [search, setSearch] = React.useState("");
   const [apiResults, setApiResults] = React.useState<string[]>([]);
   const [isSearching, setIsSearching] = React.useState(false);
+  const [recentLocations, setRecentLocations] = React.useState<string[]>([]);
   const inputRef = React.useRef<HTMLInputElement>(null);
+  const containerRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    try {
+      const raw = localStorage.getItem(RECENT_LOCATIONS_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      if (Array.isArray(parsed)) {
+        setRecentLocations(parsed.filter((item) => typeof item === 'string'));
+      }
+    } catch (error) {
+      console.error('Erro ao carregar locais recentes:', error);
+    }
+  }, []);
 
   React.useEffect(() => {
     if (open) {
-      const timer = setTimeout(() => {
-        inputRef.current?.focus();
-      }, 150);
+      const timer = setTimeout(() => inputRef.current?.focus(), 50);
       return () => clearTimeout(timer);
+    }
+  }, [open]);
+
+  React.useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+
+    if (open) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
     }
   }, [open]);
 
@@ -84,47 +83,76 @@ export function LocationSearch({ value, onSelect, placeholder = "Pesquisar local
     return () => clearTimeout(timer);
   }, [search]);
 
+  const addRecentLocation = React.useCallback((location: string) => {
+    const normalized = location.trim();
+    if (!normalized) return;
+    const updated = [normalized, ...recentLocations.filter((item) => item !== normalized)].slice(0, RECENT_LOCATIONS_LIMIT);
+    setRecentLocations(updated);
+    try {
+      localStorage.setItem(RECENT_LOCATIONS_KEY, JSON.stringify(updated));
+    } catch (error) {
+      console.error('Erro ao salvar locais recentes:', error);
+    }
+  }, [recentLocations]);
+
+  const displayName = React.useMemo(() => {
+    if (!value) return '';
+    return value.split(',')[0]?.trim() || value;
+  }, [value]);
+
   return (
-    <Popover open={open} onOpenChange={setOpen} modal={false}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          className="w-full justify-between h-11 font-normal bg-background border-2"
-        >
-          {value ? (
-            <div className="flex items-center gap-2 overflow-hidden">
-              <MapPin className="h-4 w-4 text-primary shrink-0" />
-              <span className="truncate font-medium">{value}</span>
-            </div>
-          ) : (
-            <span className="text-muted-foreground">{placeholder}</span>
-          )}
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent 
-        className="w-[var(--radix-popover-trigger-width)] p-0 z-[100]" 
-        align="start"
-        onOpenAutoFocus={(e) => e.preventDefault()}
+    <div ref={containerRef} className="relative w-full">
+      <Button
+        variant="outline"
+        type="button"
+        role="combobox"
+        aria-expanded={open}
+        className="w-full justify-start text-left font-normal h-11 bg-background border-2"
+        onClick={() => {
+          setOpen(!open);
+          if (!open) {
+            setTimeout(() => inputRef.current?.focus(), 50);
+          }
+        }}
       >
-        <div 
-          className="flex flex-col h-full bg-popover border shadow-xl rounded-xl overflow-hidden"
-          onKeyDown={(e) => e.stopPropagation()} // IMPEDE que a Sheet pai capture o teclado
-        >
-          <div className="flex items-center border-b px-3 bg-muted/10">
-            <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-            <Input 
-              ref={inputRef}
-              placeholder="Digite o fórum ou um endereço..." 
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => e.stopPropagation()} // PROTEÇÃO PARA DIGITAÇÃO
-              className="border-none focus-visible:ring-0 focus-visible:ring-offset-0 h-11 bg-transparent"
-            />
+        {value ? (
+          <div className="flex items-center gap-2 overflow-hidden">
+            <MapPin className="h-4 w-4 text-primary shrink-0" />
+            <span className="truncate font-medium">{displayName}</span>
           </div>
-          
+        ) : (
+          <span className="text-muted-foreground">{placeholder}</span>
+        )}
+      </Button>
+
+      {open && (
+        <div className="absolute top-full left-0 right-0 mt-2 bg-background border border-border rounded-lg shadow-lg z-[200] animate-in fade-in slide-in-from-top-1 duration-200">
+          <div className="p-3 border-b">
+            <div className="relative">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground pointer-events-none" />
+              <Input 
+                ref={inputRef}
+                placeholder="      Digite o fórum ou um endereço..." 
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full pl-9 pr-9 h-9 rounded border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                autoComplete="off"
+              />
+              {search && (
+                <button
+                  onClick={() => {
+                    setSearch('');
+                    inputRef.current?.focus();
+                  }}
+                  className="absolute right-3 top-2.5"
+                  type="button"
+                >
+                  <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                </button>
+              )}
+            </div>
+          </div>
+
           <ScrollArea className="max-h-[350px] overflow-y-auto">
             {isSearching && (
               <div className="p-4 flex items-center justify-center gap-2 text-xs text-muted-foreground">
@@ -141,7 +169,7 @@ export function LocationSearch({ value, onSelect, placeholder = "Pesquisar local
                     key={address}
                     type="button"
                     onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => { onSelect(address); setOpen(false); }}
+                    onClick={() => { onSelect(address); addRecentLocation(address); setOpen(false); setSearch(''); }}
                     className={cn(
                       "flex items-start gap-2 w-full px-3 py-2.5 text-sm rounded-md transition-colors text-left",
                       "hover:bg-accent hover:text-accent-foreground",
@@ -156,37 +184,35 @@ export function LocationSearch({ value, onSelect, placeholder = "Pesquisar local
               </div>
             )}
 
-            {groupedLocations.map((group) => (
-              <div key={group.label} className="p-1 border-t first:border-t-0">
-                <div className="px-2 py-1.5 text-[10px] font-black text-muted-foreground uppercase tracking-widest">{group.label}</div>
-                {group.items.map((item) => (
-                  <button
-                    key={item.name}
-                    type="button"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => { onSelect(item.name); setOpen(false); }}
-                    className={cn(
-                      "flex items-center gap-3 w-full px-3 py-2 text-sm rounded-md transition-colors text-left",
-                      "hover:bg-accent hover:text-accent-foreground",
-                      value === item.name && "bg-accent text-accent-foreground font-bold"
-                    )}
-                  >
-                    <div className="h-7 w-7 rounded-md bg-muted flex items-center justify-center shrink-0">
-                      <item.icon className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                    <span className="flex-1 truncate">{item.name}</span>
-                    {value === item.name && <Check className="h-4 w-4 shrink-0" />}
-                  </button>
-                ))}
-              </div>
-            ))}
+            <div className="p-1 border-t first:border-t-0">
+              <div className="px-2 py-1.5 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Últimos Fóruns Pesquisados</div>
+              {(recentLocations.length ? recentLocations : [RECENT_FALLBACK]).map((location) => (
+                <button
+                  key={location}
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => { onSelect(location); addRecentLocation(location); setOpen(false); setSearch(''); }}
+                  className={cn(
+                    "flex items-center gap-3 w-full px-3 py-2 text-sm rounded-md transition-colors text-left",
+                    "hover:bg-accent hover:text-accent-foreground",
+                    value === location && "bg-accent text-accent-foreground font-bold"
+                  )}
+                >
+                  <div className="h-7 w-7 rounded-md bg-muted flex items-center justify-center shrink-0">
+                    <History className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <span className="flex-1 truncate">{location}</span>
+                  {value === location && <Check className="h-4 w-4 shrink-0" />}
+                </button>
+              ))}
+            </div>
             
             {search && (
               <div className="p-1 border-t">
                 <button
                   type="button"
                   onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => { onSelect(search); setOpen(false); }}
+                  onClick={() => { onSelect(search); addRecentLocation(search); setOpen(false); setSearch(''); }}
                   className="flex items-center gap-2 w-full px-3 py-3 text-sm rounded-md hover:bg-accent text-primary font-bold text-left"
                 >
                   <PlusCircle className="h-4 w-4" />
@@ -196,7 +222,7 @@ export function LocationSearch({ value, onSelect, placeholder = "Pesquisar local
             )}
           </ScrollArea>
         </div>
-      </PopoverContent>
-    </Popover>
+      )}
+    </div>
   );
 }
