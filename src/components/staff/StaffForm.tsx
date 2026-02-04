@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/select"
 import { SheetFooter } from '@/components/ui/sheet';
 import { H2 } from '@/components/ui/typography';
-import { Loader2, Search, DollarSign, Percent, Briefcase } from 'lucide-react';
+import { Loader2, Search, DollarSign, Percent, Briefcase, MapPin } from 'lucide-react';
 
 import { useFirebase } from '@/firebase';
 import { collection, serverTimestamp, doc, addDoc, updateDoc } from 'firebase/firestore';
@@ -194,10 +194,10 @@ export function StaffForm({
         toast({ variant: 'destructive', title: 'CEP não encontrado' });
         return;
       }
-      form.setValue('address_street', data.logradouro || '');
-      form.setValue('address_neighborhood', data.bairro || '');
-      form.setValue('address_city', data.localidade || '');
-      form.setValue('address_state', data.uf || '');
+      form.setValue('address_street', data.logradouro || '', { shouldValidate: true });
+      form.setValue('address_neighborhood', data.bairro || '', { shouldValidate: true });
+      form.setValue('address_city', data.localidade || '', { shouldValidate: true });
+      form.setValue('address_state', data.uf || '', { shouldValidate: true });
       toast({ title: 'Endereço encontrado!' });
     } catch (error) {
       toast({ variant: 'destructive', title: 'Erro ao buscar CEP' });
@@ -253,7 +253,6 @@ export function StaffForm({
       if (values.role === 'lawyer' && remuneration_type) {
         const rem: any = { type: remuneration_type };
         
-        // Atribui valores apenas se estiverem presentes ou definidos como 0
         if (remuneration_type === 'SUCUMBENCIA') {
             rem.officePercentage = remuneration_officePercentage ?? 0;
             rem.lawyerPercentage = remuneration_lawyerPercentage ?? 0;
@@ -347,7 +346,6 @@ export function StaffForm({
             </div>
           </section>
 
-          {/* REGRA DE REMUNERAÇÃO (APENAS ADVOGADOS) */}
           {watchedRole === 'lawyer' && (
             <section className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-500">
                 <div className="flex items-center gap-2 mb-2">
@@ -372,7 +370,6 @@ export function StaffForm({
                         )}
                     />
 
-                    {/* CAMPOS DINÂMICOS POR MODALIDADE */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-primary/10">
                         {watchedRemuneration === 'SUCUMBENCIA' && (
                             <>
@@ -505,12 +502,12 @@ export function StaffForm({
           
           <section className="space-y-4">
             <H2 className="text-white border-primary/20">Contatos & Localização</H2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white/5 p-6 rounded-2xl border border-white/10">
+            <div className="grid grid-cols-1 md:grid-cols-6 gap-6 bg-white/5 p-6 rounded-2xl border border-white/10">
               <FormField
                 control={form.control}
                 name="whatsapp"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="md:col-span-3">
                     <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">WhatsApp</FormLabel>
                     <FormControl><Input className="h-11 bg-background" placeholder="(11) 99999-9999" {...field} /></FormControl>
                   </FormItem>
@@ -520,7 +517,7 @@ export function StaffForm({
                   control={form.control}
                   name="address_zipCode"
                   render={({ field }) => (
-                      <FormItem>
+                      <FormItem className="md:col-span-3">
                       <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">CEP</FormLabel>
                       <div className="flex gap-2">
                         <FormControl><Input className="h-11 bg-background" placeholder="00000-000" {...field} maxLength={9}/></FormControl>
@@ -529,13 +526,69 @@ export function StaffForm({
                       </FormItem>
                   )}
               />
+              
               <FormField
                   control={form.control}
                   name="address_street"
                   render={({ field }) => (
-                      <FormItem className="md:col-span-2">
+                      <FormItem className="md:col-span-4">
                       <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">Logradouro</FormLabel>
                       <FormControl><Input className="h-11 bg-background" placeholder="Rua, avenida, etc" {...field} /></FormControl>
+                      </FormItem>
+                  )}
+              />
+
+              <FormField
+                  control={form.control}
+                  name="address_number"
+                  render={({ field }) => (
+                      <FormItem className="md:col-span-2">
+                      <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">Número</FormLabel>
+                      <FormControl><Input className="h-11 bg-background" placeholder="123" {...field} /></FormControl>
+                      </FormItem>
+                  )}
+              />
+
+              <FormField
+                  control={form.control}
+                  name="address_complement"
+                  render={({ field }) => (
+                      <FormItem className="md:col-span-3">
+                      <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">Complemento</FormLabel>
+                      <FormControl><Input className="h-11 bg-background" placeholder="Sala, bloco, etc" {...field} /></FormControl>
+                      </FormItem>
+                  )}
+              />
+
+              <FormField
+                  control={form.control}
+                  name="address_neighborhood"
+                  render={({ field }) => (
+                      <FormItem className="md:col-span-3">
+                      <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">Bairro</FormLabel>
+                      <FormControl><Input className="h-11 bg-background" placeholder="Centro" {...field} /></FormControl>
+                      </FormItem>
+                  )}
+              />
+
+              <FormField
+                  control={form.control}
+                  name="address_city"
+                  render={({ field }) => (
+                      <FormItem className="md:col-span-4">
+                      <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">Cidade</FormLabel>
+                      <FormControl><Input className="h-11 bg-background" placeholder="São Bernardo do Campo" {...field} /></FormControl>
+                      </FormItem>
+                  )}
+              />
+
+              <FormField
+                  control={form.control}
+                  name="address_state"
+                  render={({ field }) => (
+                      <FormItem className="md:col-span-2">
+                      <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">Estado (UF)</FormLabel>
+                      <FormControl><Input className="h-11 bg-background" placeholder="SP" {...field} maxLength={2} /></FormControl>
                       </FormItem>
                   )}
               />
