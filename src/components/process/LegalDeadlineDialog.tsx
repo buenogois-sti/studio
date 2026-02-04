@@ -12,7 +12,11 @@ import {
   AlertTriangle, 
   FileText, 
   Info,
-  CalendarDays
+  CalendarDays,
+  Scale,
+  Gavel,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -45,11 +49,16 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import type { Process } from '@/lib/types';
 import { createLegalDeadline } from '@/lib/deadline-actions';
+import { countBusinessDays, cn } from '@/lib/utils';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 const deadlineSchema = z.object({
   type: z.string().min(1, 'O tipo de prazo é obrigatório.'),
   startDate: z.string().min(1, 'A data inicial é obrigatória.'),
   endDate: z.string().min(1, 'A data fatal é obrigatória.'),
+  countingMethod: z.enum(['useful', 'calendar']).default('useful'),
   publicationText: z.string().optional(),
   observations: z.string().optional(),
 });
@@ -79,6 +88,7 @@ const COMMON_DEADLINES = [
 export function LegalDeadlineDialog({ process, open, onOpenChange, onSuccess }: LegalDeadlineDialogProps) {
   const [isSaving, setIsSaving] = React.useState(false);
   const [customType, setCustomType] = React.useState(false);
+  const [isHelpOpen, setIsHelpOpen] = React.useState(false);
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof deadlineSchema>>({
@@ -87,6 +97,7 @@ export function LegalDeadlineDialog({ process, open, onOpenChange, onSuccess }: 
       type: '',
       startDate: format(new Date(), 'yyyy-MM-dd'),
       endDate: '',
+      countingMethod: 'useful',
       publicationText: '',
       observations: '',
     }
@@ -94,33 +105,37 @@ export function LegalDeadlineDialog({ process, open, onOpenChange, onSuccess }: 
 
   const startDate = form.watch('startDate');
   const endDate = form.watch('endDate');
+  const countingMethod = form.watch('countingMethod');
 
-  const daysRemaining = React.useMemo(() => {
+  const businessDays = React.useMemo(() => countBusinessDays(startDate, endDate), [startDate, endDate]);
+  const calendarDays = React.useMemo(() => {
     if (!startDate || !endDate) return 0;
     try {
-      return differenceInDays(new Date(endDate), new Date(startDate));
-    } catch (e) {
-      return 0;
-    }
+      const diff = differenceInDays(new Date(endDate), new Date(startDate));
+      return diff < 0 ? 0 : diff;
+    } catch (e) { return 0; }
   }, [startDate, endDate]);
 
   const onSubmit = async (values: z.infer<typeof deadlineSchema>) => {
     if (!process) return;
     setIsSaving(true);
     try {
+      const finalCount = values.countingMethod === 'useful' ? businessDays : calendarDays;
+      
       await createLegalDeadline({
         processId: process.id,
         type: values.type,
         startDate: values.startDate,
         endDate: values.endDate,
-        daysCount: daysRemaining,
+        daysCount: finalCount,
+        isBusinessDays: values.countingMethod === 'useful',
         publicationText: values.publicationText,
         observations: values.observations,
       });
 
       toast({ 
         title: 'Prazo Lançado!', 
-        description: `O prazo de ${values.type} foi registrado na timeline do processo.` 
+        description: `O prazo de ${values.type} (${finalCount} dias) foi registrado.` 
       });
       
       onSuccess?.();
@@ -135,27 +150,27 @@ export function LegalDeadlineDialog({ process, open, onOpenChange, onSuccess }: 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl bg-card border-border max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-2xl bg-card border-border max-h-[95vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-white">
-            <Clock className="h-5 w-5 text-primary" />
-            Lançar Novo Prazo Judicial
+          <DialogTitle className="flex items-center gap-2 text-white font-headline text-xl">
+            <Clock className="h-6 w-6 text-primary" />
+            Lançar Prazo Judicial
           </DialogTitle>
           <DialogDescription className="text-slate-400">
-            Gerencie o compromisso fatal para: <span className="font-bold text-white">{process?.name}</span>
+            Configure o compromisso fatal para: <span className="font-bold text-white">{process?.name}</span>
           </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 pt-4">
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <FormField
                 control={form.control}
                 name="type"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-white">Tipo de Prazo *</FormLabel>
+                    <FormLabel className="text-white font-bold">Tipo de Prazo *</FormLabel>
                     {!customType ? (
                       <Select 
                         onValueChange={(val) => {
@@ -165,7 +180,7 @@ export function LegalDeadlineDialog({ process, open, onOpenChange, onSuccess }: 
                         value={field.value}
                       >
                         <FormControl>
-                          <SelectTrigger className="bg-background border-border">
+                          <SelectTrigger className="bg-background border-border h-11">
                             <SelectValue placeholder="Selecione o tipo..." />
                           </SelectTrigger>
                         </FormControl>
@@ -179,7 +194,7 @@ export function LegalDeadlineDialog({ process, open, onOpenChange, onSuccess }: 
                       <div className="flex gap-2">
                         <Input 
                           placeholder="Digite o tipo..." 
-                          className="bg-background border-border" 
+                          className="bg-background border-border h-11" 
                           {...field} 
                         />
                         <Button 
@@ -196,14 +211,62 @@ export function LegalDeadlineDialog({ process, open, onOpenChange, onSuccess }: 
                 )}
               />
 
-              <div className="p-3 rounded-xl bg-primary/5 border border-primary/20 flex flex-col items-center justify-center">
-                <span className="text-[10px] font-black uppercase text-primary mb-1">Duração do Prazo</span>
-                <div className="flex items-center gap-2">
-                  <CalendarDays className="h-4 w-4 text-primary" />
-                  <span className="text-2xl font-black text-white">{daysRemaining < 0 ? 0 : daysRemaining} Dias</span>
+              <div className="grid grid-cols-2 gap-2">
+                <div className={cn(
+                  "p-3 rounded-xl border flex flex-col items-center justify-center transition-all",
+                  countingMethod === 'useful' ? "bg-primary/10 border-primary shadow-[0_0_15px_rgba(245,208,48,0.1)]" : "bg-muted/30 border-border opacity-50"
+                )}>
+                  <span className="text-[9px] font-black uppercase text-primary mb-1">Dias Úteis</span>
+                  <div className="flex items-center gap-1.5">
+                    <Scale className="h-3 w-3 text-primary" />
+                    <span className="text-xl font-black text-white">{businessDays}</span>
+                  </div>
+                </div>
+                <div className={cn(
+                  "p-3 rounded-xl border flex flex-col items-center justify-center transition-all",
+                  countingMethod === 'calendar' ? "bg-blue-500/10 border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.1)]" : "bg-muted/30 border-border opacity-50"
+                )}>
+                  <span className="text-[9px] font-black uppercase text-blue-400 mb-1">Corridos</span>
+                  <div className="flex items-center gap-1.5">
+                    <CalendarDays className="h-3 w-3 text-blue-400" />
+                    <span className="text-xl font-black text-white">{calendarDays}</span>
+                  </div>
                 </div>
               </div>
             </div>
+
+            <FormField
+              control={form.control}
+              name="countingMethod"
+              render={({ field }) => (
+                <FormItem className="space-y-3">
+                  <FormLabel className="text-white font-bold">Metodologia de Contagem</FormLabel>
+                  <FormControl>
+                    <RadioGroup
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                      className="flex flex-col sm:flex-row gap-4"
+                    >
+                      <div className="flex items-center space-x-2 bg-muted/20 p-3 rounded-lg flex-1 border border-border/50">
+                        <RadioGroupItem value="useful" id="useful" />
+                        <Label htmlFor="useful" className="text-xs cursor-pointer">
+                          <strong>Dias Úteis</strong> (CPC/CLT)
+                          <p className="text-[10px] text-muted-foreground">Pula finais de semana</p>
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-2 bg-muted/20 p-3 rounded-lg flex-1 border border-border/50">
+                        <RadioGroupItem value="calendar" id="calendar" />
+                        <Label htmlFor="calendar" className="text-xs cursor-pointer">
+                          <strong>Dias Corridos</strong> (CDC Material)
+                          <p className="text-[10px] text-muted-foreground">Conta todos os dias</p>
+                        </Label>
+                      </div>
+                    </RadioGroup>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
@@ -211,9 +274,9 @@ export function LegalDeadlineDialog({ process, open, onOpenChange, onSuccess }: 
                 name="startDate"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-white">Data de Publicação / Início *</FormLabel>
+                    <FormLabel className="text-white font-bold">Início (Publicação/Leitura) *</FormLabel>
                     <FormControl>
-                      <Input type="date" className="bg-background border-border text-white" {...field} />
+                      <Input type="date" className="bg-background border-border h-11 text-white" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -224,11 +287,11 @@ export function LegalDeadlineDialog({ process, open, onOpenChange, onSuccess }: 
                 name="endDate"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-rose-400 font-bold flex items-center gap-1.5">
-                      <AlertTriangle className="h-3.5 w-3.5" /> Data Fatal (Vencimento) *
+                    <FormLabel className="text-rose-400 font-black flex items-center gap-1.5 uppercase text-[11px]">
+                      <AlertTriangle className="h-4 w-4" /> Data Fatal (Vencimento) *
                     </FormLabel>
                     <FormControl>
-                      <Input type="date" className="bg-background border-rose-500/30 text-white focus:border-rose-500" {...field} />
+                      <Input type="date" className="bg-background border-rose-500/30 h-11 text-white focus:border-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.05)]" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -236,18 +299,50 @@ export function LegalDeadlineDialog({ process, open, onOpenChange, onSuccess }: 
               />
             </div>
 
+            <Collapsible open={isHelpOpen} onOpenChange={setIsHelpOpen} className="w-full bg-blue-500/5 border border-blue-500/20 rounded-xl overflow-hidden">
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" className="w-full flex items-center justify-between p-4 hover:bg-blue-500/10 text-blue-400">
+                  <div className="flex items-center gap-2 font-bold text-xs">
+                    <Gavel className="h-4 w-4" />
+                    VER REGRAS DE CONTAGEM (CPC/CLT/CDC)
+                  </div>
+                  {isHelpOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="p-4 pt-0 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <p className="text-[11px] font-bold text-blue-300 uppercase tracking-tighter">1. CPC & TRT (Processual)</p>
+                    <p className="text-[10px] text-blue-400 leading-relaxed">
+                      Contagem apenas em <strong>dias úteis</strong>. Exclui-se o dia do começo e inclui-se o do vencimento. O prazo inicia no 1º dia útil após a publicação.
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[11px] font-bold text-blue-300 uppercase tracking-tighter">2. CDC (Material)</p>
+                    <p className="text-[10px] text-blue-400 leading-relaxed">
+                      Prazos para reclamar vícios (30 ou 90 dias) são <strong>dias corridos</strong>. Se for prazo em juízo (processual), segue o CPC (úteis).
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2 p-2 bg-amber-500/5 border border-amber-500/20 rounded text-amber-400 text-[9px] font-medium leading-tight">
+                  <Info className="h-3 w-3 shrink-0" />
+                  IMPORTANTE: No processo eletrônico, se não houver abertura em 10 dias corridos, o sistema faz leitura automática e o prazo inicia no dia útil seguinte.
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+
             <FormField
               control={form.control}
               name="publicationText"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-white flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-primary" /> Copiar/Colar Publicação
+                  <FormLabel className="text-white flex items-center gap-2 font-bold">
+                    <FileText className="h-4 w-4 text-primary" /> Colar Publicação Oficial
                   </FormLabel>
                   <FormControl>
                     <Textarea 
-                      placeholder="Cole aqui o texto do Diário Oficial ou intimação..." 
-                      className="min-h-[120px] bg-background border-border resize-none text-xs leading-relaxed" 
+                      placeholder="Cole o texto da intimação ou Diário Oficial..." 
+                      className="min-h-[100px] bg-background border-border resize-none text-[11px] leading-relaxed font-mono" 
                       {...field} 
                     />
                   </FormControl>
@@ -261,11 +356,11 @@ export function LegalDeadlineDialog({ process, open, onOpenChange, onSuccess }: 
               name="observations"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-white">Observações Estratégicas</FormLabel>
+                  <FormLabel className="text-white font-bold">Observações Estratégicas</FormLabel>
                   <FormControl>
                     <Textarea 
-                      placeholder="Notas internas para a equipe sobre este prazo..." 
-                      className="bg-background border-border resize-none" 
+                      placeholder="Notas internas para a equipe..." 
+                      className="bg-background border-border resize-none text-sm" 
                       {...field} 
                     />
                   </FormControl>
@@ -274,24 +369,17 @@ export function LegalDeadlineDialog({ process, open, onOpenChange, onSuccess }: 
               )}
             />
 
-            <div className="flex items-start gap-3 p-4 rounded-xl bg-blue-500/5 border border-blue-500/20">
-              <Info className="h-5 w-5 text-blue-500 mt-0.5 shrink-0" />
-              <p className="text-[11px] text-blue-400 leading-relaxed">
-                <strong>Atenção:</strong> O cálculo de dias acima é corrido. Verifique se o prazo do seu tribunal segue dias úteis (CPC/15) ou se há suspensão de prazos antes de confirmar a data fatal.
-              </p>
-            </div>
-
-            <DialogFooter className="pt-4 gap-2">
+            <DialogFooter className="pt-4 gap-2 border-t border-border/50 mt-6">
               <DialogClose asChild>
                 <Button variant="ghost" type="button" className="text-slate-400 hover:text-white">Cancelar</Button>
               </DialogClose>
               <Button 
                 type="submit" 
                 disabled={isSaving} 
-                className="bg-primary text-primary-foreground hover:bg-primary/90 min-w-[150px]"
+                className="bg-primary text-primary-foreground hover:bg-primary/90 font-black uppercase tracking-widest text-[11px] px-8 h-11"
               >
                 {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CalendarIcon className="mr-2 h-4 w-4" />}
-                Lançar Prazo
+                Confirmar Lançamento
               </Button>
             </DialogFooter>
           </form>

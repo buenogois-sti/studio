@@ -13,6 +13,7 @@ export async function createLegalDeadline(data: {
   startDate: string;
   endDate: string;
   daysCount: number;
+  isBusinessDays: boolean;
   publicationText?: string;
   observations?: string;
 }) {
@@ -31,6 +32,7 @@ export async function createLegalDeadline(data: {
       startDate: Timestamp.fromDate(new Date(data.startDate)),
       endDate: Timestamp.fromDate(new Date(data.endDate)),
       daysCount: data.daysCount,
+      isBusinessDays: data.isBusinessDays,
       publicationText: data.publicationText || '',
       observations: data.observations || '',
       status: 'PENDENTE' as LegalDeadlineStatus,
@@ -40,14 +42,17 @@ export async function createLegalDeadline(data: {
       updatedAt: Timestamp.now(),
     };
 
+    const methodLabel = data.isBusinessDays ? 'dias úteis' : 'dias corridos';
+    
     // Criar o evento para a Timeline do Processo
     const timelineEvent: TimelineEvent = {
       id: uuidv4(),
       type: 'deadline',
-      description: `PRAZO LANÇADO: ${data.type} (${data.daysCount} dias). Vencimento: ${new Date(data.endDate).toLocaleDateString('pt-BR')}`,
+      description: `PRAZO LANÇADO: ${data.type} (${data.daysCount} ${methodLabel}). Vencimento: ${new Date(data.endDate).toLocaleDateString('pt-BR')}`,
       date: Timestamp.now(),
       authorName: session.user.name || 'Sistema',
       endDate: Timestamp.fromDate(new Date(data.endDate)),
+      isBusinessDays: data.isBusinessDays
     };
 
     const batch = firestoreAdmin.batch();

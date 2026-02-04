@@ -67,6 +67,7 @@ export type TimelineEvent = {
   date: Timestamp;
   authorName: string;
   endDate?: Timestamp; // Para prazos
+  isBusinessDays?: boolean; // Se o prazo é contado em dias úteis
 };
 
 export type OpposingParty = {
@@ -135,6 +136,7 @@ export type LegalDeadline = {
   observations?: string;
   status: LegalDeadlineStatus;
   daysCount: number;
+  isBusinessDays: boolean;
   authorId: string;
   authorName: string;
   createdAt: Timestamp;
