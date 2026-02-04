@@ -1,4 +1,3 @@
-
 'use client';
 import * as React from 'react';
 import Link from 'next/link';
@@ -75,7 +74,7 @@ export default function ClientsPage() {
   const { data: processesData, isLoading: isLoadingProcesses } = useCollection<Process>(processesQuery);
   const processes = processesData || [];
 
-  // OTIMIZAÇÃO O(1): Mapa de contagem de processos por cliente
+  // OTIMIZAÇÃO O(1): Mapa de contagem de processos por cliente (memoizado)
   const processesByClientMap = React.useMemo(() => {
     const map = new Map<string, number>();
     processes.forEach(p => {
@@ -84,7 +83,7 @@ export default function ClientsPage() {
     return map;
   }, [processes]);
 
-  // OTIMIZAÇÃO: Cálculo de integridade memoizado para evitar lag no hover
+  // OTIMIZAÇÃO: Cálculo de integridade memoizado para evitar lag de renderização
   const clientIntegrityMap = React.useMemo(() => {
     const map = new Map<string, number>();
     clients.forEach(client => {
@@ -100,7 +99,7 @@ export default function ClientsPage() {
     return map;
   }, [clients]);
 
-  // OTIMIZAÇÃO: Filtro memoizado
+  // OTIMIZAÇÃO: Filtro e busca memoizados
   const filteredClients = React.useMemo(() => {
     let result = clients;
     if (statusFilter !== 'all') result = result.filter(c => c.status === statusFilter);
@@ -115,9 +114,9 @@ export default function ClientsPage() {
     return result;
   }, [clients, searchTerm, statusFilter]);
 
-  const handleAddNew = () => { setEditingClient(null); setIsSheetOpen(true); };
-  const handleEdit = (client: Client) => { setEditingClient(client); setIsSheetOpen(true); };
-  const handleViewDetails = (client: Client) => { setSelectedClientForDetails(client); setIsDetailsOpen(true); };
+  const handleAddNew = React.useCallback(() => { setEditingClient(null); setIsSheetOpen(true); }, []);
+  const handleEdit = React.useCallback((client: Client) => { setEditingClient(client); setIsSheetOpen(true); }, []);
+  const handleViewDetails = React.useCallback((client: Client) => { setSelectedClientForDetails(client); setIsDetailsOpen(true); }, []);
 
   const confirmDelete = async () => {
     if (!firestore || !clientToDelete) return;

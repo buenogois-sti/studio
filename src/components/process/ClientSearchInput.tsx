@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { Loader2, User, Check, Search, X, Plus } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -23,34 +23,29 @@ export function ClientSearchInput({ onSelect, selectedClientId, onCreateNew }: C
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Carrega cliente selecionado
+  // OTIMIZAÇÃO: Busca cliente selecionado apenas quando o ID muda
   useEffect(() => {
-    if (selectedClientId && (!selectedClient || selectedClient.id !== selectedClientId)) {
+    if (selectedClientId) {
       getClientById(selectedClientId).then((client) => {
-        if (client) {
-          console.log('[ClientSearchInput] Loaded selected client:', client.firstName, client.lastName);
-          setSelectedClient(client);
-        }
+        if (client) setSelectedClient(client);
       }).catch(err => console.error('[ClientSearchInput] Erro ao carregar cliente:', err));
+    } else {
+      setSelectedClient(null);
     }
   }, [selectedClientId]);
 
-  // Busca com debounce
+  // OTIMIZAÇÃO: Busca com debounce aprimorado para evitar requisições em série
   useEffect(() => {
-    console.log('[ClientSearchInput] Search effect triggered, search:', search);
-    
     if (search.length < 2) {
-      console.log('[ClientSearchInput] Search length < 2, clearing results');
       setResults([]);
+      setIsLoading(false);
       return;
     }
 
     const timer = setTimeout(async () => {
       setIsLoading(true);
-      console.log('[ClientSearchInput] Starting search for:', search);
       try {
         const data = await searchClients(search);
-        console.log('[ClientSearchInput] Search completed, results:', data?.length || 0, data);
         setResults(data || []);
       } catch (error) {
         console.error('[ClientSearchInput] Search error:', error);
@@ -58,7 +53,7 @@ export function ClientSearchInput({ onSelect, selectedClientId, onCreateNew }: C
       } finally {
         setIsLoading(false);
       }
-    }, 300);
+    }, 400); // Aumentado para 400ms para aliviar a main thread
 
     return () => clearTimeout(timer);
   }, [search]);
@@ -78,7 +73,6 @@ export function ClientSearchInput({ onSelect, selectedClientId, onCreateNew }: C
   }, [open]);
 
   const handleSelect = useCallback((client: Client) => {
-    console.log('[ClientSearchInput] Selected client:', client.firstName, client.lastName);
     setSelectedClient(client);
     onSelect(client);
     setOpen(false);
@@ -86,17 +80,68 @@ export function ClientSearchInput({ onSelect, selectedClientId, onCreateNew }: C
   }, [onSelect]);
 
   const handleCreateClick = useCallback(() => {
-    console.log('[ClientSearchInput] Create button clicked, onCreateNew available:', !!onCreateNew);
     setOpen(false);
     onCreateNew?.();
   }, [onCreateNew]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    console.log('[ClientSearchInput] Input changed to:', value);
-    setSearch(value);
-    setOpen(true);
+    setSearch(e.target.value);
+    if (!open) setOpen(true);
   };
+
+  const renderedResults = useMemo(() => {
+    if (isLoading) {
+      return (
+        <div className="p-8 text-center">
+          <Loader2 className="h-5 w-5 animate-spin mx-auto text-primary" />
+          <p className="text-xs text-muted-foreground mt-2">Buscando...</p>
+        </div>
+      );
+    }
+
+    if (search.length < 2) {
+      return (
+        <div className="p-8 text-center text-xs text-muted-foreground">
+          Digite pelo menos 2 caracteres para buscar
+        </div>
+      );
+    }
+
+    if (results.length === 0) {
+      return (
+        <div className="p-8 text-center text-xs text-muted-foreground">
+          Nenhum cliente encontrado para "{search}"
+        </div>
+      );
+    }
+
+    return (
+      <div className="p-1">
+        {results.map((client) => (
+          <button
+            key={client.id}
+            onClick={() => handleSelect(client)}
+            type="button"
+            className={cn(
+              'w-full text-left px-3 py-2.5 text-sm rounded hover:bg-accent transition-colors',
+              selectedClientId === client.id && 'bg-primary/10 border-l-2 border-primary'
+            )}
+          >
+            <div className="flex items-center gap-2">
+              <User className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold truncate">{client.firstName} {client.lastName}</p>
+                <p className="text-xs text-muted-foreground">{client.document}</p>
+              </div>
+              {selectedClientId === client.id && (
+                <Check className="h-4 w-4 shrink-0 text-primary" />
+              )}
+            </div>
+          </button>
+        ))}
+      </div>
+    );
+  }, [isLoading, search, results, selectedClientId, handleSelect]);
 
   return (
     <div ref={containerRef} className="relative w-full">
@@ -105,13 +150,9 @@ export function ClientSearchInput({ onSelect, selectedClientId, onCreateNew }: C
         type="button"
         className="w-full justify-start text-left font-normal h-11 border-2 hover:border-primary/50 hover:bg-primary/5 transition-all duration-200"
         onClick={() => {
-          console.log('[ClientSearchInput] Button clicked, open was:', open);
           setOpen(!open);
           if (!open) {
-            setTimeout(() => {
-              console.log('[ClientSearchInput] Focusing input...');
-              inputRef.current?.focus();
-            }, 50);
+            setTimeout(() => inputRef.current?.focus(), 50);
           }
         }}
       >
@@ -128,10 +169,8 @@ export function ClientSearchInput({ onSelect, selectedClientId, onCreateNew }: C
         )}
       </Button>
 
-      {/* Dropdown */}
       {open && (
         <div className="absolute top-full left-0 right-0 mt-2 bg-background border border-border rounded-lg shadow-lg z-[200] animate-in fade-in slide-in-from-top-1 duration-200">
-          {/* Header com input */}
           <div className="p-3 border-b">
             <div className="relative">
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground pointer-events-none" />
@@ -141,19 +180,13 @@ export function ClientSearchInput({ onSelect, selectedClientId, onCreateNew }: C
                 placeholder="Nome ou CPF/CNPJ..."
                 value={search}
                 onChange={handleInputChange}
-                onKeyDown={(e) => {
-                  console.log('[ClientSearchInput] Key pressed:', e.key);
-                }}
+                onKeyDown={(e) => { e.stopPropagation(); }}
                 className="w-full pl-9 pr-9 h-9 rounded border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 autoComplete="off"
               />
               {search && (
                 <button
-                  onClick={() => {
-                    console.log('[ClientSearchInput] Clear button clicked');
-                    setSearch('');
-                    inputRef.current?.focus();
-                  }}
+                  onClick={() => { setSearch(''); inputRef.current?.focus(); }}
                   className="absolute right-3 top-2.5"
                   type="button"
                 >
@@ -163,50 +196,10 @@ export function ClientSearchInput({ onSelect, selectedClientId, onCreateNew }: C
             </div>
           </div>
 
-          {/* Resultados */}
           <div className="max-h-[300px] overflow-y-auto">
-            {isLoading ? (
-              <div className="p-8 text-center">
-                <Loader2 className="h-5 w-5 animate-spin mx-auto text-primary" />
-                <p className="text-xs text-muted-foreground mt-2">Buscando...</p>
-              </div>
-            ) : search.length < 2 ? (
-              <div className="p-8 text-center text-xs text-muted-foreground">
-                Digite pelo menos 2 caracteres para buscar
-              </div>
-            ) : results.length === 0 ? (
-              <div className="p-8 text-center text-xs text-muted-foreground">
-                Nenhum cliente encontrado para "{search}"
-              </div>
-            ) : (
-              <div className="p-1">
-                {results.map((client) => (
-                  <button
-                    key={client.id}
-                    onClick={() => handleSelect(client)}
-                    type="button"
-                    className={cn(
-                      'w-full text-left px-3 py-2.5 text-sm rounded hover:bg-accent transition-colors',
-                      selectedClientId === client.id && 'bg-primary/10 border-l-2 border-primary'
-                    )}
-                  >
-                    <div className="flex items-center gap-2">
-                      <User className="h-4 w-4 shrink-0 text-muted-foreground" />
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold truncate">{client.firstName} {client.lastName}</p>
-                        <p className="text-xs text-muted-foreground">{client.document}</p>
-                      </div>
-                      {selectedClientId === client.id && (
-                        <Check className="h-4 w-4 shrink-0 text-primary" />
-                      )}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
+            {renderedResults}
           </div>
 
-          {/* Footer com botão criar */}
           {onCreateNew && (
             <div className="border-t p-2">
               <Button

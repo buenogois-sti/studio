@@ -1,4 +1,3 @@
-
 'use client';
 import * as React from 'react';
 import {
@@ -89,6 +88,7 @@ export default function ProcessosPage() {
   const staffQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'staff') : null), [firestore]);
   const { data: staffData } = useCollection<Staff>(staffQuery);
   
+  // OTIMIZAÇÃO: Mapas memoizados para busca O(1) de dependências
   const clientsMap = React.useMemo(() => new Map(clientsData?.map(c => [c.id, c])), [clientsData]);
   const staffMap = React.useMemo(() => new Map(staffData?.map(s => [s.id, s])), [staffData]);
 
@@ -101,6 +101,7 @@ export default function ProcessosPage() {
     return map;
   }, [hearingsData]);
 
+  // OTIMIZAÇÃO: Filtro memoizado
   const filteredProcesses = React.useMemo(() => {
     if (!processesData) return [];
     return processesData.filter(p => {
@@ -112,17 +113,7 @@ export default function ProcessosPage() {
     });
   }, [processesData, searchTerm, clientIdFilter]);
 
-  const stats = React.useMemo(() => {
-    if (!processesData) return { active: 0, pending: 0, totalValue: 0 };
-    return processesData.reduce((acc, p) => {
-        if (p.status === 'Ativo') acc.active++;
-        if (p.status === 'Pendente') acc.pending++;
-        acc.totalValue += (p.caseValue || 0);
-        return acc;
-    }, { active: 0, pending: 0, totalValue: 0 });
-  }, [processesData]);
-
-  const handleSyncProcess = async (process: Process) => {
+  const handleSyncProcess = React.useCallback(async (process: Process) => {
     setIsSyncing(process.id);
     try {
       await syncProcessToDrive(process.id);
@@ -132,7 +123,7 @@ export default function ProcessosPage() {
     } finally {
       setIsSyncing(null);
     }
-  };
+  }, [toast]);
 
   const isLoading = isUserLoading || isLoadingProcesses;
 

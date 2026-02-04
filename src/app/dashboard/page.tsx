@@ -1,4 +1,3 @@
-
 'use client';
 import * as React from 'react';
 import {
@@ -129,21 +128,24 @@ export default function Dashboard() {
   const { firestore } = useFirebase();
   const { data: session, status } = useSession();
 
-  const titlesQuery = useMemoFirebase(() => firestore ? collection(firestore, 'financial_titles') : null, [firestore]);
+  const titlesQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'financial_titles') : null), [firestore]);
   const { data: titlesData, isLoading: isLoadingTitles } = useCollection<FinancialTitle>(titlesQuery);
 
-  const processesQuery = useMemoFirebase(() => firestore ? collection(firestore, 'processes') : null, [firestore]);
+  const processesQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'processes') : null), [firestore]);
   const { data: processesData, isLoading: isLoadingProcesses } = useCollection<Process>(processesQuery);
 
-  const hearingsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'hearings') : null, [firestore]);
+  const hearingsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'hearings') : null), [firestore]);
   const { data: hearingsData, isLoading: isLoadingHearings } = useCollection<Hearing>(hearingsQuery);
 
-  const logsQuery = useMemoFirebase(() => (firestore && session?.user?.id ? query(collection(firestore, `users/${session.user.id}/logs`), orderBy('timestamp', 'desc'), limit(5)) : null), [firestore, session]);
+  const logsQuery = useMemoFirebase(
+    () => (firestore && session?.user?.id ? query(collection(firestore, `users/${session.user.id}/logs`), orderBy('timestamp', 'desc'), limit(5)) : null), 
+    [firestore, session?.user?.id]
+  );
   const { data: logsData, isLoading: isLoadingLogs } = useCollection<Log>(logsQuery);
 
   const isLoading = status === 'loading' || isLoadingTitles || isLoadingProcesses || isLoadingHearings || isLoadingLogs;
 
-  // OTIMIZAÇÃO: Estatísticas memoizadas O(n)
+  // OTIMIZAÇÃO: Estatísticas memoizadas para evitar re-cálculos em renders irrelevantes
   const dashboardStats = React.useMemo(() => {
     if (!titlesData || !processesData || !hearingsData) return { totalRevenue: 0, pendingReceivables: 0, totalOverdue: 0, activeProcessesCount: 0, upcomingHearingsCount: 0 };
     
@@ -182,7 +184,7 @@ export default function Dashboard() {
     if (processesData) {
         processesData.forEach(process => {
             if (process.createdAt) {
-                const createdAtDate = (process.createdAt as Timestamp).toDate();
+                const createdAtDate = process.createdAt instanceof Timestamp ? process.createdAt.toDate() : new Date(process.createdAt as any);
                 const monthKey = `${createdAtDate.getFullYear()}-${createdAtDate.getMonth()}`;
                 if (counts.hasOwnProperty(monthKey)) counts[monthKey]++;
             }
@@ -192,7 +194,7 @@ export default function Dashboard() {
     return monthLabels.map(month => ({ month: month.name, newCases: counts[month.key] }));
   }, [processesData]);
 
-  const StatCard = ({ title, value, icon: Icon, href, description }: { title: string; value: string | number; icon: React.ElementType; href: string; description: string }) => (
+  const StatCard = React.memo(({ title, value, icon: Icon, href, description }: { title: string; value: string | number; icon: React.ElementType; href: string; description: string }) => (
     <Link href={href} className="group">
       <Card className="bg-[#0f172a] border-border/50 transition-all duration-300 hover:bg-[#1e293b] hover:-translate-y-1 relative overflow-hidden">
         <div className="absolute top-0 left-0 w-1 h-full bg-primary/20 group-hover:bg-primary" />
@@ -208,7 +210,8 @@ export default function Dashboard() {
         </CardContent>
       </Card>
     </Link>
-  );
+  ));
+  StatCard.displayName = 'StatCard';
 
   return (
     <div className="flex flex-col gap-8">
@@ -300,11 +303,12 @@ export default function Dashboard() {
                                         <span className="text-lg font-black text-white leading-none">{format(h.date.toDate(), 'dd')}</span>
                                     </div>
                                     <div className="min-w-0">
-                                        <p className="font-bold text-sm truncate text-white">{h.processId}</p>
+                                        <p className="font-bold text-sm truncate text-white">Audiência de {h.type}</p>
                                         <p className="text-[10px] text-muted-foreground uppercase">{h.location}</p>
                                     </div>
                                 </div>
                             ))}
+                            {hearingsData?.length === 0 && <p className="text-xs italic text-muted-foreground text-center">Sem compromissos agendados.</p>}
                         </div>
                     )}
                 </CardContent>
