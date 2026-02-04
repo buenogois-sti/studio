@@ -4,7 +4,7 @@ import * as React from 'react';
 import { MapPin, Globe, Check, PlusCircle, Loader2, Search, X, History } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { cn } from '@/lib/utils';
+import { cn, summarizeAddress } from '@/lib/utils';
 import { ScrollArea } from '../ui/scroll-area';
 
 const RECENT_LOCATIONS_KEY = 'recent_locations';
@@ -95,9 +95,17 @@ export function LocationSearch({ value, onSelect, placeholder = "Pesquisar local
     }
   }, [recentLocations]);
 
+  const handleLocationSelect = (rawAddress: string) => {
+    const summarized = summarizeAddress(rawAddress);
+    onSelect(summarized);
+    addRecentLocation(summarized);
+    setOpen(false);
+    setSearch('');
+  };
+
   const displayName = React.useMemo(() => {
     if (!value) return '';
-    return value.split(',')[0]?.trim() || value;
+    return value.split('-')[0]?.trim() || value.split(',')[0]?.trim() || value;
   }, [value]);
 
   return (
@@ -169,7 +177,7 @@ export function LocationSearch({ value, onSelect, placeholder = "Pesquisar local
                     key={address}
                     type="button"
                     onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => { onSelect(address); addRecentLocation(address); setOpen(false); setSearch(''); }}
+                    onClick={() => handleLocationSelect(address)}
                     className={cn(
                       "flex items-start gap-2 w-full px-3 py-2.5 text-sm rounded-md transition-colors text-left",
                       "hover:bg-accent hover:text-accent-foreground",
@@ -191,7 +199,7 @@ export function LocationSearch({ value, onSelect, placeholder = "Pesquisar local
                   key={location}
                   type="button"
                   onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => { onSelect(location); addRecentLocation(location); setOpen(false); setSearch(''); }}
+                  onClick={() => handleLocationSelect(location)}
                   className={cn(
                     "flex items-center gap-3 w-full px-3 py-2 text-sm rounded-md transition-colors text-left",
                     "hover:bg-accent hover:text-accent-foreground",
@@ -212,7 +220,7 @@ export function LocationSearch({ value, onSelect, placeholder = "Pesquisar local
                 <button
                   type="button"
                   onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => { onSelect(search); addRecentLocation(search); setOpen(false); setSearch(''); }}
+                  onClick={() => handleLocationSelect(search)}
                   className="flex items-center gap-2 w-full px-3 py-3 text-sm rounded-md hover:bg-accent text-primary font-bold text-left"
                 >
                   <PlusCircle className="h-4 w-4" />

@@ -7,6 +7,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/options';
 import { createNotification } from './notification-actions';
 import type { HearingStatus, HearingType } from './types';
+import { summarizeAddress } from './utils';
 
 interface CreateHearingData {
   processId: string;
@@ -61,7 +62,8 @@ export async function createHearing(data: CreateHearingData) {
       const startDateTime = new Date(hearingDate);
       const endDateTime = add(startDateTime, { hours: 1 });
 
-      const forumName = location.split(',')[0]?.trim() || location;
+      const forumName = location.split('-')[0]?.trim() || location.split(',')[0]?.trim() || location;
+      const summarizedLoc = summarizeAddress(location);
 
       const description = [
         `📌 Processo Judicial`,
@@ -74,7 +76,7 @@ export async function createHearing(data: CreateHearingData) {
         `${clientInfo.name} (${clientInfo.phone})`,
         ``,
         `⚖️ Fórum / Local:`,
-        `${location}`,
+        `${summarizedLoc}`,
         ``,
         `👨‍⚖️ Responsável:`,
         `${responsibleParty}`,
@@ -155,7 +157,9 @@ export async function syncHearings() {
           }
         }
 
-        const forumName = hearing.location.split(',')[0]?.trim() || hearing.location;
+        const forumName = hearing.location.split('-')[0]?.trim() || hearing.location.split(',')[0]?.trim() || hearing.location;
+        const summarizedLoc = summarizeAddress(hearing.location);
+
         const description = [
           `📌 Processo Judicial`,
           `Tipo: ${legalArea}`,
@@ -167,7 +171,7 @@ export async function syncHearings() {
           `${clientInfo.name} (${clientInfo.phone})`,
           ``,
           `⚖️ Fórum / Local:`,
-          `${hearing.location}`,
+          `${summarizedLoc}`,
           ``,
           `👨‍⚖️ Responsável:`,
           `${hearing.responsibleParty}`,

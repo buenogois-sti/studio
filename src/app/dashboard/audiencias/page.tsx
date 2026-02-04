@@ -45,7 +45,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { searchProcesses } from '@/lib/process-actions';
 import { createHearing, deleteHearing, updateHearingStatus, syncHearings } from '@/lib/hearing-actions';
-import { cn } from '@/lib/utils';
+import { cn, summarizeAddress } from '@/lib/utils';
 import { LocationSearch } from '@/components/shared/LocationSearch';
 import {
   Table,
@@ -494,8 +494,8 @@ function MonthCalendar({ hearings, onDateClick, processesMap }: { hearings: Hear
                 <div className="flex items-center gap-4">
                     <h2 className="text-xl font-bold font-headline capitalize">{format(currentDate, 'MMMM yyyy', { locale: ptBR })}</h2>
                     <div className="flex items-center gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setCurrentDate(subMonths(currentDate, 1))}><ChevronLeft className="h-4 w-4"/></Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setCurrentDate(addMonths(currentDate, 1))}><ChevronRight className="h-4 w-4"/></Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => currentDate && setCurrentDate(subMonths(currentDate, 1))}><ChevronLeft className="h-4 w-4"/></Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => currentDate && setCurrentDate(addMonths(currentDate, 1))}><ChevronRight className="h-4 w-4"/></Button>
                     </div>
                 </div>
                 <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())}>Hoje</Button>
@@ -677,8 +677,8 @@ export default function AudienciasPage() {
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-                                    <MapPin className="h-3 w-3" />
-                                    <span className="truncate">{h.location}</span>
+                                    <MapPin className="h-3 w-3 shrink-0" />
+                                    <span className="truncate">{summarizeAddress(h.location)}</span>
                                 </div>
                             </div>
                         ))}
@@ -755,7 +755,7 @@ export default function AudienciasPage() {
                                                                         <div className="flex items-center gap-2 mb-1">
                                                                             <Badge variant="outline" className="text-[9px] font-black uppercase tracking-widest">{h.type}</Badge>
                                                                             <span className="text-[10px] text-muted-foreground">•</span>
-                                                                            <span className="text-[10px] text-muted-foreground font-bold uppercase truncate">{h.location}</span>
+                                                                            <span className="text-[10px] text-muted-foreground font-bold uppercase truncate max-w-[300px]">{summarizeAddress(h.location)}</span>
                                                                         </div>
                                                                         <h4 className="font-bold text-base truncate">{p?.name}</h4>
                                                                         <p className="text-xs text-muted-foreground">{c?.firstName} {c?.lastName}</p>
@@ -776,7 +776,9 @@ export default function AudienciasPage() {
                                                                                 <DropdownMenuItem onSelect={() => handleUpdateStatus(h.id, 'ADIADA')}>Marcar como Adiada</DropdownMenuItem>
                                                                                 <DropdownMenuItem onSelect={() => handleUpdateStatus(h.id, 'CANCELADA')} className="text-rose-500">Marcar como Cancelada</DropdownMenuItem>
                                                                                 <DropdownMenuSeparator />
-                                                                                <DropdownMenuItem>Ver Processo</DropdownMenuItem>
+                                                                                <DropdownMenuItem asChild>
+                                                                                    <a href={`/dashboard/processos?clientId=${p?.clientId}`}>Ver Processo</a>
+                                                                                </DropdownMenuItem>
                                                                                 <DropdownMenuItem className="text-destructive" onSelect={() => setHearingToDelete(h)}>Excluir Agendamento</DropdownMenuItem>
                                                                             </DropdownMenuContent>
                                                                         </DropdownMenu>
