@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -45,6 +46,7 @@ import {
   BarChart,
   Archive,
   Receipt,
+  Timer
 } from 'lucide-react';
 import type { UserProfile } from '@/lib/types';
 import {
@@ -74,6 +76,12 @@ const navItems = [
     href: '/dashboard/processos',
     label: 'Processos',
     icon: FolderKanban,
+    roles: ['admin', 'lawyer', 'assistant'],
+  },
+  {
+    href: '/dashboard/prazos',
+    label: 'Prazos',
+    icon: Timer,
     roles: ['admin', 'lawyer', 'assistant'],
   },
   {
@@ -130,6 +138,7 @@ const BreadcrumbMap: { [key: string]: string } = {
   '/dashboard': 'Dashboard',
   '/dashboard/clientes': 'Clientes',
   '/dashboard/processos': 'Processos',
+  '/dashboard/prazos': 'Prazos Judiciais',
   '/dashboard/audiencias': 'Audiências',
   '/dashboard/reembolsos': 'Reembolsos',
   '/dashboard/financeiro': 'Financeiro',

@@ -1,3 +1,4 @@
+
 'use server';
 
 import { firestoreAdmin } from '@/firebase/admin';
@@ -7,8 +8,9 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/options';
 import { v4 as uuidv4 } from 'uuid';
 import { getGoogleApiClientsForUser } from '@/lib/drive';
-import { formatISO, subHours } from 'date-fns';
+import { formatISO } from 'date-fns';
 import { createNotification } from './notification-actions';
+import { revalidatePath } from 'next/cache';
 
 /**
  * Constrói a descrição detalhada do prazo para o Google Agenda.
@@ -22,6 +24,7 @@ function buildDeadlineCalendarDescription(data: {
   publicationText?: string;
   observations?: string;
   id: string;
+  status: string;
 }) {
   const cleanPhone = data.clientPhone.replace(/\D/g, '');
   const whatsappLink = cleanPhone ? `https://wa.me/${cleanPhone.startsWith('55') ? cleanPhone : '55' + cleanPhone}` : 'Não disponível';
@@ -29,6 +32,7 @@ function buildDeadlineCalendarDescription(data: {
   return [
     `📅 PRAZO JUDICIAL FATAL`,
     `Tipo: ${data.type}`,
+    `Status Atual: ${data.status}`,
     ``,
     `🔢 Processo:`,
     `${data.processName}`,
@@ -104,7 +108,6 @@ export async function createLegalDeadline(data: {
       const { calendar } = await getGoogleApiClientsForUser();
       
       const fatalDate = new Date(data.endDate);
-      // Definimos o horário do evento para as 09:00 AM do dia fatal para garantir visibilidade
       fatalDate.setHours(9, 0, 0, 0);
       const endDateTime = new Date(fatalDate);
       endDateTime.setHours(10, 0, 0, 0);
@@ -117,7 +120,8 @@ export async function createLegalDeadline(data: {
         clientPhone: clientInfo.phone,
         publicationText: data.publicationText,
         observations: data.observations,
-        id: deadlineRef.id
+        id: deadlineRef.id,
+        status: 'PENDENTE'
       });
 
       const event = {
@@ -125,13 +129,12 @@ export async function createLegalDeadline(data: {
         description: description,
         start: { dateTime: formatISO(fatalDate), timeZone: 'America/Sao_Paulo' },
         end: { dateTime: formatISO(endDateTime), timeZone: 'America/Sao_Paulo' },
-        // Notificações de 24h (1440 min) e 12h (720 min)
         reminders: {
           useDefault: false,
           overrides: [
-            { method: 'popup', minutes: 1440 }, // 24h
-            { method: 'popup', minutes: 720 },  // 12h
-            { method: 'email', minutes: 1440 }  // E-mail 24h antes por segurança
+            { method: 'popup', minutes: 1440 },
+            { method: 'popup', minutes: 720 },
+            { method: 'email', minutes: 1440 }
           ],
         },
       };
@@ -154,7 +157,7 @@ export async function createLegalDeadline(data: {
     const timelineEvent: TimelineEvent = {
       id: uuidv4(),
       type: 'deadline',
-      description: `PRAZO LANÇADO: ${data.type} (${data.daysCount} ${methodLabel}). Vencimento: ${new Date(data.endDate).toLocaleDateString('pt-BR')}. Sincronizado com Agenda (Alertas 24h/12h ativos).`,
+      description: `PRAZO LANÇADO: ${data.type} (${data.daysCount} ${methodLabel}). Vencimento: ${new Date(data.endDate).toLocaleDateString('pt-BR')}. Sincronizado com Agenda.`,
       date: Timestamp.now(),
       authorName: session.user.name || 'Sistema',
       endDate: Timestamp.fromDate(new Date(data.endDate)),
@@ -170,20 +173,103 @@ export async function createLegalDeadline(data: {
 
     await batch.commit();
 
-    // Criar Notificação no Sistema
     if (session.user.id) {
       await createNotification({
         userId: session.user.id,
         title: "Prazo Registrado",
         description: `${data.type} para ${processData?.name} agendado para ${new Date(data.endDate).toLocaleDateString('pt-BR')}.`,
-        href: `/dashboard/processos`,
+        href: `/dashboard/prazos`,
       });
     }
 
+    revalidatePath('/dashboard/prazos');
     return { success: true, id: deadlineRef.id };
   } catch (error: any) {
     console.error('Error creating deadline:', error);
     throw new Error(error.message || 'Falha ao lançar prazo.');
+  }
+}
+
+export async function updateDeadlineStatus(id: string, status: LegalDeadlineStatus) {
+  if (!firestoreAdmin) throw new Error('Servidor indisponível.');
+  const session = await getServerSession(authOptions);
+  if (!session) throw new Error('Não autenticado.');
+
+  try {
+    const deadlineRef = firestoreAdmin.collection('deadlines').doc(id);
+    const deadlineDoc = await deadlineRef.get();
+    if (!deadlineDoc.exists) throw new Error('Prazo não encontrado.');
+    
+    const deadlineData = deadlineDoc.data() as LegalDeadline;
+    const processRef = firestoreAdmin.collection('processes').doc(deadlineData.processId);
+
+    await deadlineRef.update({ 
+      status, 
+      updatedAt: Timestamp.now() 
+    });
+
+    // Atualizar Google Calendar
+    if (deadlineData.googleCalendarEventId) {
+      try {
+        const { calendar } = await getGoogleApiClientsForUser();
+        const processDoc = await processRef.get();
+        const processData = processDoc.data();
+        
+        let clientInfo = { name: 'Não informado', phone: 'Não informado' };
+        if (processData?.clientId) {
+          const clientDoc = await firestoreAdmin.collection('clients').doc(processData.clientId).get();
+          const clientData = clientDoc.data();
+          if (clientData) {
+            clientInfo = {
+              name: `${clientData.firstName} ${clientData.lastName}`.trim(),
+              phone: clientData.mobile || clientData.phone || 'Não informado'
+            };
+          }
+        }
+
+        const newDescription = buildDeadlineCalendarDescription({
+          type: deadlineData.type,
+          processName: processData?.name || 'Processo',
+          processNumber: processData?.processNumber || 'N/A',
+          clientName: clientInfo.name,
+          clientPhone: clientInfo.phone,
+          publicationText: deadlineData.publicationText,
+          observations: deadlineData.observations,
+          id: id,
+          status: status
+        });
+
+        await calendar.events.patch({
+          calendarId: 'primary',
+          eventId: deadlineData.googleCalendarEventId,
+          requestBody: {
+            description: newDescription,
+            summary: `${status === 'CUMPRIDO' ? '✅ ' : ''}PRAZO: ${deadlineData.type} | ${processData?.name || 'Processo'}`
+          }
+        });
+      } catch (e) {
+        console.warn('Failed to update calendar event for deadline:', id);
+      }
+    }
+
+    // Adicionar evento na timeline do processo
+    const timelineEvent: TimelineEvent = {
+      id: uuidv4(),
+      type: 'note',
+      description: `PRAZO ATUALIZADO: O prazo de "${deadlineData.type}" foi marcado como ${status}.`,
+      date: Timestamp.now(),
+      authorName: session.user.name || 'Sistema'
+    };
+
+    await processRef.update({
+      timeline: FieldValue.arrayUnion(timelineEvent),
+      updatedAt: FieldValue.serverTimestamp()
+    });
+
+    revalidatePath('/dashboard/prazos');
+    return { success: true };
+  } catch (error: any) {
+    throw new Error(error.message);
   }
 }
 
@@ -194,7 +280,6 @@ export async function deleteLegalDeadline(id: string) {
     const deadlineDoc = await deadlineRef.get();
     const deadlineData = deadlineDoc.data();
 
-    // Remover do Google Agenda se existir
     if (deadlineData?.googleCalendarEventId) {
       try {
         const { calendar } = await getGoogleApiClientsForUser();
@@ -208,6 +293,7 @@ export async function deleteLegalDeadline(id: string) {
     }
 
     await deadlineRef.delete();
+    revalidatePath('/dashboard/prazos');
     return { success: true };
   } catch (error: any) {
     throw new Error(error.message);
