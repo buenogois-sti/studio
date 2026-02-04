@@ -103,11 +103,6 @@ export function LocationSearch({ value, onSelect, placeholder = "Pesquisar local
     setSearch('');
   };
 
-  const displayName = React.useMemo(() => {
-    if (!value) return '';
-    return value.split('-')[0]?.trim() || value.split(',')[0]?.trim() || value;
-  }, [value]);
-
   return (
     <div ref={containerRef} className="relative w-full">
       <Button
@@ -115,7 +110,7 @@ export function LocationSearch({ value, onSelect, placeholder = "Pesquisar local
         type="button"
         role="combobox"
         aria-expanded={open}
-        className="w-full justify-start text-left font-normal h-11 bg-background border-2"
+        className="w-full justify-start text-left font-normal h-11 bg-background border-2 overflow-hidden"
         onClick={() => {
           setOpen(!open);
           if (!open) {
@@ -124,9 +119,9 @@ export function LocationSearch({ value, onSelect, placeholder = "Pesquisar local
         }}
       >
         {value ? (
-          <div className="flex items-center gap-2 overflow-hidden">
+          <div className="flex items-center gap-2 overflow-hidden w-full">
             <MapPin className="h-4 w-4 text-primary shrink-0" />
-            <span className="truncate font-medium">{displayName}</span>
+            <span className="truncate font-medium flex-1">{value}</span>
           </div>
         ) : (
           <span className="text-muted-foreground">{placeholder}</span>
@@ -224,7 +219,7 @@ export function LocationSearch({ value, onSelect, placeholder = "Pesquisar local
                   className="flex items-center gap-2 w-full px-3 py-3 text-sm rounded-md hover:bg-accent text-primary font-bold text-left"
                 >
                   <PlusCircle className="h-4 w-4" />
-                  <span>Usar personalizado: "{search}"</span>
+                  <span className="truncate">Usar personalizado: "{search}"</span>
                 </button>
               </div>
             )}

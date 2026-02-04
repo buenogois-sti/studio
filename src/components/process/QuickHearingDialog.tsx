@@ -95,20 +95,20 @@ export function QuickHearingDialog({ process, open, onOpenChange, onSuccess }: Q
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-xl">
+      <DialogContent className="sm:max-w-xl max-w-[95vw] overflow-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Gavel className="h-5 w-5 text-primary" />
             Marcar Audiência
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="truncate">
             Agendamento rápido para o processo: <span className="font-bold text-foreground">{process?.name}</span>
           </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-4">
-            <div className="grid grid-cols-2 gap-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-4 overflow-x-hidden">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="type"
@@ -116,7 +116,7 @@ export function QuickHearingDialog({ process, open, onOpenChange, onSuccess }: Q
                   <FormItem>
                     <FormLabel>Tipo de Audiência</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                      <FormControl><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
                       <SelectContent>
                         <SelectItem value="UNA">Una</SelectItem>
                         <SelectItem value="CONCILIACAO">Conciliação</SelectItem>
@@ -142,7 +142,7 @@ export function QuickHearingDialog({ process, open, onOpenChange, onSuccess }: Q
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="time"
@@ -171,7 +171,7 @@ export function QuickHearingDialog({ process, open, onOpenChange, onSuccess }: Q
               control={form.control}
               name="location"
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="min-w-0">
                   <FormLabel>Local / Fórum</FormLabel>
                   <FormControl>
                     <LocationSearch value={field.value} onSelect={field.onChange} />
@@ -181,9 +181,9 @@ export function QuickHearingDialog({ process, open, onOpenChange, onSuccess }: Q
               )}
             />
 
-            <DialogFooter className="pt-4">
-              <DialogClose asChild><Button variant="outline" type="button">Cancelar</Button></DialogClose>
-              <Button type="submit" disabled={isSaving}>
+            <DialogFooter className="pt-4 flex-col sm:flex-row gap-2">
+              <DialogClose asChild><Button variant="outline" type="button" className="w-full sm:w-auto">Cancelar</Button></DialogClose>
+              <Button type="submit" disabled={isSaving} className="w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/90">
                 {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CalendarIcon className="h-4 w-4 mr-2" />}
                 Confirmar Agendamento
               </Button>
