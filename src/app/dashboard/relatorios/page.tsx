@@ -152,12 +152,12 @@ export default function RelatoriosPage() {
     if (!staffData || !processesData || !titlesData) return [];
     
     return (staffData || [])
-      .filter(s => s.role === 'lawyer' || s.role === 'partner')
+      .filter(s => s.role === 'lawyer')
       .map(staff => {
-        const processos = processesData?.filter(p => p.lawyerId === staff.id).length || 0;
+        const processos = processesData?.filter(p => p.leadLawyerId === staff.id).length || 0;
         const receita = titlesData
           ?.filter(t => t.type === 'RECEITA' && t.processId && 
-            processesData?.find(p => p.id === t.processId && p.lawyerId === staff.id))
+            processesData?.find(p => p.id === t.processId && p.leadLawyerId === staff.id))
           .reduce((sum, t) => sum + t.value, 0) || 0;
         
         return {

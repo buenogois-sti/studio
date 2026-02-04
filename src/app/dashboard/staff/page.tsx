@@ -59,7 +59,7 @@ import { Input } from '@/components/ui/input';
 
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, doc, deleteDoc } from 'firebase/firestore';
-import type { Staff, Process, LawyerCredit } from '@/lib/types';
+import type { Staff, Process } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
@@ -77,7 +77,7 @@ function StaffBalance({ staffId }: { staffId: string }) {
         () => firestore ? collection(firestore, `staff/${staffId}/credits`) : null,
         [firestore, staffId]
     );
-    const { data: credits } = useCollection<LawyerCredit>(creditsQuery);
+    const { data: credits } = useCollection<any>(creditsQuery);
 
     const available = React.useMemo(() => {
         if (!credits) return 0;

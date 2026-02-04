@@ -84,6 +84,7 @@ export type TeamParticipant = {
 export type Process = {
   id: string;
   clientId: string;
+  clientName?: string; // Nome do cliente (opcional, pode ser derivado de clientId)
   clientRole?: 'Polo Ativo' | 'Polo Passivo';
   secondaryClientIds?: string[];
   name: string;
@@ -159,6 +160,7 @@ export type FinancialTitle = {
   financialEventId?: string;
   processId?: string;
   clientId?: string;
+  costCenter?: string; // Centro de custo para agrupamento em relatórios
   description: string;
   type: 'RECEITA' | 'DESPESA';
   origin:

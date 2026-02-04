@@ -18,7 +18,7 @@ async function serializeProcess(doc: adminFirestore.DocumentSnapshot): Promise<P
     }
 
     let clientName = '';
-    if (data.clientId) {
+    if (data.clientId && firestoreAdmin) {
         try {
             const clientDoc = await firestoreAdmin.collection('clients').doc(data.clientId).get();
             if (clientDoc.exists) {
@@ -42,6 +42,7 @@ async function serializeProcess(doc: adminFirestore.DocumentSnapshot): Promise<P
         opposingParties: data.opposingParties || [],
         description: data.description || '',
         status: data.status || 'Ativo',
+        legalArea: data.legalArea || '',
         responsibleStaffIds: data.responsibleStaffIds || [],
         driveFolderId: data.driveFolderId,
         timeline: data.timeline || [],

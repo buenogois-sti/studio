@@ -5,6 +5,7 @@ import { Plus, X, Loader2, CheckCircle2 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { Timestamp } from 'firebase/firestore';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -72,8 +73,9 @@ export function ClientCreationModal({ open, onOpenChange, onClientCreated }: Cli
         email: data.email || '',
         phone: data.phone || '',
         legalArea: data.legalArea || '',
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        avatar: `https://ui-avatars.com/api/?name=${data.firstName}+${data.lastName}&background=0D8ABC&color=fff`,
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
       };
 
       setSuccess(true);

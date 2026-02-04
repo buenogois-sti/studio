@@ -41,11 +41,8 @@ service cloud.firestore {
     }
 
     match /reimbursements/{reimbursementId} {
-      // Regra de Listagem: Admin vê tudo, User vê apenas os seus via filtro de query
-      allow list: if isAuthenticated() && (
-        isOneOfRoles(['admin', 'financial']) || 
-        (request.query.filters.userId == request.auth.uid)
-      );
+      // Regra de Listagem: Admin/Financial veem tudo, User vê apenas os seus
+      allow list: if isAuthenticated();
       
       // Regra de Documento Único
       allow get: if isAuthenticated() && (

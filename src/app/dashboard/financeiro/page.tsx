@@ -29,7 +29,7 @@ import {
 } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, Timestamp, query, orderBy, deleteDoc, doc, getDocs, where } from 'firebase/firestore';
-import type { FinancialTitle, Staff, LawyerCredit, Client } from '@/lib/types';
+import type { FinancialTitle, Staff, Client } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -68,7 +68,22 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 const titleFormSchema = z.object({
   description: z.string().min(3, 'Descrição obrigatória'),
   type: z.enum(['RECEITA', 'DESPESA']),
-  origin: z.string().min(1, 'Origem obrigatória'),
+  origin: z.enum([
+    'ACORDO',
+    'SENTENCA',
+    'HONORARIOS_CONTRATUAIS',
+    'SUCUMBENCIA',
+    'CUSTAS_PROCESSUAIS',
+    'HONORARIOS_PAGOS',
+    'SALARIOS_PROLABORE',
+    'ALUGUEL_CONTAS',
+    'INFRAESTRUTURA_TI',
+    'MARKETING_PUBLICIDADE',
+    'IMPOSTOS_TAXAS',
+    'MATERIAL_ESCRITORIO',
+    'SERVICOS_TERCEIROS',
+    'OUTRAS_DESPESAS',
+  ]),
   value: z.coerce.number().positive('Valor deve ser positivo'),
   dueDate: z.string().min(1, 'Data de vencimento obrigatória'),
   status: z.enum(['PENDENTE', 'PAGO']).default('PENDENTE'),
@@ -271,7 +286,7 @@ function RepassePaymentDialog({
   onPaid
 }: { 
   staff: Staff | null; 
-  credits: LawyerCredit[]; 
+  credits: any[]; 
   open: boolean; 
   onOpenChange: (open: boolean) => void;
   onPaid: () => void;
@@ -356,128 +371,19 @@ function RepassePaymentDialog({
   );
 }
 
+// TODO: Implementar repasses quando a estrutura de créditos for definida
 function RepassesTab() {
-    const { firestore } = useFirebase();
-    const [selectedStaff, setSelectedStaff] = React.useState<Staff | null>(null);
-    const [availableCredits, setAvailableCredits] = React.useState<LawyerCredit[]>([]);
-    const [showPayment, setShowPayment] = React.useState(false);
-    
-    const staffQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'staff') : null), [firestore]);
-    const { data: staffList, isLoading: isLoadingStaff } = useCollection<Staff>(staffQuery);
-    const [balances, setBalances] = React.useState<Record<string, { available: number, retained: number }>>({});
-    const [loadingBalances, setLoadingBalances] = React.useState(false);
-
-    const fetchBalances = React.useCallback(async () => {
-        if (!staffList || !firestore) return;
-        setLoadingBalances(true);
-        const newBalances: Record<string, { available: number, retained: number }> = {};
-        
-        for (const member of staffList) {
-            if (member.role === 'lawyer' || member.role === 'intern') {
-                const creditsSnap = await getDocs(collection(firestore, `staff/${member.id}/credits`));
-                const data = creditsSnap.docs.map(d => ({ id: d.id, ...d.data() } as LawyerCredit));
-                
-                newBalances[member.id] = {
-                    available: data.filter(c => c.status === 'DISPONIVEL').reduce((sum, c) => sum + c.value, 0),
-                    retained: data.filter(c => c.status === 'RETIDO').reduce((sum, c) => sum + c.value, 0),
-                };
-            }
-        }
-        setBalances(newBalances);
-        setLoadingBalances(false);
-    }, [staffList, firestore]);
-
-    React.useEffect(() => { fetchBalances(); }, [fetchBalances]);
-
-    const handleOpenRepasse = async (member: Staff) => {
-        if (!firestore) return;
-        const creditsSnap = await getDocs(query(collection(firestore, `staff/${member.id}/credits`), where('status', '==', 'DISPONIVEL')));
-        const credits = creditsSnap.docs.map(d => ({ id: d.id, ...d.data() } as LawyerCredit));
-        setAvailableCredits(credits);
-        setSelectedStaff(member);
-        setShowPayment(true);
-    };
-
-    if (isLoadingStaff || loadingBalances) {
-        return <div className="p-8 space-y-4">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-16 w-full bg-white/5" />)}</div>;
-    }
-
-    const formatCurrency = (val: number) => val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-
-    return (
-        <div className="space-y-6">
-            <Card className="bg-[#0f172a] border-white/5 overflow-hidden shadow-2xl">
-                <Table>
-                    <TableHeader>
-                        <TableRow className="border-white/5 hover:bg-transparent bg-white/5">
-                            <TableHead className="text-muted-foreground text-[10px] font-black uppercase tracking-widest px-6 py-4">Profissional</TableHead>
-                            <TableHead className="text-muted-foreground text-[10px] font-black uppercase tracking-widest">Status OAB</TableHead>
-                            <TableHead className="text-right text-muted-foreground text-[10px] font-black uppercase tracking-widest">Aguardando Cliente</TableHead>
-                            <TableHead className="text-right text-muted-foreground text-[10px] font-black uppercase tracking-widest">Saldo p/ Repasse</TableHead>
-                            <TableHead className="text-right text-muted-foreground text-[10px] font-black uppercase tracking-widest px-6">Ação</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {staffList?.filter(s => s.role !== 'employee').map(member => {
-                            const b = balances[member.id] || { available: 0, retained: 0 };
-                            return (
-                                <TableRow key={member.id} className="border-white/5 hover:bg-white/5 transition-all group">
-                                    <TableCell className="px-6 py-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className="h-10 w-10 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center font-bold text-primary group-hover:scale-110 transition-transform">
-                                                {member.firstName.charAt(0)}{member.lastName.charAt(0)}
-                                            </div>
-                                            <div className="flex flex-col">
-                                                <span className="font-bold text-white text-sm">{member.firstName} {member.lastName}</span>
-                                                <Badge variant="outline" className="w-fit text-[8px] h-4 font-black uppercase mt-1 bg-white/5">{member.role === 'lawyer' ? 'Advogado' : 'Estagiário'}</Badge>
-                                            </div>
-                                        </div>
-                                    </TableCell>
-                                    <TableCell>
-                                        <div className="flex items-center gap-1.5">
-                                            <ShieldCheck className={cn("h-3 w-3", member.oabStatus === 'Ativa' ? "text-emerald-500" : "text-amber-500")} />
-                                            <span className="text-[10px] font-mono text-slate-400">{member.oabNumber || 'N/A'}</span>
-                                        </div>
-                                    </TableCell>
-                                    <TableCell className="text-right tabular-nums text-xs text-muted-foreground italic">
-                                        {formatCurrency(b.retained)}
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        <div className="flex flex-col items-end">
-                                            <span className="font-black text-emerald-400 text-base tabular-nums">{formatCurrency(b.available)}</span>
-                                            {b.available > 0 && <span className="text-[8px] font-bold text-emerald-500/60 uppercase">Liberado para saque</span>}
-                                        </div>
-                                    </TableCell>
-                                    <TableCell className="text-right px-6">
-                                        <Button 
-                                            size="sm" 
-                                            variant="outline" 
-                                            className="h-9 px-4 text-[10px] font-black uppercase border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/10 gap-2 group-hover:bg-emerald-500 group-hover:text-white transition-all" 
-                                            disabled={b.available <= 0}
-                                            onClick={() => handleOpenRepasse(member)}
-                                        >
-                                            <ChevronRight className="h-3 w-3" /> Pagar Agora
-                                        </Button>
-                                    </TableCell>
-                                </TableRow>
-                            );
-                        })}
-                        {(!staffList || staffList.length === 0) && (
-                            <TableRow><TableCell colSpan={5} className="text-center py-24 text-muted-foreground italic opacity-50"><Users className="h-12 w-12 mx-auto mb-4 opacity-20" /><p>Nenhum profissional habilitado para repasses encontrado.</p></TableCell></TableRow>
-                        )}
-                    </TableBody>
-                </Table>
-            </Card>
-
-            <RepassePaymentDialog 
-                staff={selectedStaff} 
-                credits={availableCredits} 
-                open={showPayment} 
-                onOpenChange={setShowPayment}
-                onPaid={fetchBalances}
-            />
-        </div>
-    );
+  return (
+    <Card className="bg-[#0f172a] border-white/5 p-12 text-center flex flex-col items-center gap-4">
+      <div className="h-16 w-16 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-400">
+        <AlertCircle className="h-8 w-8" />
+      </div>
+      <div className="space-y-2">
+        <h3 className="text-xl font-bold text-white">Módulo de Reparesses</h3>
+        <p className="text-muted-foreground max-w-sm">Este módulo está sendo desenvolvido. Em breve você poderá gerenciar os pagamentos e reparesses para os profissionais da equipe.</p>
+      </div>
+    </Card>
+  );
 }
 
 export default function FinanceiroPage() {

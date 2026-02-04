@@ -2,7 +2,7 @@
 import * as React from 'react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection } from 'firebase/firestore';
-import type { Staff, LawyerCredit } from '@/lib/types';
+import type { Staff } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '../ui/separator';
@@ -19,7 +19,7 @@ export function StaffCreditCard({ staffMember }: { staffMember: Staff }) {
         () => firestore ? collection(firestore, `staff/${staffMember.id}/credits`) : null,
         [firestore, staffMember.id]
     );
-    const { data: credits, isLoading } = useCollection<LawyerCredit>(creditsQuery);
+    const { data: credits, isLoading } = useCollection<any>(creditsQuery);
 
     const summary = React.useMemo(() => {
         if (!credits) return { available: 0, paid: 0, retained: 0 };

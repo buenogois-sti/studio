@@ -6,6 +6,9 @@ import { firestoreAdmin } from '@/firebase/admin';
 
 export async function initializeAdminDriveStructure() {
     try {
+        if (!firestoreAdmin) {
+            throw new Error("Firestore não está configurado");
+        }
         // Get all clients and sync them to drive
         const clientsSnapshot = await firestoreAdmin.collection('clients').get();
         

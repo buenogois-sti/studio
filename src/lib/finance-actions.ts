@@ -1,7 +1,7 @@
 
 'use server';
 import { firestoreAdmin } from '@/firebase/admin';
-import type { FinancialTitle, Process, FinancialEvent, Staff, LawyerCredit } from './types';
+import type { FinancialTitle, Process, FinancialEvent, Staff } from './types';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { addMonths } from 'date-fns';
 import { getServerSession } from 'next-auth/next';
@@ -91,7 +91,7 @@ export async function createFinancialEventAndTitles(data: CreateEventData) {
 
         if (lawyerValue > 0) {
           const creditRef = firestoreAdmin.collection(`staff/${leadLawyerId}/credits`).doc();
-          const newCredit: Omit<LawyerCredit, 'id'> = {
+          const newCredit: any = {
             processId,
             description: `Honorários (${rem.type}): ${description}`,
             value: lawyerValue,

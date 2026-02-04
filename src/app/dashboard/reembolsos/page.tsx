@@ -56,14 +56,23 @@ const statusConfig: Record<ReimbursementStatus, { label: string; color: string; 
   NEGADO: { label: 'Negado', color: 'bg-rose-500/10 text-rose-400 border-rose-500/20', icon: XCircle },
 };
 
-function NewReimbursementDialog({ onCreated, isAdmin }: { onCreated: () => void; isAdmin: boolean }) {
+function NewReimbursementDialog({
+  onCreated,
+  canManage,
+  currentUserId,
+  currentUserName,
+}: {
+  onCreated: () => void;
+  canManage: boolean;
+  currentUserId: string | null;
+  currentUserName: string;
+}) {
   const [open, setOpen] = React.useState(false);
   const [isSaving, setIsSaving] = React.useState(false);
   const { firestore } = useFirebase();
-  const { data: session } = useSession();
   const { toast } = useToast();
 
-  const usersQuery = useMemoFirebase(() => (firestore && isAdmin ? collection(firestore, 'users') : null), [firestore, isAdmin]);
+  const usersQuery = useMemoFirebase(() => (firestore && canManage ? collection(firestore, 'users') : null), [firestore, canManage]);
   const { data: users } = useCollection<UserProfile>(usersQuery);
 
   const form = useForm<z.infer<typeof reimbursementFormSchema>>({
@@ -72,21 +81,25 @@ function NewReimbursementDialog({ onCreated, isAdmin }: { onCreated: () => void;
       description: '',
       value: 0,
       requestDate: format(new Date(), 'yyyy-MM-dd'),
-      userId: session?.user?.id,
+      userId: currentUserId || undefined,
     }
   });
 
   const onSubmit = async (values: z.infer<typeof reimbursementFormSchema>) => {
     setIsSaving(true);
     try {
-      let userName = session?.user?.name || 'Usuário';
-      if (isAdmin && values.userId && values.userId !== session?.user?.id) {
+      if (!currentUserId) {
+        throw new Error('Usuário não autenticado. Faça login novamente.');
+      }
+      let userName = currentUserName || 'Usuário';
+      if (canManage && values.userId && values.userId !== currentUserId) {
         const selectedUser = users?.find(u => u.id === values.userId);
         if (selectedUser) userName = `${selectedUser.firstName} ${selectedUser.lastName}`;
       }
 
       await createReimbursement({
         ...values,
+        userId: values.userId || currentUserId || '',
         userName,
       });
 
@@ -116,7 +129,7 @@ function NewReimbursementDialog({ onCreated, isAdmin }: { onCreated: () => void;
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-4">
-            {isAdmin && (
+            {canManage && (
               <FormField
                 control={form.control}
                 name="userId"
@@ -200,27 +213,37 @@ export default function ReembolsosPage() {
   );
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
 
-  const isAdmin = userProfile?.role === 'admin' || userProfile?.role === 'financial';
+  const role = userProfile?.role;
+  const canManage = role === 'admin' || role === 'financial';
+  const canAccess = role ? ['admin', 'financial', 'lawyer', 'assistant'].includes(role) : false;
+  const currentUserId = user?.uid || null;
+  const currentUserName = userProfile ? `${userProfile.firstName} ${userProfile.lastName}`.trim() : (session?.user?.name || 'Usuário');
+
+  React.useEffect(() => {
+    if (!canManage && activeTab === 'todos') {
+      setActiveTab('meus');
+    }
+  }, [canManage, activeTab]);
 
   // LOGICA 1: Query restrita para usuários comuns (vê apenas os seus)
   const myReimbursementsQuery = useMemoFirebase(
-    () => (firestore && user?.uid ? query(
+    () => (firestore && currentUserId ? query(
       collection(firestore, 'reimbursements'),
-      where('userId', '==', user.uid),
+      where('userId', '==', currentUserId),
       orderBy('createdAt', 'desc')
     ) : null),
-    [firestore, user?.uid]
+    [firestore, currentUserId]
   );
   const { data: myData, isLoading: isLoadingMy } = useCollection<Reimbursement>(myReimbursementsQuery);
 
   // LOGICA 2: Query global para Financeiro/Admin (vê tudo)
   // Só dispara se o perfil do Firestore confirmar que é admin
   const allReimbursementsQuery = useMemoFirebase(
-    () => (firestore && isAdmin ? query(
+    () => (firestore && canManage && !isProfileLoading ? query(
       collection(firestore, 'reimbursements'),
       orderBy('createdAt', 'desc')
     ) : null),
-    [firestore, isAdmin]
+    [firestore, canManage, isProfileLoading]
   );
   const { data: allData, isLoading: isLoadingAll } = useCollection<Reimbursement>(allReimbursementsQuery);
 
@@ -255,7 +278,7 @@ export default function ReembolsosPage() {
     }
   };
 
-  const isLoading = isFirebaseLoading || isProfileLoading || (isAdmin && activeTab === 'todos' ? isLoadingAll : isLoadingMy);
+  const isLoading = isFirebaseLoading || isProfileLoading || (canManage && activeTab === 'todos' ? isLoadingAll : isLoadingMy);
 
   // Tratamento de Erro de Project ID mismatch
   if (userError && (userError.message.includes('400') || userError.message.includes('custom-token'))) {
@@ -276,8 +299,24 @@ export default function ReembolsosPage() {
     );
   }
 
+  if (!isProfileLoading && role && !canAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center space-y-6">
+        <div className="h-20 w-20 rounded-full bg-rose-500/10 flex items-center justify-center">
+          <AlertTriangle className="h-10 w-10 text-rose-500" />
+        </div>
+        <div className="space-y-2">
+          <h2 className="text-2xl font-black text-white font-headline">Acesso Negado</h2>
+          <p className="text-slate-400 max-w-md mx-auto">
+            Seu perfil não possui permissão para acessar o módulo de reembolsos.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   const stats = React.useMemo(() => {
-    const list = isAdmin && activeTab === 'todos' ? allData : myData;
+    const list = canManage && activeTab === 'todos' ? allData : myData;
     if (!list) return { total: 0, pending: 0, paid: 0 };
     return list.reduce((acc, r) => {
       acc.total += r.value;
@@ -297,7 +336,12 @@ export default function ReembolsosPage() {
           </h1>
           <p className="text-sm text-muted-foreground">Controle de despesas e solicitações de ressarcimento.</p>
         </div>
-        <NewReimbursementDialog onCreated={() => {}} isAdmin={isAdmin} />
+        <NewReimbursementDialog
+          onCreated={() => {}}
+          canManage={canManage}
+          currentUserId={currentUserId}
+          currentUserName={currentUserName}
+        />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -340,10 +384,10 @@ export default function ReembolsosPage() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <TabsList className="bg-white/5 p-1 border border-white/10">
             <TabsTrigger value="meus" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Meus Pedidos</TabsTrigger>
-            {isAdmin && <TabsTrigger value="todos" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Fila Administrativa (Todos)</TabsTrigger>}
+            {canManage && <TabsTrigger value="todos" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Fila Administrativa (Todos)</TabsTrigger>}
           </TabsList>
           
-          {activeTab === 'todos' && (
+          {activeTab === 'todos' && canManage && (
             <div className="relative w-full max-w-sm">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input 
@@ -360,17 +404,19 @@ export default function ReembolsosPage() {
           <ReimbursementTable 
             data={myData} 
             isLoading={isLoading} 
-            isAdmin={false} 
+            canManage={false} 
+            currentUserId={currentUserId}
             onDelete={handleDelete}
           />
         </TabsContent>
 
-        {isAdmin && (
+        {canManage && (
           <TabsContent value="todos" className="mt-0">
             <ReimbursementTable 
               data={filteredAllData} 
               isLoading={isLoading} 
-              isAdmin={true} 
+              canManage={true} 
+              currentUserId={currentUserId}
               onUpdateStatus={handleStatusUpdate}
               onDelete={handleDelete}
               updatingId={isUpdating}
@@ -385,14 +431,16 @@ export default function ReembolsosPage() {
 function ReimbursementTable({ 
   data, 
   isLoading, 
-  isAdmin, 
+  canManage, 
+  currentUserId,
   onUpdateStatus,
   onDelete,
   updatingId 
 }: { 
   data: Reimbursement[] | null; 
   isLoading: boolean; 
-  isAdmin: boolean;
+  canManage: boolean;
+  currentUserId: string | null;
   onUpdateStatus?: (id: string, status: ReimbursementStatus) => void;
   onDelete?: (id: string) => void;
   updatingId?: string | null;
@@ -420,7 +468,7 @@ function ReimbursementTable({
       <Table>
         <TableHeader className="bg-white/5 border-b border-white/10">
           <TableRow className="hover:bg-transparent">
-            {isAdmin && <TableHead className="text-muted-foreground">Colaborador</TableHead>}
+            {canManage && <TableHead className="text-muted-foreground">Colaborador</TableHead>}
             <TableHead className="text-muted-foreground">Descrição</TableHead>
             <TableHead className="text-muted-foreground">Data Despesa</TableHead>
             <TableHead className="text-muted-foreground">Valor</TableHead>
@@ -435,7 +483,7 @@ function ReimbursementTable({
             
             return (
               <TableRow key={r.id} className="border-white/5 hover:bg-white/5 transition-colors">
-                {isAdmin && (
+                {canManage && (
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center">
@@ -467,7 +515,7 @@ function ReimbursementTable({
                 </TableCell>
                 <TableCell className="text-right px-6">
                   <div className="flex justify-end gap-2">
-                    {isAdmin && r.status === 'SOLICITADO' && (
+                    {canManage && r.status === 'SOLICITADO' && (
                       <>
                         <Button 
                           variant="ghost" 
@@ -491,7 +539,7 @@ function ReimbursementTable({
                         </Button>
                       </>
                     )}
-                    {isAdmin && r.status === 'APROVADO' && (
+                    {canManage && r.status === 'APROVADO' && (
                       <Button 
                         variant="outline" 
                         size="sm" 
@@ -511,7 +559,7 @@ function ReimbursementTable({
                         <DropdownMenuItem className="text-slate-300" onSelect={() => window.print()}>
                           <FileText className="mr-2 h-4 w-4" /> Imprimir Comprovante
                         </DropdownMenuItem>
-                        {(isAdmin || r.status === 'SOLICITADO') && (
+                        {((canManage || (r.userId === currentUserId && r.status === 'SOLICITADO'))) && (
                           <>
                             <DropdownMenuSeparator className="bg-white/10" />
                             <DropdownMenuItem className="text-rose-500" onClick={() => onDelete?.(r.id)}>

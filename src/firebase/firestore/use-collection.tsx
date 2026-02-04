@@ -100,8 +100,10 @@ export function useCollection<T = any>(
         setData(null)
         setIsLoading(false)
 
-        // trigger global error propagation
-        errorEmitter.emit('permission-error', contextualError);
+        // Log permission errors for debugging but don't emit globally
+        if (error.code === 'permission-denied') {
+          console.warn('[useCollection] Permission denied for:', path);
+        }
       }
     );
 

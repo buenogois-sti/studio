@@ -117,8 +117,8 @@ export async function createLegalDeadline(data: {
     const deadlinePayload: Omit<LegalDeadline, 'id'> = {
       processId: data.processId,
       type: data.type,
-      startDate: Timestamp.fromDate(new Date(data.startDate)),
-      endDate: Timestamp.fromDate(new Date(data.endDate)),
+      startDate: Timestamp.fromDate(new Date(data.startDate)) as any,
+      endDate: Timestamp.fromDate(new Date(data.endDate)) as any,
       daysCount: data.daysCount,
       isBusinessDays: data.isBusinessDays,
       publicationText: data.publicationText || '',
@@ -126,8 +126,8 @@ export async function createLegalDeadline(data: {
       status: 'PENDENTE' as LegalDeadlineStatus,
       authorId: session.user.id,
       authorName: session.user.name || 'Advogado',
-      createdAt: Timestamp.now(),
-      updatedAt: Timestamp.now(),
+      createdAt: Timestamp.now() as any,
+      updatedAt: Timestamp.now() as any,
     };
 
     const calendarDescription = buildDeadlineCalendarDescription({
@@ -211,9 +211,9 @@ export async function createLegalDeadline(data: {
       id: uuidv4(),
       type: 'deadline',
       description: `PRAZO LANÇADO: ${data.type} (${data.daysCount} ${methodLabel}). Vencimento: ${new Date(data.endDate).toLocaleDateString('pt-BR')}. Tarefa criada no Workspace.`,
-      date: Timestamp.now(),
+      date: Timestamp.now() as any,
       authorName: session.user.name || 'Sistema',
-      endDate: Timestamp.fromDate(new Date(data.endDate)),
+      endDate: Timestamp.fromDate(new Date(data.endDate)) as any,
       isBusinessDays: data.isBusinessDays
     };
 
@@ -452,7 +452,7 @@ export async function updateDeadlineStatus(id: string, status: LegalDeadlineStat
       id: uuidv4(),
       type: 'note',
       description: `PRAZO ATUALIZADO: O prazo de "${deadlineData.type}" foi marcado como ${status}.`,
-      date: Timestamp.now(),
+      date: Timestamp.now() as any,
       authorName: session.user.name || 'Sistema'
     };
 

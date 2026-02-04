@@ -521,7 +521,7 @@ export function StaffForm({
                       <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">CEP</FormLabel>
                       <div className="flex gap-2">
                         <FormControl><Input className="h-11 bg-background" placeholder="00000-000" {...field} maxLength={9}/></FormControl>
-                        <Button type="button" variant="outline" size="icon" onClick={() => searchAddressByCep(field.value)} disabled={loadingZip || !field.value} className="h-11 w-11"><Search className={cn("h-4 w-4", loadingZip && "animate-spin")} /></Button>
+                        <Button type="button" variant="outline" size="icon" onClick={() => field.value && searchAddressByCep(field.value)} disabled={loadingZip || !field.value} className="h-11 w-11"><Search className={cn("h-4 w-4", loadingZip && "animate-spin")} /></Button>
                       </div>
                       </FormItem>
                   )}

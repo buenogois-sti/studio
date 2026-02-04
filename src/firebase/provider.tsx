@@ -65,17 +65,26 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
       console.log('[Firebase Auth] Sincronizando com Custom Token...');
       
       signInWithCustomToken(auth, session.customToken).catch((error: any) => {
+        // Tratamento robusto do erro - pode ser um objeto vazio ou incompleto
+        const errorCode = error?.code || 'UNKNOWN_ERROR';
+        const errorMessage = error?.message || 'Erro desconhecido ao sincronizar com Firebase';
+        const clientProject = auth.app.options.projectId;
+        const expectedProject = 'studio-7080106838-23904';
+        
         console.error('[Firebase Auth] Erro Crítico:', {
-          code: error.code,
-          message: error.message,
-          expectedProject: 'studio-7080106838-23904',
-          clientProject: auth.app.options.projectId,
+          code: errorCode,
+          message: errorMessage,
+          expectedProject,
+          clientProject,
         });
         
-        // Alerta amigável para o desenvolvedor sobre o erro 400
-        if (error.code === 'auth/invalid-custom-token' || error.message.includes('400')) {
+        // Alerta amigável para o desenvolvedor sobre mismatch REAL de projeto
+        const isMismatch = !!clientProject && clientProject !== expectedProject;
+        if (isMismatch) {
           const mismatchMsg = '⚠️ PROJECT ID MISMATCH: Sua chave de servidor (FIREBASE_SERVICE_ACCOUNT_JSON) não pertence a este projeto. Baixe a chave correta no console do Firebase.';
-          console.warn('[Firebase Auth]', mismatchMsg);
+          console.warn('[Firebase Auth]', mismatchMsg, { expectedProject, clientProject });
+        } else if (errorCode === 'auth/invalid-custom-token') {
+          console.warn('[Firebase Auth] Custom token inválido. Verifique a geração do token e o relógio do servidor.');
         }
         setUserAuthState((state) => ({ ...state, userError: error, isUserLoading: false }));
       });
@@ -96,8 +105,14 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
         setUserAuthState({ user: firebaseUser, isUserLoading: false, userError: null });
       },
       (error) => {
-        console.error('FirebaseProvider: onAuthStateChanged error:', error);
-        setUserAuthState({ user: null, isUserLoading: false, userError: error });
+        // Tratamento robusto do erro no listener
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.error('[FirebaseProvider] onAuthStateChanged error:', {
+          message: errorMessage,
+          code: (error as any)?.code || 'UNKNOWN',
+          type: error?.constructor?.name || typeof error
+        });
+        setUserAuthState({ user: null, isUserLoading: false, userError: error as Error });
       }
     );
 
