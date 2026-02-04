@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -15,70 +14,46 @@ import {
   CheckCircle2,
   XCircle,
   Clock3,
-  Filter,
   ChevronLeft,
   ChevronRight,
   Gavel,
-  Check,
-  ChevronsUpDown,
+  History,
   Search,
-  User,
-  Hash,
-  History
+  CalendarDays
 } from 'lucide-react';
-import { format, addDays, isToday, isSameDay, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, addMonths, subMonths } from 'date-fns';
+import { 
+  format, 
+  addDays, 
+  isToday, 
+  isSameDay, 
+  startOfMonth, 
+  endOfMonth, 
+  startOfWeek, 
+  endOfWeek, 
+  eachDayOfInterval, 
+  isSameMonth, 
+  addMonths, 
+  subMonths 
+} from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { z } from 'zod';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
 
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection } from 'firebase/firestore';
-import type { Hearing, Process, Client, HearingStatus, HearingType, Staff } from '@/lib/types';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+import type { Hearing, Process, HearingStatus } from '@/lib/types';
 import { useToast } from '@/components/ui/use-toast';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { searchProcesses } from '@/lib/process-actions';
-import { createHearing, deleteHearing, updateHearingStatus, syncHearings } from '@/lib/hearing-actions';
-import { cn, summarizeAddress } from '@/lib/utils';
-import { LocationSearch } from '@/components/shared/LocationSearch';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { updateHearingStatus, syncHearings } from '@/lib/hearing-actions';
+import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
-  DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
 import { H1 } from '@/components/ui/typography';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 const statusConfig: Record<HearingStatus, { label: string; icon: any; color: string }> = {
@@ -92,25 +67,19 @@ export default function AudienciasPage() {
   const { firestore, isUserLoading } = useFirebase();
   const [refreshKey, setRefreshKey] = React.useState(0);
   const [isSyncing, setIsSyncing] = React.useState(false);
-  const [hearingToDelete, setHearingToDelete] = React.useState<Hearing | null>(null);
   const [viewMode, setViewMode] = React.useState<'list' | 'calendar' | 'history'>('list');
+  const [currentDate, setCurrentDate] = React.useState(new Date());
+  const [selectedDay, setSelectedDay] = React.useState<Date | null>(new Date());
   const { toast } = useToast();
 
   const hearingsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'hearings') : null, [firestore, refreshKey]);
   const { data: hearingsData, isLoading: isLoadingHearings } = useCollection<Hearing>(hearingsQuery);
 
   const processesQuery = useMemoFirebase(() => firestore ? collection(firestore, 'processes') : null, [firestore]);
-  const { data: processesData, isLoading: isLoadingProcesses } = useCollection<Process>(processesQuery);
+  const { data: processesData } = useCollection<Process>(processesQuery);
   
-  // OTIMIZAÇÃO: Memoize os mapas de busca O(1)
   const processesMap = React.useMemo(() => new Map(processesData?.map(p => [p.id, p])), [processesData]);
 
-  const clientsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'clients') : null, [firestore]);
-  const { data: clientsData, isLoading: isLoadingClients } = useCollection<Client>(clientsQuery);
-  const clientsMap = React.useMemo(() => new Map(clientsData?.map(c => [c.id, c])), [clientsData]);
-
-  const isLoading = isUserLoading || isLoadingHearings || isLoadingProcesses || isLoadingClients;
-  
   const handleUpdateStatus = async (hearingId: string, status: HearingStatus) => {
       try {
           await updateHearingStatus(hearingId, status);
@@ -121,7 +90,6 @@ export default function AudienciasPage() {
       }
   };
 
-  // OTIMIZAÇÃO: Filtros memoizados
   const todayHearings = React.useMemo(() => {
       if (!hearingsData) return [];
       return hearingsData
@@ -143,8 +111,22 @@ export default function AudienciasPage() {
         .sort((a, b) => b.date.seconds - a.date.seconds);
   }, [hearingsData]);
 
+  // Lógica do Calendário Mensal
+  const monthDays = React.useMemo(() => {
+    const start = startOfWeek(startOfMonth(currentDate));
+    const end = endOfWeek(endOfMonth(currentDate));
+    return eachDayOfInterval({ start, end });
+  }, [currentDate]);
+
+  const hearingsForSelectedDay = React.useMemo(() => {
+    if (!hearingsData || !selectedDay) return [];
+    return hearingsData.filter(h => isSameDay(h.date.toDate(), selectedDay));
+  }, [hearingsData, selectedDay]);
+
+  const isLoading = isUserLoading || isLoadingHearings;
+
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-8 pb-10">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
                 <H1 className="text-white">Agenda de Audiências</H1>
@@ -173,7 +155,7 @@ export default function AudienciasPage() {
             </div>
         </div>
 
-        {todayHearings.length > 0 && (
+        {todayHearings.length > 0 && viewMode !== 'calendar' && (
             <Card className="border-2 border-primary/20 bg-primary/5">
                 <CardHeader className="pb-3">
                     <div className="flex items-center gap-2 text-primary">
@@ -210,11 +192,18 @@ export default function AudienciasPage() {
 
         <Tabs value={viewMode} onValueChange={v => setViewMode(v as any)} className="w-full">
             <TabsList className="bg-[#0f172a] p-1 border border-border/50 mb-6">
-                <TabsTrigger value="list" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><ListIcon className="h-4 w-4"/> Próximos 7 Dias</TabsTrigger>
-                <TabsTrigger value="history" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><History className="h-4 w-4"/> Histórico</TabsTrigger>
+                <TabsTrigger value="list" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                  <ListIcon className="h-4 w-4"/> Próximos 7 Dias
+                </TabsTrigger>
+                <TabsTrigger value="calendar" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                  <CalendarDays className="h-4 w-4"/> Calendário Mensal
+                </TabsTrigger>
+                <TabsTrigger value="history" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                  <History className="h-4 w-4"/> Histórico
+                </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="list">
+            <TabsContent value="list" className="animate-in fade-in duration-300">
                 <Card className="bg-[#0f172a] border-border/50 overflow-hidden">
                     <div className="divide-y divide-border/30">
                         {weekDays.map(day => {
@@ -275,21 +264,145 @@ export default function AudienciasPage() {
                 </Card>
             </TabsContent>
 
-            <TabsContent value="history">
-                <Card className="bg-[#0f172a] border-border/50">
-                    <Table>
-                        <TableHeader><TableRow className="border-border/50"><TableHead className="text-muted-foreground">Data</TableHead><TableHead className="text-muted-foreground">Processo</TableHead><TableHead className="text-muted-foreground">Local</TableHead><TableHead className="text-right text-muted-foreground">Status</TableHead></TableRow></TableHeader>
-                        <TableBody>
-                            {historyHearings.map(h => (
-                                <TableRow key={h.id} className="border-border/20">
-                                    <TableCell className="text-white font-bold">{format(h.date.toDate(), 'dd/MM/yyyy HH:mm')}</TableCell>
-                                    <TableCell className="text-white">{processesMap.get(h.processId)?.name}</TableCell>
-                                    <TableCell className="text-muted-foreground text-xs">{h.location}</TableCell>
-                                    <TableCell className="text-right"><Badge variant="outline" className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20">REALIZADA</Badge></TableCell>
-                                </TableRow>
+            <TabsContent value="calendar" className="animate-in fade-in duration-300">
+              <div className="grid lg:grid-cols-12 gap-6">
+                <Card className="lg:col-span-8 bg-[#0f172a] border-border/50 p-6">
+                  <div className="flex items-center justify-between mb-8">
+                    <h2 className="text-xl font-black text-white uppercase tracking-tight">
+                      {format(currentDate, 'MMMM yyyy', { locale: ptBR })}
+                    </h2>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCurrentDate(subMonths(currentDate, 1))}>
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <Button variant="outline" size="sm" className="h-8 text-[10px] font-bold uppercase" onClick={() => setCurrentDate(new Date())}>
+                        Hoje
+                      </Button>
+                      <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCurrentDate(addMonths(currentDate, 1))}>
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-7 gap-1">
+                    {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(d => (
+                      <div key={d} className="text-center text-[10px] font-black uppercase text-muted-foreground pb-4">{d}</div>
+                    ))}
+                    {monthDays.map((day, i) => {
+                      const dailyHearings = hearingsData?.filter(h => isSameDay(h.date.toDate(), day)) || [];
+                      const isSelected = selectedDay && isSameDay(day, selectedDay);
+                      const isTodayDay = isToday(day);
+                      const isCurrentMonth = isSameMonth(day, currentDate);
+
+                      return (
+                        <button
+                          key={i}
+                          onClick={() => setSelectedDay(day)}
+                          className={cn(
+                            "relative aspect-square p-2 flex flex-col items-center justify-start border border-border/20 transition-all group",
+                            !isCurrentMonth && "opacity-20",
+                            isSelected ? "bg-primary/10 border-primary/50" : "hover:bg-white/5",
+                            isTodayDay && !isSelected && "bg-white/5"
+                          )}
+                        >
+                          <span className={cn(
+                            "text-sm font-bold",
+                            isTodayDay ? "text-primary underline decoration-2 underline-offset-4" : "text-white/80",
+                            isSelected && "text-primary"
+                          )}>
+                            {format(day, 'd')}
+                          </span>
+                          
+                          <div className="mt-auto flex flex-wrap justify-center gap-0.5">
+                            {dailyHearings.slice(0, 3).map(h => (
+                              <div key={h.id} className={cn(
+                                "w-1.5 h-1.5 rounded-full",
+                                h.status === 'REALIZADA' ? "bg-emerald-500" : "bg-primary"
+                              )} />
                             ))}
-                        </TableBody>
-                    </Table>
+                            {dailyHearings.length > 3 && <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />}
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </Card>
+
+                <div className="lg:col-span-4 space-y-4">
+                  <Card className="bg-[#0f172a] border-border/50 flex flex-col h-full min-h-[400px]">
+                    <CardHeader className="border-b border-border/30 pb-4">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-sm font-black uppercase tracking-widest text-primary">
+                          {selectedDay ? format(selectedDay, "dd 'de' MMMM", { locale: ptBR }) : 'Selecione um dia'}
+                        </CardTitle>
+                        <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
+                          {hearingsForSelectedDay.length} Eventos
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="p-0 flex-1">
+                      <ScrollArea className="h-[500px]">
+                        <div className="p-4 space-y-3">
+                          {hearingsForSelectedDay.length > 0 ? (
+                            hearingsForSelectedDay.map(h => (
+                              <div key={h.id} className="p-3 rounded-xl border border-border/30 bg-black/20 space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-black text-white">{format(h.date.toDate(), 'HH:mm')}</span>
+                                  <Badge variant="outline" className={cn("text-[8px] font-black uppercase", statusConfig[h.status || 'PENDENTE'].color)}>
+                                    {h.status}
+                                  </Badge>
+                                </div>
+                                <p className="text-xs font-bold text-slate-200 truncate">{processesMap.get(h.processId)?.name}</p>
+                                <p className="text-[10px] text-muted-foreground truncate flex items-center gap-1">
+                                  <MapPin className="h-3 w-3 text-primary" /> {h.location}
+                                </p>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="flex flex-col items-center justify-center py-20 text-center opacity-30">
+                              <CalendarIcon className="h-10 w-10 mb-2" />
+                              <p className="text-xs font-bold uppercase">Sem compromissos</p>
+                            </div>
+                          )}
+                        </div>
+                      </ScrollArea>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="history" className="animate-in fade-in duration-300">
+                <Card className="bg-[#0f172a] border-border/50 overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm text-left">
+                        <thead className="bg-muted/30 text-[10px] uppercase font-black tracking-widest text-muted-foreground border-b border-border/50">
+                          <tr>
+                            <th className="px-6 py-4">Data/Hora</th>
+                            <th className="px-6 py-4">Processo</th>
+                            <th className="px-6 py-4">Tipo</th>
+                            <th className="px-6 py-4">Local</th>
+                            <th className="px-6 py-4 text-right">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border/20">
+                          {historyHearings.map(h => (
+                              <tr key={h.id} className="hover:bg-white/5 transition-colors">
+                                  <td className="px-6 py-4 text-white font-bold whitespace-nowrap">{format(h.date.toDate(), 'dd/MM/yyyy HH:mm')}</td>
+                                  <td className="px-6 py-4 text-slate-300 truncate max-w-[200px]">{processesMap.get(h.processId)?.name}</td>
+                                  <td className="px-6 py-4"><Badge variant="outline" className="text-[10px] bg-white/5">{h.type}</Badge></td>
+                                  <td className="px-6 py-4 text-muted-foreground text-xs truncate max-w-[200px]">{h.location}</td>
+                                  <td className="px-6 py-4 text-right"><Badge variant="outline" className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-[9px] font-black uppercase">REALIZADA</Badge></td>
+                              </tr>
+                          ))}
+                          {historyHearings.length === 0 && (
+                            <tr>
+                              <td colSpan={5} className="px-6 py-20 text-center text-muted-foreground italic">Nenhuma audiência realizada no histórico.</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
                 </Card>
             </TabsContent>
         </Tabs>
