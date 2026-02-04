@@ -1,4 +1,3 @@
-
 'use server';
 
 import { firestoreAdmin } from '@/firebase/admin';
@@ -6,6 +5,7 @@ import type { Reimbursement, ReimbursementStatus } from './types';
 import { Timestamp } from 'firebase-admin/firestore';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/options';
+import { createNotification } from './notification-actions';
 
 export async function createReimbursement(data: {
   description: string;
@@ -36,6 +36,19 @@ export async function createReimbursement(data: {
     };
 
     await reimbursementRef.set(payload);
+
+    // Notificar Admin
+    const admins = await firestoreAdmin.collection('users').where('role', '==', 'admin').get();
+    for (const admin of admins.docs) {
+      await createNotification({
+        userId: admin.id,
+        title: "Novo Pedido de Reembolso",
+        description: `${targetUserName} solicitou R$ ${data.value.toFixed(2)}: ${data.description}`,
+        type: 'finance',
+        href: '/dashboard/reembolsos'
+      });
+    }
+
     return { success: true };
   } catch (error: any) {
     console.error('Error creating reimbursement:', error);
@@ -52,11 +65,33 @@ export async function updateReimbursementStatus(id: string, status: Reimbursemen
   }
 
   try {
-    await firestoreAdmin.collection('reimbursements').doc(id).update({
+    const ref = firestoreAdmin.collection('reimbursements').doc(id);
+    const doc = await ref.get();
+    const data = doc.data();
+
+    await ref.update({
       status,
       notes: notes || '',
       updatedAt: Timestamp.now(),
     });
+
+    // Notificar o solicitante
+    if (data?.userId) {
+      const statusLabels = {
+        APROVADO: "✅ Aprovado",
+        NEGADO: "❌ Negado",
+        REEMBOLSADO: "💰 Pago"
+      };
+      
+      await createNotification({
+        userId: data.userId,
+        title: `Reembolso ${statusLabels[status as keyof typeof statusLabels] || status}`,
+        description: `Seu pedido de R$ ${data.value.toFixed(2)} (${data.description}) foi atualizado.`,
+        type: status === 'NEGADO' ? 'error' : 'success',
+        href: '/dashboard/reembolsos'
+      });
+    }
+
     return { success: true };
   } catch (error: any) {
     throw new Error(error.message);

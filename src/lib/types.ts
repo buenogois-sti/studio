@@ -194,7 +194,7 @@ export type Reimbursement = {
   status: ReimbursementStatus;
   notes?: string;
   createdAt: Timestamp;
-  updatedAt?: Timestamp;
+  updatedAt: Timestamp;
 };
 
 export type Log = {
@@ -267,6 +267,8 @@ export type DocumentTemplate = {
   updatedAt?: Timestamp;
 };
 
+export type NotificationType = 'info' | 'success' | 'warning' | 'error' | 'finance' | 'deadline' | 'hearing';
+
 export type Notification = {
   id: string;
   userId: string;
@@ -274,5 +276,6 @@ export type Notification = {
   description: string;
   href?: string;
   isRead: boolean;
+  type?: NotificationType;
   createdAt: Timestamp;
 };

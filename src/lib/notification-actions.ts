@@ -1,7 +1,7 @@
 'use server';
 
 import { firestoreAdmin } from '@/firebase/admin';
-import type { Notification } from './types';
+import type { Notification, NotificationType } from './types';
 import { Timestamp } from 'firebase-admin/firestore';
 
 interface CreateNotificationData {
@@ -9,12 +9,12 @@ interface CreateNotificationData {
   title: string;
   description: string;
   href?: string;
+  type?: NotificationType;
 }
 
 export async function createNotification(data: CreateNotificationData): Promise<void> {
   if (!firestoreAdmin) {
     console.error("Firebase Admin not initialized, cannot create notification.");
-    // Don't throw an error, as notifications are non-critical.
     return;
   }
   
@@ -25,6 +25,7 @@ export async function createNotification(data: CreateNotificationData): Promise<
       description: data.description,
       href: data.href || '#',
       isRead: false,
+      type: data.type || 'info',
       createdAt: Timestamp.now(),
     };
     
@@ -32,7 +33,6 @@ export async function createNotification(data: CreateNotificationData): Promise<
 
   } catch (error) {
     console.error("Error creating notification:", error);
-    // Don't re-throw, to avoid failing the primary action.
   }
 }
 
@@ -47,6 +47,5 @@ export async function markNotificationAsRead(userId: string, notificationId: str
         await notifRef.update({ isRead: true });
     } catch (error) {
         console.error(`Error marking notification ${notificationId} as read:`, error);
-        // Do not re-throw, it's not a critical failure.
     }
 }

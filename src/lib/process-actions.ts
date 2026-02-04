@@ -5,6 +5,9 @@ import type { firestore as adminFirestore } from 'firebase-admin';
 import { copyFile } from './drive-actions';
 import { syncProcessToDrive } from './drive';
 import { revalidatePath } from 'next/cache';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/app/api/auth/[...nextauth]/options';
+import { createNotification } from './notification-actions';
 
 async function serializeProcess(doc: adminFirestore.DocumentSnapshot): Promise<Process | null> {
     const data = doc.data();
@@ -14,7 +17,6 @@ async function serializeProcess(doc: adminFirestore.DocumentSnapshot): Promise<P
         return null;
     }
 
-    // Busca o nome do cliente para enriquecer o resultado da busca
     let clientName = '';
     if (data.clientId) {
         try {
@@ -31,7 +33,7 @@ async function serializeProcess(doc: adminFirestore.DocumentSnapshot): Promise<P
     return {
         id,
         clientId: data.clientId,
-        clientName, // Campo extra para busca/exibição
+        clientName,
         name: data.name || '',
         processNumber: data.processNumber || '',
         court: data.court || '',
@@ -53,14 +55,10 @@ export async function searchProcesses(query: string): Promise<Process[]> {
     if (!query || query.length < 2) return [];
     
     if (!firestoreAdmin) {
-        console.error("Firebase Admin not initialized, cannot search processes.");
         throw new Error("A conexão com o servidor de dados falhou.");
     }
     
     try {
-        // Busca otimizada: No Firestore real, faríamos um where, 
-        // mas como a query pode bater no nome do cliente ou processo, 
-        // pegamos os recentes e filtramos. Em larga escala, denormalizaríamos a busca.
         const processesSnapshot = await firestoreAdmin.collection('processes').limit(100).get();
         
         const allProcessesData = await Promise.all(
@@ -99,6 +97,7 @@ export async function archiveProcess(processId: string): Promise<{ success: bool
 
 export async function draftDocument(processId: string, templateFileId: string, fileName: string): Promise<{ success: boolean; url?: string; error?: string }> {
     if (!firestoreAdmin) throw new Error("Servidor indisponível.");
+    const session = await getServerSession(authOptions);
 
     try {
         const processRef = firestoreAdmin.collection('processes').doc(processId);
@@ -107,10 +106,8 @@ export async function draftDocument(processId: string, templateFileId: string, f
         
         const processData = processDoc.data() as Process;
 
-        // Ensure Drive folder exists
         if (!processData.driveFolderId) {
             await syncProcessToDrive(processId);
-            // Refresh data
             const updatedDoc = await processRef.get();
             const updatedData = updatedDoc.data() as Process;
             if (!updatedData.driveFolderId) throw new Error("Falha ao sincronizar pasta do processo no Drive.");
@@ -119,6 +116,16 @@ export async function draftDocument(processId: string, templateFileId: string, f
 
         const newFileName = `${fileName} - ${processData.name}`;
         const copiedFile = await copyFile(templateFileId, newFileName, processData.driveFolderId);
+
+        if (session?.user?.id) {
+          await createNotification({
+            userId: session.user.id,
+            title: "Rascunho Gerado",
+            description: `O documento "${fileName}" foi criado para o processo ${processData.name}.`,
+            type: 'success',
+            href: copiedFile.webViewLink || '#'
+          });
+        }
 
         return { 
             success: true, 
