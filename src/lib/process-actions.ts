@@ -6,17 +6,32 @@ import { copyFile } from './drive-actions';
 import { syncProcessToDrive } from './drive';
 import { revalidatePath } from 'next/cache';
 
-function serializeProcess(doc: adminFirestore.DocumentSnapshot): Process | null {
+async function serializeProcess(doc: adminFirestore.DocumentSnapshot): Promise<Process | null> {
     const data = doc.data();
     const id = doc.id;
 
     if (!data) {
         return null;
     }
+
+    // Busca o nome do cliente para enriquecer o resultado da busca
+    let clientName = '';
+    if (data.clientId) {
+        try {
+            const clientDoc = await firestoreAdmin.collection('clients').doc(data.clientId).get();
+            if (clientDoc.exists) {
+                const c = clientDoc.data();
+                clientName = `${c?.firstName || ''} ${c?.lastName || ''}`.trim();
+            }
+        } catch (e) {
+            console.warn(`Could not fetch client name for process ${id}`);
+        }
+    }
     
     return {
         id,
         clientId: data.clientId,
+        clientName, // Campo extra para busca/exibição
         name: data.name || '',
         processNumber: data.processNumber || '',
         court: data.court || '',
@@ -30,12 +45,12 @@ function serializeProcess(doc: adminFirestore.DocumentSnapshot): Process | null 
         timeline: data.timeline || [],
         createdAt: data.createdAt,
         updatedAt: data.updatedAt,
-    };
+    } as Process;
 }
 
 
 export async function searchProcesses(query: string): Promise<Process[]> {
-    if (!query) return [];
+    if (!query || query.length < 2) return [];
     
     if (!firestoreAdmin) {
         console.error("Firebase Admin not initialized, cannot search processes.");
@@ -43,21 +58,26 @@ export async function searchProcesses(query: string): Promise<Process[]> {
     }
     
     try {
-        const processesSnapshot = await firestoreAdmin.collection('processes').get();
+        // Busca otimizada: No Firestore real, faríamos um where, 
+        // mas como a query pode bater no nome do cliente ou processo, 
+        // pegamos os recentes e filtramos. Em larga escala, denormalizaríamos a busca.
+        const processesSnapshot = await firestoreAdmin.collection('processes').limit(100).get();
         
-        const allProcessesData = processesSnapshot.docs
-            .map(serializeProcess)
-            .filter((process): process is Process => process !== null);
+        const allProcessesData = await Promise.all(
+            processesSnapshot.docs.map(doc => serializeProcess(doc))
+        );
 
-        const lowerCaseQuery = query.toLowerCase();
-
-        const filteredProcesses = allProcessesData.filter(process => {
-            const name = process.name.toLowerCase();
-            const processNumber = process.processNumber || '';
-            return name.includes(lowerCaseQuery) || processNumber.includes(lowerCaseQuery);
+        const filtered = allProcessesData.filter((process): process is Process => {
+            if (!process) return false;
+            const q = query.toLowerCase();
+            return (
+                process.name.toLowerCase().includes(q) ||
+                (process.processNumber || '').includes(q) ||
+                (process.clientName || '').toLowerCase().includes(q)
+            );
         });
 
-        return filteredProcesses.slice(0, 10);
+        return filtered.slice(0, 10);
     } catch (error) {
         console.error("Error searching processes:", error);
         throw new Error('Ocorreu um erro ao buscar os processos.');

@@ -21,6 +21,8 @@ import {
   Check,
   ChevronsUpDown,
   Search,
+  User,
+  Hash
 } from 'lucide-react';
 import { format, addDays, isToday, isSameDay, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, addMonths, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -112,6 +114,7 @@ function ProcessSearch({ onSelect, selectedProcess }: { onSelect: (process: Proc
   const inputRef = React.useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
+  // Foco inteligente: Aguarda a animação do popover antes de focar
   React.useEffect(() => {
     if (open) {
       const timer = setTimeout(() => {
@@ -140,70 +143,115 @@ function ProcessSearch({ onSelect, selectedProcess }: { onSelect: (process: Proc
     return () => clearTimeout(timer);
   }, [search, toast]);
 
+  const handleSelect = (process: Process) => {
+    onSelect(process);
+    setOpen(false);
+    setSearch('');
+  };
+
   return (
     <Popover open={open} onOpenChange={setOpen} modal={false}>
       <PopoverTrigger asChild>
-        <Button variant="outline" role="combobox" className="w-full justify-between h-11 font-normal bg-background">
+        <Button 
+          variant="outline" 
+          type="button"
+          role="combobox" 
+          className="w-full justify-between h-11 font-normal bg-background border-2 hover:border-primary/50 transition-all"
+        >
           {selectedProcess ? (
             <div className="flex items-center gap-2 overflow-hidden">
               <Gavel className="h-4 w-4 text-primary shrink-0" />
               <span className="truncate font-bold">{selectedProcess.name}</span>
             </div>
-          ) : "Selecione um processo..."}
+          ) : (
+            <span className="text-muted-foreground">Selecione o processo...</span>
+          )}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
       <PopoverContent 
-        className="w-[var(--radix-popover-trigger-width)] p-0 z-[100]" 
+        className="w-[var(--radix-popover-trigger-width)] p-0 z-[200] shadow-2xl border-2" 
         align="start"
         onOpenAutoFocus={(e) => e.preventDefault()}
-        onKeyDown={(e) => e.stopPropagation()}
+        onKeyDown={(e) => {
+          // Impede que a janela lateral intercepte o teclado
+          e.stopPropagation();
+        }}
       >
-        <div className="flex flex-col h-full bg-popover border shadow-xl rounded-md">
-          <div className="flex items-center border-b px-3">
+        <div className="flex flex-col h-full bg-popover rounded-lg overflow-hidden">
+          <div className="flex items-center border-b px-3 bg-muted/20">
             <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-            <Input 
+            <input 
               ref={inputRef}
-              placeholder="Buscar processo..." 
+              placeholder="Nome do processo, nº ou nome do cliente..." 
               value={search} 
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={(e) => {
                 e.stopPropagation();
               }}
-              className="border-none focus-visible:ring-0 focus-visible:ring-offset-0 h-11 bg-transparent"
+              className="flex h-11 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
+              autoComplete="off"
             />
+            {search && (
+              <button onClick={() => setSearch('')} className="p-1 hover:bg-muted rounded-full">
+                <XCircle className="h-4 w-4 text-muted-foreground" />
+              </button>
+            )}
           </div>
           <ScrollArea className="max-h-[300px] overflow-y-auto">
             {isLoading && (
-              <div className="p-4 text-center text-xs text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" />
-                Buscando...
+              <div className="p-8 text-center text-xs text-muted-foreground">
+                <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 text-primary" />
+                Pesquisando base de dados...
               </div>
             )}
             {!isLoading && search.length >= 2 && results.length === 0 && (
-              <div className="p-4 text-center text-sm text-muted-foreground">Nenhum processo encontrado.</div>
+              <div className="p-8 text-center text-sm text-muted-foreground italic">
+                Nenhum processo encontrado para "{search}".
+              </div>
+            )}
+            {!isLoading && search.length < 2 && (
+              <div className="p-8 text-center text-xs text-muted-foreground">
+                Digite pelo menos 2 caracteres para pesquisar.
+              </div>
             )}
             <div className="p-1">
               {results.map((process) => (
                 <button
                   key={process.id}
                   type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => { onSelect(process); setOpen(false); }}
+                  onMouseDown={(e) => {
+                    // Previne perda de foco do teclado antes da seleção
+                    e.preventDefault();
+                  }}
+                  onClick={() => handleSelect(process)}
                   className={cn(
-                    "flex items-start gap-3 w-full px-3 py-2.5 text-sm rounded-md transition-colors text-left",
-                    "hover:bg-accent hover:text-accent-foreground",
-                    selectedProcess?.id === process.id && "bg-accent text-accent-foreground font-bold"
+                    "flex items-start gap-3 w-full px-3 py-3 text-sm rounded-md transition-all text-left group",
+                    "hover:bg-primary/10",
+                    selectedProcess?.id === process.id && "bg-primary/5 border-l-4 border-primary"
                   )}
                 >
-                  <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                    <Gavel className="h-4 w-4 text-primary" />
+                  <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors">
+                    <Gavel className="h-5 w-5 text-muted-foreground group-hover:text-primary" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <span className="block truncate font-bold">{process.name}</span>
-                    <span className="block text-[10px] text-muted-foreground font-mono tracking-tighter">{process.processNumber || 'Sem número'}</span>
+                    <span className="block truncate font-bold text-foreground group-hover:text-primary transition-colors">
+                      {process.name}
+                    </span>
+                    <div className="flex items-center gap-3 mt-1">
+                      <span className="flex items-center gap-1 text-[10px] text-muted-foreground font-mono">
+                        <Hash className="h-3 w-3" />
+                        {process.processNumber || 'Sem número'}
+                      </span>
+                      {process.clientName && (
+                        <span className="flex items-center gap-1 text-[10px] text-primary/70 font-bold uppercase tracking-tighter">
+                          <User className="h-3 w-3" />
+                          {process.clientName}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  {selectedProcess?.id === process.id && <Check className="ml-2 h-4 w-4 shrink-0 self-center" />}
+                  {selectedProcess?.id === process.id && <Check className="ml-2 h-4 w-4 shrink-0 self-center text-primary" />}
                 </button>
               ))}
             </div>
@@ -312,7 +360,7 @@ function NewHearingDialog({ onHearingCreated, hearingsData }: { onHearingCreated
               name="processId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Processo Vinculado *</FormLabel>
+                  <FormLabel className="text-xs font-black uppercase tracking-widest text-muted-foreground">Processo Vinculado *</FormLabel>
                    <ProcessSearch 
                       selectedProcess={selectedProcess}
                       onSelect={handleProcessSelect}
@@ -328,7 +376,7 @@ function NewHearingDialog({ onHearingCreated, hearingsData }: { onHearingCreated
                   name="type"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Tipo *</FormLabel>
+                      <FormLabel className="text-xs font-black uppercase tracking-widest text-muted-foreground">Tipo *</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl><SelectTrigger className="h-11"><SelectValue placeholder="Tipo..." /></SelectTrigger></FormControl>
                         <SelectContent>
@@ -344,7 +392,7 @@ function NewHearingDialog({ onHearingCreated, hearingsData }: { onHearingCreated
                   name="date"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Data *</FormLabel>
+                      <FormLabel className="text-xs font-black uppercase tracking-widest text-muted-foreground">Data *</FormLabel>
                       <FormControl>
                         <Input type="date" className="h-11" {...field} value={field.value instanceof Date ? format(field.value, 'yyyy-MM-dd') : field.value || ''} />
                       </FormControl>
@@ -357,7 +405,7 @@ function NewHearingDialog({ onHearingCreated, hearingsData }: { onHearingCreated
                     name="time"
                     render={({ field }) => (
                         <FormItem>
-                        <FormLabel>Hora *</FormLabel>
+                        <FormLabel className="text-xs font-black uppercase tracking-widest text-muted-foreground">Hora *</FormLabel>
                         <FormControl><Input type="time" className="h-11" {...field} /></FormControl>
                         <FormMessage />
                         </FormItem>
@@ -377,7 +425,7 @@ function NewHearingDialog({ onHearingCreated, hearingsData }: { onHearingCreated
                 name="location"
                 render={({ field }) => (
                     <FormItem>
-                    <FormLabel>Local da Audiência *</FormLabel>
+                    <FormLabel className="text-xs font-black uppercase tracking-widest text-muted-foreground">Local da Audiência *</FormLabel>
                     <FormControl>
                       <LocationSearch 
                         value={field.value} 
@@ -394,7 +442,7 @@ function NewHearingDialog({ onHearingCreated, hearingsData }: { onHearingCreated
                 name="responsibleParty"
                 render={({ field }) => (
                     <FormItem>
-                    <FormLabel>Advogado Responsável *</FormLabel>
+                    <FormLabel className="text-xs font-black uppercase tracking-widest text-muted-foreground">Advogado Responsável *</FormLabel>
                     <FormControl><Input placeholder="Ex: Dr. Alan Bueno" className="h-11" {...field} /></FormControl>
                     <FormMessage />
                     </FormItem>
@@ -406,8 +454,8 @@ function NewHearingDialog({ onHearingCreated, hearingsData }: { onHearingCreated
                 name="notes"
                 render={({ field }) => (
                     <FormItem>
-                    <FormLabel>Notas e Observações</FormLabel>
-                    <FormControl><Textarea placeholder="Link da audiência, testemunhas, lembretes..." className="resize-none" {...field} /></FormControl>
+                    <FormLabel className="text-xs font-black uppercase tracking-widest text-muted-foreground">Notas e Observações</FormLabel>
+                    <FormControl><Textarea placeholder="Link da audiência, testemunhas, lembretes..." className="resize-none h-24" {...field} /></FormControl>
                     <FormMessage />
                     </FormItem>
                 )}
@@ -415,7 +463,7 @@ function NewHearingDialog({ onHearingCreated, hearingsData }: { onHearingCreated
 
             <DialogFooter className="gap-2 border-t pt-6">
                 <DialogClose asChild><Button type="button" variant="outline" disabled={isSaving}>Cancelar</Button></DialogClose>
-                <Button type="submit" disabled={isSaving}>
+                <Button type="submit" disabled={isSaving} className="bg-primary hover:bg-primary/90">
                     {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     {isSaving ? "Gravando..." : "Confirmar Agendamento"}
                 </Button>
