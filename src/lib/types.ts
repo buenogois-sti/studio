@@ -139,6 +139,7 @@ export type LegalDeadline = {
   isBusinessDays: boolean;
   authorId: string;
   authorName: string;
+  googleCalendarEventId?: string;
   createdAt: Timestamp;
   updatedAt?: Timestamp;
 };
