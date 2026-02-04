@@ -186,7 +186,7 @@ function NewReimbursementDialog({ onCreated, isAdmin }: { onCreated: () => void;
 }
 
 export default function ReembolsosPage() {
-  const { firestore, isUserLoading } = useFirebase();
+  const { firestore, user, isUserLoading: isFirebaseLoading } = useFirebase();
   const { data: session } = useSession();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = React.useState('meus');
@@ -195,22 +195,23 @@ export default function ReembolsosPage() {
 
   const isAdmin = session?.user?.role === 'admin';
 
+  // OTIMIZAÇÃO: Só inicia a query quando o usuário do Firebase está carregado e sincronizado
   const myReimbursementsQuery = useMemoFirebase(
-    () => (firestore && session?.user?.id ? query(
+    () => (firestore && user && !isFirebaseLoading ? query(
       collection(firestore, 'reimbursements'),
-      where('userId', '==', session.user.id),
+      where('userId', '==', user.uid),
       orderBy('createdAt', 'desc')
     ) : null),
-    [firestore, session?.user?.id]
+    [firestore, user, isFirebaseLoading]
   );
   const { data: myData, isLoading: isLoadingMy } = useCollection<Reimbursement>(myReimbursementsQuery);
 
   const allReimbursementsQuery = useMemoFirebase(
-    () => (firestore && isAdmin ? query(
+    () => (firestore && user && isAdmin && !isFirebaseLoading ? query(
       collection(firestore, 'reimbursements'),
       orderBy('createdAt', 'desc')
     ) : null),
-    [firestore, isAdmin]
+    [firestore, user, isAdmin, isFirebaseLoading]
   );
   const { data: allData, isLoading: isLoadingAll } = useCollection<Reimbursement>(allReimbursementsQuery);
 
@@ -317,7 +318,7 @@ export default function ReembolsosPage() {
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input 
                 placeholder="Buscar por colaborador ou descrição..." 
-                className="pl-8 bg-card border-border/50 h-9" 
+                className="pl-8 bg-card border-border/50 h-9 text-white" 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
@@ -328,7 +329,7 @@ export default function ReembolsosPage() {
         <TabsContent value="meus" className="mt-0">
           <ReimbursementTable 
             data={myData} 
-            isLoading={isUserLoading || isLoadingMy} 
+            isLoading={isFirebaseLoading || isLoadingMy} 
             isAdmin={false} 
             onDelete={handleDelete}
           />
@@ -338,7 +339,7 @@ export default function ReembolsosPage() {
           <TabsContent value="todos" className="mt-0">
             <ReimbursementTable 
               data={filteredAllData} 
-              isLoading={isUserLoading || isLoadingAll} 
+              isLoading={isFirebaseLoading || isLoadingAll} 
               isAdmin={true} 
               onUpdateStatus={handleStatusUpdate}
               onDelete={handleDelete}

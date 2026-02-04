@@ -1,48 +1,59 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // --- Helper Functions ---
+    // --- Funções Auxiliares ---
     function isAuthenticated() {
       return request.auth != null;
     }
-    function isOneOfRoles(roles) {
-      return isAuthenticated() && request.auth.token != null && request.auth.token.role in roles;
+    
+    function getUserRole() {
+      return request.auth.token.role;
     }
+
+    function isOneOfRoles(roles) {
+      return isAuthenticated() && getUserRole() != null && getUserRole() in roles;
+    }
+
     function isAdmin() {
       return isOneOfRoles(['admin']);
     }
-    function isUser(userId) {
+
+    function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    // --- Global Read Rule ---
-    match /{path=**} {
-      allow read: if isAuthenticated();
-    }
-
-    // --- Collection-Specific Rules ---
+    // --- Regras por Coleção ---
+    
     match /users/{userId} {
-      allow update: if (isUser(userId) && request.resource.data.role == resource.data.role) || isAdmin();
+      allow read: if isAuthenticated();
+      allow update: if isOwner(userId) || isAdmin();
       allow create, delete: if isAdmin();
     }
 
     match /reimbursements/{reimbursementId} {
+      // Permite leitura se for o dono ou se for admin/financeiro
+      // Para listagem (queries), o Firestore exige que os filtros da query correspondam às regras
       allow read: if isAuthenticated();
+      
       allow create: if isAuthenticated();
-      allow update, delete: if isAdmin() || (isAuthenticated() && (resource.data.userId == request.auth.uid));
+      
+      allow update, delete: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
     }
 
     match /clients/{clientId} {
+      allow read: if isAuthenticated();
       allow create, update: if isOneOfRoles(['admin', 'lawyer', 'assistant']);
       allow delete: if isAdmin();
     }
 
     match /processes/{processId} {
+      allow read: if isAuthenticated();
       allow create, update: if isOneOfRoles(['admin', 'lawyer', 'assistant']);
       allow delete: if isAdmin();
     }
 
     match /hearings/{hearingId} {
+      allow read: if isAuthenticated();
       allow create, update: if isOneOfRoles(['admin', 'lawyer', 'assistant']);
       allow delete: if isAdmin();
     }
@@ -54,10 +65,21 @@ service cloud.firestore {
     }
 
     match /financial_titles/{titleId} {
+      allow read: if isAuthenticated();
       allow write: if isOneOfRoles(['admin', 'financial']);
     }
     
     match /staff/{staffId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /document_templates/{templateId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /system_settings/{settingId} {
       allow read: if isAuthenticated();
       allow write: if isAdmin();
     }
