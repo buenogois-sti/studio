@@ -1,3 +1,4 @@
+
 'use client';
 import * as React from 'react';
 import Link from 'next/link';
@@ -74,7 +75,7 @@ export default function ClientsPage() {
   const { data: processesData, isLoading: isLoadingProcesses } = useCollection<Process>(processesQuery);
   const processes = processesData || [];
 
-  // OTIMIZAÇÃO: Mapa O(1) para evitar congelamento em listas grandes
+  // OTIMIZAÇÃO O(1): Mapa de contagem de processos por cliente
   const processesByClientMap = React.useMemo(() => {
     const map = new Map<string, number>();
     processes.forEach(p => {
@@ -83,7 +84,7 @@ export default function ClientsPage() {
     return map;
   }, [processes]);
 
-  // OTIMIZAÇÃO: Cálculo de integridade memoizado por ID para evitar re-calculo em cada frame
+  // OTIMIZAÇÃO: Cálculo de integridade memoizado para evitar lag no hover
   const clientIntegrityMap = React.useMemo(() => {
     const map = new Map<string, number>();
     clients.forEach(client => {
@@ -99,6 +100,7 @@ export default function ClientsPage() {
     return map;
   }, [clients]);
 
+  // OTIMIZAÇÃO: Filtro memoizado
   const filteredClients = React.useMemo(() => {
     let result = clients;
     if (statusFilter !== 'all') result = result.filter(c => c.status === statusFilter);
@@ -153,13 +155,13 @@ export default function ClientsPage() {
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative w-full max-w-sm">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Pesquisar..." className="pl-8 pr-8 bg-card border-border/50" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-              {searchTerm && <button onClick={() => setSearchTerm('')} className="absolute right-2.5 top-2.5"><X className="h-4 w-4 text-muted-foreground" /></button>}
+              <Input placeholder="Pesquisar..." className="pl-8 pr-8 bg-card border-border/50 text-white" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+              {searchTerm && <button onClick={() => setSearchTerm('')} className="absolute right-2.5 top-2.5 text-white/50"><X className="h-4 w-4" /></button>}
             </div>
             <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as any)}>
-              <TabsList className="h-9 bg-card">
-                <TabsTrigger value="grid" className="px-3"><LayoutGrid className="h-4 w-4" /></TabsTrigger>
-                <TabsTrigger value="table" className="px-3"><List className="h-4 w-4" /></TabsTrigger>
+              <TabsList className="h-9 bg-card border-border/50">
+                <TabsTrigger value="grid" className="px-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><LayoutGrid className="h-4 w-4" /></TabsTrigger>
+                <TabsTrigger value="table" className="px-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><List className="h-4 w-4" /></TabsTrigger>
               </TabsList>
             </Tabs>
             <Button variant="outline" size="sm" onClick={() => setIsVCFDialogOpen(true)} className="border-primary/20 text-primary hover:bg-primary/10"><FileUp className="mr-2 h-4 w-4" /> VCF</Button>
@@ -169,7 +171,7 @@ export default function ClientsPage() {
 
         {isLoading ? (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-64 w-full bg-card" />)}
+            {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-64 w-full bg-card/50" />)}
           </div>
         ) : filteredClients.length > 0 ? (
           viewMode === 'grid' ? (
@@ -179,7 +181,7 @@ export default function ClientsPage() {
                 const integrity = clientIntegrityMap.get(client.id) || 0;
                 const statusInfo = STATUS_CONFIG[client.status || 'active'];
                 return (
-                  <Card key={client.id} className="relative flex flex-col group hover:shadow-xl transition-all duration-300 overflow-hidden bg-card border-border/50">
+                  <Card key={client.id} className="relative flex flex-col group hover:shadow-xl transition-all duration-300 overflow-hidden bg-[#0f172a] border-border/50">
                     <div className="absolute top-0 left-0 w-full h-1 bg-muted">
                         <div className={cn("h-full transition-all duration-1000", integrity < 50 ? "bg-rose-500" : integrity < 80 ? "bg-amber-500" : "bg-emerald-500")} style={{ width: `${integrity}%` }} />
                     </div>
@@ -191,11 +193,11 @@ export default function ClientsPage() {
                               <p className="text-xs text-muted-foreground font-mono">{client.document}</p>
                           </div>
                           <DropdownMenu>
-                            <DropdownMenuTrigger asChild><Button size="icon" variant="ghost" className="h-8 w-8"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                            <DropdownMenuTrigger asChild><Button size="icon" variant="ghost" className="h-8 w-8 text-white/50"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-56 bg-card border-border">
                                 <DropdownMenuItem onClick={() => handleViewDetails(client)}><UserCheck className="mr-2 h-4 w-4 text-primary" /> Ficha Completa</DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => handleEdit(client)}><Edit className="mr-2 h-4 w-4" /> Editar</DropdownMenuItem>
-                                <DropdownMenuSeparator />
+                                <DropdownMenuSeparator className="bg-white/10" />
                                 <DropdownMenuItem asChild><Link href={`/dashboard/processos?clientId=${client.id}`}><FolderKanban className="mr-2 h-4 w-4" /> Processos</Link></DropdownMenuItem>
                                 <DropdownMenuItem className="text-destructive" onClick={() => setClientToDelete(client)}><Trash2 className="mr-2 h-4 w-4" /> Excluir</DropdownMenuItem>
                             </DropdownMenuContent>
@@ -216,7 +218,7 @@ export default function ClientsPage() {
                           <span className="text-primary">{integrity}% Info</span>
                       </div>
                     </CardContent>
-                    <CardFooter className="border-t border-border/30 bg-muted/5 py-3 flex items-center justify-between">
+                    <CardFooter className="border-t border-border/30 bg-black/20 py-3 flex items-center justify-between">
                         <span className="text-[9px] text-muted-foreground font-bold uppercase">Cadastrado: {typeof client.createdAt === 'string' ? client.createdAt.split('T')[0] : client.createdAt.toDate().toLocaleDateString()}</span>
                         
                         {client.driveFolderId ? (
@@ -245,7 +247,7 @@ export default function ClientsPage() {
               })}
             </div>
           ) : (
-            <Card className="bg-card border-border/50">
+            <Card className="bg-[#0f172a] border-border/50 overflow-hidden">
               <CardContent className="p-0">
                 <Table>
                   <TableHeader><TableRow className="border-border/50 hover:bg-transparent"><TableHead className="w-[300px] text-muted-foreground">Cliente</TableHead><TableHead className="text-center text-muted-foreground">Status</TableHead><TableHead className="text-muted-foreground">Documento</TableHead><TableHead className="text-right text-muted-foreground">Ações</TableHead></TableRow></TableHeader>
@@ -279,7 +281,7 @@ export default function ClientsPage() {
       </div>
 
       <Sheet open={isSheetOpen} onOpenChange={(open) => { if (!open) setEditingClient(null); setIsSheetOpen(open); }}>
-        <SheetContent className="sm:max-w-4xl w-full p-0 flex flex-col bg-card border-border">
+        <SheetContent className="sm:max-w-4xl w-full p-0 flex flex-col bg-[#020617] border-border">
           <SheetHeader className="px-6 pt-6 pb-2">
             <SheetTitle className="text-white">{editingClient ? 'Editar Cadastro' : 'Novo Cliente'}</SheetTitle>
             <SheetDescription className="text-slate-400">Mantenha a integridade dos dados para automação.</SheetDescription>
@@ -296,7 +298,7 @@ export default function ClientsPage() {
       <VCFImportDialog open={isVCFDialogOpen} onOpenChange={setIsVCFDialogOpen} onImportSuccess={() => {}} />
 
       <AlertDialog open={!!clientToDelete} onOpenChange={(open) => !isDeleting && !open && setClientToDelete(null)}>
-        <AlertDialogContent className="bg-card border-border"><AlertDialogHeader><AlertDialogTitle className="text-white">Excluir Cliente?</AlertDialogTitle><AlertDialogDescription className="text-slate-400">Isso removerá os dados de <strong>{clientToDelete?.firstName} {clientToDelete?.lastName}</strong> permanentemente.</AlertDialogDescription></AlertDialogHeader>
+        <AlertDialogContent className="bg-[#0f172a] border-border"><AlertDialogHeader><AlertDialogTitle className="text-white">Excluir Cliente?</AlertDialogTitle><AlertDialogDescription className="text-slate-400">Isso removerá os dados de <strong>{clientToDelete?.firstName} {clientToDelete?.lastName}</strong> permanentemente.</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter><AlertDialogCancel className="bg-transparent border-border text-white hover:bg-white/5" disabled={isDeleting}>Cancelar</AlertDialogCancel><AlertDialogAction onClick={confirmDelete} disabled={isDeleting} className="bg-destructive text-white hover:bg-destructive/90">{isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Confirmar Exclusão'}</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

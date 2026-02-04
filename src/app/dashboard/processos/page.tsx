@@ -1,3 +1,4 @@
+
 'use client';
 import * as React from 'react';
 import {
@@ -35,7 +36,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
-import { useFirebase, useCollection, useMemoFirebase, useDoc } from '@/firebase';
+import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, doc, deleteDoc } from 'firebase/firestore';
 import type { Process, Client, UserProfile, Hearing } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -66,9 +67,6 @@ export default function ProcessosPage() {
   const [editingProcess, setEditingProcess] = React.useState<Process | null>(null);
   const [selectedProcess, setSelectedProcess] = React.useState<Process | null>(null);
   const [processToDelete, setProcessToDelete] = React.useState<Process | null>(null);
-  const [processToArchive, setProcessToArchive] = React.useState<Process | null>(null);
-  const [isDeleting, setIsDeleting] = React.useState(false);
-  const [isArchiving, setIsArchiving] = React.useState(false);
   const [isSyncing, setIsSyncing] = React.useState<string | null>(null);
   const [searchTerm, setSearchTerm] = React.useState('');
   const [eventProcess, setEventProcess] = React.useState<Process | null>(null);
@@ -89,10 +87,10 @@ export default function ProcessosPage() {
   const clientsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'clients') : null), [firestore]);
   const { data: clientsData } = useCollection<Client>(clientsQuery);
   
-  // OTIMIZAÇÃO: Memoize o mapa de clientes para evitar congelamento
+  // OTIMIZAÇÃO: Memoize o mapa de clientes para evitar congelamento O(1)
   const clientsMap = React.useMemo(() => new Map(clientsData?.map(c => [c.id, c])), [clientsData]);
 
-  // OTIMIZAÇÃO: Memoize o mapa de audiências por processo
+  // OTIMIZAÇÃO: Memoize o mapa de audiências por processo O(1)
   const hearingsByProcessMap = React.useMemo(() => {
     const map = new Map<string, Hearing[]>();
     hearingsData?.forEach(h => {
@@ -102,6 +100,7 @@ export default function ProcessosPage() {
     return map;
   }, [hearingsData]);
 
+  // OTIMIZAÇÃO: Filtro memoizado para evitar lag ao digitar
   const filteredProcesses = React.useMemo(() => {
     if (!processesData) return [];
     return processesData.filter(p => {
@@ -114,6 +113,7 @@ export default function ProcessosPage() {
     });
   }, [processesData, searchTerm, clientIdFilter]);
 
+  // OTIMIZAÇÃO: Estatísticas memoizadas
   const stats = React.useMemo(() => {
     if (!processesData) return { active: 0, pending: 0, totalValue: 0 };
     return processesData.reduce((acc, p) => {
@@ -148,7 +148,7 @@ export default function ProcessosPage() {
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative w-full max-w-sm">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Pesquisar..." className="pl-8 pr-8 bg-card border-border/50" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+            <Input placeholder="Pesquisar..." className="pl-8 pr-8 bg-[#0f172a] border-border/50 text-white" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
           </div>
           <Button size="sm" className="bg-primary text-primary-foreground" onClick={() => { setEditingProcess(null); setIsSheetOpen(true); }}>
               <PlusCircle className="mr-2 h-4 w-4" /> Novo Processo
@@ -194,7 +194,7 @@ export default function ProcessosPage() {
 
       <div className="grid gap-4">
         {isLoading ? (
-          Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-32 w-full bg-card" />)
+          Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-32 w-full bg-card/50" />)
         ) : filteredProcesses.map((p) => {
             const client = clientsMap.get(p.clientId);
             const statusInfo = STATUS_CONFIG[p.status || 'Ativo'];
@@ -202,14 +202,14 @@ export default function ProcessosPage() {
             const isExpanded = expandedProcessId === p.id;
 
             return (
-              <Card key={p.id} className="border-none shadow-sm overflow-hidden bg-card hover:bg-card/80 transition-all">
+              <Card key={p.id} className="border-none shadow-sm overflow-hidden bg-[#0f172a] hover:bg-card/80 transition-all">
                 <CardContent className="p-4">
                   <div className="flex flex-col gap-4">
                     <div className="flex items-start justify-between gap-4">
                       <div className="space-y-2">
                         <div className="flex items-center gap-2">
                           <h3 className="font-bold text-base text-white">{p.name}</h3>
-                          <Button variant="ghost" size="icon" onClick={() => setExpandedProcessId(isExpanded ? null : p.id)} className="h-6 w-6 text-muted-foreground">
+                          <Button variant="ghost" size="icon" onClick={() => setExpandedProcessId(isExpanded ? null : p.id)} className="h-6 w-6 text-white/50">
                             {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                           </Button>
                         </div>
@@ -223,13 +223,13 @@ export default function ProcessosPage() {
                           <statusInfo.icon className="h-3 w-3" /> {statusInfo.label}
                         </Badge>
                         <DropdownMenu>
-                          <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                          <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-white/50"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-60 bg-card border-border">
                             <DropdownMenuItem onClick={() => { setSelectedProcess(p); setIsTimelineOpen(true); }}><History className="mr-2 h-4 w-4 text-primary" /> Timeline</DropdownMenuItem>
                             <DropdownMenuItem onClick={() => { setSelectedProcess(p); setIsHearingOpen(true); }}><Gavel className="mr-2 h-4 w-4 text-amber-400" /> Marcar Audiência</DropdownMenuItem>
                             <DropdownMenuItem onClick={() => { setSelectedProcess(p); setIsDraftingOpen(true); }}><FilePlus2 className="mr-2 h-4 w-4 text-emerald-400" /> Gerar Rascunho</DropdownMenuItem>
                             <DropdownMenuItem onSelect={() => setEventProcess(p)}><DollarSign className="mr-2 h-4 w-4 text-blue-400" /> Evento Financeiro</DropdownMenuItem>
-                            <DropdownMenuSeparator />
+                            <DropdownMenuSeparator className="bg-white/10" />
                             <DropdownMenuItem onClick={() => { setEditingProcess(p); setIsSheetOpen(true); }}><FileText className="mr-2 h-4 w-4" /> Editar</DropdownMenuItem>
                             <DropdownMenuItem className="text-destructive" onClick={() => setProcessToDelete(p)}><X className="mr-2 h-4 w-4" /> Excluir</DropdownMenuItem>
                           </DropdownMenuContent>
@@ -281,7 +281,7 @@ export default function ProcessosPage() {
       </div>
 
       <Sheet open={isSheetOpen} onOpenChange={(open) => { if (!open) setEditingProcess(null); setIsSheetOpen(open); }}>
-        <SheetContent className="sm:max-w-4xl w-full p-1 flex flex-col bg-card border-border">
+        <SheetContent className="sm:max-w-4xl w-full p-1 flex flex-col bg-[#020617] border-border">
           <SheetHeader className="px-6 pt-6 pb-2">
             <SheetTitle className="text-white text-2xl font-black font-headline">{editingProcess ? 'Editar Processo' : 'Novo Processo'}</SheetTitle>
             <SheetDescription className="text-slate-400">Siga as etapas para um cadastro completo.</SheetDescription>

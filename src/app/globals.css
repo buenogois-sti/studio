@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -5,7 +6,7 @@
 @layer base {
   :root {
     /* Primary: Bueno Gois Gold (#F5D030) */
-    --background: 222 47% 4%; /* Deep Navy */
+    --background: 222 47% 4%; /* Deep Navy para fundo geral */
     --foreground: 210 40% 98%;
     --card: 222 47% 7%;
     --card-foreground: 210 40% 98%;
