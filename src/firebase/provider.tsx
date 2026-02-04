@@ -62,25 +62,25 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
 
   useEffect(() => {
     if (sessionStatus === 'authenticated' && session?.customToken && auth) {
-      console.log('[Firebase Auth] Attempting signInWithCustomToken');
-      console.log('[Firebase Auth] Project ID:', auth.app.options.projectId);
-      console.log('[Firebase Auth] Token exists:', !!session.customToken);
+      console.log('[Firebase Auth] Sincronizando com Custom Token...');
       
       signInWithCustomToken(auth, session.customToken).catch((error: any) => {
-        console.error('[Firebase Auth] signInWithCustomToken error:', {
+        console.error('[Firebase Auth] Erro Crítico:', {
           code: error.code,
           message: error.message,
-          clientProjectId: auth.app.options.projectId,
+          expectedProject: 'studio-7080106838-23904',
+          clientProject: auth.app.options.projectId,
         });
         
+        // Alerta amigável para o desenvolvedor sobre o erro 400
         if (error.code === 'auth/invalid-custom-token' || error.message.includes('400')) {
-          console.error('[Firebase Auth] PROJECT ID MISMATCH DETECTED:');
-          console.error('   1. Verifique sua variável FIREBASE_SERVICE_ACCOUNT_JSON no servidor.');
-          console.error('   2. O campo "project_id" no JSON deve ser exatamente: studio-7080106838-23904');
-          console.error('   3. Se for diferente, gere uma nova chave no Firebase Console do projeto correto.');
+          const mismatchMsg = '⚠️ PROJECT ID MISMATCH: Sua chave de servidor (FIREBASE_SERVICE_ACCOUNT_JSON) não pertence a este projeto. Baixe a chave correta no console do Firebase.';
+          console.warn('[Firebase Auth]', mismatchMsg);
         }
-        setUserAuthState((state) => ({ ...state, userError: error }));
+        setUserAuthState((state) => ({ ...state, userError: error, isUserLoading: false }));
       });
+    } else if (sessionStatus === 'unauthenticated') {
+      setUserAuthState((state) => ({ ...state, isUserLoading: false }));
     }
   }, [session, sessionStatus, auth]);
 

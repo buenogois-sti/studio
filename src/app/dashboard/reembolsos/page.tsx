@@ -12,14 +12,13 @@ import {
   MoreVertical,
   History,
   User,
-  Receipt,
   Check,
   X,
   FileText,
-  Trash2
+  Trash2,
+  AlertTriangle
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -28,8 +27,8 @@ import { useSession } from 'next-auth/react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, where, orderBy } from 'firebase/firestore';
+import { useFirebase, useCollection, useMemoFirebase, useDoc } from '@/firebase';
+import { collection, query, where, orderBy, doc } from 'firebase/firestore';
 import type { Reimbursement, ReimbursementStatus, UserProfile } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose, DialogTrigger } from '@/components/ui/dialog';
@@ -173,7 +172,7 @@ function NewReimbursementDialog({ onCreated, isAdmin }: { onCreated: () => void;
               />
             </div>
             <DialogFooter className="pt-4">
-              <DialogClose asChild><Button variant="ghost" className="text-slate-400 hover:text-white" type="button">Cancelar</Button></DialogClose>
+              <DialogClose asChild><Button variant="outline" className="text-slate-400 hover:text-white" type="button">Cancelar</Button></DialogClose>
               <Button type="submit" disabled={isSaving} className="bg-primary text-primary-foreground">
                 {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 Enviar Pedido
@@ -194,10 +193,16 @@ export default function ReembolsosPage() {
   const [isUpdating, setIsUpdating] = React.useState<string | null>(null);
   const [searchTerm, setSearchTerm] = React.useState('');
 
-  const isAdmin = session?.user?.role === 'admin' || session?.user?.role === 'financial';
+  // Sincronização de Role baseada no Firestore (mais confiável para permissões do que o Session puro)
+  const userProfileRef = useMemoFirebase(
+    () => (firestore && user?.uid ? doc(firestore, 'users', user.uid) : null),
+    [firestore, user?.uid]
+  );
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
+
+  const isAdmin = userProfile?.role === 'admin' || userProfile?.role === 'financial';
 
   // LOGICA 1: Query restrita para usuários comuns (vê apenas os seus)
-  // IMPORTANTE: O uso do WHERE 'userId' é obrigatório para não disparar erro de permissão no Firebase Rules
   const myReimbursementsQuery = useMemoFirebase(
     () => (firestore && user?.uid ? query(
       collection(firestore, 'reimbursements'),
@@ -209,6 +214,7 @@ export default function ReembolsosPage() {
   const { data: myData, isLoading: isLoadingMy } = useCollection<Reimbursement>(myReimbursementsQuery);
 
   // LOGICA 2: Query global para Financeiro/Admin (vê tudo)
+  // Só dispara se o perfil do Firestore confirmar que é admin
   const allReimbursementsQuery = useMemoFirebase(
     () => (firestore && isAdmin ? query(
       collection(firestore, 'reimbursements'),
@@ -249,22 +255,26 @@ export default function ReembolsosPage() {
     }
   };
 
-  // Se houver erro de Project ID no login, exibe um aviso amigável
-  if (userError && userError.message.includes('400')) {
-      return (
-          <div className="flex flex-col items-center justify-center py-20 text-center space-y-4">
-              <XCircle className="h-16 w-16 text-rose-500" />
-              <h2 className="text-2xl font-bold text-white">Erro de Configuração de Login</h2>
-              <p className="text-muted-foreground max-w-md">
-                  Detectamos uma incompatibilidade entre o projeto do servidor e do cliente. 
-                  Por favor, verifique a variável <strong>FIREBASE_SERVICE_ACCOUNT_JSON</strong>.
-              </p>
-          </div>
-      );
-  }
+  const isLoading = isFirebaseLoading || isProfileLoading || (isAdmin && activeTab === 'todos' ? isLoadingAll : isLoadingMy);
 
-  const listToUse = (isAdmin && activeTab === 'todos') ? filteredAllData : (myData || []);
-  const loadingToUse = (isAdmin && activeTab === 'todos') ? (isFirebaseLoading || isLoadingAll) : (isFirebaseLoading || isLoadingMy);
+  // Tratamento de Erro de Project ID mismatch
+  if (userError && (userError.message.includes('400') || userError.message.includes('custom-token'))) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center space-y-6">
+        <div className="h-20 w-20 rounded-full bg-rose-500/10 flex items-center justify-center animate-bounce">
+          <AlertTriangle className="h-10 w-10 text-rose-500" />
+        </div>
+        <div className="space-y-2">
+          <h2 className="text-2xl font-black text-white font-headline">Falha Crítica na Autenticação</h2>
+          <p className="text-slate-400 max-w-md mx-auto">
+            O servidor tentou gerar um acesso para um projeto diferente do atual. 
+            <strong> Solução:</strong> Atualize a variável <code>FIREBASE_SERVICE_ACCOUNT_JSON</code> no seu servidor com a chave do projeto <code>studio-7080106838-23904</code>.
+          </p>
+        </div>
+        <Button variant="outline" onClick={() => window.location.reload()}>Tentar Reconectar</Button>
+      </div>
+    );
+  }
 
   const stats = React.useMemo(() => {
     const list = isAdmin && activeTab === 'todos' ? allData : myData;
@@ -282,10 +292,10 @@ export default function ReembolsosPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-black tracking-tight font-headline flex items-center gap-3 text-white">
-            <Receipt className="h-8 w-8 text-primary" />
-            Reembolsos
+            <DollarSign className="h-8 w-8 text-primary" />
+            Gestão de Reembolsos
           </h1>
-          <p className="text-sm text-muted-foreground">Controle de despesas operacionais e reembolsos de equipe.</p>
+          <p className="text-sm text-muted-foreground">Controle de despesas e solicitações de ressarcimento.</p>
         </div>
         <NewReimbursementDialog onCreated={() => {}} isAdmin={isAdmin} />
       </div>
@@ -308,7 +318,7 @@ export default function ReembolsosPage() {
               <Clock className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-[10px] font-black uppercase text-muted-foreground">Em Aberto</p>
+              <p className="text-[10px] font-black uppercase text-muted-foreground">Aguardando Aprovação</p>
               <p className="text-xl font-black text-white">{stats.pending.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
             </div>
           </CardContent>
@@ -316,7 +326,7 @@ export default function ReembolsosPage() {
         <Card className="bg-white/5 border-white/10">
           <CardContent className="p-4 flex items-center gap-4">
             <div className="h-10 w-10 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400">
-              <DollarSign className="h-5 w-5" />
+              <CheckCircle2 className="h-5 w-5" />
             </div>
             <div>
               <p className="text-[10px] font-black uppercase text-muted-foreground">Total Pago</p>
@@ -330,14 +340,14 @@ export default function ReembolsosPage() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <TabsList className="bg-white/5 p-1 border border-white/10">
             <TabsTrigger value="meus" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Meus Pedidos</TabsTrigger>
-            {isAdmin && <TabsTrigger value="todos" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Todos (Fila Admin)</TabsTrigger>}
+            {isAdmin && <TabsTrigger value="todos" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Fila Administrativa (Todos)</TabsTrigger>}
           </TabsList>
           
           {activeTab === 'todos' && (
             <div className="relative w-full max-w-sm">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input 
-                placeholder="Buscar por colaborador ou descrição..." 
+                placeholder="Filtrar pedidos..." 
                 className="pl-8 bg-card border-border/50 h-9 text-white" 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -349,7 +359,7 @@ export default function ReembolsosPage() {
         <TabsContent value="meus" className="mt-0">
           <ReimbursementTable 
             data={myData} 
-            isLoading={loadingToUse} 
+            isLoading={isLoading} 
             isAdmin={false} 
             onDelete={handleDelete}
           />
@@ -359,7 +369,7 @@ export default function ReembolsosPage() {
           <TabsContent value="todos" className="mt-0">
             <ReimbursementTable 
               data={filteredAllData} 
-              isLoading={loadingToUse} 
+              isLoading={isLoading} 
               isAdmin={true} 
               onUpdateStatus={handleStatusUpdate}
               onDelete={handleDelete}
@@ -389,26 +399,24 @@ function ReimbursementTable({
 }) {
   if (isLoading) {
     return (
-      <Card className="bg-card border-border/50">
-        <div className="p-8 space-y-4">
-          {[...Array(3)].map((_, i) => <Skeleton className="h-12 w-full bg-white/5" key={i} />)}
-        </div>
-      </Card>
+      <div className="space-y-4">
+        {[...Array(3)].map((_, i) => <Skeleton className="h-16 w-full bg-white/5 rounded-xl" key={i} />)}
+      </div>
     );
   }
 
   if (!data || data.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center border-2 border-dashed border-border/50 rounded-2xl bg-white/5">
-        <Receipt className="h-12 w-12 mb-4 text-muted-foreground/20" />
-        <p className="font-bold text-lg text-white">Sem pedidos no momento</p>
-        <p className="text-sm text-muted-foreground">Novas solicitações de despesas aparecerão aqui.</p>
+        <XCircle className="h-12 w-12 mb-4 text-muted-foreground/20" />
+        <p className="font-bold text-lg text-white">Nenhum registro encontrado</p>
+        <p className="text-sm text-muted-foreground">Novas solicitações aparecerão aqui.</p>
       </div>
     );
   }
 
   return (
-    <Card className="border-none shadow-none bg-card overflow-hidden">
+    <Card className="border-none shadow-none bg-[#0f172a] overflow-hidden">
       <Table>
         <TableHeader className="bg-white/5 border-b border-white/10">
           <TableRow className="hover:bg-transparent">
@@ -417,7 +425,7 @@ function ReimbursementTable({
             <TableHead className="text-muted-foreground">Data Despesa</TableHead>
             <TableHead className="text-muted-foreground">Valor</TableHead>
             <TableHead className="text-center text-muted-foreground">Status</TableHead>
-            <TableHead className="text-right text-muted-foreground">Ações</TableHead>
+            <TableHead className="text-right text-muted-foreground px-6">Ações</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -441,12 +449,12 @@ function ReimbursementTable({
                   <div className="flex flex-col">
                     <span className="font-bold text-sm text-white">{r.description}</span>
                     <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                      <History className="h-3 w-3" /> Criado em {r.createdAt?.toDate ? format(r.createdAt.toDate(), "dd/MM/yy") : 'Recente'}
+                      <History className="h-3 w-3" /> Criado em {r.createdAt && typeof r.createdAt !== 'string' ? format(r.createdAt.toDate(), "dd/MM/yy") : 'Recente'}
                     </span>
                   </div>
                 </TableCell>
                 <TableCell className="text-sm text-slate-300">
-                  {r.requestDate?.toDate ? format(r.requestDate.toDate(), 'dd/MM/yyyy') : 'N/A'}
+                  {r.requestDate && typeof r.requestDate !== 'string' ? format(r.requestDate.toDate(), 'dd/MM/yyyy') : 'N/A'}
                 </TableCell>
                 <TableCell className="font-mono text-sm font-bold text-white">
                   {r.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
@@ -457,7 +465,7 @@ function ReimbursementTable({
                     {config.label}
                   </Badge>
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell className="text-right px-6">
                   <div className="flex justify-end gap-2">
                     {isAdmin && r.status === 'SOLICITADO' && (
                       <>
@@ -496,7 +504,7 @@ function ReimbursementTable({
                     )}
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground"><MoreVertical className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-white/50"><MoreVertical className="h-4 w-4" /></Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="bg-card border-border">
                         <DropdownMenuLabel className="text-white">Opções</DropdownMenuLabel>

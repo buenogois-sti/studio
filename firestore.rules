@@ -3,7 +3,7 @@ service cloud.firestore {
   match /databases/{database}/documents {
     // --- Funções Auxiliares ---
     function isAuthenticated() {
-      return request.auth != null;
+      return request.auth != null && request.auth.uid != null;
     }
     
     function getUserRole() {
@@ -11,7 +11,7 @@ service cloud.firestore {
     }
 
     function isOneOfRoles(roles) {
-      return isAuthenticated() && getUserRole() != null && getUserRole() in roles;
+      return isAuthenticated() && (getUserRole() in roles);
     }
 
     function isAdmin() {
@@ -41,15 +41,24 @@ service cloud.firestore {
     }
 
     match /reimbursements/{reimbursementId} {
-      // Admins e Financeiros podem listar e ler tudo.
-      // Usuários comuns podem apenas listar e ler se o filtro da query for seu próprio userId.
-      allow list: if isOneOfRoles(['admin', 'financial']) || (isAuthenticated() && request.query.filters.userId == request.auth.uid);
-      allow get: if isOneOfRoles(['admin', 'financial']) || (isAuthenticated() && resource.data.userId == request.auth.uid);
+      // Regra de Listagem: Admin vê tudo, User vê apenas os seus via filtro de query
+      allow list: if isAuthenticated() && (
+        isOneOfRoles(['admin', 'financial']) || 
+        (request.query.filters.userId == request.auth.uid)
+      );
+      
+      // Regra de Documento Único
+      allow get: if isAuthenticated() && (
+        isOneOfRoles(['admin', 'financial']) || 
+        (resource.data.userId == request.auth.uid)
+      );
       
       allow create: if isAuthenticated();
       
-      // Apenas Admin/Financeiro ou o dono (se ainda estiver pendente) podem editar/deletar
-      allow update, delete: if isOneOfRoles(['admin', 'financial']) || (isAuthenticated() && resource.data.userId == request.auth.uid);
+      allow update, delete: if isAuthenticated() && (
+        isOneOfRoles(['admin', 'financial']) || 
+        (resource.data.userId == request.auth.uid)
+      );
     }
 
     match /clients/{clientId} {
