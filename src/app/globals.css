@@ -4,35 +4,35 @@
 
 @layer base {
   :root {
-    /* Primary: Deep blue (#1E3A8A) -> hsl(224 64% 33%) */
-    --background: 210 31% 96%; /* #F0F4F8 - Light blue-gray */
+    /* Primary: Gold (#F5D030) -> hsl(48 91% 58%) */
+    --background: 210 31% 96%; /* #F0F4F8 - Light blue-gray background for dashboard */
     --foreground: 222.2 84% 4.9%;
     --card: 0 0% 100%;
     --card-foreground: 222.2 84% 4.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
-    --primary: 224 64% 33%; /* #1E3A8A */
-    --primary-foreground: 210 40% 98%;
+    --primary: 48 91% 58%; /* #F5D030 - Dourado Bueno Gois */
+    --primary-foreground: 224 64% 10%; /* Dark Navy for text on gold */
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 83 77% 44%; /* #84CC16 - Soft Green */
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 224 64% 33%; /* Blue as accent */
+    --accent-foreground: 210 40% 98%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 224 64% 33%;
-    --radius: 0.5rem;
+    --ring: 48 91% 58%;
+    --radius: 0.75rem;
     --sidebar-background: 224 64% 15%; /* Darker Blue for sidebar */
     --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 224 64% 33%;
-    --sidebar-primary-foreground: 210 40% 98%;
+    --sidebar-primary: 48 91% 58%;
+    --sidebar-primary-foreground: 224 64% 10%;
     --sidebar-accent: 224 64% 25%;
     --sidebar-accent-foreground: 210 40% 98%;
     --sidebar-border: 224 64% 20%;
-    --sidebar-ring: 224 64% 33%;
+    --sidebar-ring: 48 91% 58%;
   }
 }
 
@@ -45,77 +45,7 @@
   }
 }
 
-@layer utilities {
-  .noise-bg::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 1024 1024' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
-    opacity: 0.02;
-    pointer-events: none;
-  }
-}
-
 /* Advanced Animations */
-@keyframes gradient {
-  0%, 100% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-}
-
-@keyframes float {
-  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.5; }
-  25% { transform: translate(20px, -20px) scale(1.1); opacity: 0.8; }
-  50% { transform: translate(-20px, 20px) scale(0.9); opacity: 0.6; }
-  75% { transform: translate(20px, 10px) scale(1.05); opacity: 0.7; }
-}
-
-@keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 20px rgba(30, 58, 138, 0.2); }
-  50% { box-shadow: 0 0 40px rgba(30, 58, 138, 0.4); }
-}
-
-.animate-gradient { animation: gradient 6s ease infinite; }
-.animate-float { animation: float 8s ease-in-out infinite; }
-.animate-pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
-
-/* Premium Refinements */
-html { scroll-behavior: smooth; }
-
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-::-webkit-scrollbar-track { background: transparent; }
-
-::-webkit-scrollbar-thumb {
-  background: hsl(var(--primary) / 0.3);
-  border-radius: 10px;
-}
-
-::-webkit-scrollbar-thumb:hover { background: hsl(var(--primary) / 0.5); }
-
-.glass {
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(0, 0, 0, 0.05);
-}
-
-.text-gradient {
-  @apply bg-gradient-to-r from-primary via-blue-600 to-primary bg-clip-text text-transparent;
-}
-
-.hover-lift {
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-}
-
-.hover-lift:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.08);
-}
-
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
@@ -123,7 +53,7 @@ html { scroll-behavior: smooth; }
 
 .animate-fadeIn { animation: fadeIn 0.5s ease-out forwards; }
 
-/* WhatsApp animations kept for the widget */
+/* WhatsApp animations */
 @keyframes whatsappBounce { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
 @keyframes whatsappSlideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes whatsappPulse { 0% { box-shadow: 0 0 0 0 rgba(37, 211, 102, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(37, 211, 102, 0); } 100% { box-shadow: 0 0 0 0 rgba(37, 211, 102, 0); } }
