@@ -4,6 +4,10 @@ import GoogleProvider from 'next-auth/providers/google';
 import { firestoreAdmin, authAdmin, firebaseAdminInitializationError } from '@/firebase/admin';
 import type { UserProfile, UserRole } from '@/lib/types';
 
+console.log('[NextAuth Options] Loading...');
+console.log('[NextAuth Options] authAdmin available:', !!authAdmin);
+console.log('[NextAuth Options] firebaseAdminInitializationError:', firebaseAdminInitializationError);
+
 const googleClientId = process.env.GOOGLE_CLIENT_ID;
 const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
 const nextAuthSecret = process.env.NEXTAUTH_SECRET;
@@ -79,6 +83,13 @@ export const authOptions: NextAuthOptions = {
             return !!(user.email && user.id);
         },
         async jwt({ token, user, account }) {
+            console.log('[NextAuth JWT] JWT callback called with:', {
+                hasUser: !!user,
+                hasAccount: !!account,
+                hasToken: !!token,
+                tokenHasCustomToken: !!token.customToken,
+            });
+            
             if (firebaseAdminInitializationError) {
                 token.error = `ServerConfigError: ${firebaseAdminInitializationError}`;
                 return token;
@@ -90,6 +101,7 @@ export const authOptions: NextAuthOptions = {
             const db = firestoreAdmin;
 
             if (account && user && user.email) {
+                console.log('[NextAuth JWT] Account + User received, creating token...');
                 try {
                     const userRef = db.collection('users').doc(user.id);
                     const userDoc = await userRef.get();
@@ -134,17 +146,37 @@ export const authOptions: NextAuthOptions = {
                     token.accessToken = account.access_token;
                     const expiresIn = Number(account.expires_in || 3600);
                     token.accessTokenExpires = account.expires_at ? account.expires_at * 1000 : Date.now() + (expiresIn * 1000);
-                    token.customToken = await authAdmin.createCustomToken(user.id, { role });
+                    
+                    try {
+                      console.log('[NextAuth JWT] Creating custom token for user:', user.id);
+                      console.log('[NextAuth JWT] authAdmin available:', !!authAdmin);
+                      console.log('[NextAuth JWT] authAdmin project:', authAdmin?.app?.options?.projectId);
+                      
+                      token.customToken = await authAdmin.createCustomToken(user.id, { role });
+                      console.log('[NextAuth JWT] ✅ Custom token created successfully for user:', user.id);
+                      console.log('[NextAuth JWT] Token length:', token.customToken.length);
+                    } catch (tokenError: any) {
+                      console.error('[NextAuth JWT] ❌ Custom token creation failed:', {
+                        userId: user.id,
+                        error: tokenError.message,
+                        code: tokenError.code,
+                        authAdminProjectId: authAdmin?.app?.options?.projectId,
+                      });
+                      token.error = 'CustomTokenCreationFailed';
+                    }
                 } catch (error) {
-                    console.error("JWT Callback Error:", error);
+                    console.error("[NextAuth JWT] Database error:", error);
                     token.error = "DatabaseError";
                 }
                 return token;
             }
 
+            console.log('[NextAuth JWT] No account or user, checking token validity...');
             if (Date.now() < (token.accessTokenExpires ?? 0)) {
+                console.log('[NextAuth JWT] Token still valid, returning...');
                 return token;
             }
+            console.log('[NextAuth JWT] Token expired, refreshing...');
             return refreshAccessToken(token);
         },
         async session({ session, token }) {

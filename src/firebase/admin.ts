@@ -13,27 +13,39 @@ if (!admin.apps.length) {
     const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
 
     if (serviceAccountJson) {
-      console.log("Initializing Firebase Admin with Service Account from environment variable.");
+      console.log("[Firebase Admin] Initializing with Service Account from environment variable.");
       const serviceAccount = JSON.parse(serviceAccountJson);
+      
+      console.log('[Firebase Admin] Service Account project_id:', serviceAccount.project_id);
+      console.log('[Firebase Admin] Client config projectId:', firebaseConfig.projectId);
 
       // Validate Project ID consistency to prevent auth/invalid-custom-token
       if (serviceAccount.project_id !== firebaseConfig.projectId) {
-        throw new Error(`CRITICAL_CONFIG_ERROR: Project ID mismatch. Server: '${serviceAccount.project_id}' vs Client: '${firebaseConfig.projectId}'. Check your FIREBASE_SERVICE_ACCOUNT_JSON.`);
+        const error = `CRITICAL_CONFIG_ERROR: Project ID mismatch. Server: '${serviceAccount.project_id}' vs Client: '${firebaseConfig.projectId}'. Check your FIREBASE_SERVICE_ACCOUNT_JSON.`;
+        console.error('[Firebase Admin]', error);
+        throw new Error(error);
       }
 
       admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
       });
+      console.log('[Firebase Admin] ✅ Successfully initialized with project:', serviceAccount.project_id);
       initialized = true;
     } else {
-      console.log("Initializing Firebase Admin with Application Default Credentials (ADC).");
+      console.log('[Firebase Admin] Initializing with Application Default Credentials (ADC).');
       admin.initializeApp();
       
       const adminProjectId = admin.app().options.projectId;
+      console.log('[Firebase Admin] ADC project_id:', adminProjectId);
+      console.log('[Firebase Admin] Client config projectId:', firebaseConfig.projectId);
+      
       if (adminProjectId && adminProjectId !== firebaseConfig.projectId) {
-        throw new Error(`CRITICAL_CONFIG_ERROR: Project ID mismatch in ADC. Server: '${adminProjectId}' vs Client: '${firebaseConfig.projectId}'.`);
+        const error = `CRITICAL_CONFIG_ERROR: Project ID mismatch in ADC. Server: '${adminProjectId}' vs Client: '${firebaseConfig.projectId}'.`;
+        console.error('[Firebase Admin]', error);
+        throw new Error(error);
       }
 
+      console.log('[Firebase Admin] ✅ Successfully initialized with ADC project:', adminProjectId);
       initialized = true;
     }
   } catch (error: any) {

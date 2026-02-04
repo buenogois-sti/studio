@@ -1,42 +1,24 @@
 'use client';
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Loader2, ChevronRight, ChevronLeft, CheckCircle2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 import { Form } from '@/components/ui/form';
-import { Button } from '@/components/ui/button';
-import { SheetFooter } from '@/components/ui/sheet';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection } from 'firebase/firestore';
-import { cn } from '@/lib/utils';
 
 import type { Process, Staff } from '@/lib/types';
 import { useProcessForm, processSchema, type ProcessFormValues } from '@/hooks/use-process-form';
-import { ProcessFormStepper } from './ProcessFormStepper';
-import {
-  ClientsSection,
-  PartiesSection,
-  IdentificationSection,
-  CourtSection,
-  TeamSection,
-  StrategySection,
-} from './ProcessFormSections';
+import { ProcessFormHeader } from './ProcessFormHeader';
+import { ProcessFormFooter } from './ProcessFormFooter';
+import { createProcessSteps } from './ProcessSteps';
 
 interface ProcessFormProps {
   onSave: () => void;
   process?: Process | null;
 }
-
-const STEPS = [
-  { id: 'clients', label: 'Autores' },
-  { id: 'defendants', label: 'Réus' },
-  { id: 'details', label: 'Processo' },
-  { id: 'court', label: 'Juízo' },
-  { id: 'team', label: 'Equipe' },
-  { id: 'strategy', label: 'Estratégia' },
-];
 
 const STEP_VALIDATIONS: Record<number, (keyof ProcessFormValues)[]> = {
   0: ['clientId'],
@@ -44,13 +26,19 @@ const STEP_VALIDATIONS: Record<number, (keyof ProcessFormValues)[]> = {
   4: ['leadLawyerId'],
 };
 
+const AUTOSAVE_INTERVAL = 30000;
+
 export function ProcessForm({ onSave, process }: ProcessFormProps) {
   const { firestore } = useFirebase();
   const [currentStep, setCurrentStep] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
+  const [isAutoSaving, setIsAutoSaving] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [completedSteps, setCompletedSteps] = useState<boolean[]>(new Array(6).fill(false));
+  const [lastSaveTime, setLastSaveTime] = useState<Date | null>(null);
+  const [draftExists, setDraftExists] = useState(false);
 
-  const { defaultValues, submitForm } = useProcessForm(process, onSave);
+  const { defaultValues, submitForm, saveDraft, loadDraft } = useProcessForm(process, onSave);
 
   const staffQuery = useMemoFirebase(
     () => (firestore ? collection(firestore, 'staff') : null),
@@ -62,6 +50,7 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
   const form = useForm<ProcessFormValues>({
     resolver: zodResolver(processSchema),
     defaultValues,
+    mode: 'onBlur',
   });
 
   const { fields: partyFields, append: addParty, remove: removeParty } = useFieldArray({
@@ -74,60 +63,138 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
     name: 'teamParticipants',
   });
 
-  const validateStep = async () => {
-    const fieldsToValidate = STEP_VALIDATIONS[currentStep];
+  // Carrega draft se existir
+  useEffect(() => {
+    const draft = loadDraft(process?.id);
+    if (draft) {
+      setDraftExists(true);
+    }
+  }, [process?.id, loadDraft]);
+
+  // Autosave: salva draft a cada intervalo
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      if (form.formState.isDirty && !isSaving) {
+        setIsAutoSaving(true);
+        await saveDraft(form.getValues(), process?.id);
+        setLastSaveTime(new Date());
+        setIsAutoSaving(false);
+      }
+    }, AUTOSAVE_INTERVAL);
+
+    return () => clearInterval(interval);
+  }, [form, isSaving, saveDraft, process?.id]);
+
+  // Marca etapa como concluída quando seus campos são válidos
+  const markStepAsCompleted = useCallback(async (stepIndex: number) => {
+    const fieldsToValidate = STEP_VALIDATIONS[stepIndex];
     if (fieldsToValidate) {
       const isValid = await form.trigger(fieldsToValidate);
+      if (isValid) {
+        setCompletedSteps(prev => {
+          const updated = [...prev];
+          updated[stepIndex] = true;
+          return updated;
+        });
+      }
+    }
+  }, [form]);
+
+  const validateStep = useCallback(async () => {
+    const fieldsToValidate = STEP_VALIDATIONS[currentStep];
+    if (fieldsToValidate) {
+      const isValid = await form.trigger(fieldsToValidate as (keyof ProcessFormValues)[]);
       if (!isValid) {
-        const firstError = Object.keys(form.formState.errors)[0];
-        const element = document.querySelector(`[name="${firstError}"]`);
-        element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const errors = form.formState.errors;
+        const firstErrorField = fieldsToValidate.find(field => field in errors);
+        if (firstErrorField) {
+          const element = document.querySelector(`[name="${firstErrorField}"]`);
+          element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
         return false;
       }
     }
     return true;
-  };
+  }, [currentStep, form]);
 
   const handleStepChange = useCallback(async (direction: 'next' | 'prev') => {
     if (direction === 'next') {
       const isValid = await validateStep();
       if (!isValid) return;
+      await markStepAsCompleted(currentStep);
     }
 
     setIsTransitioning(true);
-    setTimeout(() => {
-      if (direction === 'next') {
-        setCurrentStep(prev => Math.min(prev + 1, STEPS.length - 1));
-      } else {
-        setCurrentStep(prev => Math.max(prev - 1, 0));
-      }
+    const timer = setTimeout(() => {
+      setCurrentStep(prev => {
+        const newStep = direction === 'next' 
+          ? Math.min(prev + 1, 5) 
+          : Math.max(prev - 1, 0);
+        return newStep;
+      });
       setIsTransitioning(false);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }, 150);
-  }, [currentStep, form]);
+    
+    return () => clearTimeout(timer);
+  }, [currentStep, validateStep, markStepAsCompleted]);
 
-  const onSubmit = async (values: ProcessFormValues) => {
+  const handleStepClick = useCallback((stepIndex: number) => {
+    if (completedSteps[stepIndex] || stepIndex < currentStep || stepIndex === currentStep) {
+      setCurrentStep(stepIndex);
+    }
+  }, [completedSteps, currentStep]);
+
+  const onSubmit = useCallback(async (values: ProcessFormValues) => {
     setIsSaving(true);
     const success = await submitForm(values);
     if (!success) setIsSaving(false);
-  };
+  }, [submitForm]);
+
+  const STEPS = useMemo(() => [
+    { id: 'clients', label: 'Autores' },
+    { id: 'defendants', label: 'Réus' },
+    { id: 'details', label: 'Processo' },
+    { id: 'court', label: 'Juízo' },
+    { id: 'team', label: 'Equipe' },
+    { id: 'strategy', label: 'Estratégia' },
+  ], []);
+
+  const processSteps = useMemo(() => 
+    createProcessSteps(
+      form,
+      staff,
+      partyFields,
+      () => addParty({ name: '', email: '', phone: '' }),
+      removeParty,
+      teamFields,
+      () => addMember({ staffId: '', percentage: 0 }),
+      removeMember
+    ),
+    [form, staff, partyFields, teamFields, addParty, removeParty, addMember, removeMember]
+  );
 
   const StepContent = useMemo(() => {
-    switch (currentStep) {
-      case 0: return <ClientsSection control={form.control} onClientSelect={(c) => form.setValue('clientId', c.id, { shouldValidate: true })} />;
-      case 1: return <PartiesSection control={form.control} partyFields={partyFields} onAddParty={() => addParty({ name: '', email: '', phone: '' })} onRemoveParty={removeParty} />;
-      case 2: return <IdentificationSection control={form.control} />;
-      case 3: return <CourtSection control={form.control} />;
-      case 4: return <TeamSection control={form.control} staff={staff} teamFields={teamFields} onAddMember={() => addMember({ staffId: '', percentage: 0 })} onRemoveMember={removeMember} />;
-      case 5: return <StrategySection control={form.control} />;
-      default: return null;
-    }
-  }, [currentStep, form, partyFields, teamFields, staff]);
+    const Step = processSteps[currentStep]?.component;
+    return Step ? <Step /> : null;
+  }, [currentStep, processSteps]);
+
+  const hasErrors = Object.keys(form.formState.errors).length > 0;
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col h-full space-y-6">
-        <ProcessFormStepper steps={STEPS} currentStep={currentStep} />
+      <div onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col h-screen space-y-4">
+        <ProcessFormHeader
+          steps={STEPS}
+          currentStep={currentStep}
+          onStepClick={handleStepClick}
+          completionStatus={completedSteps}
+          isAutoSaving={isAutoSaving}
+          lastSaveTime={lastSaveTime}
+          draftExists={draftExists}
+          hasErrors={hasErrors}
+          processId={process?.id}
+        />
 
         <div className={cn(
           "flex-1 overflow-y-auto px-1 transition-opacity duration-300",
@@ -143,41 +210,18 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
           </fieldset>
         </div>
 
-        <SheetFooter className="border-t pt-6 bg-background">
-          <div className="flex items-center justify-between w-full">
-            <Button 
-              type="button" 
-              variant="outline" 
-              onClick={() => handleStepChange('prev')} 
-              disabled={currentStep === 0 || isSaving}
-              className="gap-2"
-              aria-label="Voltar etapa"
-            >
-              <ChevronLeft className="h-4 w-4" /> Anterior
-            </Button>
-
-            {currentStep < STEPS.length - 1 ? (
-              <Button 
-                type="button" 
-                onClick={() => handleStepChange('next')} 
-                className="gap-2 min-w-[120px]"
-                aria-label="Próxima etapa"
-              >
-                Próximo <ChevronRight className="h-4 w-4" />
-              </Button>
-            ) : (
-              <Button 
-                type="submit" 
-                disabled={isSaving} 
-                className="gap-2 min-w-[120px] bg-emerald-600 hover:bg-emerald-700"
-              >
-                {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                Finalizar Cadastro
-              </Button>
-            )}
-          </div>
-        </SheetFooter>
-      </form>
+        <div className="mt-auto border-t pt-6 bg-background/50 backdrop-blur-sm">
+          <ProcessFormFooter
+            currentStep={currentStep}
+            totalSteps={STEPS.length}
+            isSaving={isSaving}
+            hasErrors={hasErrors}
+            onPrevious={() => handleStepChange('prev')}
+            onNext={() => handleStepChange('next')}
+            onSubmit={() => form.handleSubmit(onSubmit)()}
+          />
+        </div>
+      </div>
     </Form>
   );
 }

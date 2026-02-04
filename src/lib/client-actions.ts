@@ -48,15 +48,19 @@ export async function searchClients(query: string): Promise<Client[]> {
     if (!query || query.length < 2) return [];
     
     if (!firestoreAdmin) {
+        console.error('[searchClients] firestoreAdmin não inicializado');
         throw new Error("A conexão com o servidor de dados falhou.");
     }
     
     try {
+        console.log('[searchClients] Iniciando busca por:', query);
         const clientsSnapshot = await firestoreAdmin.collection('clients').get();
+        console.log('[searchClients] Total de clientes na base:', clientsSnapshot.docs.length);
+        
         const lowerCaseQuery = query.toLowerCase().replace(/\D/g, ''); // For document matching
         const textQuery = query.toLowerCase();
 
-        return clientsSnapshot.docs
+        const filtered = clientsSnapshot.docs
             .map(serializeClient)
             .filter((client): client is Client => {
                 if (!client) return false;
@@ -68,8 +72,11 @@ export async function searchClients(query: string): Promise<Client[]> {
                        (client.document || '').includes(textQuery);
             })
             .slice(0, 10);
+        
+        console.log('[searchClients] Resultados após filtro:', filtered.length);
+        return filtered;
     } catch (error) {
-        console.error("Error searching clients:", error);
+        console.error("[searchClients] Erro na busca:", error);
         return [];
     }
 }

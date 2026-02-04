@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/select"
 import { SheetFooter } from '@/components/ui/sheet';
 import { H2 } from '@/components/ui/typography';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Search } from 'lucide-react';
 
 import { useFirebase } from '@/firebase';
 import { collection, serverTimestamp, doc, addDoc, updateDoc } from 'firebase/firestore';
@@ -91,6 +91,7 @@ export function StaffForm({
   const { firestore } = useFirebase();
   const { toast } = useToast();
   const [isSaving, setIsSaving] = React.useState(false);
+  const [loadingZip, setLoadingZip] = React.useState(false);
 
   const form = useForm<StaffFormValues>({
     resolver: zodResolver(staffSchema),
@@ -131,6 +132,57 @@ export function StaffForm({
   });
   
   const watchedRole = form.watch('role');
+
+  // Função para buscar endereço via CEP
+  const searchAddressByCep = React.useCallback(async (cep: string) => {
+    // Remove caracteres não numéricos
+    const cleanCep = cep.replace(/\D/g, '');
+    
+    if (cleanCep.length !== 8) {
+      toast({ 
+        variant: 'destructive', 
+        title: 'CEP inválido', 
+        description: 'O CEP deve conter exatamente 8 dígitos.'
+      });
+      return;
+    }
+
+    setLoadingZip(true);
+    try {
+      const response = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
+      const data = await response.json();
+
+      if (data.erro) {
+        toast({ 
+          variant: 'destructive', 
+          title: 'CEP não encontrado', 
+          description: 'Nenhum endereço foi encontrado para este CEP.'
+        });
+        setLoadingZip(false);
+        return;
+      }
+
+      // Preencher os campos com dados da API
+      form.setValue('address_street', data.logradouro || '');
+      form.setValue('address_neighborhood', data.bairro || '');
+      form.setValue('address_city', data.localidade || '');
+      form.setValue('address_state', data.uf || '');
+      form.setValue('address_zipCode', cleanCep);
+
+      toast({ 
+        title: 'Endereço encontrado!',
+        description: `${data.logradouro}, ${data.bairro} - ${data.localidade}, ${data.uf}`
+      });
+    } catch (error) {
+      toast({ 
+        variant: 'destructive', 
+        title: 'Erro ao buscar CEP', 
+        description: 'Não foi possível conectar ao serviço de CEP.'
+      });
+    } finally {
+      setLoadingZip(false);
+    }
+  }, [form, toast]);
 
   async function onSubmit(values: StaffFormValues) {
     if (!firestore) return;
@@ -306,12 +358,116 @@ export function StaffForm({
               />
               <FormField
                   control={form.control}
+                  name="address_zipCode"
+                  render={({ field }) => (
+                      <FormItem>
+                      <FormLabel>CEP</FormLabel>
+                      <div className="flex gap-2">
+                        <FormControl>
+                            <Input 
+                              placeholder="00000-000" 
+                              {...field} 
+                              maxLength={9}
+                            />
+                        </FormControl>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          onClick={() => searchAddressByCep(field.value)}
+                          disabled={loadingZip || !field.value}
+                          className="px-3"
+                        >
+                          {loadingZip ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Search className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
+                      <FormMessage />
+                      </FormItem>
+                  )}
+              />
+            </div>
+          </section>
+
+          <section>
+            <H2>Endereço</H2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+              <FormField
+                  control={form.control}
                   name="address_street"
                   render={({ field }) => (
-                      <FormItem className="md:col-span-2">
-                      <FormLabel>Endereço</FormLabel>
+                      <FormItem>
+                      <FormLabel>Logradouro</FormLabel>
                       <FormControl>
                           <Input placeholder="Rua, avenida, etc" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                      </FormItem>
+                  )}
+              />
+              <FormField
+                  control={form.control}
+                  name="address_number"
+                  render={({ field }) => (
+                      <FormItem>
+                      <FormLabel>Número</FormLabel>
+                      <FormControl>
+                          <Input placeholder="000" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                      </FormItem>
+                  )}
+              />
+              <FormField
+                  control={form.control}
+                  name="address_neighborhood"
+                  render={({ field }) => (
+                      <FormItem>
+                      <FormLabel>Bairro</FormLabel>
+                      <FormControl>
+                          <Input placeholder="Bairro" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                      </FormItem>
+                  )}
+              />
+              <FormField
+                  control={form.control}
+                  name="address_city"
+                  render={({ field }) => (
+                      <FormItem>
+                      <FormLabel>Cidade</FormLabel>
+                      <FormControl>
+                          <Input placeholder="Cidade" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                      </FormItem>
+                  )}
+              />
+              <FormField
+                  control={form.control}
+                  name="address_state"
+                  render={({ field }) => (
+                      <FormItem>
+                      <FormLabel>Estado</FormLabel>
+                      <FormControl>
+                          <Input placeholder="SP" maxLength={2} {...field} />
+                      </FormControl>
+                      <FormMessage />
+                      </FormItem>
+                  )}
+              />
+              <FormField
+                  control={form.control}
+                  name="address_complement"
+                  render={({ field }) => (
+                      <FormItem>
+                      <FormLabel>Complemento</FormLabel>
+                      <FormControl>
+                          <Input placeholder="Apto, sala, etc" {...field} />
                       </FormControl>
                       <FormMessage />
                       </FormItem>

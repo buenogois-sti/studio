@@ -127,10 +127,10 @@ export default function ProcessosPage() {
 
   return (
     <div className="grid flex-1 items-start gap-6 auto-rows-max">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2 duration-500">
         <div>
           <h1 className="text-3xl font-black tracking-tight font-headline">Processos Judiciais</h1>
-          <p className="text-sm text-muted-foreground">Gestão estratégica de casos, prazos e andamentos.</p>
+          <p className="text-sm text-muted-foreground">Gestão estratégica de {filteredProcesses?.length || 'seus'} casos, prazos e andamentos.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative w-full max-w-sm">
@@ -153,8 +153,8 @@ export default function ProcessosPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="bg-emerald-500/5 border-emerald-500/10 hover:bg-emerald-500/10 transition-colors">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-in fade-in slide-in-from-top-3 duration-700 delay-100">
+          <Card className="bg-emerald-500/5 border-emerald-500/10 hover:bg-emerald-500/10 transition-all hover:shadow-md hover:scale-105 duration-300">
               <CardContent className="p-4 flex items-center gap-4">
                   <div className="h-10 w-10 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-600">
                       <CheckCircle2 className="h-5 w-5" />
@@ -165,7 +165,7 @@ export default function ProcessosPage() {
                   </div>
               </CardContent>
           </Card>
-          <Card className="bg-amber-500/5 border-amber-500/10 hover:bg-amber-500/10 transition-colors">
+          <Card className="bg-amber-500/5 border-amber-500/10 hover:bg-amber-500/10 transition-all hover:shadow-md hover:scale-105 duration-300">
               <CardContent className="p-4 flex items-center gap-4">
                   <div className="h-10 w-10 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-600">
                       <ShieldAlert className="h-5 w-5" />
@@ -176,7 +176,7 @@ export default function ProcessosPage() {
                   </div>
               </CardContent>
           </Card>
-          <Card className="bg-blue-500/5 border-blue-500/10 hover:bg-blue-500/10 transition-colors">
+          <Card className="bg-blue-500/5 border-blue-500/10 hover:bg-blue-500/10 transition-all hover:shadow-md hover:scale-105 duration-300">
               <CardContent className="p-4 flex items-center gap-4">
                   <div className="h-10 w-10 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-600">
                       <TrendingUp className="h-5 w-5" />
@@ -208,12 +208,12 @@ export default function ProcessosPage() {
                   </TableRow>
                 ))
               ) : filteredProcesses.length > 0 ? (
-                filteredProcesses.map(p => {
+                filteredProcesses.map((p, idx) => {
                   const client = clientsMap.get(p.clientId);
                   const StatusInfo = STATUS_CONFIG[p.status || 'Ativo'];
                   
                   return (
-                    <TableRow key={p.id} className="group hover:bg-muted/30 transition-colors">
+                    <TableRow key={p.id} className="group hover:bg-muted/30 transition-colors animate-in fade-in duration-300" style={{ animationDelay: `${idx * 50}ms` }}>
                       <TableCell className="py-4">
                         <div className="flex flex-col gap-1.5">
                           <span className="font-bold text-sm leading-tight text-foreground group-hover:text-primary transition-colors">{p.name}</span>
@@ -300,9 +300,17 @@ export default function ProcessosPage() {
               ) : (
                 <TableRow>
                   <TableCell colSpan={4} className="h-48 text-center">
-                    <div className="flex flex-col items-center gap-2 opacity-40">
-                        <FolderOpen className="h-12 w-12" />
-                        <p className="text-sm font-bold">Nenhum processo encontrado</p>
+                    <div className="flex flex-col items-center gap-3 opacity-50 animate-in fade-in duration-500">
+                        <div className="h-16 w-16 rounded-xl bg-muted/50 flex items-center justify-center">
+                          <FolderOpen className="h-8 w-8 text-muted-foreground" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold mb-1">Nenhum processo encontrado</p>
+                          <p className="text-xs text-muted-foreground">Comece criando seu primeiro processo judicial</p>
+                        </div>
+                        <Button size="sm" variant="outline" onClick={() => { setEditingProcess(null); setIsSheetOpen(true); }} className="mt-2">
+                          <PlusCircle className="mr-2 h-4 w-4" /> Criar Primeiro Processo
+                        </Button>
                     </div>
                   </TableCell>
                 </TableRow>

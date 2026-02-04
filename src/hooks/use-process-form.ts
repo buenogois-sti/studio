@@ -11,13 +11,13 @@ export const processSchema = z.object({
   name: z.string()
     .min(3, 'O título deve ter no mínimo 3 caracteres.')
     .max(200, 'O título deve ter no máximo 200 caracteres.'),
-  processNumber: z.string().optional(),
+  processNumber: z.string().optional().or(z.literal('')),
   status: z.enum(['Ativo', 'Arquivado', 'Pendente']).default('Ativo'),
   legalArea: z.string().min(1, 'Selecione a área jurídica.'),
   caseValue: z.coerce.number().min(0, 'O valor não pode ser negativo.').default(0),
-  court: z.string().optional(),
-  courtAddress: z.string().optional(),
-  courtBranch: z.string().optional(),
+  court: z.string().optional().or(z.literal('')),
+  courtAddress: z.string().optional().or(z.literal('')),
+  courtBranch: z.string().optional().or(z.literal('')),
   leadLawyerId: z.string().min(1, 'Defina o advogado responsável.'),
   teamParticipants: z.array(z.object({
     staffId: z.string().min(1, 'Selecione um membro.'),
@@ -26,12 +26,14 @@ export const processSchema = z.object({
   opposingParties: z.array(z.object({
     name: z.string().min(1, 'Nome é obrigatório'),
     email: z.string().email('E-mail inválido').optional().or(z.literal('')),
-    phone: z.string().optional(),
+    phone: z.string().optional().or(z.literal('')),
   })).default([]),
-  description: z.string().optional(),
+  description: z.string().optional().or(z.literal('')),
 });
 
 export type ProcessFormValues = z.infer<typeof processSchema>;
+
+const DRAFT_STORAGE_KEY = (processId?: string) => `process_draft_${processId || 'new'}`;
 
 export const useProcessForm = (process?: Process | null, onSave?: () => void) => {
   const { firestore } = useFirebase();
@@ -74,6 +76,41 @@ export const useProcessForm = (process?: Process | null, onSave?: () => void) =>
     };
   }, [process]);
 
+  // Salva rascunho no localStorage
+  const saveDraft = useCallback(async (values: ProcessFormValues, processId?: string) => {
+    try {
+      localStorage.setItem(
+        DRAFT_STORAGE_KEY(processId),
+        JSON.stringify({
+          ...values,
+          savedAt: new Date().toISOString(),
+        })
+      );
+    } catch (error) {
+      console.error('Erro ao salvar rascunho:', error);
+    }
+  }, []);
+
+  // Carrega rascunho do localStorage
+  const loadDraft = useCallback((processId?: string) => {
+    try {
+      const draft = localStorage.getItem(DRAFT_STORAGE_KEY(processId));
+      return draft ? JSON.parse(draft) : null;
+    } catch (error) {
+      console.error('Erro ao carregar rascunho:', error);
+      return null;
+    }
+  }, []);
+
+  // Remove rascunho após salvar com sucesso
+  const clearDraft = useCallback((processId?: string) => {
+    try {
+      localStorage.removeItem(DRAFT_STORAGE_KEY(processId));
+    } catch (error) {
+      console.error('Erro ao limpar rascunho:', error);
+    }
+  }, []);
+
   const submitForm = useCallback(async (values: ProcessFormValues) => {
     if (!firestore) return false;
 
@@ -86,11 +123,21 @@ export const useProcessForm = (process?: Process | null, onSave?: () => void) =>
       if (process?.id) {
         const ref = doc(firestore, 'processes', process.id);
         await updateDoc(ref, data);
-        toast({ title: 'Processo atualizado!', description: 'As alterações foram salvas com sucesso.' });
+        clearDraft(process.id);
+        toast({ 
+          title: 'Processo atualizado!', 
+          description: 'As alterações foram salvas com sucesso.',
+          variant: 'default'
+        });
       } else {
         const col = collection(firestore, 'processes');
-        await addDoc(col, { ...data, createdAt: serverTimestamp() });
-        toast({ title: 'Processo criado!', description: 'O novo caso foi registrado e organizado.' });
+        const docRef = await addDoc(col, { ...data, createdAt: serverTimestamp() });
+        clearDraft();
+        toast({ 
+          title: 'Processo criado!', 
+          description: 'O novo caso foi registrado e organizado.',
+          variant: 'default'
+        });
       }
       
       onSave?.();
@@ -104,7 +151,7 @@ export const useProcessForm = (process?: Process | null, onSave?: () => void) =>
       });
       return false;
     }
-  }, [firestore, process, toast, onSave]);
+  }, [firestore, process, toast, onSave, clearDraft]);
 
-  return { defaultValues, submitForm };
+  return { defaultValues, submitForm, saveDraft, loadDraft, clearDraft };
 };

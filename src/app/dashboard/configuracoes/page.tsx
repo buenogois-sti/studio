@@ -28,6 +28,7 @@ import { useDoc, useFirebase, useMemoFirebase, useCollection } from '@/firebase'
 import { doc, collection, setDoc } from 'firebase/firestore';
 import type { UserProfile, UserRole, UserRoleInfo } from '@/lib/types';
 import { ClientKitManager } from '@/components/settings/client-kit-manager';
+import { AppearanceTab } from '@/components/settings/appearance-tab';
 import { TemplateLibraryManager } from '@/components/settings/template-library-manager';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -503,28 +504,6 @@ function FinancialTab() {
         </CardContent>
       </Card>
     </>
-  );
-}
-
-function AppearanceTab() {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Aparência</CardTitle>
-        <CardDescription>Ajuste o tema de aparência do sistema.</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex items-center space-x-3 rounded-lg border p-4">
-          <Switch id="dark-mode" defaultChecked disabled />
-          <Label htmlFor="dark-mode" className="cursor-pointer">
-            Modo Escuro (Padrão)
-          </Label>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          O modo escuro é o tema padrão. A funcionalidade para alternar entre temas claro/escuro em tempo real será implementada em breve.
-        </p>
-      </CardContent>
-    </Card>
   );
 }
 

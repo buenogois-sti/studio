@@ -72,8 +72,19 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
   // Effect to handle sign-in with custom token from NextAuth session
   useEffect(() => {
     if (sessionStatus === 'authenticated' && session?.customToken && auth) {
-      signInWithCustomToken(auth, session.customToken).catch((error) => {
-        console.error('Firebase signInWithCustomToken error:', error);
+      console.log('[Firebase Auth] Attempting signInWithCustomToken');
+      console.log('[Firebase Auth] Project ID:', auth.app.options.projectId);
+      console.log('[Firebase Auth] Token exists:', !!session.customToken);
+      signInWithCustomToken(auth, session.customToken).catch((error: any) => {
+        console.error('[Firebase Auth] signInWithCustomToken error:', {
+          code: error.code,
+          message: error.message,
+          projectId: auth.app.options.projectId,
+          customTokenProvided: !!session.customToken,
+        });
+        if (error.code === 'auth/invalid-custom-token') {
+          console.error('[Firebase Auth] PROJECT ID MISMATCH DETECTED: Verify FIREBASE_SERVICE_ACCOUNT_JSON project_id matches client config');
+        }
         setUserAuthState((state) => ({ ...state, userError: error }));
       });
     }

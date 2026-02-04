@@ -2,11 +2,14 @@
 import type { ReactNode } from 'react';
 import { SessionProvider } from 'next-auth/react';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
+import { ThemeProvider } from '@/hooks/use-theme';
 
 export function Providers({ children }: { children: ReactNode }) {
   return (
     <SessionProvider>
-      <FirebaseClientProvider>{children}</FirebaseClientProvider>
+      <ThemeProvider>
+        <FirebaseClientProvider>{children}</FirebaseClientProvider>
+      </ThemeProvider>
     </SessionProvider>
   );
 }
