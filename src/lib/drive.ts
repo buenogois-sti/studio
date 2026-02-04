@@ -1,6 +1,6 @@
 'use server';
 
-import { google, type drive_v3, type sheets_v4, type calendar_v3 } from 'googleapis';
+import { google, type drive_v3, type sheets_v4, type calendar_v3, type tasks_v1 } from 'googleapis';
 import { firestoreAdmin } from '@/firebase/admin';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/options';
@@ -46,6 +46,7 @@ interface GoogleApiClients {
     drive: drive_v3.Drive;
     sheets: sheets_v4.Sheets;
     calendar: calendar_v3.Calendar;
+    tasks: tasks_v1.Tasks;
 }
 
 export async function getGoogleApiClientsForUser(): Promise<GoogleApiClients> {
@@ -61,8 +62,9 @@ export async function getGoogleApiClientsForUser(): Promise<GoogleApiClients> {
     const drive = google.drive({ version: 'v3', auth });
     const sheets = google.sheets({ version: 'v4', auth });
     const calendar = google.calendar({ version: 'v3', auth });
+    const tasks = google.tasks({ version: 'v1', auth });
     
-    return { drive, sheets, calendar };
+    return { drive, sheets, calendar, tasks };
 }
 
 async function createMultipleFolders(drive: drive_v3.Drive, parentId: string, folderNames: string[]): Promise<Map<string, string>> {

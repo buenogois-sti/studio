@@ -134,34 +134,37 @@ export async function createLegalDeadline(data: {
       updatedAt: Timestamp.now(),
     };
 
-    // 1. Sincronização com Google Calendar
+    const calendarDescription = buildDeadlineCalendarDescription({
+      type: data.type,
+      endDate: new Date(data.endDate),
+      legalArea: processData?.legalArea || 'N/A',
+      processName: processData?.name || 'Processo',
+      processNumber: processData?.processNumber || 'N/A',
+      clientName: clientInfo.name,
+      clientPhone: clientInfo.phone,
+      publicationText: data.publicationText,
+      observations: data.observations,
+      responsibleParty: responsibleName,
+      status: 'PENDENTE',
+      id: deadlineRef.id
+    });
+
+    // 1. Sincronização com Google Calendar e Google Tasks
     let googleCalendarEventId: string | undefined;
+    let googleTaskId: string | undefined;
+
     try {
-      const { calendar } = await getGoogleApiClientsForUser();
+      const { calendar, tasks } = await getGoogleApiClientsForUser();
       
       const fatalDate = new Date(data.endDate);
       fatalDate.setHours(9, 0, 0, 0);
       const endDateTime = new Date(fatalDate);
       endDateTime.setHours(10, 0, 0, 0);
 
-      const description = buildDeadlineCalendarDescription({
-        type: data.type,
-        endDate: new Date(data.endDate),
-        legalArea: processData?.legalArea || 'N/A',
-        processName: processData?.name || 'Processo',
-        processNumber: processData?.processNumber || 'N/A',
-        clientName: clientInfo.name,
-        clientPhone: clientInfo.phone,
-        publicationText: data.publicationText,
-        observations: data.observations,
-        responsibleParty: responsibleName,
-        status: 'PENDENTE',
-        id: deadlineRef.id
-      });
-
+      // Criar Evento no Calendário
       const event = {
         summary: `🚨 PRAZO: ${data.type} | ${clientInfo.name}`,
-        description: description,
+        description: calendarDescription,
         start: { dateTime: formatISO(fatalDate), timeZone: 'America/Sao_Paulo' },
         end: { dateTime: formatISO(endDateTime), timeZone: 'America/Sao_Paulo' },
         reminders: {
@@ -178,21 +181,35 @@ export async function createLegalDeadline(data: {
         calendarId: 'primary',
         requestBody: event,
       });
-
       googleCalendarEventId = createdEvent.data.id || undefined;
+
+      // Criar Tarefa no Google Tasks
+      try {
+        const createdTask = await tasks.tasks.insert({
+          tasklist: '@default',
+          requestBody: {
+            title: `🚨 PRAZO: ${data.type} | ${processData?.name}`,
+            notes: calendarDescription,
+            due: formatISO(new Date(data.endDate)),
+          }
+        });
+        googleTaskId = createdTask.data.id || undefined;
+      } catch (taskErr) {
+        console.warn('Google Tasks sync failed:', taskErr);
+      }
+
     } catch (calendarError: any) {
-      console.warn('Google Calendar sync failed for deadline:', calendarError.message);
+      console.warn('Google Workspace sync failed for deadline:', calendarError.message);
     }
 
-    if (googleCalendarEventId) {
-      deadlinePayload.googleCalendarEventId = googleCalendarEventId;
-    }
+    if (googleCalendarEventId) deadlinePayload.googleCalendarEventId = googleCalendarEventId;
+    if (googleTaskId) deadlinePayload.googleTaskId = googleTaskId;
 
     const methodLabel = data.isBusinessDays ? 'dias úteis' : 'dias corridos';
     const timelineEvent: TimelineEvent = {
       id: uuidv4(),
       type: 'deadline',
-      description: `PRAZO LANÇADO: ${data.type} (${data.daysCount} ${methodLabel}). Vencimento: ${new Date(data.endDate).toLocaleDateString('pt-BR')}. Sincronizado com Agenda.`,
+      description: `PRAZO LANÇADO: ${data.type} (${data.daysCount} ${methodLabel}). Vencimento: ${new Date(data.endDate).toLocaleDateString('pt-BR')}. Sincronizado com Workspace (Agenda + Tarefas).`,
       date: Timestamp.now(),
       authorName: session.user.name || 'Sistema',
       endDate: Timestamp.fromDate(new Date(data.endDate)),
@@ -260,53 +277,53 @@ export async function updateLegalDeadline(id: string, data: {
 
     await deadlineRef.update(updatePayload);
 
-    // Atualizar Google Calendar
-    if (oldData.googleCalendarEventId) {
-      try {
-        const { calendar } = await getGoogleApiClientsForUser();
-        const processDoc = await processRef.get();
-        const processData = processDoc.data();
-        
-        let clientInfo = { name: 'Não informado', phone: 'Não informado' };
-        if (processData?.clientId) {
-          const clientDoc = await firestoreAdmin.collection('clients').doc(processData.clientId).get();
-          const clientData = clientDoc.data();
-          if (clientData) {
-            clientInfo = {
-              name: `${clientData.firstName} ${clientData.lastName}`.trim(),
-              phone: clientData.mobile || clientData.phone || 'Não informado'
-            };
+    // Atualizar Google Workspace
+    try {
+      const { calendar, tasks } = await getGoogleApiClientsForUser();
+      const processDoc = await processRef.get();
+      const processData = processDoc.data();
+      
+      let clientInfo = { name: 'Não informado', phone: 'Não informado' };
+      if (processData?.clientId) {
+        const clientDoc = await firestoreAdmin.collection('clients').doc(processData.clientId).get();
+        const clientData = clientDoc.data();
+        if (clientData) {
+          clientInfo = {
+            name: `${clientData.firstName} ${clientData.lastName}`.trim(),
+            phone: clientData.mobile || clientData.phone || 'Não informado'
+          };
+        }
+      }
+
+      let responsibleName = session.user.name || 'Alan Bueno de Gois';
+      if (processData?.leadLawyerId) {
+          const staffDoc = await firestoreAdmin.collection('staff').doc(processData.leadLawyerId).get();
+          const staffData = staffDoc.data();
+          if (staffData) {
+              responsibleName = `${staffData.firstName} ${staffData.lastName}`;
           }
-        }
+      }
 
-        let responsibleName = session.user.name || 'Alan Bueno de Gois';
-        if (processData?.leadLawyerId) {
-            const staffDoc = await firestoreAdmin.collection('staff').doc(processData.leadLawyerId).get();
-            const staffData = staffDoc.data();
-            if (staffData) {
-                responsibleName = `${staffData.firstName} ${staffData.lastName}`;
-            }
-        }
+      const newDescription = buildDeadlineCalendarDescription({
+        type: data.type,
+        endDate: new Date(data.endDate),
+        legalArea: processData?.legalArea || 'N/A',
+        processName: processData?.name || 'Processo',
+        processNumber: processData?.processNumber || 'N/A',
+        clientName: clientInfo.name,
+        clientPhone: clientInfo.phone,
+        publicationText: data.publicationText,
+        observations: data.observations,
+        responsibleParty: responsibleName,
+        status: oldData.status,
+        id: id
+      });
 
+      if (oldData.googleCalendarEventId) {
         const fatalDate = new Date(data.endDate);
         fatalDate.setHours(9, 0, 0, 0);
         const endDateTime = new Date(fatalDate);
         endDateTime.setHours(10, 0, 0, 0);
-
-        const newDescription = buildDeadlineCalendarDescription({
-          type: data.type,
-          endDate: new Date(data.endDate),
-          legalArea: processData?.legalArea || 'N/A',
-          processName: processData?.name || 'Processo',
-          processNumber: processData?.processNumber || 'N/A',
-          clientName: clientInfo.name,
-          clientPhone: clientInfo.phone,
-          publicationText: data.publicationText,
-          observations: data.observations,
-          responsibleParty: responsibleName,
-          status: oldData.status,
-          id: id
-        });
 
         await calendar.events.patch({
           calendarId: 'primary',
@@ -318,9 +335,21 @@ export async function updateLegalDeadline(id: string, data: {
             end: { dateTime: formatISO(endDateTime), timeZone: 'America/Sao_Paulo' },
           }
         });
-      } catch (e) {
-        console.warn('Failed to update calendar event for deadline:', id);
       }
+
+      if (oldData.googleTaskId) {
+        await tasks.tasks.patch({
+          tasklist: '@default',
+          task: oldData.googleTaskId,
+          requestBody: {
+            title: `🚨 PRAZO: ${data.type} | ${processData?.name}`,
+            notes: newDescription,
+            due: formatISO(new Date(data.endDate)),
+          }
+        });
+      }
+    } catch (e) {
+      console.warn('Failed to update Workspace for deadline:', id);
     }
 
     revalidatePath('/dashboard/prazos');
@@ -348,49 +377,49 @@ export async function updateDeadlineStatus(id: string, status: LegalDeadlineStat
       updatedAt: Timestamp.now() 
     });
 
-    // Atualizar Google Calendar
-    if (deadlineData.googleCalendarEventId) {
-      try {
-        const { calendar } = await getGoogleApiClientsForUser();
-        const processDoc = await processRef.get();
-        const processData = processDoc.data();
-        
-        let clientInfo = { name: 'Não informado', phone: 'Não informado' };
-        if (processData?.clientId) {
-          const clientDoc = await firestoreAdmin.collection('clients').doc(processData.clientId).get();
-          const clientData = clientDoc.data();
-          if (clientData) {
-            clientInfo = {
-              name: `${clientData.firstName} ${clientData.lastName}`.trim(),
-              phone: clientData.mobile || clientData.phone || 'Não informado'
-            };
+    // Atualizar Google Workspace
+    try {
+      const { calendar, tasks } = await getGoogleApiClientsForUser();
+      const processDoc = await processRef.get();
+      const processData = processDoc.data();
+      
+      let clientInfo = { name: 'Não informado', phone: 'Não informado' };
+      if (processData?.clientId) {
+        const clientDoc = await firestoreAdmin.collection('clients').doc(processData.clientId).get();
+        const clientData = clientDoc.data();
+        if (clientData) {
+          clientInfo = {
+            name: `${clientData.firstName} ${clientData.lastName}`.trim(),
+            phone: clientData.mobile || clientData.phone || 'Não informado'
+          };
+        }
+      }
+
+      let responsibleName = session.user.name || 'Alan Bueno de Gois';
+      if (processData?.leadLawyerId) {
+          const staffDoc = await firestoreAdmin.collection('staff').doc(processData.leadLawyerId).get();
+          const staffData = staffDoc.data();
+          if (staffData) {
+              responsibleName = `${staffData.firstName} ${staffData.lastName}`;
           }
-        }
+      }
 
-        let responsibleName = session.user.name || 'Alan Bueno de Gois';
-        if (processData?.leadLawyerId) {
-            const staffDoc = await firestoreAdmin.collection('staff').doc(processData.leadLawyerId).get();
-            const staffData = staffDoc.data();
-            if (staffData) {
-                responsibleName = `${staffData.firstName} ${staffData.lastName}`;
-            }
-        }
+      const newDescription = buildDeadlineCalendarDescription({
+        type: deadlineData.type,
+        endDate: deadlineData.endDate.toDate(),
+        legalArea: processData?.legalArea || 'N/A',
+        processName: processData?.name || 'Processo',
+        processNumber: processData?.processNumber || 'N/A',
+        clientName: clientInfo.name,
+        clientPhone: clientInfo.phone,
+        publicationText: deadlineData.publicationText,
+        observations: deadlineData.observations,
+        responsibleParty: responsibleName,
+        status: status,
+        id: id
+      });
 
-        const newDescription = buildDeadlineCalendarDescription({
-          type: deadlineData.type,
-          endDate: deadlineData.endDate.toDate(),
-          legalArea: processData?.legalArea || 'N/A',
-          processName: processData?.name || 'Processo',
-          processNumber: processData?.processNumber || 'N/A',
-          clientName: clientInfo.name,
-          clientPhone: clientInfo.phone,
-          publicationText: deadlineData.publicationText,
-          observations: deadlineData.observations,
-          responsibleParty: responsibleName,
-          status: status,
-          id: id
-        });
-
+      if (deadlineData.googleCalendarEventId) {
         await calendar.events.patch({
           calendarId: 'primary',
           eventId: deadlineData.googleCalendarEventId,
@@ -399,9 +428,20 @@ export async function updateDeadlineStatus(id: string, status: LegalDeadlineStat
             summary: `${status === 'CUMPRIDO' ? '✅ ' : '🚨 '}PRAZO: ${deadlineData.type} | ${clientInfo.name}`
           }
         });
-      } catch (e) {
-        console.warn('Failed to update calendar event for deadline:', id);
       }
+
+      if (deadlineData.googleTaskId) {
+        await tasks.tasks.patch({
+          tasklist: '@default',
+          task: deadlineData.googleTaskId,
+          requestBody: {
+            status: status === 'CUMPRIDO' ? 'completed' : 'needsAction',
+            notes: newDescription
+          }
+        });
+      }
+    } catch (e) {
+      console.warn('Failed to update Workspace status for deadline:', id);
     }
 
     // Adicionar evento na timeline do processo
@@ -432,16 +472,22 @@ export async function deleteLegalDeadline(id: string) {
     const deadlineDoc = await deadlineRef.get();
     const deadlineData = deadlineDoc.data();
 
-    if (deadlineData?.googleCalendarEventId) {
-      try {
-        const { calendar } = await getGoogleApiClientsForUser();
+    try {
+      const { calendar, tasks } = await getGoogleApiClientsForUser();
+      if (deadlineData?.googleCalendarEventId) {
         await calendar.events.delete({
           calendarId: 'primary',
           eventId: deadlineData.googleCalendarEventId,
         });
-      } catch (e) {
-        console.warn('Could not delete calendar event for deadline:', id);
       }
+      if (deadlineData?.googleTaskId) {
+        await tasks.tasks.delete({
+          tasklist: '@default',
+          task: deadlineData.googleTaskId,
+        });
+      }
+    } catch (e) {
+      console.warn('Could not delete Workspace items for deadline:', id);
     }
 
     await deadlineRef.delete();

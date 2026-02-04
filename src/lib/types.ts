@@ -140,6 +140,7 @@ export type LegalDeadline = {
   authorId: string;
   authorName: string;
   googleCalendarEventId?: string;
+  googleTaskId?: string;
   createdAt: Timestamp;
   updatedAt?: Timestamp;
 };
