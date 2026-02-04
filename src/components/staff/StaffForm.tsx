@@ -27,7 +27,7 @@ import { Loader2, Search, DollarSign, Percent, Briefcase } from 'lucide-react';
 
 import { useFirebase } from '@/firebase';
 import { collection, serverTimestamp, doc, addDoc, updateDoc } from 'firebase/firestore';
-import type { Staff, RemunerationType } from '@/lib/types';
+import type { Staff } from '@/lib/types';
 import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -36,35 +36,35 @@ const staffSchema = z.object({
   firstName: z.string().min(2, { message: 'O nome é obrigatório.' }),
   lastName: z.string().min(2, { message: 'O sobrenome é obrigatório.' }),
   email: z.string().email({ message: 'E-mail inválido.' }),
-  phone: z.string().optional(),
-  whatsapp: z.string().optional(),
+  phone: z.string().optional().or(z.literal('')),
+  whatsapp: z.string().optional().or(z.literal('')),
   
-  address_street: z.string().optional(),
-  address_number: z.string().optional(),
-  address_complement: z.string().optional(),
-  address_zipCode: z.string().optional(),
-  address_neighborhood: z.string().optional(),
-  address_city: z.string().optional(),
-  address_state: z.string().optional(),
+  address_street: z.string().optional().or(z.literal('')),
+  address_number: z.string().optional().or(z.literal('')),
+  address_complement: z.string().optional().or(z.literal('')),
+  address_zipCode: z.string().optional().or(z.literal('')),
+  address_neighborhood: z.string().optional().or(z.literal('')),
+  address_city: z.string().optional().or(z.literal('')),
+  address_state: z.string().optional().or(z.literal('')),
 
-  oabNumber: z.string().optional(),
+  oabNumber: z.string().optional().or(z.literal('')),
   oabStatus: z.enum(['Ativa', 'Suspensa', 'Inativa', 'Pendente']).optional(),
 
-  bankName: z.string().optional(),
-  agency: z.string().optional(),
-  account: z.string().optional(),
-  pixKey: z.string().optional(),
+  bankName: z.string().optional().or(z.literal('')),
+  agency: z.string().optional().or(z.literal('')),
+  account: z.string().optional().or(z.literal('')),
+  pixKey: z.string().optional().or(z.literal('')),
 
   remuneration_type: z.enum(['SUCUMBENCIA', 'PRODUCAO', 'QUOTA_LITIS', 'FIXO_MENSAL', 'AUDIENCISTA']).optional(),
-  remuneration_officePercentage: z.coerce.number().min(0).max(100).optional(),
-  remuneration_lawyerPercentage: z.coerce.number().min(0).max(100).optional(),
-  remuneration_fixedMonthlyValue: z.coerce.number().min(0).optional(),
-  remuneration_valuePerHearing: z.coerce.number().min(0).optional(),
-  remuneration_priceDrafting: z.coerce.number().min(0).optional(),
-  remuneration_priceDiligence: z.coerce.number().min(0).optional(),
+  remuneration_officePercentage: z.coerce.number().min(0).max(100).optional().or(z.literal(0)),
+  remuneration_lawyerPercentage: z.coerce.number().min(0).max(100).optional().or(z.literal(0)),
+  remuneration_fixedMonthlyValue: z.coerce.number().min(0).optional().or(z.literal(0)),
+  remuneration_valuePerHearing: z.coerce.number().min(0).optional().or(z.literal(0)),
+  remuneration_priceDrafting: z.coerce.number().min(0).optional().or(z.literal(0)),
+  remuneration_priceDiligence: z.coerce.number().min(0).optional().or(z.literal(0)),
 }).refine((data) => {
     if (data.role === 'lawyer' || data.role === 'intern') {
-        return data.oabNumber && data.oabNumber.length > 0;
+        return !!data.oabNumber && data.oabNumber.length > 0;
     }
     return true;
 }, {
@@ -121,7 +121,12 @@ export function StaffForm({
   const form = useForm<StaffFormValues>({
     resolver: zodResolver(staffSchema),
     defaultValues: staff ? {
-        ...staff,
+        role: staff.role,
+        firstName: staff.firstName,
+        lastName: staff.lastName,
+        email: staff.email,
+        phone: staff.phone || '',
+        whatsapp: staff.whatsapp || '',
         address_street: staff.address?.street ?? '',
         address_number: staff.address?.number ?? '',
         address_complement: staff.address?.complement ?? '',
@@ -133,13 +138,15 @@ export function StaffForm({
         agency: staff.bankInfo?.agency ?? '',
         account: staff.bankInfo?.account ?? '',
         pixKey: staff.bankInfo?.pixKey ?? '',
+        oabNumber: staff.oabNumber || '',
+        oabStatus: staff.oabStatus || 'Ativa',
         remuneration_type: staff.remuneration?.type,
-        remuneration_officePercentage: staff.remuneration?.officePercentage,
-        remuneration_lawyerPercentage: staff.remuneration?.lawyerPercentage,
-        remuneration_fixedMonthlyValue: staff.remuneration?.fixedMonthlyValue,
-        remuneration_valuePerHearing: staff.remuneration?.valuePerHearing,
-        remuneration_priceDrafting: staff.remuneration?.activityPrices?.drafting,
-        remuneration_priceDiligence: staff.remuneration?.activityPrices?.diligence,
+        remuneration_officePercentage: staff.remuneration?.officePercentage ?? 0,
+        remuneration_lawyerPercentage: staff.remuneration?.lawyerPercentage ?? 0,
+        remuneration_fixedMonthlyValue: staff.remuneration?.fixedMonthlyValue ?? 0,
+        remuneration_valuePerHearing: staff.remuneration?.valuePerHearing ?? 0,
+        remuneration_priceDrafting: staff.remuneration?.activityPrices?.drafting ?? 0,
+        remuneration_priceDiligence: staff.remuneration?.activityPrices?.diligence ?? 0,
     } : {
         role: 'lawyer',
         firstName: '',
@@ -161,6 +168,12 @@ export function StaffForm({
         account: '',
         pixKey: '',
         remuneration_type: 'SUCUMBENCIA' as any,
+        remuneration_officePercentage: 0,
+        remuneration_lawyerPercentage: 0,
+        remuneration_fixedMonthlyValue: 0,
+        remuneration_valuePerHearing: 0,
+        remuneration_priceDrafting: 0,
+        remuneration_priceDiligence: 0,
     },
   });
   
@@ -208,43 +221,57 @@ export function StaffForm({
         ...restOfValues
       } = values;
 
-      const staffData: any = { ...restOfValues };
+      // Construção segura do objeto para evitar 'undefined' no Firestore
+      const staffData: any = { 
+        ...restOfValues,
+        phone: values.phone || "",
+        whatsapp: values.whatsapp || "",
+        oabNumber: values.oabNumber || "",
+        oabStatus: values.oabStatus || "Ativa"
+      };
 
       // Endereço
       staffData.address = {
-        street: address_street,
-        number: address_number,
-        complement: address_complement,
-        zipCode: address_zipCode,
-        neighborhood: address_neighborhood,
-        city: address_city,
-        state: address_state,
+        street: address_street || "",
+        number: address_number || "",
+        complement: address_complement || "",
+        zipCode: address_zipCode || "",
+        neighborhood: address_neighborhood || "",
+        city: address_city || "",
+        state: address_state || "",
       };
 
       // Banco
       staffData.bankInfo = {
-        bankName,
-        agency,
-        account,
-        pixKey,
+        bankName: bankName || "",
+        agency: agency || "",
+        account: account || "",
+        pixKey: pixKey || "",
       };
 
       // Remuneração (Apenas para Advogados)
       if (values.role === 'lawyer' && remuneration_type) {
-        staffData.remuneration = {
-          type: remuneration_type,
-          officePercentage: remuneration_officePercentage,
-          lawyerPercentage: remuneration_lawyerPercentage,
-          fixedMonthlyValue: remuneration_fixedMonthlyValue,
-          valuePerHearing: remuneration_valuePerHearing,
-          activityPrices: {
-            drafting: remuneration_priceDrafting,
-            diligence: remuneration_priceDiligence,
-          }
-        };
+        const rem: any = { type: remuneration_type };
+        
+        // Atribui valores apenas se estiverem presentes ou definidos como 0
+        if (remuneration_type === 'SUCUMBENCIA') {
+            rem.officePercentage = remuneration_officePercentage ?? 0;
+            rem.lawyerPercentage = remuneration_lawyerPercentage ?? 0;
+        } else if (remuneration_type === 'QUOTA_LITIS') {
+            rem.lawyerPercentage = remuneration_lawyerPercentage ?? 0;
+        } else if (remuneration_type === 'FIXO_MENSAL') {
+            rem.fixedMonthlyValue = remuneration_fixedMonthlyValue ?? 0;
+        } else if (remuneration_type === 'AUDIENCISTA') {
+            rem.valuePerHearing = remuneration_valuePerHearing ?? 0;
+        } else if (remuneration_type === 'PRODUCAO') {
+            rem.activityPrices = {
+                drafting: remuneration_priceDrafting ?? 0,
+                diligence: remuneration_priceDiligence ?? 0,
+            };
+        }
+        
+        staffData.remuneration = rem;
       }
-
-      const displayName = `${staffData.firstName} ${staffData.lastName}`;
 
       if (staff?.id) {
         await updateDoc(doc(firestore, 'staff', staff.id), { ...staffData, updatedAt: serverTimestamp() });
@@ -255,6 +282,7 @@ export function StaffForm({
       }
       onSave();
     } catch (error: any) {
+        console.error("Erro ao salvar membro da equipe:", error);
         toast({ variant: 'destructive', title: 'Erro ao Salvar', description: error.message });
     } finally {
         setIsSaving(false);
