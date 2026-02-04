@@ -707,7 +707,6 @@ export function TeamSection({ control, staff, teamFields, onAddMember, onRemoveM
                               <Input 
                                 type="number" 
                                 min="0"
-                                max="100"
                                 placeholder="0" 
                                 className="h-10 pl-7 text-xs" 
                                 onKeyDown={(e) => e.stopPropagation()}

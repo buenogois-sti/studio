@@ -56,8 +56,8 @@ const staffSchema = z.object({
   pixKey: z.string().optional().or(z.literal('')),
 
   remuneration_type: z.enum(['SUCUMBENCIA', 'PRODUCAO', 'QUOTA_LITIS', 'FIXO_MENSAL', 'AUDIENCISTA']).optional(),
-  remuneration_officePercentage: z.coerce.number().min(0).max(100).optional().or(z.literal(0)),
-  remuneration_lawyerPercentage: z.coerce.number().min(0).max(100).optional().or(z.literal(0)),
+  remuneration_officePercentage: z.coerce.number().min(0).optional().or(z.literal(0)),
+  remuneration_lawyerPercentage: z.coerce.number().min(0).optional().or(z.literal(0)),
   remuneration_fixedMonthlyValue: z.coerce.number().min(0).optional().or(z.literal(0)),
   remuneration_valuePerHearing: z.coerce.number().min(0).optional().or(z.literal(0)),
   remuneration_priceDrafting: z.coerce.number().min(0).optional().or(z.literal(0)),

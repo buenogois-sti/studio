@@ -23,7 +23,7 @@ export const processSchema = z.object({
   leadLawyerId: z.string().min(1, 'Defina o advogado responsável.'),
   teamParticipants: z.array(z.object({
     staffId: z.string().min(1, 'Selecione um membro.'),
-    percentage: z.coerce.number().min(0).max(100),
+    percentage: z.coerce.number().min(0),
   })).default([]),
   opposingParties: z.array(z.object({
     name: z.string().min(1, 'Nome é obrigatório'),
