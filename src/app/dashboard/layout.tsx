@@ -38,7 +38,6 @@ import {
   DollarSign,
   Settings,
   Search,
-  PanelLeft,
   Briefcase,
   AlertCircle,
   Loader2,
@@ -143,10 +142,10 @@ const BreadcrumbMap: { [key: string]: string } = {
 
 function AccessDenied() {
   return (
-    <div className="flex flex-1 h-full items-center justify-center rounded-lg border border-dashed shadow-sm">
+    <div className="flex flex-1 h-full items-center justify-center rounded-lg border border-dashed border-border/50 bg-card/20 shadow-sm">
       <div className="flex flex-col items-center gap-2 text-center">
         <AlertCircle className="h-16 w-16 text-destructive" />
-        <h1 className="text-2xl font-bold tracking-tight font-headline mt-4">Acesso Negado</h1>
+        <h1 className="text-2xl font-bold tracking-tight font-headline mt-4 text-white">Acesso Negado</h1>
         <p className="text-sm text-muted-foreground max-w-sm">
           Você não tem permissão para visualizar esta página. Por favor, selecione um perfil com acesso ou
           contate um administrador.
@@ -178,14 +177,14 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
                 shouldSignOut = true;
             } else if (session.error === 'DatabaseError') {
                 title = 'Erro de Banco de Dados';
-                description = 'Não foi possível acessar seus dados de perfil. Verifique a configuração do servidor e tente novamente.';
+                description = 'Não foi possível acessar seus dados de perfil. Verifique a configuração do servidor.';
             }
             
             toast({
                 variant: 'destructive',
                 title: title,
                 description: description,
-                duration: 20000,
+                duration: 10000,
             });
 
             if (shouldSignOut) {
@@ -213,7 +212,7 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
             <BreadcrumbList>
             <BreadcrumbItem>
                 <BreadcrumbLink asChild>
-                <Link href="/dashboard">Início</Link>
+                <Link href="/dashboard" className="text-muted-foreground hover:text-white">Início</Link>
                 </BreadcrumbLink>
             </BreadcrumbItem>
             {pathParts.map((part, index) => {
@@ -221,13 +220,13 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
                 const isLast = index === pathParts.length - 1;
                 return (
                 <React.Fragment key={href}>
-                    <BreadcrumbSeparator />
+                    <BreadcrumbSeparator className="text-muted-foreground/50" />
                     <BreadcrumbItem>
                     {isLast ? (
-                        <BreadcrumbPage>{BreadcrumbMap[href] || part}</BreadcrumbPage>
+                        <BreadcrumbPage className="text-white font-bold">{BreadcrumbMap[href] || part}</BreadcrumbPage>
                     ) : (
                         <BreadcrumbLink asChild>
-                        <Link href={href}>{BreadcrumbMap[href] || part}</Link>
+                        <Link href={href} className="text-muted-foreground hover:text-white">{BreadcrumbMap[href] || part}</Link>
                         </BreadcrumbLink>
                     )}
                     </BreadcrumbItem>
@@ -253,7 +252,7 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
 
     if (status === 'loading' || !session || isUserProfileLoading) {
         return (
-        <div className="flex h-screen w-full items-center justify-center bg-background">
+        <div className="flex h-screen w-full items-center justify-center bg-[#020617]">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
         );
@@ -266,40 +265,19 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
     const currentNavItem = getBestNavItemForPath(pathname);
     const hasPermission = userProfile && currentNavItem && currentNavItem.roles.includes(userProfile.role);
 
-    if (session?.error && session.error.startsWith('ServerConfigError:')) {
-        return (
-             <div className="flex flex-1 h-screen w-screen items-center justify-center rounded-lg bg-background">
-                <div className="flex flex-col items-center gap-2 text-center p-4">
-                    <AlertCircle className="h-16 w-16 text-destructive" />
-                    <h1 className="text-2xl font-bold tracking-tight font-headline mt-4">Erro Crítico de Configuração</h1>
-                    <p className="text-base text-muted-foreground max-w-xl">
-                       Não foi possível conectar ao Firebase. A autenticação falhou devido a um erro de configuração no servidor.
-                    </p>
-                    <p className="text-sm text-destructive bg-destructive/10 p-3 rounded-md mt-2 max-w-2xl">
-                        <strong>Detalhes do Erro:</strong> {session.error.replace('ServerConfigError: ', '')}
-                    </p>
-                    <p className="text-sm text-muted-foreground max-w-xl mt-2">
-                      Por favor, verifique a variável de ambiente `FIREBASE_SERVICE_ACCOUNT_JSON` em sua plataforma de hospedagem (Vercel, etc.) e faça o deploy novamente. Consulte a documentação para mais detalhes.
-                    </p>
-                    <Button onClick={() => signOut({ callbackUrl: '/login' })} className="mt-4">Tentar Login Novamente</Button>
-                </div>
-            </div>
-        )
-    }
-
     return (
         <SidebarProvider>
         <Sidebar variant="sidebar" collapsible="icon">
-            <SidebarHeader className="h-14 justify-center p-2 group-data-[collapsible=icon]:justify-center">
+            <SidebarHeader className="h-14 justify-center p-2 group-data-[collapsible=icon]:justify-center border-b border-white/5">
             <Link href="/dashboard" className="flex items-center gap-2">
                 <Logo />
-                <span className="font-bold text-lg text-primary-foreground group-data-[collapsible=icon]:hidden">
+                <span className="font-bold text-lg text-white group-data-[collapsible=icon]:hidden">
                 Bueno Gois
                 </span>
             </Link>
             </SidebarHeader>
             <SidebarContent>
-            <SidebarMenu>
+            <SidebarMenu className="mt-4">
                 {accessibleNavItems.map(
                 (item) => (
                     <SidebarMenuItem key={item.label}>
@@ -307,6 +285,7 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
                         asChild
                         isActive={currentNavItem?.href === item.href}
                         tooltip={{ children: item.label }}
+                        className="data-[active=true]:bg-primary/20 data-[active=true]:text-primary"
                         >
                         <Link href={item.href}>
                             <item.icon />
@@ -318,23 +297,21 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
                 )}
             </SidebarMenu>
             </SidebarContent>
-            <SidebarFooter className="justify-center h-14 border-t border-sidebar-border group-data-[collapsible=icon]:justify-center">
-            <div className="group-data-[collapsible=icon]:hidden w-full">
-            </div>
+            <SidebarFooter className="justify-center h-14 border-t border-white/5 group-data-[collapsible=icon]:justify-center">
             </SidebarFooter>
         </Sidebar>
-        <SidebarInset className="bg-background">
-            <header className="flex h-14 items-center gap-4 border-b bg-white/80 backdrop-blur-md px-4 lg:h-[60px] lg:px-6 sticky top-0 z-30">
-            <SidebarTrigger className="shrink-0 md:hidden" />
+        <SidebarInset className="bg-[#020617]">
+            <header className="flex h-14 items-center gap-4 border-b border-white/5 bg-[#020617]/80 backdrop-blur-md px-4 lg:h-[60px] lg:px-6 sticky top-0 z-30">
+            <SidebarTrigger className="shrink-0 md:hidden text-white" />
             {getBreadcrumb()}
             <div className="ml-auto flex items-center gap-2">
-                <form>
+                <form className="hidden md:block">
                 <div className="relative">
                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
                     type="search"
                     placeholder="Pesquisar..."
-                    className="pl-8 sm:w-[300px] md:w-[200px] lg:w-[300px] bg-background"
+                    className="pl-8 sm:w-[200px] lg:w-[300px] bg-card/50 border-white/10 text-white placeholder:text-muted-foreground"
                     />
                 </div>
                 </form>
@@ -342,7 +319,7 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
                 <UserNav />
             </div>
             </header>
-            <main className="flex-1 p-4 sm:p-6 overflow-y-auto">
+            <main className="flex-1 p-4 sm:p-6 overflow-y-auto bg-transparent">
               {hasPermission ? children : <AccessDenied />}
             </main>
         </SidebarInset>

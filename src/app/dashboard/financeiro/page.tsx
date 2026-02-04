@@ -8,7 +8,7 @@ import {
   ArrowUpRight, ArrowDownRight, PlusCircle, Loader2, Check, Download, Receipt, Users, RefreshCw, TrendingUp, BarChartIcon
 } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, Timestamp, query, orderBy, addDoc } from 'firebase/firestore';
+import { collection, Timestamp, query, orderBy } from 'firebase/firestore';
 import type { FinancialTitle, Staff } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -24,7 +24,6 @@ import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { createFinancialTitle } from '@/lib/finance-actions';
-import { Textarea } from '@/components/ui/textarea';
 
 const titleSchema = z.object({
   processId: z.string().optional(),
@@ -67,29 +66,6 @@ const expenseOrigins = [
   { value: 'VIAGENS', label: 'Viagens' },
   { value: 'OUTROS', label: 'Outros' },
 ];
-
-const reimbursementSchema = z.object({
-  staffId: z.string().min(1, 'Selecione um membro'),
-  description: z.string().min(3, 'Descrição obrigatória'),
-  value: z.coerce.number().positive('Valor deve ser positivo'),
-  reason: z.string().min(5, 'Motivo obrigatório'),
-  requestDate: z.coerce.date(),
-  status: z.enum(['SOLICITADO', 'APROVADO', 'REEMBOLSADO']).default('SOLICITADO'),
-});
-
-type ReimbursementFormValues = z.infer<typeof reimbursementSchema>;
-
-const paymentSchema = z.object({
-  staffId: z.string().min(1, 'Selecione o prestador'),
-  description: z.string().min(3, 'Descrição do pagamento'),
-  referentTo: z.string().min(3, 'Referente a (ex: Processo, Repasse)'),
-  value: z.coerce.number().positive('Valor deve ser positivo'),
-  paymentDate: z.coerce.date(),
-  status: z.enum(['PENDENTE', 'PAGO', 'ATRASADO']).default('PENDENTE'),
-  notes: z.string().optional(),
-});
-
-type PaymentFormValues = z.infer<typeof paymentSchema>;
 
 function NovaReceitaDialog({ onTitleCreated }: { onTitleCreated: () => void }) {
   const [open, setOpen] = React.useState(false);
@@ -265,14 +241,14 @@ export default function FinanceiroPage() {
     }, { totalReceitas: 0, totalDespesas: 0 });
   }, [titlesData]);
 
-  const receitas = titlesData?.filter(t => t.type === 'RECEITA') || [];
-  const despesas = titlesData?.filter(t => t.type === 'DESPESA') || [];
+  const receitas = React.useMemo(() => titlesData?.filter(t => t.type === 'RECEITA') || [], [titlesData]);
+  const despesas = React.useMemo(() => titlesData?.filter(t => t.type === 'DESPESA') || [], [titlesData]);
   
   const isLoading = isUserLoading || isLoadingTitles || isLoadingReimbursements || isLoadingPayments;
 
   return (
     <div className="flex flex-col gap-6 p-1">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-border/50">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-white/5">
         <div><H1 className="text-white">Financeiro</H1><p className="text-sm text-muted-foreground">Controle estratégico de faturamento e despesas.</p></div>
         <div className="flex gap-2">
             <div className="px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex flex-col items-end">
@@ -287,7 +263,7 @@ export default function FinanceiroPage() {
       </div>
 
       <Tabs defaultValue="receitas" className="flex-1 flex flex-col">
-        <TabsList className="grid w-full grid-cols-5 bg-card border border-border/50 rounded-lg p-1 gap-1">
+        <TabsList className="grid w-full grid-cols-5 bg-card border border-white/5 rounded-lg p-1 gap-1">
             <TabsTrigger value="receitas" className="rounded-md data-[state=active]:bg-emerald-500/20 data-[state=active]:text-emerald-400">Receitas</TabsTrigger>
             <TabsTrigger value="despesas" className="rounded-md data-[state=active]:bg-rose-500/20 data-[state=active]:text-rose-400">Despesas</TabsTrigger>
             <TabsTrigger value="reembolsos" className="rounded-md data-[state=active]:bg-blue-500/20 data-[state=active]:text-blue-400">Reembolsos</TabsTrigger>
@@ -296,17 +272,17 @@ export default function FinanceiroPage() {
         </TabsList>
 
         <TabsContent value="receitas" className="flex-1">
-            <Card className="bg-card border-border/50">
+            <Card className="bg-card border-white/5">
                 <CardHeader className="flex-row items-center justify-between">
                     <div><CardTitle className="text-lg text-white">Receitas do Escritório</CardTitle><CardDescription className="text-slate-400">Honorários e acordos processuais.</CardDescription></div>
                     <NovaReceitaDialog onTitleCreated={() => setRefreshKey(k => k+1)} />
                 </CardHeader>
                 <CardContent className="p-0">
                     <Table>
-                        <TableHeader><TableRow className="border-border/50 hover:bg-transparent"><TableHead className="text-muted-foreground">Descrição</TableHead><TableHead className="text-muted-foreground">Vencimento</TableHead><TableHead className="text-center text-muted-foreground">Status</TableHead><TableHead className="text-right text-muted-foreground">Valor</TableHead></TableRow></TableHeader>
+                        <TableHeader><TableRow className="border-white/5 hover:bg-transparent"><TableHead className="text-muted-foreground">Descrição</TableHead><TableHead className="text-muted-foreground">Vencimento</TableHead><TableHead className="text-center text-muted-foreground">Status</TableHead><TableHead className="text-right text-muted-foreground">Valor</TableHead></TableRow></TableHeader>
                         <TableBody>
                             {isLoading ? Array.from({ length: 3 }).map((_, i) => <TableRow key={i}><TableCell colSpan={4}><Skeleton className="h-8 w-full bg-white/5" /></TableCell></TableRow>) : receitas.map(r => (
-                                <TableRow key={r.id} className="border-border/30 hover:bg-white/5">
+                                <TableRow key={r.id} className="border-white/5 hover:bg-white/5 transition-colors">
                                     <TableCell className="font-medium text-white">{r.description}</TableCell>
                                     <TableCell className="text-slate-400">{format(r.dueDate instanceof Timestamp ? r.dueDate.toDate() : new Date(r.dueDate), 'dd/MM/yyyy')}</TableCell>
                                     <TableCell className="text-center"><Badge className={r.status === 'PAGO' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 'bg-amber-500/20 text-amber-400 border-amber-500/30'} variant="outline">{r.status}</Badge></TableCell>
@@ -320,19 +296,19 @@ export default function FinanceiroPage() {
         </TabsContent>
 
         <TabsContent value="despesas" className="flex-1">
-            <Card className="bg-card border-border/50">
+            <Card className="bg-card border-white/5">
                 <CardHeader className="flex-row items-center justify-between">
                     <div><CardTitle className="text-lg text-white">Fluxo de Despesas</CardTitle><CardDescription className="text-slate-400">Gastos operacionais e fixos.</CardDescription></div>
                     <NovaDespesaDialog onTitleCreated={() => setRefreshKey(k => k+1)} />
                 </CardHeader>
                 <CardContent className="p-0">
                     <Table>
-                        <TableHeader><TableRow className="border-border/50 hover:bg-transparent"><TableHead className="text-muted-foreground">Descrição</TableHead><TableHead className="text-muted-foreground">Centro de Custo</TableHead><TableHead className="text-muted-foreground">Data</TableHead><TableHead className="text-right text-muted-foreground">Valor</TableHead></TableRow></TableHeader>
+                        <TableHeader><TableRow className="border-white/5 hover:bg-transparent"><TableHead className="text-muted-foreground">Descrição</TableHead><TableHead className="text-muted-foreground">Centro de Custo</TableHead><TableHead className="text-muted-foreground">Data</TableHead><TableHead className="text-right text-muted-foreground">Valor</TableHead></TableRow></TableHeader>
                         <TableBody>
                             {isLoading ? Array.from({ length: 3 }).map((_, i) => <TableRow key={i}><TableCell colSpan={4}><Skeleton className="h-8 w-full bg-white/5" /></TableCell></TableRow>) : despesas.map(d => (
-                                <TableRow key={d.id} className="border-border/30 hover:bg-white/5">
+                                <TableRow key={d.id} className="border-white/5 hover:bg-white/5 transition-colors">
                                     <TableCell className="font-medium text-white">{d.description}</TableCell>
-                                    <TableCell><Badge variant="outline" className="bg-slate-800 text-slate-300 border-border/50">{d.costCenter || 'N/A'}</Badge></TableCell>
+                                    <TableCell><Badge variant="outline" className="bg-slate-800 text-slate-300 border-white/5">{d.costCenter || 'N/A'}</Badge></TableCell>
                                     <TableCell className="text-slate-400">{format(d.dueDate instanceof Timestamp ? d.dueDate.toDate() : new Date(d.dueDate), 'dd/MM/yyyy')}</TableCell>
                                     <TableCell className="text-right font-bold text-rose-400">{formatCurrency(d.value)}</TableCell>
                                 </TableRow>
@@ -344,16 +320,16 @@ export default function FinanceiroPage() {
         </TabsContent>
 
         <TabsContent value="prestadores" className="flex-1">
-            <Card className="bg-card border-border/50">
+            <Card className="bg-card border-white/5">
                 <CardHeader><CardTitle className="text-white">Pagamentos a Prestadores</CardTitle><CardDescription className="text-slate-400">Repasses e honorários da equipe.</CardDescription></CardHeader>
                 <CardContent className="p-0">
                     <Table>
-                        <TableHeader><TableRow className="border-border/50 hover:bg-transparent"><TableHead className="text-muted-foreground">Advogado</TableHead><TableHead className="text-muted-foreground">Referente</TableHead><TableHead className="text-center text-muted-foreground">Status</TableHead><TableHead className="text-right text-muted-foreground">Valor</TableHead><TableHead className="text-center text-muted-foreground">Recibo</TableHead></TableRow></TableHeader>
+                        <TableHeader><TableRow className="border-white/5 hover:bg-transparent"><TableHead className="text-muted-foreground">Advogado</TableHead><TableHead className="text-muted-foreground">Referente</TableHead><TableHead className="text-center text-muted-foreground">Status</TableHead><TableHead className="text-right text-muted-foreground">Valor</TableHead><TableHead className="text-center text-muted-foreground">Recibo</TableHead></TableRow></TableHeader>
                         <TableBody>
                             {isLoading ? Array.from({ length: 3 }).map((_, i) => <TableRow key={i}><TableCell colSpan={5}><Skeleton className="h-8 w-full bg-white/5" /></TableCell></TableRow>) : paymentsData?.map(p => {
                                 const staff = staffData?.find(s => s.id === p.staffId);
                                 return (
-                                    <TableRow key={p.id} className="border-border/30 hover:bg-white/5">
+                                    <TableRow key={p.id} className="border-white/5 hover:bg-white/5 transition-colors">
                                         <TableCell className="text-white font-medium">{staff?.firstName} {staff?.lastName}</TableCell>
                                         <TableCell className="text-slate-400">{p.referentTo}</TableCell>
                                         <TableCell className="text-center"><Badge variant="outline" className="bg-cyan-500/10 text-cyan-400 border-cyan-500/30">{p.status}</Badge></TableCell>

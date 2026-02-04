@@ -5,24 +5,24 @@
 @layer base {
   :root {
     /* Primary: Gold (#F5D030) */
-    --background: 222.2 84% 4.9%; /* #020617 - Fundo Escuro Navy */
+    --background: 222 47% 11%; /* Navy Profundo */
     --foreground: 210 40% 98%;
-    --card: 222.2 84% 6%; /* Pouco mais claro que o fundo */
+    --card: 222 47% 13%;
     --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 5%;
+    --popover: 222 47% 11%;
     --popover-foreground: 210 40% 98%;
     --primary: 48 91% 58%; /* Gold Bueno Gois */
     --primary-foreground: 222.2 47.4% 11.2%;
     --secondary: 217.2 32.6% 17.5%;
     --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 12%;
+    --muted: 217.2 32.6% 15%;
     --muted-foreground: 215 20.2% 65.1%;
-    --accent: 48 91% 58%; /* Destaques em Dourado */
+    --accent: 48 91% 58%;
     --accent-foreground: 210 40% 98%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
+    --border: 217.2 32.6% 20%;
+    --input: 217.2 32.6% 20%;
     --ring: 48 91% 58%;
     --radius: 0.75rem;
     --sidebar-background: 224 64% 4%;
@@ -45,7 +45,6 @@
   }
 }
 
-/* Animations */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
@@ -53,7 +52,6 @@
 
 .animate-fadeIn { animation: fadeIn 0.5s ease-out forwards; }
 
-/* Custom utility for dark backgrounds in containers */
 .bg-navy-gradient {
   background: linear-gradient(135deg, #020617 0%, #0f172a 100%);
 }

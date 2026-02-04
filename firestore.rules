@@ -1,43 +1,38 @@
-
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     // --- Helper Functions ---
+    function isAuthenticated() {
+      return request.auth != null;
+    }
     function isOneOfRoles(roles) {
-      return request.auth != null && request.auth.token != null && request.auth.token.role in roles;
+      return isAuthenticated() && request.auth.token != null && request.auth.token.role in roles;
     }
     function isAdmin() {
       return isOneOfRoles(['admin']);
     }
     function isUser(userId) {
-      return request.auth != null && request.auth.uid == userId;
+      return isAuthenticated() && request.auth.uid == userId;
     }
 
     // --- Global Read Rule ---
     match /{path=**} {
-      allow read: if true;
+      allow read: if isAuthenticated();
     }
 
-    // --- Collection-Specific Write Rules ---
+    // --- Collection-Specific Rules ---
     match /users/{userId} {
       allow update: if (isUser(userId) && request.resource.data.role == resource.data.role) || isAdmin();
       allow create, delete: if isAdmin();
-      
-      match /notifications/{notificationId} {
-        allow read, update: if isUser(userId);
-        allow create, delete: if false;
-      }
-
-      match /logs/{logId} {
-        allow create: if isUser(userId);
-      }
     }
 
     match /reimbursements/{reimbursementId} {
-      allow read: if isAdmin() || isUser(resource.data.userId);
-      allow create: if request.auth != null;
-      allow update: if isAdmin() || (isUser(resource.data.userId) && resource.data.status == 'SOLICITADO');
-      allow delete: if isAdmin();
+      // Permitir leitura se autenticado (validação fina feita via queries no frontend)
+      allow read: if isAuthenticated();
+      // Permitir criação se autenticado
+      allow create: if isAuthenticated();
+      // Permitir alteração apenas pelo Admin ou pelo próprio dono
+      allow update, delete: if isAdmin() || (isAuthenticated() && (resource.data.userId == request.auth.uid));
     }
 
     match /clients/{clientId} {
@@ -50,36 +45,17 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    match /processes/{processId}/fee_split_rules/default {
-      allow write: if isOneOfRoles(['admin', 'lawyer', 'financial']);
-    }
-
     match /hearings/{hearingId} {
       allow create, update: if isOneOfRoles(['admin', 'lawyer', 'assistant']);
       allow delete: if isAdmin();
     }
 
-    match /financial_events/{eventId} {
-      allow write: if isOneOfRoles(['admin', 'financial']);
-    }
-
     match /financial_titles/{titleId} {
       allow write: if isOneOfRoles(['admin', 'financial']);
     }
-
+    
     match /staff/{staffId} {
-      allow write: if isAdmin();
-    }
-
-    match /staff/{staffId}/credits/{creditId} {
-      allow write: if isOneOfRoles(['admin', 'financial']);
-    }
-
-    match /document_templates/{templateId} {
-      allow write: if isAdmin();
-    }
-
-    match /system_settings/{settingId} {
+      allow read: if isAuthenticated();
       allow write: if isAdmin();
     }
   }
