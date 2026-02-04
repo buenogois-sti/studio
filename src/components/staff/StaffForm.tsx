@@ -23,12 +23,13 @@ import {
 } from "@/components/ui/select"
 import { SheetFooter } from '@/components/ui/sheet';
 import { H2 } from '@/components/ui/typography';
-import { Loader2, Search } from 'lucide-react';
+import { Loader2, Search, DollarSign, Percent, Briefcase } from 'lucide-react';
 
 import { useFirebase } from '@/firebase';
 import { collection, serverTimestamp, doc, addDoc, updateDoc } from 'firebase/firestore';
-import type { Staff } from '@/lib/types';
+import type { Staff, RemunerationType } from '@/lib/types';
 import { useToast } from '@/components/ui/use-toast';
+import { cn } from '@/lib/utils';
 
 const staffSchema = z.object({
   role: z.enum(['employee', 'lawyer', 'intern'], { required_error: 'O perfil é obrigatório.'}),
@@ -53,6 +54,14 @@ const staffSchema = z.object({
   agency: z.string().optional(),
   account: z.string().optional(),
   pixKey: z.string().optional(),
+
+  remuneration_type: z.enum(['SUCUMBENCIA', 'PRODUCAO', 'QUOTA_LITIS', 'FIXO_MENSAL', 'AUDIENCISTA']).optional(),
+  remuneration_officePercentage: z.coerce.number().min(0).max(100).optional(),
+  remuneration_lawyerPercentage: z.coerce.number().min(0).max(100).optional(),
+  remuneration_fixedMonthlyValue: z.coerce.number().min(0).optional(),
+  remuneration_valuePerHearing: z.coerce.number().min(0).optional(),
+  remuneration_priceDrafting: z.coerce.number().min(0).optional(),
+  remuneration_priceDiligence: z.coerce.number().min(0).optional(),
 }).refine((data) => {
     if (data.role === 'lawyer' || data.role === 'intern') {
         return data.oabNumber && data.oabNumber.length > 0;
@@ -69,6 +78,14 @@ const staffSchema = z.object({
 }, {
     message: "A situação da OAB é obrigatória para Advogado/Estagiário.",
     path: ["oabStatus"],
+}).refine((data) => {
+    if (data.role === 'lawyer') {
+        return !!data.remuneration_type;
+    }
+    return true;
+}, {
+    message: "A regra de remuneração é obrigatória para advogados.",
+    path: ["remuneration_type"],
 });
 
 type StaffFormValues = z.infer<typeof staffSchema>;
@@ -77,6 +94,14 @@ const roleOptions = [
     { value: 'employee', label: 'Funcionário(a)' },
     { value: 'lawyer', label: 'Advogado(a)' },
     { value: 'intern', label: 'Estagiário(a)' },
+];
+
+const remunerationOptions = [
+    { value: 'SUCUMBENCIA', label: 'Honorários de Sucumbência' },
+    { value: 'PRODUCAO', label: 'Honorários por Produção (Pró-Labore)' },
+    { value: 'QUOTA_LITIS', label: 'Participação sobre o Êxito (Quota Litis)' },
+    { value: 'FIXO_MENSAL', label: 'Valor Fixo Mensal' },
+    { value: 'AUDIENCISTA', label: 'Advogado Audiencista (Por Audiência)' },
 ];
 
 const oabStatusOptions = ['Ativa', 'Suspensa', 'Inativa', 'Pendente'];
@@ -108,8 +133,15 @@ export function StaffForm({
         agency: staff.bankInfo?.agency ?? '',
         account: staff.bankInfo?.account ?? '',
         pixKey: staff.bankInfo?.pixKey ?? '',
+        remuneration_type: staff.remuneration?.type,
+        remuneration_officePercentage: staff.remuneration?.officePercentage,
+        remuneration_lawyerPercentage: staff.remuneration?.lawyerPercentage,
+        remuneration_fixedMonthlyValue: staff.remuneration?.fixedMonthlyValue,
+        remuneration_valuePerHearing: staff.remuneration?.valuePerHearing,
+        remuneration_priceDrafting: staff.remuneration?.activityPrices?.drafting,
+        remuneration_priceDiligence: staff.remuneration?.activityPrices?.diligence,
     } : {
-        role: 'employee',
+        role: 'lawyer',
         firstName: '',
         lastName: '',
         email: '',
@@ -123,62 +155,39 @@ export function StaffForm({
         address_city: '',
         address_state: '',
         oabNumber: '',
-        oabStatus: undefined,
+        oabStatus: 'Ativa' as any,
         bankName: '',
         agency: '',
         account: '',
         pixKey: '',
+        remuneration_type: 'SUCUMBENCIA' as any,
     },
   });
   
   const watchedRole = form.watch('role');
+  const watchedRemuneration = form.watch('remuneration_type');
 
-  // Função para buscar endereço via CEP
   const searchAddressByCep = React.useCallback(async (cep: string) => {
-    // Remove caracteres não numéricos
     const cleanCep = cep.replace(/\D/g, '');
-    
     if (cleanCep.length !== 8) {
-      toast({ 
-        variant: 'destructive', 
-        title: 'CEP inválido', 
-        description: 'O CEP deve conter exatamente 8 dígitos.'
-      });
+      toast({ variant: 'destructive', title: 'CEP inválido' });
       return;
     }
-
     setLoadingZip(true);
     try {
       const response = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
       const data = await response.json();
-
       if (data.erro) {
-        toast({ 
-          variant: 'destructive', 
-          title: 'CEP não encontrado', 
-          description: 'Nenhum endereço foi encontrado para este CEP.'
-        });
-        setLoadingZip(false);
+        toast({ variant: 'destructive', title: 'CEP não encontrado' });
         return;
       }
-
-      // Preencher os campos com dados da API
       form.setValue('address_street', data.logradouro || '');
       form.setValue('address_neighborhood', data.bairro || '');
       form.setValue('address_city', data.localidade || '');
       form.setValue('address_state', data.uf || '');
-      form.setValue('address_zipCode', cleanCep);
-
-      toast({ 
-        title: 'Endereço encontrado!',
-        description: `${data.logradouro}, ${data.bairro} - ${data.localidade}, ${data.uf}`
-      });
+      toast({ title: 'Endereço encontrado!' });
     } catch (error) {
-      toast({ 
-        variant: 'destructive', 
-        title: 'Erro ao buscar CEP', 
-        description: 'Não foi possível conectar ao serviço de CEP.'
-      });
+      toast({ variant: 'destructive', title: 'Erro ao buscar CEP' });
     } finally {
       setLoadingZip(false);
     }
@@ -193,65 +202,60 @@ export function StaffForm({
         address_street, address_number, address_complement, address_zipCode, 
         address_neighborhood, address_city, address_state,
         bankName, agency, account, pixKey,
+        remuneration_type, remuneration_officePercentage, remuneration_lawyerPercentage,
+        remuneration_fixedMonthlyValue, remuneration_valuePerHearing,
+        remuneration_priceDrafting, remuneration_priceDiligence,
         ...restOfValues
       } = values;
 
-      const staffData: { [key: string]: any } = { ...restOfValues };
+      const staffData: any = { ...restOfValues };
 
-      // Sanitize the object to remove undefined or empty string values.
-      Object.keys(staffData).forEach(key => {
-        if (staffData[key] === undefined || staffData[key] === '') {
-          delete staffData[key];
-        }
-      });
-      
-      const address: { [key: string]: any } = {};
-      if (address_street) address.street = address_street;
-      if (address_number) address.number = address_number;
-      if (address_complement) address.complement = address_complement;
-      if (address_zipCode) address.zipCode = address_zipCode;
-      if (address_neighborhood) address.neighborhood = address_neighborhood;
-      if (address_city) address.city = address_city;
-      if (address_state) address.state = address_state;
-      if (Object.keys(address).length > 0) {
-        staffData.address = address;
-      }
+      // Endereço
+      staffData.address = {
+        street: address_street,
+        number: address_number,
+        complement: address_complement,
+        zipCode: address_zipCode,
+        neighborhood: address_neighborhood,
+        city: address_city,
+        state: address_state,
+      };
 
-      if (values.role === 'lawyer' || values.role === 'intern') {
-        const bankInfo: { [key: string]: any } = {};
-        if (bankName) bankInfo.bankName = bankName;
-        if (agency) bankInfo.agency = agency;
-        if (account) bankInfo.account = account;
-        if (pixKey) bankInfo.pixKey = pixKey;
-        if (Object.keys(bankInfo).length > 0) {
-          staffData.bankInfo = bankInfo;
-        }
-      } else {
-        // For non-lawyers/interns, ensure these fields are not present in the final object
-        delete staffData.oabNumber;
-        delete staffData.oabStatus;
-        delete staffData.bankInfo;
+      // Banco
+      staffData.bankInfo = {
+        bankName,
+        agency,
+        account,
+        pixKey,
+      };
+
+      // Remuneração (Apenas para Advogados)
+      if (values.role === 'lawyer' && remuneration_type) {
+        staffData.remuneration = {
+          type: remuneration_type,
+          officePercentage: remuneration_officePercentage,
+          lawyerPercentage: remuneration_lawyerPercentage,
+          fixedMonthlyValue: remuneration_fixedMonthlyValue,
+          valuePerHearing: remuneration_valuePerHearing,
+          activityPrices: {
+            drafting: remuneration_priceDrafting,
+            diligence: remuneration_priceDiligence,
+          }
+        };
       }
 
       const displayName = `${staffData.firstName} ${staffData.lastName}`;
 
       if (staff?.id) {
-        const staffRef = doc(firestore, 'staff', staff.id);
-        await updateDoc(staffRef, { ...staffData, updatedAt: serverTimestamp() });
-        toast({ title: 'Membro atualizado!', description: `Os dados de ${displayName} foram salvos.` });
+        await updateDoc(doc(firestore, 'staff', staff.id), { ...staffData, updatedAt: serverTimestamp() });
+        toast({ title: 'Membro atualizado!' });
       } else {
-        const staffCollection = collection(firestore, 'staff');
-        await addDoc(staffCollection, { ...staffData, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
-        toast({ title: 'Membro cadastrado!', description: `${displayName} foi adicionado(a) à equipe.` });
+        await addDoc(collection(firestore, 'staff'), { ...staffData, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+        toast({ title: 'Membro cadastrado!' });
       }
       onSave();
     } catch (error: any) {
-        console.error("Failed to save staff member:", error);
-        toast({ 
-          variant: 'destructive', 
-          title: 'Erro ao Salvar', 
-          description: error.message || 'Não foi possível salvar os dados.'
-        });
+        toast({ variant: 'destructive', title: 'Erro ao Salvar', description: error.message });
     } finally {
         setIsSaving(false);
     }
@@ -259,27 +263,21 @@ export function StaffForm({
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8 px-1 py-4">
-        <fieldset disabled={isSaving} className="space-y-6">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-10 pb-10">
+        <fieldset disabled={isSaving} className="space-y-8">
           
-          <section>
-            <H2>Dados de Acesso e Perfil</H2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+          <section className="space-y-4">
+            <H2 className="text-white border-primary/20">Identificação & Acesso</H2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white/5 p-6 rounded-2xl border border-white/10">
               <FormField
                 control={form.control}
                 name="role"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Perfil *</FormLabel>
+                    <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">Perfil Profissional *</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger ref={field.ref}>
-                          <SelectValue placeholder="Selecionar perfil..." />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {roleOptions.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
-                      </SelectContent>
+                      <FormControl><SelectTrigger className="h-11 bg-background"><SelectValue placeholder="Selecionar..." /></SelectTrigger></FormControl>
+                      <SelectContent>{roleOptions.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}</SelectContent>
                     </Select>
                     <FormMessage />
                   </FormItem>
@@ -290,29 +288,19 @@ export function StaffForm({
                   name="email"
                   render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Email *</FormLabel>
-                        <FormControl>
-                            <Input placeholder="contato@email.com" {...field} />
-                        </FormControl>
+                        <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">Email Corporativo *</FormLabel>
+                        <FormControl><Input className="h-11 bg-background" placeholder="adv@buenogois.com.br" {...field} /></FormControl>
                         <FormMessage />
                       </FormItem>
                   )}
               />
-            </div>
-          </section>
-          
-          <section>
-            <H2>Dados Pessoais</H2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
               <FormField
                 control={form.control}
                 name="firstName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Nome *</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Primeiro nome" {...field} />
-                    </FormControl>
+                    <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">Nome *</FormLabel>
+                    <FormControl><Input className="h-11 bg-background" placeholder="Primeiro nome" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -322,37 +310,181 @@ export function StaffForm({
                 name="lastName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Sobrenome *</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Sobrenome completo" {...field} />
-                    </FormControl>
+                    <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">Sobrenome *</FormLabel>
+                    <FormControl><Input className="h-11 bg-background" placeholder="Sobrenome completo" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-               <FormField
-                control={form.control}
-                name="phone"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Telefone</FormLabel>
-                    <FormControl>
-                      <Input placeholder="(00) 0000-0000" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            </div>
+          </section>
+
+          {/* REGRA DE REMUNERAÇÃO (APENAS ADVOGADOS) */}
+          {watchedRole === 'lawyer' && (
+            <section className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-500">
+                <div className="flex items-center gap-2 mb-2">
+                    <DollarSign className="h-5 w-5 text-primary" />
+                    <H2 className="text-white border-primary/20">Regras de Remuneração</H2>
+                </div>
+                <div className="bg-primary/5 p-6 rounded-2xl border-2 border-primary/20 space-y-6">
+                    <FormField
+                        control={form.control}
+                        name="remuneration_type"
+                        render={({ field }) => (
+                        <FormItem>
+                            <FormLabel className="text-xs font-black uppercase text-primary tracking-widest">Modalidade de Pagamento *</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl><SelectTrigger className="h-12 bg-background border-primary/30"><SelectValue placeholder="Selecione a regra base..." /></SelectTrigger></FormControl>
+                            <SelectContent>
+                                {remunerationOptions.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
+                            </SelectContent>
+                            </Select>
+                            <FormMessage />
+                        </FormItem>
+                        )}
+                    />
+
+                    {/* CAMPOS DINÂMICOS POR MODALIDADE */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-primary/10">
+                        {watchedRemuneration === 'SUCUMBENCIA' && (
+                            <>
+                                <FormField
+                                    control={form.control}
+                                    name="remuneration_officePercentage"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel className="text-xs font-bold uppercase">Cota Escritório (%)</FormLabel>
+                                            <FormControl>
+                                                <div className="relative">
+                                                    <Percent className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                                    <Input type="number" className="h-11 pl-10 bg-background" placeholder="Ex: 70" {...field} />
+                                                </div>
+                                            </FormControl>
+                                        </FormItem>
+                                    )}
+                                />
+                                <FormField
+                                    control={form.control}
+                                    name="remuneration_lawyerPercentage"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel className="text-xs font-bold uppercase">Cota Advogado (%)</FormLabel>
+                                            <FormControl>
+                                                <div className="relative">
+                                                    <Percent className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                                    <Input type="number" className="h-11 pl-10 bg-background" placeholder="Ex: 30" {...field} />
+                                                </div>
+                                            </FormControl>
+                                        </FormItem>
+                                    )}
+                                />
+                            </>
+                        )}
+
+                        {watchedRemuneration === 'QUOTA_LITIS' && (
+                            <FormField
+                                control={form.control}
+                                name="remuneration_lawyerPercentage"
+                                render={({ field }) => (
+                                    <FormItem className="md:col-span-2">
+                                        <FormLabel className="text-xs font-bold uppercase">Participação sobre o Êxito (%)</FormLabel>
+                                        <FormControl>
+                                            <div className="relative">
+                                                <Percent className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                                <Input type="number" className="h-11 pl-10 bg-background" placeholder="Ex: 10" {...field} />
+                                            </div>
+                                        </FormControl>
+                                        <p className="text-[10px] text-primary/60 italic">Pagamento condicionado ao recebimento efetivo pelo cliente.</p>
+                                    </FormItem>
+                                )}
+                            />
+                        )}
+
+                        {watchedRemuneration === 'FIXO_MENSAL' && (
+                            <FormField
+                                control={form.control}
+                                name="remuneration_fixedMonthlyValue"
+                                render={({ field }) => (
+                                    <FormItem className="md:col-span-2">
+                                        <FormLabel className="text-xs font-bold uppercase">Valor Fixo Pro-Labore (R$)</FormLabel>
+                                        <FormControl>
+                                            <div className="relative">
+                                                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                                <Input type="number" className="h-11 pl-10 bg-background" placeholder="0,00" {...field} />
+                                            </div>
+                                        </FormControl>
+                                    </FormItem>
+                                )}
+                            />
+                        )}
+
+                        {watchedRemuneration === 'AUDIENCISTA' && (
+                            <FormField
+                                control={form.control}
+                                name="remuneration_valuePerHearing"
+                                render={({ field }) => (
+                                    <FormItem className="md:col-span-2">
+                                        <FormLabel className="text-xs font-bold uppercase">Valor por Audiência Realizada (R$)</FormLabel>
+                                        <FormControl>
+                                            <div className="relative">
+                                                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                                <Input type="number" className="h-11 pl-10 bg-background" placeholder="0,00" {...field} />
+                                            </div>
+                                        </FormControl>
+                                    </FormItem>
+                                )}
+                            />
+                        )}
+
+                        {watchedRemuneration === 'PRODUCAO' && (
+                            <>
+                                <FormField
+                                    control={form.control}
+                                    name="remuneration_priceDrafting"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel className="text-xs font-bold uppercase">Valor por Peça Processual (R$)</FormLabel>
+                                            <FormControl>
+                                                <div className="relative">
+                                                    <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                                    <Input type="number" className="h-11 pl-10 bg-background" placeholder="0,00" {...field} />
+                                                </div>
+                                            </FormControl>
+                                        </FormItem>
+                                    )}
+                                />
+                                <FormField
+                                    control={form.control}
+                                    name="remuneration_priceDiligence"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel className="text-xs font-bold uppercase">Valor por Diligência (R$)</FormLabel>
+                                            <FormControl>
+                                                <div className="relative">
+                                                    <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                                    <Input type="number" className="h-11 pl-10 bg-background" placeholder="0,00" {...field} />
+                                                </div>
+                                            </FormControl>
+                                        </FormItem>
+                                    )}
+                                />
+                            </>
+                        )}
+                    </div>
+                </div>
+            </section>
+          )}
+          
+          <section className="space-y-4">
+            <H2 className="text-white border-primary/20">Contatos & Localização</H2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white/5 p-6 rounded-2xl border border-white/10">
               <FormField
                 control={form.control}
                 name="whatsapp"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>WhatsApp</FormLabel>
-                    <FormControl>
-                      <Input placeholder="(00) 00000-0000" {...field} />
-                    </FormControl>
-                    <FormMessage />
+                    <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">WhatsApp</FormLabel>
+                    <FormControl><Input className="h-11 bg-background" placeholder="(11) 99999-9999" {...field} /></FormControl>
                   </FormItem>
                 )}
               />
@@ -361,115 +493,21 @@ export function StaffForm({
                   name="address_zipCode"
                   render={({ field }) => (
                       <FormItem>
-                      <FormLabel>CEP</FormLabel>
+                      <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">CEP</FormLabel>
                       <div className="flex gap-2">
-                        <FormControl>
-                            <Input 
-                              placeholder="00000-000" 
-                              {...field} 
-                              maxLength={9}
-                            />
-                        </FormControl>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          onClick={() => searchAddressByCep(field.value)}
-                          disabled={loadingZip || !field.value}
-                          className="px-3"
-                        >
-                          {loadingZip ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Search className="h-4 w-4" />
-                          )}
-                        </Button>
+                        <FormControl><Input className="h-11 bg-background" placeholder="00000-000" {...field} maxLength={9}/></FormControl>
+                        <Button type="button" variant="outline" size="icon" onClick={() => searchAddressByCep(field.value)} disabled={loadingZip || !field.value} className="h-11 w-11"><Search className={cn("h-4 w-4", loadingZip && "animate-spin")} /></Button>
                       </div>
-                      <FormMessage />
                       </FormItem>
                   )}
               />
-            </div>
-          </section>
-
-          <section>
-            <H2>Endereço</H2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
               <FormField
                   control={form.control}
                   name="address_street"
                   render={({ field }) => (
-                      <FormItem>
-                      <FormLabel>Logradouro</FormLabel>
-                      <FormControl>
-                          <Input placeholder="Rua, avenida, etc" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                      </FormItem>
-                  )}
-              />
-              <FormField
-                  control={form.control}
-                  name="address_number"
-                  render={({ field }) => (
-                      <FormItem>
-                      <FormLabel>Número</FormLabel>
-                      <FormControl>
-                          <Input placeholder="000" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                      </FormItem>
-                  )}
-              />
-              <FormField
-                  control={form.control}
-                  name="address_neighborhood"
-                  render={({ field }) => (
-                      <FormItem>
-                      <FormLabel>Bairro</FormLabel>
-                      <FormControl>
-                          <Input placeholder="Bairro" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                      </FormItem>
-                  )}
-              />
-              <FormField
-                  control={form.control}
-                  name="address_city"
-                  render={({ field }) => (
-                      <FormItem>
-                      <FormLabel>Cidade</FormLabel>
-                      <FormControl>
-                          <Input placeholder="Cidade" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                      </FormItem>
-                  )}
-              />
-              <FormField
-                  control={form.control}
-                  name="address_state"
-                  render={({ field }) => (
-                      <FormItem>
-                      <FormLabel>Estado</FormLabel>
-                      <FormControl>
-                          <Input placeholder="SP" maxLength={2} {...field} />
-                      </FormControl>
-                      <FormMessage />
-                      </FormItem>
-                  )}
-              />
-              <FormField
-                  control={form.control}
-                  name="address_complement"
-                  render={({ field }) => (
-                      <FormItem>
-                      <FormLabel>Complemento</FormLabel>
-                      <FormControl>
-                          <Input placeholder="Apto, sala, etc" {...field} />
-                      </FormControl>
-                      <FormMessage />
+                      <FormItem className="md:col-span-2">
+                      <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">Logradouro</FormLabel>
+                      <FormControl><Input className="h-11 bg-background" placeholder="Rua, avenida, etc" {...field} /></FormControl>
                       </FormItem>
                   )}
               />
@@ -477,19 +515,16 @@ export function StaffForm({
           </section>
           
           {(watchedRole === 'lawyer' || watchedRole === 'intern') && (
-            <>
-              <section>
-                <H2>Dados da OAB</H2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            <section className="space-y-4">
+                <H2 className="text-white border-primary/20">Habilitação Profissional</H2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white/5 p-6 rounded-2xl border border-white/10">
                   <FormField
                     control={form.control}
                     name="oabNumber"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Número da OAB *</FormLabel>
-                        <FormControl>
-                          <Input placeholder="000000/SP" {...field} />
-                        </FormControl>
+                        <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">Número OAB *</FormLabel>
+                        <FormControl><Input className="h-11 bg-background font-mono" placeholder="000000/SP" {...field} /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -499,86 +534,29 @@ export function StaffForm({
                     name="oabStatus"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Situação da OAB *</FormLabel>
+                        <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">Situação OAB *</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger ref={field.ref}>
-                              <SelectValue placeholder="Selecionar situação..." />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {oabStatusOptions.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
-                          </SelectContent>
+                          <FormControl><SelectTrigger className="h-11 bg-background"><SelectValue placeholder="Selecionar..." /></SelectTrigger></FormControl>
+                          <SelectContent>{oabStatusOptions.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}</SelectContent>
                         </Select>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
                 </div>
-              </section>
-
-              <section>
-                <H2>Dados Financeiros</H2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                    <FormField
-                        control={form.control}
-                        name="bankName"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Banco</FormLabel>
-                                <FormControl><Input placeholder="Nome do banco" {...field} /></FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
-                    <FormField
-                        control={form.control}
-                        name="agency"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Agência</FormLabel>
-                                <FormControl><Input placeholder="0000" {...field} /></FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
-                    <FormField
-                        control={form.control}
-                        name="account"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Conta Corrente</FormLabel>
-                                <FormControl><Input placeholder="00000-0" {...field} /></FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
-                    <FormField
-                        control={form.control}
-                        name="pixKey"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Chave PIX</FormLabel>
-                                <FormControl><Input placeholder="CPF, e-mail, telefone, etc." {...field} /></FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
-                </div>
-              </section>
-            </>
+            </section>
           )}
 
         </fieldset>
 
-        <SheetFooter className="pt-4">
-           <Button type="button" variant="outline" onClick={onSave} disabled={isSaving}>
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={isSaving}>
-                {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isSaving ? 'Salvando...' : (staff ? 'Salvar Alterações' : 'Salvar Membro')}
-            </Button>
+        <SheetFooter className="sticky bottom-0 bg-background/95 backdrop-blur-md border-t pt-6 pb-6 px-1 z-50">
+           <div className="flex w-full justify-between items-center gap-4">
+                <Button type="button" variant="ghost" onClick={onSave} disabled={isSaving} className="text-muted-foreground hover:text-white">Cancelar</Button>
+                <Button type="submit" disabled={isSaving} className="min-w-[180px] bg-primary text-primary-foreground font-black uppercase tracking-widest shadow-xl shadow-primary/20">
+                    {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    {staff ? 'Salvar Alterações' : 'Finalizar Cadastro'}
+                </Button>
+           </div>
         </SheetFooter>
       </form>
     </Form>

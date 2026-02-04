@@ -206,6 +206,7 @@ export type Log = {
 
 export type StaffRole = 'employee' | 'lawyer' | 'intern';
 export type OABStatus = 'Ativa' | 'Suspensa' | 'Inativa' | 'Pendente';
+export type RemunerationType = 'SUCUMBENCIA' | 'PRODUCAO' | 'QUOTA_LITIS' | 'FIXO_MENSAL' | 'AUDIENCISTA';
 
 export type Staff = {
   id: string;
@@ -231,6 +232,18 @@ export type Staff = {
     agency?: string;
     account?: string;
     pixKey?: string;
+  };
+  remuneration?: {
+    type: RemunerationType;
+    officePercentage?: number;
+    lawyerPercentage?: number;
+    fixedMonthlyValue?: number;
+    valuePerHearing?: number;
+    activityPrices?: {
+      drafting?: number;
+      diligence?: number;
+      other?: number;
+    };
   };
   createdAt: Timestamp;
   updatedAt?: Timestamp;
