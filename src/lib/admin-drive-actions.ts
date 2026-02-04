@@ -19,3 +19,4 @@ export async function initializeAdminDriveStructure() {
         console.error('Error initializing drive structure:', error);
         throw error;
     }
+}
