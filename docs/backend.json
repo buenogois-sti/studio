@@ -1,294 +1,52 @@
-
 {
   "entities": {
     "User": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "User",
-      "type": "object",
-      "description": "Represents a user in the LexFlow Workspace system.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the user entity."
-        },
-        "googleId": {
-          "type": "string",
-          "description": "The Google ID of the user, obtained during Google OAuth authentication."
-        },
-        "email": {
-          "type": "string",
-          "description": "The email address of the user.",
-          "format": "email"
-        },
-        "firstName": {
-          "type": "string",
-          "description": "The first name of the user."
-        },
-        "lastName": {
-          "type": "string",
-          "description": "The last name of the user."
-        },
-        "role": {
-          "type": "string",
-          "description": "The role of the user (e.g., admin, lawyer, financial, assistant).",
-          "enum": ["admin", "lawyer", "financial", "assistant"]
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "The date and time when the user was created.",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "description": "The date and time when the user was last updated.",
-          "format": "date-time"
-        }
-      },
-      "required": [
-        "id",
-        "googleId",
-        "email",
-        "firstName",
-        "lastName",
-        "role",
-        "createdAt",
-        "updatedAt"
-      ]
-    },
-    "Client": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Client",
-      "type": "object",
-      "description": "Represents a client in the LexFlow Workspace system.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the client entity."
-        },
-        "firstName": {
-          "type": "string",
-          "description": "The first name of the client."
-        },
-        "lastName": {
-          "type": "string",
-          "description": "The last name of the client."
-        },
-        "clientType": {
-          "type": "string",
-          "description": "Type of client (e.g., 'Pessoa Física', 'Pessoa Jurídica')."
-        },
-        "email": {
-          "type": "string",
-          "format": "email",
-          "description": "The email of the client."
-        },
-        "document": {
-          "type": "string",
-          "description": "The client's identification document (e.g., CPF, CNPJ)."
-        },
-        "phone": {
-          "type": "string",
-          "description": "The client's phone number."
-        },
-        "mobile": {
-          "type": "string",
-          "description": "The client's mobile phone number."
-        },
-        "avatar": {
-          "type": "string",
-          "description": "The URL of the client's avatar."
-        },
-        "legalArea": {
-          "type": "string",
-          "description": "The legal area of the case associated with the client."
-        },
-        "address": {
-          "type": "object",
-          "description": "The client's address.",
-          "properties": {
-            "street": {
-              "type": "string"
-            },
-            "number": {
-              "type": "string"
-            },
-            "complement": {
-              "type": "string"
-            },
-            "zipCode": {
-              "type": "string"
-            },
-            "neighborhood": {
-              "type": "string"
-            },
-            "city": {
-              "type": "string"
-            },
-            "state": {
-              "type": "string"
-            }
-          }
-        },
-        "driveFolderId": {
-          "type": "string",
-          "description": "The ID of the client's folder in Google Drive."
-        },
-        "sheetId": {
-          "type": "string",
-          "description": "The ID of the client's Google Sheet."
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "The date and time when the client was created.",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "description": "The date and time when the client was last updated.",
-          "format": "date-time"
-        }
-      },
-      "required": [
-        "id",
-        "firstName",
-        "lastName",
-        "document",
-        "createdAt",
-        "email"
-      ]
-    },
-    "Process": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Process",
-      "type": "object",
-      "description": "Represents a legal process in the LexFlow Workspace system.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the process entity."
-        },
-        "clientId": {
-          "type": "string",
-          "description": "Reference to the primary client associated with the process."
-        },
-        "name": {
-          "type": "string",
-          "description": "The title or internal name for the process, for easy identification."
-        },
-        "processNumber": {
-          "type": "string",
-          "description": "The official number of the legal process, if distributed."
-        },
-        "court": {
-          "type": "string",
-          "description": "The court where the process is being handled (e.g., 'TRT-2')."
-        },
-        "courtBranch": {
-          "type": "string",
-          "description": "The specific branch or division of the court (Vara)."
-        },
-        "caseValue": {
-          "type": "number",
-          "description": "The monetary value of the case."
-        },
-        "opposingParties": {
-          "type": "array",
-          "description": "A list of names of the opposing parties (people or companies).",
-          "items": {
-            "type": "string"
-          }
-        },
-        "description": {
-          "type": "string",
-          "description": "Detailed notes and observations about the process."
-        },
-        "status": {
-          "type": "string",
-          "description": "Current status of the process.",
-          "enum": [
-            "Ativo",
-            "Arquivado",
-            "Pendente"
-          ]
-        },
-        "responsibleStaffIds": {
-          "type": "array",
-          "description": "A list of staff IDs responsible for the process.",
-          "items": {
-            "type": "string"
-          }
-        },
-        "driveFolderId": {
-          "type": "string",
-          "description": "The ID of the process's subfolder in Google Drive."
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "The date and time when the process was created.",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "description": "The date and time when the process was last updated.",
-          "format": "date-time"
-        }
-      },
-      "required": [
-        "id",
-        "clientId",
-        "name",
-        "createdAt"
-      ]
-    },
-    "Reimbursement": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Reimbursement",
-      "description": "Represents a reimbursement request from a staff member.",
-      "type": "object",
+      "description": "Perfil de acesso ao sistema vinculado à conta Google.",
       "properties": {
         "id": { "type": "string" },
-        "userId": { "type": "string", "description": "ID of the user who requested." },
-        "userName": { "type": "string", "description": "Name of the user for display." },
-        "description": { "type": "string" },
-        "value": { "type": "number" },
-        "status": { "type": "string", "enum": ["SOLICITADO", "APROVADO", "REEMBOLSADO", "NEGADO"] },
-        "requestDate": { "type": "string", "format": "date-time" },
-        "notes": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "updatedAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["id", "userId", "description", "value", "status", "requestDate"]
+        "role": { "enum": ["admin", "lawyer", "financial", "assistant"] }
+      }
+    },
+    "Client": {
+      "description": "Base de dados de clientes e leads.",
+      "properties": {
+        "integrity": { "type": "number", "description": "Percentual de preenchimento do cadastro." },
+        "driveFolderId": { "type": "string" }
+      }
+    },
+    "Process": {
+      "description": "Processos judiciais vinculados a clientes.",
+      "properties": {
+        "timeline": { "type": "array", "description": "Histórico de andamentos e notas." },
+        "legalArea": { "type": "string" },
+        "leadLawyerId": { "type": "string" }
+      }
+    },
+    "LegalDeadline": {
+      "description": "Prazos fatais vinculados a processos.",
+      "properties": {
+        "startDate": { "type": "string", "format": "date" },
+        "endDate": { "type": "string", "format": "date" },
+        "isBusinessDays": { "type": "boolean" },
+        "status": { "enum": ["PENDENTE", "CUMPRIDO", "PERDIDO", "CANCELADO"] }
+      }
+    },
+    "Staff": {
+      "description": "Equipe do escritório com regras de remuneração.",
+      "properties": {
+        "role": { "enum": ["lawyer", "intern", "employee"] },
+        "remuneration": {
+          "type": "object",
+          "properties": {
+            "type": { "enum": ["SUCUMBENCIA", "PRODUCAO", "QUOTA_LITIS", "FIXO_MENSAL", "AUDIENCISTA"] }
+          }
+        }
+      }
     }
   },
-  "auth": {
-    "providers": [
-      "google"
-    ]
-  },
-  "firestore": {
-    "/users/{userId}": {
-      "schema": {
-        "$ref": "#/backend/entities/User"
-      },
-      "description": "Stores user profiles."
-    },
-    "/reimbursements/{reimbursementId}": {
-      "schema": {
-        "$ref": "#/backend/entities/Reimbursement"
-      },
-      "description": "Stores reimbursement requests."
-    },
-    "/clients/{clientId}": {
-      "schema": {
-        "$ref": "#/backend/entities/Client"
-      },
-      "description": "Stores client information."
-    },
-    "/processes/{processId}": {
-      "schema": {
-        "$ref": "#/backend/entities/Process"
-      },
-      "description": "Stores legal process information."
-    }
+  "integrations": {
+    "GoogleDrive": "Sincronização de pastas por cliente e processo.",
+    "GoogleCalendar": "Agendamento automático de audiências com link WhatsApp.",
+    "GenkitAI": "Insights estratégicos sobre faturamento e carga de trabalho."
   }
 }

@@ -1,5 +1,20 @@
-# Firebase Studio
+# LexFlow - Bueno Gois Advogados
 
-This is a NextJS starter in Firebase Studio.
+Plataforma integrada de gestão jurídica com tecnologia de elite para o escritório Bueno Gois Advogados e Associados.
 
-To get started, take a look at src/app/page.tsx.
+## 🚀 Principais Módulos
+- **CRM Inteligente**: Gestão de clientes com integração WhatsApp.
+- **Controle de Processos**: Workflow em etapas e sincronização com Google Drive.
+- **Agenda Premium**: Sincronização com Google Calendar e gestão de audiências.
+- **Prazos Jurídicos**: Motor de contagem automática (Dias Úteis/Corridos - CPC).
+- **Financeiro**: Regras de remuneração variável para advogados e controle de reembolsos.
+- **IA Advisor**: Análise estratégica de saúde do escritório via Gemini.
+
+## 🛠️ Tecnologias
+- Next.js 15, Firebase, Google APIs, Genkit (AI), Tailwind CSS.
+
+## 📘 Documentação Detalhada
+Para detalhes técnicos de cada componente e página, consulte o [Guia Técnico](./src/docs/TECHNICAL_GUIDE.md).
+
+## 🛡️ Segurança
+O sistema utiliza autenticação via Google Workspace com permissões granulares baseadas em perfis (Admin, Advogado, Financeiro, Assistente).
