@@ -11,7 +11,7 @@ import type { HearingStatus, HearingType } from './types';
 interface CreateHearingData {
   processId: string;
   processName: string;
-  hearingDate: string; // ISO string from the client
+  hearingDate: string;
   location: string;
   responsibleParty: string;
   status: HearingStatus;
@@ -28,21 +28,23 @@ export async function createHearing(data: CreateHearingData) {
   const session = await getServerSession(authOptions);
 
   try {
-    // 1. Fetch Process and Client Info for Rich Calendar Data
     const processDoc = await firestoreAdmin.collection('processes').doc(processId).get();
     const processData = processDoc.data();
     const processNumber = processData?.processNumber || 'Não informado';
+    const legalArea = processData?.legalArea || 'Não informada';
     
-    let clientFullName = 'Não informado';
+    let clientInfo = { name: 'Não informado', phone: 'Não informado' };
     if (processData?.clientId) {
       const clientDoc = await firestoreAdmin.collection('clients').doc(processData.clientId).get();
       const clientData = clientDoc.data();
       if (clientData) {
-        clientFullName = `${clientData.firstName} ${clientData.lastName}`.trim();
+        clientInfo = {
+          name: `${clientData.firstName} ${clientData.lastName}`.trim(),
+          phone: clientData.mobile || clientData.phone || 'Não informado'
+        };
       }
     }
 
-    // 2. Save to Firestore
     const hearingRef = await firestoreAdmin.collection('hearings').add({
       processId,
       date: new Date(hearingDate),
@@ -54,16 +56,42 @@ export async function createHearing(data: CreateHearingData) {
       createdAt: new Date(),
     });
 
-    // 3. Try to add to Google Calendar with full details
     try {
       const { calendar } = await getGoogleApiClientsForUser();
       const startDateTime = new Date(hearingDate);
       const endDateTime = add(startDateTime, { hours: 1 });
 
+      const forumName = location.split(',')[0]?.trim() || location;
+
+      const description = [
+        `📌 Processo Judicial`,
+        `Tipo: ${legalArea}`,
+        ``,
+        `🔢 Número do Processo:`,
+        `${processNumber}`,
+        ``,
+        `👤 Cliente:`,
+        `${clientInfo.name} (${clientInfo.phone})`,
+        ``,
+        `⚖️ Fórum / Local:`,
+        `${location}`,
+        ``,
+        `👨‍⚖️ Responsável:`,
+        `${responsibleParty}`,
+        ``,
+        `🚩 Status:`,
+        `${status}`,
+        ``,
+        `📝 Observações:`,
+        `${notes || 'Nenhuma anotação no momento.'}`,
+        ``,
+        `🔐 ID Interno: ${hearingRef.id}`
+      ].join('\n');
+
       const event = {
-        summary: `Audiência [${type}] | ${clientFullName} | Proc: ${processNumber}`,
-        location: location,
-        description: `📌 PROCESSO: ${processName}\n🔢 NÚMERO: ${processNumber}\n👤 CLIENTE: ${clientFullName}\n⚖️ LOCAL: ${location}\n👨‍⚖️ RESPONSÁVEL: ${responsibleParty}\n🚩 STATUS: ${status}\n\n📝 NOTAS: ${notes || 'Nenhuma'}\n\n---\nID Interno: ${hearingRef.id}`,
+        summary: `Audiência [${type}] | ${clientInfo.name}`,
+        location: forumName,
+        description: description,
         start: { dateTime: formatISO(startDateTime), timeZone: 'America/Sao_Paulo' },
         end: { dateTime: formatISO(endDateTime), timeZone: 'America/Sao_Paulo' },
       };
@@ -79,8 +107,8 @@ export async function createHearing(data: CreateHearingData) {
         if (session?.user?.id) {
             await createNotification({
                 userId: session.user.id,
-                title: "Audiência Agendada e Sincronizada",
-                description: `A audiência ${type} para "${processName}" foi salva e adicionada à agenda.`,
+                title: "Audiência Agendada",
+                description: `Audiência de ${clientInfo.name} sincronizada com Google Agenda.`,
                 href: `/dashboard/audiencias`,
             });
         }
@@ -109,29 +137,57 @@ export async function syncHearings() {
 
     for (const doc of hearingsSnapshot.docs) {
       const hearing = doc.data();
-      // Only try to sync if it doesn't have an ID yet
       if (!hearing.googleCalendarEventId) {
         const processDoc = await firestoreAdmin.collection('processes').doc(hearing.processId).get();
         const processData = processDoc.data();
-        const processName = processDoc.exists ? processData?.name : 'Processo';
         const processNumber = processData?.processNumber || 'Não informado';
+        const legalArea = processData?.legalArea || 'Não informada';
 
-        let clientFullName = 'Não informado';
+        let clientInfo = { name: 'Não informado', phone: 'Não informado' };
         if (processData?.clientId) {
           const clientDoc = await firestoreAdmin.collection('clients').doc(processData.clientId).get();
           const clientData = clientDoc.data();
           if (clientData) {
-            clientFullName = `${clientData.firstName} ${clientData.lastName}`.trim();
+            clientInfo = {
+              name: `${clientData.firstName} ${clientData.lastName}`.trim(),
+              phone: clientData.mobile || clientData.phone || 'Não informado'
+            };
           }
         }
+
+        const forumName = hearing.location.split(',')[0]?.trim() || hearing.location;
+        const description = [
+          `📌 Processo Judicial`,
+          `Tipo: ${legalArea}`,
+          ``,
+          `🔢 Número do Processo:`,
+          `${processNumber}`,
+          ``,
+          `👤 Cliente:`,
+          `${clientInfo.name} (${clientInfo.phone})`,
+          ``,
+          `⚖️ Fórum / Local:`,
+          `${hearing.location}`,
+          ``,
+          `👨‍⚖️ Responsável:`,
+          `${hearing.responsibleParty}`,
+          ``,
+          `🚩 Status:`,
+          `${hearing.status}`,
+          ``,
+          `📝 Observações:`,
+          `${hearing.notes || 'Nenhuma anotação no momento.'}`,
+          ``,
+          `🔐 ID Interno: ${doc.id}`
+        ].join('\n');
 
         const startDateTime = hearing.date.toDate();
         const endDateTime = add(startDateTime, { hours: 1 });
 
         const event = {
-          summary: `Audiência [${hearing.type}] | ${clientFullName} | Proc: ${processNumber}`,
-          location: hearing.location,
-          description: `📌 PROCESSO: ${processName}\n🔢 NÚMERO: ${processNumber}\n👤 CLIENTE: ${clientFullName}\n⚖️ LOCAL: ${hearing.location}\n👨‍⚖️ RESPONSÁVEL: ${hearing.responsibleParty}\n🚩 STATUS: ${hearing.status}\n\nSincronização Manual LexFlow\nID Interno: ${doc.id}`,
+          summary: `Audiência [${hearing.type}] | ${clientInfo.name}`,
+          location: forumName,
+          description: description,
           start: { dateTime: formatISO(startDateTime), timeZone: 'America/Sao_Paulo' },
           end: { dateTime: formatISO(endDateTime), timeZone: 'America/Sao_Paulo' },
         };

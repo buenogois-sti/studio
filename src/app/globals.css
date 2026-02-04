@@ -4,34 +4,34 @@
 
 @layer base {
   :root {
-    /* Primary: Gold (#F5D030) */
-    --background: 222 47% 11%; /* Navy Profundo */
+    /* Primary: Ouro Bueno Gois (#F5D030) */
+    --background: 222 47% 4%; /* Navy Ultra Profundo para dashboard */
     --foreground: 210 40% 98%;
-    --card: 222 47% 13%;
+    --card: 222 47% 7%;
     --card-foreground: 210 40% 98%;
-    --popover: 222 47% 11%;
+    --popover: 222 47% 5%;
     --popover-foreground: 210 40% 98%;
-    --primary: 48 91% 58%; /* Gold Bueno Gois */
+    --primary: 48 91% 58%; /* Gold Premium */
     --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
+    --secondary: 217.2 32.6% 12%;
     --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 15%;
+    --muted: 217.2 32.6% 10%;
     --muted-foreground: 215 20.2% 65.1%;
     --accent: 48 91% 58%;
     --accent-foreground: 210 40% 98%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 20%;
-    --input: 217.2 32.6% 20%;
+    --border: 217.2 32.6% 15%;
+    --input: 217.2 32.6% 15%;
     --ring: 48 91% 58%;
     --radius: 0.75rem;
-    --sidebar-background: 224 64% 4%;
+    --sidebar-background: 224 64% 3%;
     --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 48 91% 58%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent: 240 3.7% 10.9%;
     --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-border: 240 3.7% 10.9%;
     --sidebar-ring: 48 91% 58%;
   }
 }
@@ -41,7 +41,7 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
   }
 }
 
@@ -54,4 +54,19 @@
 
 .bg-navy-gradient {
   background: linear-gradient(135deg, #020617 0%, #0f172a 100%);
+}
+
+/* Custom Scrollbar for Navy Theme */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: hsl(var(--muted));
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--primary) / 0.5);
 }

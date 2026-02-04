@@ -267,7 +267,7 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
 
     return (
         <SidebarProvider>
-        <Sidebar variant="sidebar" collapsible="icon">
+        <Sidebar variant="sidebar" collapsible="icon" className="border-r border-white/5">
             <SidebarHeader className="h-14 justify-center p-2 group-data-[collapsible=icon]:justify-center border-b border-white/5">
             <Link href="/dashboard" className="flex items-center gap-2">
                 <Logo />
@@ -276,8 +276,8 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
                 </span>
             </Link>
             </SidebarHeader>
-            <SidebarContent>
-            <SidebarMenu className="mt-4">
+            <SidebarContent className="bg-[#020617]">
+            <SidebarMenu className="mt-4 px-2">
                 {accessibleNavItems.map(
                 (item) => (
                     <SidebarMenuItem key={item.label}>
@@ -285,7 +285,7 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
                         asChild
                         isActive={currentNavItem?.href === item.href}
                         tooltip={{ children: item.label }}
-                        className="data-[active=true]:bg-primary/20 data-[active=true]:text-primary"
+                        className="data-[active=true]:bg-primary/10 data-[active=true]:text-primary text-slate-400 hover:text-white transition-colors"
                         >
                         <Link href={item.href}>
                             <item.icon />
@@ -297,11 +297,11 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
                 )}
             </SidebarMenu>
             </SidebarContent>
-            <SidebarFooter className="justify-center h-14 border-t border-white/5 group-data-[collapsible=icon]:justify-center">
+            <SidebarFooter className="bg-[#020617] justify-center h-14 border-t border-white/5 group-data-[collapsible=icon]:justify-center">
             </SidebarFooter>
         </Sidebar>
-        <SidebarInset className="bg-[#020617]">
-            <header className="flex h-14 items-center gap-4 border-b border-white/5 bg-[#020617]/80 backdrop-blur-md px-4 lg:h-[60px] lg:px-6 sticky top-0 z-30">
+        <SidebarInset className="bg-[#020617] min-h-screen">
+            <header className="flex h-14 items-center gap-4 border-b border-white/5 bg-[#020617]/95 backdrop-blur-md px-4 lg:h-[60px] lg:px-6 sticky top-0 z-30">
             <SidebarTrigger className="shrink-0 md:hidden text-white" />
             {getBreadcrumb()}
             <div className="ml-auto flex items-center gap-2">
