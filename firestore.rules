@@ -28,15 +28,24 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow update: if isOwner(userId) || isAdmin();
       allow create, delete: if isAdmin();
+
+      // Permitir acesso às notificações do próprio usuário
+      match /notifications/{notificationId} {
+        allow read, update, delete: if isOwner(userId);
+        allow create: if isAuthenticated();
+      }
+
+      // Permitir acesso aos logs do próprio usuário
+      match /logs/{logId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create: if isAuthenticated();
+      }
     }
 
     match /reimbursements/{reimbursementId} {
-      // Permite leitura se for o dono ou se for admin/financeiro
-      // Para listagem (queries), o Firestore exige que os filtros da query correspondam às regras
-      allow read: if isAuthenticated();
-      
+      // Admins e Financeiros veem tudo. Usuários comuns veem apenas os seus.
+      allow read: if isOneOfRoles(['admin', 'financial']) || (isAuthenticated() && resource.data.userId == request.auth.uid);
       allow create: if isAuthenticated();
-      
       allow update, delete: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
     }
 
@@ -64,6 +73,11 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    match /financial_events/{eventId} {
+      allow read: if isAuthenticated();
+      allow write: if isOneOfRoles(['admin', 'financial']);
+    }
+
     match /financial_titles/{titleId} {
       allow read: if isAuthenticated();
       allow write: if isOneOfRoles(['admin', 'financial']);
@@ -72,6 +86,12 @@ service cloud.firestore {
     match /staff/{staffId} {
       allow read: if isAuthenticated();
       allow write: if isAdmin();
+
+      // Créditos e repasses vinculados ao membro da equipe
+      match /credits/{creditId} {
+        allow read: if isAuthenticated();
+        allow write: if isOneOfRoles(['admin', 'financial']);
+      }
     }
 
     match /document_templates/{templateId} {
