@@ -183,7 +183,7 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
 
   return (
     <Form {...form}>
-      <div onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col h-screen space-y-4">
+      <div onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col h-screen">
         <ProcessFormHeader
           steps={STEPS}
           currentStep={currentStep}
@@ -197,7 +197,7 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
         />
 
         <div className={cn(
-          "flex-1 overflow-y-auto px-1 transition-opacity duration-300",
+          "flex-1 overflow-y-auto px-1 pb-24 transition-opacity duration-300",
           isTransitioning ? "opacity-0" : "opacity-100"
         )}>
           <fieldset 
@@ -210,7 +210,7 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
           </fieldset>
         </div>
 
-        <div className="mt-auto border-t pt-6 bg-background/50 backdrop-blur-sm">
+        <div className="fixed bottom-0 left-0 right-0 border-t bg-background/95 backdrop-blur-sm z-50 shadow-lg">
           <ProcessFormFooter
             currentStep={currentStep}
             totalSteps={STEPS.length}
