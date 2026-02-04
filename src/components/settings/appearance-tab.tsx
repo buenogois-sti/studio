@@ -2,77 +2,47 @@
 
 import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useTheme } from '@/hooks/use-theme';
+import { AlertCircle } from 'lucide-react';
 
 export function AppearanceTab() {
-  const { theme, setTheme } = useTheme();
-
   return (
     <Card>
       <CardHeader>
         <CardTitle>Aparência</CardTitle>
-        <CardDescription>Ajuste o tema de aparência do sistema.</CardDescription>
+        <CardDescription>Visualize as configurações de design do sistema.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div>
-          <h3 className="text-base font-semibold mb-4">Tema do Sistema</h3>
-          <div className="grid grid-cols-3 gap-4">
-            {/* Light Theme */}
-            <button
-              onClick={() => setTheme('light')}
-              className={`relative flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all ${
-                theme === 'light'
-                  ? 'border-amber-500 bg-amber-50/5'
-                  : 'border-slate-700 hover:border-slate-600'
-              }`}
-            >
-              <div className="w-12 h-12 rounded bg-gradient-to-b from-white to-slate-100 border border-slate-200 flex items-center justify-center">
-                <div className="text-xl">☀️</div>
-              </div>
-              <span className="text-sm font-medium">Claro</span>
-              {theme === 'light' && (
-                <div className="absolute top-2 right-2 w-2 h-2 bg-amber-500 rounded-full" />
-              )}
-            </button>
-
-            {/* Dark Theme */}
-            <button
-              onClick={() => setTheme('dark')}
-              className={`relative flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all ${
-                theme === 'dark'
-                  ? 'border-cyan-500 bg-cyan-50/5'
-                  : 'border-slate-700 hover:border-slate-600'
-              }`}
-            >
-              <div className="w-12 h-12 rounded bg-gradient-to-b from-slate-800 to-slate-900 border border-slate-600 flex items-center justify-center">
-                <div className="text-xl">🌙</div>
-              </div>
-              <span className="text-sm font-medium">Escuro</span>
-              {theme === 'dark' && (
-                <div className="absolute top-2 right-2 w-2 h-2 bg-cyan-500 rounded-full" />
-              )}
-            </button>
-
-            {/* Auto Theme */}
-            <button
-              onClick={() => {
-                const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                setTheme(prefersDark ? 'dark' : 'light');
-              }}
-              className="relative flex flex-col items-center gap-2 p-4 rounded-lg border-2 border-slate-700 hover:border-slate-600 transition-all"
-            >
-              <div className="w-12 h-12 rounded bg-gradient-to-r from-slate-100 to-slate-800 border border-slate-600 flex items-center justify-center">
-                <div className="text-xl">🔄</div>
-              </div>
-              <span className="text-sm font-medium">Automático</span>
-            </button>
+        <div className="flex items-start gap-3 p-4 rounded-xl bg-blue-50 border border-blue-100 text-blue-700">
+          <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <p className="text-sm font-bold">Tema Unificado</p>
+            <p className="text-xs">
+              O sistema utiliza exclusivamente o tema Bueno Gois Premium (Light Mode) para garantir 
+              a consistência da marca e máxima legibilidade documental.
+            </p>
           </div>
         </div>
 
-        <div className="pt-4 border-t border-slate-700">
-          <p className="text-sm text-slate-400">
-            O tema será automaticamente sincronizado em todas as páginas do sistema. Sua escolha é salva localmente no navegador.
-          </p>
+        <div>
+          <h3 className="text-sm font-semibold mb-4 uppercase tracking-wider text-muted-foreground">Paleta Ativa</h3>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="space-y-2">
+              <div className="h-12 w-full rounded-lg bg-primary border" />
+              <p className="text-[10px] font-bold text-center">Primary (Gold)</p>
+            </div>
+            <div className="space-y-2">
+              <div className="h-12 w-full rounded-lg bg-slate-900 border" />
+              <p className="text-[10px] font-bold text-center">Navy</p>
+            </div>
+            <div className="space-y-2">
+              <div className="h-12 w-full rounded-lg bg-white border" />
+              <p className="text-[10px] font-bold text-center">Background</p>
+            </div>
+            <div className="space-y-2">
+              <div className="h-12 w-full rounded-lg bg-muted border" />
+              <p className="text-[10px] font-bold text-center">Muted</p>
+            </div>
+          </div>
         </div>
       </CardContent>
     </Card>
