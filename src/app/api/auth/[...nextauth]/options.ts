@@ -22,13 +22,18 @@ if (!nextAuthSecret) {
 async function refreshAccessToken(token: JWT): Promise<JWT> {
     try {
         if (!token.id) throw new Error("Token is missing user ID.");
+        const refreshToken = (token as any).refreshToken as string | undefined;
+        let refreshTokenToUse = refreshToken;
 
-        const userDoc = await firestoreAdmin?.collection('users').doc(token.id).get();
-        if (!userDoc?.exists) throw new Error("User not found in database for token refresh.");
+        if (!refreshTokenToUse) {
+            const userDoc = await firestoreAdmin?.collection('users').doc(token.id).get();
+            if (!userDoc?.exists) throw new Error("User not found in database for token refresh.");
 
-        const userProfile = userDoc.data();
-        if (!userProfile?.googleRefreshToken) {
-            throw new Error("Missing Google refresh token in database.");
+            const userProfile = userDoc.data();
+            if (!userProfile?.googleRefreshToken) {
+                throw new Error("Missing Google refresh token in database.");
+            }
+            refreshTokenToUse = userProfile.googleRefreshToken as string;
         }
 
         const url = "https://oauth2.googleapis.com/token";
@@ -39,7 +44,7 @@ async function refreshAccessToken(token: JWT): Promise<JWT> {
                 client_id: googleClientId!,
                 client_secret: googleClientSecret!,
                 grant_type: "refresh_token",
-                refresh_token: userProfile.googleRefreshToken,
+                refresh_token: refreshTokenToUse,
             }),
         });
 
@@ -103,11 +108,25 @@ export const authOptions: NextAuthOptions = {
             if (account && user && user.email) {
                 console.log('[NextAuth JWT] Account + User received, creating token...');
                 try {
+                    token.id = user.id;
+                    if (account.refresh_token) {
+                        (token as any).refreshToken = account.refresh_token;
+                    }
                     const userRef = db.collection('users').doc(user.id);
-                    const userDoc = await userRef.get();
+                    let userDoc: FirebaseFirestore.DocumentSnapshot | null = null;
+                    try {
+                        userDoc = await userRef.get();
+                    } catch (dbError: any) {
+                        if (dbError?.code === 8 || dbError?.details?.includes('Quota')) {
+                            console.warn('[NextAuth JWT] Firestore quota exceeded. Continuando sem leitura de perfil.');
+                            userDoc = null;
+                        } else {
+                            throw dbError;
+                        }
+                    }
                     let role: UserRole = 'lawyer';
 
-                    if (!userDoc.exists) {
+                    if (!userDoc || !userDoc.exists) {
                         const existingUsersSnapshot = await db.collection('users').limit(1).get();
                         if (existingUsersSnapshot.empty) {
                             role = 'admin';
@@ -119,17 +138,25 @@ export const authOptions: NextAuthOptions = {
                         }
 
                         const [firstName, ...lastNameParts] = user.name?.split(' ') ?? ['', ''];
-                        await userRef.set({
-                            id: user.id,
-                            googleId: user.id,
-                            email: user.email,
-                            firstName,
-                            lastName: lastNameParts.join(' '),
-                            role,
-                            createdAt: new Date(),
-                            updatedAt: new Date(),
-                            ...(account.refresh_token && { googleRefreshToken: account.refresh_token }),
-                        });
+                        try {
+                            await userRef.set({
+                                id: user.id,
+                                googleId: user.id,
+                                email: user.email,
+                                firstName,
+                                lastName: lastNameParts.join(' '),
+                                role,
+                                createdAt: new Date(),
+                                updatedAt: new Date(),
+                                ...(account.refresh_token && { googleRefreshToken: account.refresh_token }),
+                            });
+                        } catch (writeError: any) {
+                            if (writeError?.code === 8 || writeError?.details?.includes('Quota')) {
+                                console.warn('[NextAuth JWT] Firestore quota exceeded. Perfil não foi criado.');
+                            } else {
+                                throw writeError;
+                            }
+                        }
                     } else {
                         const existingData = userDoc.data() as UserProfile;
                         role = existingData.role;
@@ -173,10 +200,29 @@ export const authOptions: NextAuthOptions = {
 
             console.log('[NextAuth JWT] No account or user, checking token validity...');
             if (Date.now() < (token.accessTokenExpires ?? 0)) {
+                if (!token.customToken && token.id && authAdmin) {
+                    try {
+                        console.log('[NextAuth JWT] Recreating custom token for user:', token.id);
+                        token.customToken = await authAdmin.createCustomToken(token.id, { role: token.role });
+                        console.log('[NextAuth JWT] ✅ Custom token recreated successfully.');
+                    } catch (tokenError: any) {
+                        console.error('[NextAuth JWT] ❌ Custom token recreation failed:', {
+                            userId: token.id,
+                            error: tokenError?.message,
+                            code: tokenError?.code,
+                            authAdminProjectId: authAdmin?.app?.options?.projectId,
+                        });
+                        token.error = 'CustomTokenCreationFailed';
+                    }
+                }
                 console.log('[NextAuth JWT] Token still valid, returning...');
                 return token;
             }
             console.log('[NextAuth JWT] Token expired, refreshing...');
+            if (!token.id) {
+                token.error = 'RefreshAccessTokenError';
+                return token;
+            }
             return refreshAccessToken(token);
         },
         async session({ session, token }) {
