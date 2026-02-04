@@ -18,11 +18,13 @@ import {
   Calendar,
   AlertCircle,
   FileText,
-  DollarSign
+  DollarSign,
+  Users,
+  Handshake
 } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, Timestamp, query, orderBy, deleteDoc, doc } from 'firebase/firestore';
-import type { FinancialTitle, Staff } from '@/lib/types';
+import { collection, Timestamp, query, orderBy, deleteDoc, doc, getDocs } from 'firebase/firestore';
+import type { FinancialTitle, Staff, LawyerCredit } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -199,6 +201,85 @@ function NewTitleDialog({ onCreated }: { onCreated: () => void }) {
   );
 }
 
+function RepassesTab() {
+    const { firestore } = useFirebase();
+    const staffQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'staff') : null), [firestore]);
+    const { data: staffList, isLoading: isLoadingStaff } = useCollection<Staff>(staffQuery);
+    const [balances, setBalances] = React.useState<Record<string, number>>({});
+    const [loadingBalances, setLoadingLoadingBalances] = React.useState(false);
+
+    React.useEffect(() => {
+        const fetchBalances = async () => {
+            if (!staffList || !firestore) return;
+            setLoadingLoadingBalances(true);
+            const newBalances: Record<string, number> = {};
+            
+            for (const member of staffList) {
+                if (member.role === 'lawyer' || member.role === 'intern') {
+                    const creditsSnap = await getDocs(collection(firestore, `staff/${member.id}/credits`));
+                    const totalAvailable = creditsSnap.docs
+                        .map(d => d.data() as LawyerCredit)
+                        .filter(c => c.status === 'DISPONIVEL')
+                        .reduce((sum, c) => sum + c.value, 0);
+                    newBalances[member.id] = totalAvailable;
+                }
+            }
+            setBalances(newBalances);
+            setLoadingLoadingBalances(false);
+        };
+        fetchBalances();
+    }, [staffList, firestore]);
+
+    if (isLoadingStaff || loadingBalances) {
+        return <div className="p-8 space-y-4">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-16 w-full bg-white/5" />)}</div>;
+    }
+
+    const formatCurrency = (val: number) => val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+    return (
+        <Card className="bg-[#0f172a] border-white/5 overflow-hidden">
+            <Table>
+                <TableHeader>
+                    <TableRow className="border-white/5 hover:bg-transparent">
+                        <TableHead className="text-muted-foreground">Profissional</TableHead>
+                        <TableHead className="text-muted-foreground">Perfil</TableHead>
+                        <TableHead className="text-right text-muted-foreground">Saldo para Repasse</TableHead>
+                        <TableHead className="text-right text-muted-foreground">Ação</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {staffList?.filter(s => s.role !== 'employee').map(member => (
+                        <TableRow key={member.id} className="border-white/5 hover:bg-white/5 transition-colors">
+                            <TableCell>
+                                <div className="flex flex-col">
+                                    <span className="font-bold text-white">{member.firstName} {member.lastName}</span>
+                                    <span className="text-[10px] text-muted-foreground font-mono uppercase">OAB: {member.oabNumber || 'N/A'}</span>
+                                </div>
+                            </TableCell>
+                            <TableCell>
+                                <Badge variant="outline" className="text-[10px] uppercase font-black tracking-widest bg-white/5 border-white/10">
+                                    {member.role === 'lawyer' ? 'Advogado' : 'Estagiário'}
+                                </Badge>
+                            </TableCell>
+                            <TableCell className="text-right font-bold text-emerald-400 tabular-nums">
+                                {formatCurrency(balances[member.id] || 0)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                                <Button size="sm" variant="outline" className="h-8 text-[10px] font-black uppercase border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/10" disabled={(balances[member.id] || 0) <= 0}>
+                                    Pagar Agora
+                                </Button>
+                            </TableCell>
+                        </TableRow>
+                    ))}
+                    {(!staffList || staffList.length === 0) && (
+                        <TableRow><TableCell colSpan={4} className="text-center py-20 text-muted-foreground italic">Nenhum profissional habilitado para repasses encontrado.</TableCell></TableRow>
+                    )}
+                </TableBody>
+            </Table>
+        </Card>
+    );
+}
+
 export default function FinanceiroPage() {
   const { firestore, isUserLoading } = useFirebase();
   const [refreshKey, setRefreshKey] = React.useState(0);
@@ -210,7 +291,6 @@ export default function FinanceiroPage() {
   
   const stats = React.useMemo(() => {
     if (!titlesData) return { totalReceitas: 0, totalDespesas: 0, pendenteReceita: 0, pendenteDespesa: 0 };
-    const now = new Date();
     return titlesData.reduce((acc, t) => {
       const val = t.value || 0;
       if (t.type === 'RECEITA') {
@@ -340,7 +420,7 @@ export default function FinanceiroPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-white/5">
         <div>
           <H1 className="text-white">Financeiro</H1>
-          <p className="text-sm text-muted-foreground">Controle estratégico de faturamento e despesas operacionais.</p>
+          <p className="text-sm text-muted-foreground">Controle estratégico de faturamento, despesas e repasses.</p>
         </div>
         <NewTitleDialog onCreated={() => setRefreshKey(k => k + 1)} />
       </div>
@@ -365,12 +445,15 @@ export default function FinanceiroPage() {
       </div>
 
       <Tabs defaultValue="receitas" className="flex-1 flex flex-col">
-        <TabsList className="grid w-full grid-cols-3 bg-[#0f172a] border border-white/5 rounded-lg p-1 gap-1">
+        <TabsList className="grid w-full grid-cols-4 bg-[#0f172a] border border-white/5 rounded-lg p-1 gap-1">
             <TabsTrigger value="receitas" className="rounded-md data-[state=active]:bg-emerald-500/20 data-[state=active]:text-emerald-400">
               <ArrowUpRight className="h-4 w-4 mr-2" /> Receitas
             </TabsTrigger>
             <TabsTrigger value="despesas" className="rounded-md data-[state=active]:bg-rose-500/20 data-[state=active]:text-rose-400">
               <ArrowDownRight className="h-4 w-4 mr-2" /> Despesas
+            </TabsTrigger>
+            <TabsTrigger value="repasses" className="rounded-md data-[state=active]:bg-blue-500/20 data-[state=active]:text-blue-400">
+              <Handshake className="h-4 w-4 mr-2" /> Repasses
             </TabsTrigger>
             <TabsTrigger value="relatorios" className="rounded-md data-[state=active]:bg-purple-500/20 data-[state=active]:text-purple-400">
               <FileText className="h-4 w-4 mr-2" /> Relatórios
@@ -387,6 +470,10 @@ export default function FinanceiroPage() {
           {isLoading ? <Skeleton className="h-64 w-full bg-white/5" /> : (
             <TitleTable data={titlesData?.filter(t => t.type === 'DESPESA') || []} type="DESPESA" />
           )}
+        </TabsContent>
+
+        <TabsContent value="repasses" className="flex-1 mt-4">
+            <RepassesTab />
         </TabsContent>
 
         <TabsContent value="relatorios" className="flex-1 mt-4">
