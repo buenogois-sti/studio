@@ -21,10 +21,14 @@ import {
   DollarSign,
   Users,
   Handshake,
-  Printer
+  Printer,
+  ChevronRight,
+  Wallet,
+  ShieldCheck,
+  CheckCircle2
 } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, Timestamp, query, orderBy, deleteDoc, doc, getDocs } from 'firebase/firestore';
+import { collection, Timestamp, query, orderBy, deleteDoc, doc, getDocs, where } from 'firebase/firestore';
 import type { FinancialTitle, Staff, LawyerCredit, Client } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -49,7 +53,7 @@ import { Input } from '@/components/ui/input';
 import { format, isBefore } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { createFinancialTitle, updateFinancialTitleStatus } from '@/lib/finance-actions';
+import { createFinancialTitle, updateFinancialTitleStatus, processRepasse } from '@/lib/finance-actions';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -59,6 +63,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Separator } from '@/components/ui/separator';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const titleFormSchema = z.object({
   description: z.string().min(3, 'Descrição obrigatória'),
@@ -217,10 +222,7 @@ function ReceiptDialog({
 }) {
   if (!title) return null;
 
-  const handlePrint = () => {
-    window.print();
-  };
-
+  const handlePrint = () => { window.print(); };
   const formattedValue = title.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   const today = format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
 
@@ -239,22 +241,12 @@ function ReceiptDialog({
               <div className="text-sm font-bold text-slate-500">Nº {title.id.substring(0, 8).toUpperCase()}</div>
             </div>
           </div>
-
           <div className="py-10 space-y-6 text-lg leading-relaxed">
-            <p>
-              Recebemos de <strong className="border-b-2 border-slate-900 pb-0.5">{client ? `${client.firstName} ${client.lastName}` : 'Cliente não identificado'}</strong>, 
-              inscrito no CPF/CNPJ <strong className="border-b-2 border-slate-900 pb-0.5">{client?.document || 'N/A'}</strong>, 
-              a importância de <strong className="text-2xl font-black">{formattedValue}</strong>.
-            </p>
-            
-            <p>
-              Referente a: <span className="italic text-slate-700">{title.description}</span>
-            </p>
+            <p>Recebemos de <strong className="border-b-2 border-slate-900 pb-0.5">{client ? `${client.firstName} ${client.lastName}` : 'Cliente não identificado'}</strong>, inscrito no CPF/CNPJ <strong className="border-b-2 border-slate-900 pb-0.5">{client?.document || 'N/A'}</strong>, a importância de <strong className="text-2xl font-black">{formattedValue}</strong>.</p>
+            <p>Referente a: <span className="italic text-slate-700">{title.description}</span></p>
           </div>
-
           <div className="pt-12 flex flex-col items-center gap-12">
             <p className="text-sm font-medium">São Bernardo do Campo, {today}</p>
-            
             <div className="flex flex-col items-center w-full max-w-xs pt-4">
               <div className="w-full border-t border-slate-900 mb-2" />
               <p className="text-xs font-bold uppercase tracking-widest">Bueno Gois Advogados e Associados</p>
@@ -262,11 +254,101 @@ function ReceiptDialog({
             </div>
           </div>
         </div>
-
         <DialogFooter className="p-4 bg-slate-50 border-t print:hidden">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Fechar</Button>
-          <Button onClick={handlePrint} className="gap-2">
-            <Printer className="h-4 w-4" /> Imprimir Recibo
+          <Button onClick={handlePrint} className="gap-2"><Printer className="h-4 w-4" /> Imprimir Recibo</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function RepassePaymentDialog({ 
+  staff, 
+  credits, 
+  open, 
+  onOpenChange,
+  onPaid
+}: { 
+  staff: Staff | null; 
+  credits: LawyerCredit[]; 
+  open: boolean; 
+  onOpenChange: (open: boolean) => void;
+  onPaid: () => void;
+}) {
+  const [isProcessing, setIsProcessing] = React.useState(false);
+  const { toast } = useToast();
+
+  const totalValue = React.useMemo(() => credits.reduce((sum, c) => sum + c.value, 0), [credits]);
+
+  const handlePay = async () => {
+    if (!staff) return;
+    setIsProcessing(true);
+    try {
+      await processRepasse(staff.id, credits.map(c => c.id), totalValue);
+      toast({ title: 'Repasse Concluído!', description: `Valor de ${totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} repassado com sucesso.` });
+      onPaid();
+      onOpenChange(false);
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Erro no repasse', description: e.message });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  if (!staff) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-xl bg-card border-border">
+        <DialogHeader>
+          <DialogTitle className="text-white flex items-center gap-2">
+            <Wallet className="h-5 w-5 text-emerald-400" />
+            Processar Repasse de Honorários
+          </DialogTitle>
+          <DialogDescription className="text-slate-400">
+            Confirmando o pagamento para <span className="text-white font-bold">{staff.firstName} {staff.lastName}</span>.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-6 py-4">
+          <div className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/20 text-center">
+            <p className="text-[10px] font-black uppercase text-emerald-400 mb-1">Valor Total a Pagar</p>
+            <p className="text-3xl font-black text-white">{totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+          </div>
+
+          <div className="space-y-3">
+            <h4 className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Itens do Repasse ({credits.length})</h4>
+            <ScrollArea className="h-[200px] border border-white/5 rounded-lg p-2 bg-black/20">
+              <div className="space-y-2">
+                {credits.map(c => (
+                  <div key={c.id} className="flex items-center justify-between p-2 rounded-md bg-white/5 border border-white/5">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-bold text-slate-200 truncate">{c.description}</p>
+                      <p className="text-[9px] text-muted-foreground uppercase">{c.processId ? `Processo Vinculado` : 'Avulso'}</p>
+                    </div>
+                    <span className="text-xs font-black text-emerald-400 ml-4">{c.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          </div>
+
+          <div className="flex items-start gap-3 p-3 rounded-lg bg-blue-500/5 border border-blue-500/20 text-[10px] text-blue-400 italic">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            <p>Ao confirmar, o sistema registrará uma saída de caixa no financeiro e marcará estes honorários como pagos no histórico do profissional.</p>
+          </div>
+        </div>
+
+        <DialogFooter className="gap-2">
+          <DialogClose asChild><Button variant="ghost" className="text-slate-400">Cancelar</Button></DialogClose>
+          <Button 
+            className="bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase tracking-widest"
+            onClick={handlePay}
+            disabled={isProcessing}
+          >
+            {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
+            Confirmar Pagamento
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -276,32 +358,45 @@ function ReceiptDialog({
 
 function RepassesTab() {
     const { firestore } = useFirebase();
+    const [selectedStaff, setSelectedStaff] = React.useState<Staff | null>(null);
+    const [availableCredits, setAvailableCredits] = React.useState<LawyerCredit[]>([]);
+    const [showPayment, setShowPayment] = React.useState(false);
+    
     const staffQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'staff') : null), [firestore]);
     const { data: staffList, isLoading: isLoadingStaff } = useCollection<Staff>(staffQuery);
-    const [balances, setBalances] = React.useState<Record<string, number>>({});
-    const [loadingBalances, setLoadingLoadingBalances] = React.useState(false);
+    const [balances, setBalances] = React.useState<Record<string, { available: number, retained: number }>>({});
+    const [loadingBalances, setLoadingBalances] = React.useState(false);
 
-    React.useEffect(() => {
-        const fetchBalances = async () => {
-            if (!staffList || !firestore) return;
-            setLoadingLoadingBalances(true);
-            const newBalances: Record<string, number> = {};
-            
-            for (const member of staffList) {
-                if (member.role === 'lawyer' || member.role === 'intern') {
-                    const creditsSnap = await getDocs(collection(firestore, `staff/${member.id}/credits`));
-                    const totalAvailable = creditsSnap.docs
-                        .map(d => d.data() as LawyerCredit)
-                        .filter(c => c.status === 'DISPONIVEL')
-                        .reduce((sum, c) => sum + c.value, 0);
-                    newBalances[member.id] = totalAvailable;
-                }
+    const fetchBalances = React.useCallback(async () => {
+        if (!staffList || !firestore) return;
+        setLoadingBalances(true);
+        const newBalances: Record<string, { available: number, retained: number }> = {};
+        
+        for (const member of staffList) {
+            if (member.role === 'lawyer' || member.role === 'intern') {
+                const creditsSnap = await getDocs(collection(firestore, `staff/${member.id}/credits`));
+                const data = creditsSnap.docs.map(d => ({ id: d.id, ...d.data() } as LawyerCredit));
+                
+                newBalances[member.id] = {
+                    available: data.filter(c => c.status === 'DISPONIVEL').reduce((sum, c) => sum + c.value, 0),
+                    retained: data.filter(c => c.status === 'RETIDO').reduce((sum, c) => sum + c.value, 0),
+                };
             }
-            setBalances(newBalances);
-            setLoadingLoadingBalances(false);
-        };
-        fetchBalances();
+        }
+        setBalances(newBalances);
+        setLoadingBalances(false);
     }, [staffList, firestore]);
+
+    React.useEffect(() => { fetchBalances(); }, [fetchBalances]);
+
+    const handleOpenRepasse = async (member: Staff) => {
+        if (!firestore) return;
+        const creditsSnap = await getDocs(query(collection(firestore, `staff/${member.id}/credits`), where('status', '==', 'DISPONIVEL')));
+        const credits = creditsSnap.docs.map(d => ({ id: d.id, ...d.data() } as LawyerCredit));
+        setAvailableCredits(credits);
+        setSelectedStaff(member);
+        setShowPayment(true);
+    };
 
     if (isLoadingStaff || loadingBalances) {
         return <div className="p-8 space-y-4">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-16 w-full bg-white/5" />)}</div>;
@@ -310,46 +405,78 @@ function RepassesTab() {
     const formatCurrency = (val: number) => val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
     return (
-        <Card className="bg-[#0f172a] border-white/5 overflow-hidden">
-            <Table>
-                <TableHeader>
-                    <TableRow className="border-white/5 hover:bg-transparent">
-                        <TableHead className="text-muted-foreground">Profissional</TableHead>
-                        <TableHead className="text-muted-foreground">Perfil</TableHead>
-                        <TableHead className="text-right text-muted-foreground">Saldo para Repasse</TableHead>
-                        <TableHead className="text-right text-muted-foreground">Ação</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {staffList?.filter(s => s.role !== 'employee').map(member => (
-                        <TableRow key={member.id} className="border-white/5 hover:bg-white/5 transition-colors">
-                            <TableCell>
-                                <div className="flex flex-col">
-                                    <span className="font-bold text-white">{member.firstName} {member.lastName}</span>
-                                    <span className="text-[10px] text-muted-foreground font-mono uppercase">OAB: {member.oabNumber || 'N/A'}</span>
-                                </div>
-                            </TableCell>
-                            <TableCell>
-                                <Badge variant="outline" className="text-[10px] uppercase font-black tracking-widest bg-white/5 border-white/10">
-                                    {member.role === 'lawyer' ? 'Advogado' : 'Estagiário'}
-                                </Badge>
-                            </TableCell>
-                            <TableCell className="text-right font-bold text-emerald-400 tabular-nums">
-                                {formatCurrency(balances[member.id] || 0)}
-                            </TableCell>
-                            <TableCell className="text-right">
-                                <Button size="sm" variant="outline" className="h-8 text-[10px] font-black uppercase border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/10" disabled={(balances[member.id] || 0) <= 0}>
-                                    Pagar Agora
-                                </Button>
-                            </TableCell>
+        <div className="space-y-6">
+            <Card className="bg-[#0f172a] border-white/5 overflow-hidden shadow-2xl">
+                <Table>
+                    <TableHeader>
+                        <TableRow className="border-white/5 hover:bg-transparent bg-white/5">
+                            <TableHead className="text-muted-foreground text-[10px] font-black uppercase tracking-widest px-6 py-4">Profissional</TableHead>
+                            <TableHead className="text-muted-foreground text-[10px] font-black uppercase tracking-widest">Status OAB</TableHead>
+                            <TableHead className="text-right text-muted-foreground text-[10px] font-black uppercase tracking-widest">Aguardando Cliente</TableHead>
+                            <TableHead className="text-right text-muted-foreground text-[10px] font-black uppercase tracking-widest">Saldo p/ Repasse</TableHead>
+                            <TableHead className="text-right text-muted-foreground text-[10px] font-black uppercase tracking-widest px-6">Ação</TableHead>
                         </TableRow>
-                    ))}
-                    {(!staffList || staffList.length === 0) && (
-                        <TableRow><TableCell colSpan={4} className="text-center py-20 text-muted-foreground italic">Nenhum profissional habilitado para repasses encontrado.</TableCell></TableRow>
-                    )}
-                </TableBody>
-            </Table>
-        </Card>
+                    </TableHeader>
+                    <TableBody>
+                        {staffList?.filter(s => s.role !== 'employee').map(member => {
+                            const b = balances[member.id] || { available: 0, retained: 0 };
+                            return (
+                                <TableRow key={member.id} className="border-white/5 hover:bg-white/5 transition-all group">
+                                    <TableCell className="px-6 py-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="h-10 w-10 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center font-bold text-primary group-hover:scale-110 transition-transform">
+                                                {member.firstName.charAt(0)}{member.lastName.charAt(0)}
+                                            </div>
+                                            <div className="flex flex-col">
+                                                <span className="font-bold text-white text-sm">{member.firstName} {member.lastName}</span>
+                                                <Badge variant="outline" className="w-fit text-[8px] h-4 font-black uppercase mt-1 bg-white/5">{member.role === 'lawyer' ? 'Advogado' : 'Estagiário'}</Badge>
+                                            </div>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="flex items-center gap-1.5">
+                                            <ShieldCheck className={cn("h-3 w-3", member.oabStatus === 'Ativa' ? "text-emerald-500" : "text-amber-500")} />
+                                            <span className="text-[10px] font-mono text-slate-400">{member.oabNumber || 'N/A'}</span>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="text-right tabular-nums text-xs text-muted-foreground italic">
+                                        {formatCurrency(b.retained)}
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        <div className="flex flex-col items-end">
+                                            <span className="font-black text-emerald-400 text-base tabular-nums">{formatCurrency(b.available)}</span>
+                                            {b.available > 0 && <span className="text-[8px] font-bold text-emerald-500/60 uppercase">Liberado para saque</span>}
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="text-right px-6">
+                                        <Button 
+                                            size="sm" 
+                                            variant="outline" 
+                                            className="h-9 px-4 text-[10px] font-black uppercase border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/10 gap-2 group-hover:bg-emerald-500 group-hover:text-white transition-all" 
+                                            disabled={b.available <= 0}
+                                            onClick={() => handleOpenRepasse(member)}
+                                        >
+                                            <ChevronRight className="h-3 w-3" /> Pagar Agora
+                                        </Button>
+                                    </TableCell>
+                                </TableRow>
+                            );
+                        })}
+                        {(!staffList || staffList.length === 0) && (
+                            <TableRow><TableCell colSpan={5} className="text-center py-24 text-muted-foreground italic opacity-50"><Users className="h-12 w-12 mx-auto mb-4 opacity-20" /><p>Nenhum profissional habilitado para repasses encontrado.</p></TableCell></TableRow>
+                        )}
+                    </TableBody>
+                </Table>
+            </Card>
+
+            <RepassePaymentDialog 
+                staff={selectedStaff} 
+                credits={availableCredits} 
+                open={showPayment} 
+                onOpenChange={setShowPayment}
+                onPaid={fetchBalances}
+            />
+        </div>
     );
 }
 

@@ -2,8 +2,11 @@
 'use server';
 import { firestoreAdmin } from '@/firebase/admin';
 import type { FinancialTitle, Process, FinancialEvent, Staff, LawyerCredit } from './types';
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { addMonths } from 'date-fns';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/app/api/auth/[...nextauth]/options';
+import { createNotification } from './notification-actions';
 
 interface CreateEventData {
   processId: string;
@@ -34,7 +37,6 @@ export async function createFinancialEventAndTitles(data: CreateEventData) {
 
   const batch = firestoreAdmin.batch();
 
-  // 1. Buscar dados do Processo e do Advogado Responsável
   const processDoc = await firestoreAdmin.collection('processes').doc(processId).get();
   if (!processDoc.exists) {
     throw new Error("Processo associado não encontrado.");
@@ -42,7 +44,6 @@ export async function createFinancialEventAndTitles(data: CreateEventData) {
   const processData = processDoc.data() as Process;
   const leadLawyerId = processData.leadLawyerId;
 
-  // 2. Criar o Evento Financeiro Central
   const eventRef = firestoreAdmin.collection('financial_events').doc();
   const newEvent: Omit<FinancialEvent, 'id'> = {
     processId,
@@ -53,7 +54,6 @@ export async function createFinancialEventAndTitles(data: CreateEventData) {
   };
   batch.set(eventRef, newEvent);
 
-  // 3. Gerar Títulos de Receita (Fluxo de Caixa do Escritório)
   const installmentValue = totalValue / installments;
   const origin = eventTypeToOriginMap[type];
 
@@ -76,7 +76,6 @@ export async function createFinancialEventAndTitles(data: CreateEventData) {
     batch.set(titleRef, newTitle);
   }
 
-  // 4. CÁLCULO DE HONORÁRIOS (Crédito do Advogado)
   if (leadLawyerId) {
     const lawyerDoc = await firestoreAdmin.collection('staff').doc(leadLawyerId).get();
     if (lawyerDoc.exists) {
@@ -86,7 +85,6 @@ export async function createFinancialEventAndTitles(data: CreateEventData) {
       if (rem) {
         let lawyerValue = 0;
         
-        // Regra de Sucumbência ou Quota Litis
         if ((rem.type === 'SUCUMBENCIA' || rem.type === 'QUOTA_LITIS') && rem.lawyerPercentage) {
           lawyerValue = totalValue * (rem.lawyerPercentage / 100);
         }
@@ -97,7 +95,7 @@ export async function createFinancialEventAndTitles(data: CreateEventData) {
             processId,
             description: `Honorários (${rem.type}): ${description}`,
             value: lawyerValue,
-            status: 'RETIDO', // Fica retido até o cliente pagar o título
+            status: 'RETIDO',
             date: new Date(),
             financialEventId: eventRef.id
           };
@@ -149,7 +147,6 @@ export async function updateFinancialTitleStatus(titleId: string, status: 'PAGO'
         if (status === 'PAGO') {
             updateData.paymentDate = FieldValue.serverTimestamp();
             
-            // Liberar créditos de advogados vinculados a este evento financeiro
             if (titleData.financialEventId) {
                 const staffSnapshot = await firestoreAdmin.collection('staff').get();
                 for (const staffDoc of staffSnapshot.docs) {
@@ -171,4 +168,56 @@ export async function updateFinancialTitleStatus(titleId: string, status: 'PAGO'
     } catch (error: any) {
         throw new Error(error.message || 'Falha ao atualizar status.');
     }
+}
+
+export async function processRepasse(staffId: string, creditIds: string[], totalValue: number) {
+  if (!firestoreAdmin) throw new Error("Servidor indisponível.");
+  const session = await getServerSession(authOptions);
+  if (!session) throw new Error("Não autorizado.");
+
+  const batch = firestoreAdmin.batch();
+  const staffRef = firestoreAdmin.collection('staff').doc(staffId);
+  const staffDoc = await staffRef.get();
+  const staffData = staffDoc.data() as Staff;
+
+  // 1. Marcar créditos como pagos
+  for (const id of creditIds) {
+    const creditRef = staffRef.collection('credits').doc(id);
+    batch.update(creditRef, { 
+      status: 'PAGO', 
+      paymentDate: FieldValue.serverTimestamp(),
+      paidBy: session.user.name 
+    });
+  }
+
+  // 2. Lançar despesa no financeiro
+  const titleRef = firestoreAdmin.collection('financial_titles').doc();
+  const newTitle: Omit<FinancialTitle, 'id'> = {
+    description: `Repasse de Honorários: ${staffData.firstName} ${staffData.lastName}`,
+    type: 'DESPESA',
+    origin: 'HONORARIOS_PAGOS',
+    value: totalValue,
+    dueDate: new Date(),
+    paymentDate: Timestamp.now() as any,
+    status: 'PAGO',
+    paidToStaffId: staffId
+  };
+  batch.set(titleRef, newTitle);
+
+  try {
+    await batch.commit();
+    
+    // Notificar o advogado
+    await createNotification({
+      userId: staffId, // Se o staffId for o mesmo do User UID
+      title: "Honorários Recebidos",
+      description: `O escritório processou um repasse de ${totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} para você.`,
+      type: 'finance',
+      href: '/dashboard/financeiro'
+    });
+
+    return { success: true };
+  } catch (error: any) {
+    throw new Error(error.message);
+  }
 }
