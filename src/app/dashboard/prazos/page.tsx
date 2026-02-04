@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -15,8 +14,12 @@ import {
   Loader2,
   Calendar,
   ExternalLink,
-  Check
+  Check,
+  Eye,
+  Edit,
+  ArrowRight
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy, Timestamp } from 'firebase/firestore';
 import type { LegalDeadline, Process, LegalDeadlineStatus } from '@/lib/types';
@@ -39,12 +42,21 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { DeadlineDetailsSheet } from '@/components/process/DeadlineDetailsSheet';
+import { LegalDeadlineDialog } from '@/components/process/LegalDeadlineDialog';
 
 export default function PrazosPage() {
   const { firestore, isUserLoading } = useFirebase();
   const { toast } = useToast();
+  const router = useRouter();
   const [searchTerm, setSearchTerm] = React.useState('');
   const [isProcessing, setIsProcessing] = React.useState<string | null>(null);
+  
+  const [selectedDeadlineDetails, setSelectedDeadlineDetails] = React.useState<LegalDeadline | null>(null);
+  const [isDetailsOpen, setIsDetailsOpen] = React.useState(false);
+  
+  const [editingDeadline, setEditingDeadline] = React.useState<LegalDeadline | null>(null);
+  const [isEditOpen, setIsEditOpen] = React.useState(false);
 
   const deadlinesQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'deadlines'), orderBy('endDate', 'asc')) : null, [firestore]);
   const { data: deadlinesData, isLoading: isLoadingDeadlines } = useCollection<LegalDeadline>(deadlinesQuery);
@@ -94,6 +106,20 @@ export default function PrazosPage() {
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Erro', description: error.message });
     }
+  };
+
+  const handleViewDetails = (d: LegalDeadline) => {
+    setSelectedDeadlineDetails(d);
+    setIsDetailsOpen(true);
+  };
+
+  const handleEdit = (d: LegalDeadline) => {
+    setEditingDeadline(d);
+    setIsEditOpen(true);
+  };
+
+  const handleGoToProcess = (processId: string) => {
+    router.push(`/dashboard/processos?clientId=${processesMap.get(processId)?.clientId}`);
   };
 
   return (
@@ -159,6 +185,9 @@ export default function PrazosPage() {
                   process={processesMap.get(d.processId)} 
                   onStatusUpdate={handleUpdateStatus}
                   onDelete={handleDelete}
+                  onViewDetails={handleViewDetails}
+                  onEdit={handleEdit}
+                  onGoToProcess={handleGoToProcess}
                   isProcessing={isProcessing === d.id}
                 />
               ))
@@ -179,6 +208,9 @@ export default function PrazosPage() {
                 process={processesMap.get(d.processId)} 
                 onStatusUpdate={handleUpdateStatus}
                 onDelete={handleDelete}
+                onViewDetails={handleViewDetails}
+                onEdit={handleEdit}
+                onGoToProcess={handleGoToProcess}
                 isProcessing={isProcessing === d.id}
               />
             ))}
@@ -212,7 +244,7 @@ export default function PrazosPage() {
                           )}>{d.status}</Badge>
                         </td>
                         <td className="px-6 py-4 text-right">
-                          <Button variant="ghost" size="icon" onClick={() => handleDelete(d.id)}><X className="h-4 w-4 text-muted-foreground" /></Button>
+                          <Button variant="ghost" size="icon" onClick={() => handleViewDetails(d)}><Eye className="h-4 w-4" /></Button>
                         </td>
                       </tr>
                     ))}
@@ -223,6 +255,20 @@ export default function PrazosPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <DeadlineDetailsSheet 
+        deadline={selectedDeadlineDetails} 
+        process={selectedDeadlineDetails ? processesMap.get(selectedDeadlineDetails.processId) : undefined}
+        open={isDetailsOpen} 
+        onOpenChange={setIsDetailsOpen} 
+      />
+
+      <LegalDeadlineDialog 
+        process={editingDeadline ? processesMap.get(editingDeadline.processId) || null : null}
+        deadline={editingDeadline}
+        open={isEditOpen}
+        onOpenChange={setIsEditOpen}
+      />
     </div>
   );
 }
@@ -232,12 +278,18 @@ function DeadlineCard({
   process, 
   onStatusUpdate, 
   onDelete,
+  onViewDetails,
+  onEdit,
+  onGoToProcess,
   isProcessing 
 }: { 
   deadline: LegalDeadline; 
   process?: Process; 
   onStatusUpdate: (id: string, status: LegalDeadlineStatus) => void;
   onDelete: (id: string) => void;
+  onViewDetails: (d: LegalDeadline) => void;
+  onEdit: (d: LegalDeadline) => void;
+  onGoToProcess: (id: string) => void;
   isProcessing: boolean;
 }) {
   const isExpired = isBefore(deadline.endDate.toDate(), new Date()) && !isToday(deadline.endDate.toDate());
@@ -318,11 +370,25 @@ function DeadlineCard({
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground"><MoreVertical className="h-4 w-4" /></Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="bg-card border-border">
-                  <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                  <DropdownMenuItem onClick={() => window.print()}><ExternalLink className="h-4 w-4 mr-2" /> Imprimir Publicação</DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem className="text-rose-500" onClick={() => onDelete(deadline.id)}>Excluir Prazo</DropdownMenuItem>
+                <DropdownMenuContent align="end" className="bg-card border-border w-52">
+                  <DropdownMenuLabel className="text-[10px] font-black uppercase text-muted-foreground">Ações</DropdownMenuLabel>
+                  <DropdownMenuItem onClick={() => onViewDetails(deadline)}>
+                    <Eye className="h-4 w-4 mr-2 text-blue-400" /> Ver Detalhes / Publicação
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onEdit(deadline)}>
+                    <Edit className="h-4 w-4 mr-2 text-primary" /> Editar Prazo
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onGoToProcess(deadline.processId)}>
+                    <ArrowRight className="h-4 w-4 mr-2" /> Ir para o Processo
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator className="bg-white/10" />
+                  <DropdownMenuItem onClick={() => window.print()}>
+                    <ExternalLink className="h-4 w-4 mr-2" /> Imprimir Publicação
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator className="bg-white/10" />
+                  <DropdownMenuItem className="text-rose-500" onClick={() => onDelete(deadline.id)}>
+                    <X className="h-4 w-4 mr-2" /> Excluir Prazo
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>

@@ -1,4 +1,3 @@
-
 'use server';
 
 import { firestoreAdmin } from '@/firebase/admin';
@@ -187,6 +186,98 @@ export async function createLegalDeadline(data: {
   } catch (error: any) {
     console.error('Error creating deadline:', error);
     throw new Error(error.message || 'Falha ao lançar prazo.');
+  }
+}
+
+export async function updateLegalDeadline(id: string, data: {
+  type: string;
+  startDate: string;
+  endDate: string;
+  daysCount: number;
+  isBusinessDays: boolean;
+  publicationText?: string;
+  observations?: string;
+}) {
+  if (!firestoreAdmin) throw new Error('Servidor indisponível.');
+  const session = await getServerSession(authOptions);
+  if (!session) throw new Error('Não autenticado.');
+
+  try {
+    const deadlineRef = firestoreAdmin.collection('deadlines').doc(id);
+    const deadlineDoc = await deadlineRef.get();
+    if (!deadlineDoc.exists) throw new Error('Prazo não encontrado.');
+    
+    const oldData = deadlineDoc.data() as LegalDeadline;
+    const processRef = firestoreAdmin.collection('processes').doc(oldData.processId);
+
+    const updatePayload = {
+      type: data.type,
+      startDate: Timestamp.fromDate(new Date(data.startDate)),
+      endDate: Timestamp.fromDate(new Date(data.endDate)),
+      daysCount: data.daysCount,
+      isBusinessDays: data.isBusinessDays,
+      publicationText: data.publicationText || '',
+      observations: data.observations || '',
+      updatedAt: Timestamp.now(),
+    };
+
+    await deadlineRef.update(updatePayload);
+
+    // Atualizar Google Calendar
+    if (oldData.googleCalendarEventId) {
+      try {
+        const { calendar } = await getGoogleApiClientsForUser();
+        const processDoc = await processRef.get();
+        const processData = processDoc.data();
+        
+        let clientInfo = { name: 'Não informado', phone: 'Não informado' };
+        if (processData?.clientId) {
+          const clientDoc = await firestoreAdmin.collection('clients').doc(processData.clientId).get();
+          const clientData = clientDoc.data();
+          if (clientData) {
+            clientInfo = {
+              name: `${clientData.firstName} ${clientData.lastName}`.trim(),
+              phone: clientData.mobile || clientData.phone || 'Não informado'
+            };
+          }
+        }
+
+        const fatalDate = new Date(data.endDate);
+        fatalDate.setHours(9, 0, 0, 0);
+        const endDateTime = new Date(fatalDate);
+        endDateTime.setHours(10, 0, 0, 0);
+
+        const newDescription = buildDeadlineCalendarDescription({
+          type: data.type,
+          processName: processData?.name || 'Processo',
+          processNumber: processData?.processNumber || 'N/A',
+          clientName: clientInfo.name,
+          clientPhone: clientInfo.phone,
+          publicationText: data.publicationText,
+          observations: data.observations,
+          id: id,
+          status: oldData.status
+        });
+
+        await calendar.events.patch({
+          calendarId: 'primary',
+          eventId: oldData.googleCalendarEventId,
+          requestBody: {
+            description: newDescription,
+            summary: `${oldData.status === 'CUMPRIDO' ? '✅ ' : ''}PRAZO: ${data.type} | ${processData?.name || 'Processo'}`,
+            start: { dateTime: formatISO(fatalDate), timeZone: 'America/Sao_Paulo' },
+            end: { dateTime: formatISO(endDateTime), timeZone: 'America/Sao_Paulo' },
+          }
+        });
+      } catch (e) {
+        console.warn('Failed to update calendar event for deadline:', id);
+      }
+    }
+
+    revalidatePath('/dashboard/prazos');
+    return { success: true };
+  } catch (error: any) {
+    throw new Error(error.message);
   }
 }
 

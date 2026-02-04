@@ -47,8 +47,8 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
-import type { Process } from '@/lib/types';
-import { createLegalDeadline } from '@/lib/deadline-actions';
+import type { Process, LegalDeadline } from '@/lib/types';
+import { createLegalDeadline, updateLegalDeadline } from '@/lib/deadline-actions';
 import { countBusinessDays, cn } from '@/lib/utils';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
@@ -65,6 +65,7 @@ const deadlineSchema = z.object({
 
 interface LegalDeadlineDialogProps {
   process: Process | null;
+  deadline?: LegalDeadline | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
@@ -85,11 +86,13 @@ const COMMON_DEADLINES = [
   'Personalizado'
 ];
 
-export function LegalDeadlineDialog({ process, open, onOpenChange, onSuccess }: LegalDeadlineDialogProps) {
+export function LegalDeadlineDialog({ process, deadline, open, onOpenChange, onSuccess }: LegalDeadlineDialogProps) {
   const [isSaving, setIsSaving] = React.useState(false);
   const [customType, setCustomType] = React.useState(false);
   const [isHelpOpen, setIsHelpOpen] = React.useState(false);
   const { toast } = useToast();
+
+  const isEdit = !!deadline;
 
   const form = useForm<z.infer<typeof deadlineSchema>>({
     resolver: zodResolver(deadlineSchema),
@@ -102,6 +105,32 @@ export function LegalDeadlineDialog({ process, open, onOpenChange, onSuccess }: 
       observations: '',
     }
   });
+
+  React.useEffect(() => {
+    if (deadline && open) {
+      form.reset({
+        type: deadline.type,
+        startDate: format(deadline.startDate.toDate(), 'yyyy-MM-dd'),
+        endDate: format(deadline.endDate.toDate(), 'yyyy-MM-dd'),
+        countingMethod: deadline.isBusinessDays ? 'useful' : 'calendar',
+        publicationText: deadline.publicationText || '',
+        observations: deadline.observations || '',
+      });
+      if (!COMMON_DEADLINES.includes(deadline.type)) {
+        setCustomType(true);
+      }
+    } else if (!deadline && open) {
+      form.reset({
+        type: '',
+        startDate: format(new Date(), 'yyyy-MM-dd'),
+        endDate: '',
+        countingMethod: 'useful',
+        publicationText: '',
+        observations: '',
+      });
+      setCustomType(false);
+    }
+  }, [deadline, open, form]);
 
   const startDate = form.watch('startDate');
   const endDate = form.watch('endDate');
@@ -122,27 +151,31 @@ export function LegalDeadlineDialog({ process, open, onOpenChange, onSuccess }: 
     try {
       const finalCount = values.countingMethod === 'useful' ? businessDays : calendarDays;
       
-      await createLegalDeadline({
-        processId: process.id,
-        type: values.type,
-        startDate: values.startDate,
-        endDate: values.endDate,
-        daysCount: finalCount,
-        isBusinessDays: values.countingMethod === 'useful',
-        publicationText: values.publicationText,
-        observations: values.observations,
-      });
-
-      toast({ 
-        title: 'Prazo Lançado!', 
-        description: `O prazo de ${values.type} (${finalCount} dias) foi registrado.` 
-      });
+      if (isEdit && deadline) {
+        await updateLegalDeadline(deadline.id, {
+          ...values,
+          daysCount: finalCount,
+          isBusinessDays: values.countingMethod === 'useful',
+        });
+        toast({ title: 'Prazo Atualizado!' });
+      } else {
+        await createLegalDeadline({
+          processId: process.id,
+          type: values.type,
+          startDate: values.startDate,
+          endDate: values.endDate,
+          daysCount: finalCount,
+          isBusinessDays: values.countingMethod === 'useful',
+          publicationText: values.publicationText,
+          observations: values.observations,
+        });
+        toast({ title: 'Prazo Lançado!' });
+      }
       
       onSuccess?.();
       onOpenChange(false);
-      form.reset();
     } catch (error: any) {
-      toast({ variant: 'destructive', title: 'Erro ao lançar prazo', description: error.message });
+      toast({ variant: 'destructive', title: 'Erro ao salvar', description: error.message });
     } finally {
       setIsSaving(false);
     }
@@ -154,7 +187,7 @@ export function LegalDeadlineDialog({ process, open, onOpenChange, onSuccess }: 
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-white font-headline text-xl">
             <Clock className="h-6 w-6 text-primary" />
-            Lançar Prazo Judicial
+            {isEdit ? 'Editar Prazo Judicial' : 'Lançar Prazo Judicial'}
           </DialogTitle>
           <DialogDescription className="text-slate-400">
             Configure o compromisso fatal para: <span className="font-bold text-white">{process?.name}</span>
@@ -244,7 +277,7 @@ export function LegalDeadlineDialog({ process, open, onOpenChange, onSuccess }: 
                   <FormControl>
                     <RadioGroup
                       onValueChange={field.onChange}
-                      defaultValue={field.value}
+                      value={field.value}
                       className="flex flex-col sm:flex-row gap-4"
                     >
                       <div className="flex items-center space-x-2 bg-muted/20 p-3 rounded-lg flex-1 border border-border/50">
@@ -379,7 +412,7 @@ export function LegalDeadlineDialog({ process, open, onOpenChange, onSuccess }: 
                 className="bg-primary text-primary-foreground hover:bg-primary/90 font-black uppercase tracking-widest text-[11px] px-8 h-11"
               >
                 {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CalendarIcon className="mr-2 h-4 w-4" />}
-                Confirmar Lançamento
+                {isEdit ? 'Salvar Alterações' : 'Confirmar Lançamento'}
               </Button>
             </DialogFooter>
           </form>
