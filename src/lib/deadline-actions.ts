@@ -7,47 +7,71 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/options';
 import { v4 as uuidv4 } from 'uuid';
 import { getGoogleApiClientsForUser } from '@/lib/drive';
-import { formatISO } from 'date-fns';
+import { formatISO, format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import { createNotification } from './notification-actions';
 import { revalidatePath } from 'next/cache';
 
 /**
- * Constrói a descrição detalhada do prazo para o Google Agenda.
+ * Constrói a descrição detalhada do prazo para o Google Agenda seguindo o padrão Bueno Gois.
  */
 function buildDeadlineCalendarDescription(data: {
   type: string;
+  endDate: Date;
+  legalArea: string;
   processName: string;
   processNumber: string;
   clientName: string;
   clientPhone: string;
   publicationText?: string;
   observations?: string;
-  id: string;
+  responsibleParty: string;
   status: string;
+  id: string;
 }) {
   const cleanPhone = data.clientPhone.replace(/\D/g, '');
-  const whatsappLink = cleanPhone ? `https://wa.me/${cleanPhone.startsWith('55') ? cleanPhone : '55' + cleanPhone}` : 'Não disponível';
+  const whatsappLink = cleanPhone ? `https://wa.me/${cleanPhone.startsWith('55') ? cleanPhone : '55' + cleanPhone}?text=${encodeURIComponent(`Olá ${data.clientName}, sou do escritório Bueno Gois e gostaria de falar sobre o andamento do seu processo ${data.processNumber}.`)}` : 'Telefone não disponível';
+  
+  const dateFormatted = format(data.endDate, "dd/MM (EEEE)", { locale: ptBR });
 
   return [
-    `📅 PRAZO JUDICIAL FATAL`,
-    `Tipo: ${data.type}`,
-    `Status Atual: ${data.status}`,
+    `🚨 PRAZO JUDICIAL FATAL – ${data.type.toUpperCase()}`,
     ``,
-    `🔢 Processo:`,
-    `${data.processName}`,
-    `Nº: ${data.processNumber}`,
+    `📅 Data do Prazo:`,
+    `${dateFormatted}`,
+    `⏰ Horário limite: 06h00 (Sugestão Protocolo)`,
     ``,
-    `👤 Cliente:`,
-    `${data.clientName}`,
+    `⚖️ Providência Processual`,
+    `Ato: ${data.type}`,
+    `Natureza: Prazo fatal (preclusivo)`,
+    ``,
+    `🔢 Processo`,
+    `Classe: ${data.legalArea}`,
+    `Número: ${data.processNumber}`,
+    `Título: ${data.processName}`,
+    ``,
+    `👤 Cliente`,
+    `Nome: ${data.clientName}`,
     `WhatsApp: ${whatsappLink}`,
     ``,
-    `📝 Publicação Oficial:`,
-    `${data.publicationText || 'Não informada.'}`,
+    `📰 Publicação Oficial`,
+    `${data.publicationText || 'Nenhuma publicação registrada.'}`,
     ``,
-    `💡 Observações Estratégicas:`,
-    `${data.observations || 'Nenhuma.'}`,
+    `👨‍⚖️ Responsável`,
+    `Advogado: ${data.responsibleParty}`,
     ``,
-    `🔐 ID Interno: ${data.id}`
+    `🚩 Status`,
+    `${data.status}`,
+    ``,
+    `💡 Observações`,
+    `${data.observations || 'Nenhuma observação registrada.'}`,
+    ``,
+    `🔔 Alertas`,
+    `1 dia antes`,
+    `12 horas antes`,
+    ``,
+    `🔐 Controle Interno`,
+    `ID: ${data.id}`
   ].join('\n');
 }
 
@@ -85,6 +109,15 @@ export async function createLegalDeadline(data: {
       }
     }
 
+    let responsibleName = session.user.name || 'Alan Bueno de Gois';
+    if (processData?.leadLawyerId) {
+        const staffDoc = await firestoreAdmin.collection('staff').doc(processData.leadLawyerId).get();
+        const staffData = staffDoc.data();
+        if (staffData) {
+            responsibleName = `${staffData.firstName} ${staffData.lastName}`;
+        }
+    }
+
     const deadlinePayload: Omit<LegalDeadline, 'id'> = {
       processId: data.processId,
       type: data.type,
@@ -113,18 +146,21 @@ export async function createLegalDeadline(data: {
 
       const description = buildDeadlineCalendarDescription({
         type: data.type,
+        endDate: new Date(data.endDate),
+        legalArea: processData?.legalArea || 'N/A',
         processName: processData?.name || 'Processo',
         processNumber: processData?.processNumber || 'N/A',
         clientName: clientInfo.name,
         clientPhone: clientInfo.phone,
         publicationText: data.publicationText,
         observations: data.observations,
-        id: deadlineRef.id,
-        status: 'PENDENTE'
+        responsibleParty: responsibleName,
+        status: 'PENDENTE',
+        id: deadlineRef.id
       });
 
       const event = {
-        summary: `🚨 PRAZO: ${data.type} | ${processData?.name || 'Processo'}`,
+        summary: `🚨 PRAZO: ${data.type} | ${clientInfo.name}`,
         description: description,
         start: { dateTime: formatISO(fatalDate), timeZone: 'America/Sao_Paulo' },
         end: { dateTime: formatISO(endDateTime), timeZone: 'America/Sao_Paulo' },
@@ -177,6 +213,7 @@ export async function createLegalDeadline(data: {
         userId: session.user.id,
         title: "Prazo Registrado",
         description: `${data.type} para ${processData?.name} agendado para ${new Date(data.endDate).toLocaleDateString('pt-BR')}.`,
+        type: 'deadline',
         href: `/dashboard/prazos`,
       });
     }
@@ -242,6 +279,15 @@ export async function updateLegalDeadline(id: string, data: {
           }
         }
 
+        let responsibleName = session.user.name || 'Alan Bueno de Gois';
+        if (processData?.leadLawyerId) {
+            const staffDoc = await firestoreAdmin.collection('staff').doc(processData.leadLawyerId).get();
+            const staffData = staffDoc.data();
+            if (staffData) {
+                responsibleName = `${staffData.firstName} ${staffData.lastName}`;
+            }
+        }
+
         const fatalDate = new Date(data.endDate);
         fatalDate.setHours(9, 0, 0, 0);
         const endDateTime = new Date(fatalDate);
@@ -249,14 +295,17 @@ export async function updateLegalDeadline(id: string, data: {
 
         const newDescription = buildDeadlineCalendarDescription({
           type: data.type,
+          endDate: new Date(data.endDate),
+          legalArea: processData?.legalArea || 'N/A',
           processName: processData?.name || 'Processo',
           processNumber: processData?.processNumber || 'N/A',
           clientName: clientInfo.name,
           clientPhone: clientInfo.phone,
           publicationText: data.publicationText,
           observations: data.observations,
-          id: id,
-          status: oldData.status
+          responsibleParty: responsibleName,
+          status: oldData.status,
+          id: id
         });
 
         await calendar.events.patch({
@@ -264,7 +313,7 @@ export async function updateLegalDeadline(id: string, data: {
           eventId: oldData.googleCalendarEventId,
           requestBody: {
             description: newDescription,
-            summary: `${oldData.status === 'CUMPRIDO' ? '✅ ' : ''}PRAZO: ${data.type} | ${processData?.name || 'Processo'}`,
+            summary: `${oldData.status === 'CUMPRIDO' ? '✅ ' : '🚨 '}PRAZO: ${data.type} | ${clientInfo.name}`,
             start: { dateTime: formatISO(fatalDate), timeZone: 'America/Sao_Paulo' },
             end: { dateTime: formatISO(endDateTime), timeZone: 'America/Sao_Paulo' },
           }
@@ -318,16 +367,28 @@ export async function updateDeadlineStatus(id: string, status: LegalDeadlineStat
           }
         }
 
+        let responsibleName = session.user.name || 'Alan Bueno de Gois';
+        if (processData?.leadLawyerId) {
+            const staffDoc = await firestoreAdmin.collection('staff').doc(processData.leadLawyerId).get();
+            const staffData = staffDoc.data();
+            if (staffData) {
+                responsibleName = `${staffData.firstName} ${staffData.lastName}`;
+            }
+        }
+
         const newDescription = buildDeadlineCalendarDescription({
           type: deadlineData.type,
+          endDate: deadlineData.endDate.toDate(),
+          legalArea: processData?.legalArea || 'N/A',
           processName: processData?.name || 'Processo',
           processNumber: processData?.processNumber || 'N/A',
           clientName: clientInfo.name,
           clientPhone: clientInfo.phone,
           publicationText: deadlineData.publicationText,
           observations: deadlineData.observations,
-          id: id,
-          status: status
+          responsibleParty: responsibleName,
+          status: status,
+          id: id
         });
 
         await calendar.events.patch({
@@ -335,7 +396,7 @@ export async function updateDeadlineStatus(id: string, status: LegalDeadlineStat
           eventId: deadlineData.googleCalendarEventId,
           requestBody: {
             description: newDescription,
-            summary: `${status === 'CUMPRIDO' ? '✅ ' : ''}PRAZO: ${deadlineData.type} | ${processData?.name || 'Processo'}`
+            summary: `${status === 'CUMPRIDO' ? '✅ ' : '🚨 '}PRAZO: ${deadlineData.type} | ${clientInfo.name}`
           }
         });
       } catch (e) {
