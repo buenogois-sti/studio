@@ -29,13 +29,11 @@ service cloud.firestore {
       allow update: if isOwner(userId) || isAdmin();
       allow create, delete: if isAdmin();
 
-      // Permitir acesso às notificações do próprio usuário
       match /notifications/{notificationId} {
         allow read, update, delete: if isOwner(userId);
         allow create: if isAuthenticated();
       }
 
-      // Permitir acesso aos logs do próprio usuário
       match /logs/{logId} {
         allow read: if isOwner(userId) || isAdmin();
         allow create: if isAuthenticated();
@@ -46,7 +44,7 @@ service cloud.firestore {
       // Admins e Financeiros veem tudo. Usuários comuns veem apenas os seus.
       allow read: if isOneOfRoles(['admin', 'financial']) || (isAuthenticated() && resource.data.userId == request.auth.uid);
       allow create: if isAuthenticated();
-      allow update, delete: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
+      allow update, delete: if isOneOfRoles(['admin', 'financial']) || (isAuthenticated() && resource.data.userId == request.auth.uid);
     }
 
     match /clients/{clientId} {
@@ -87,7 +85,6 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow write: if isAdmin();
 
-      // Créditos e repasses vinculados ao membro da equipe
       match /credits/{creditId} {
         allow read: if isAuthenticated();
         allow write: if isOneOfRoles(['admin', 'financial']);

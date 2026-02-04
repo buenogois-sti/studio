@@ -193,25 +193,27 @@ export default function ReembolsosPage() {
   const [isUpdating, setIsUpdating] = React.useState<string | null>(null);
   const [searchTerm, setSearchTerm] = React.useState('');
 
-  const isAdmin = session?.user?.role === 'admin';
+  const isAdmin = session?.user?.role === 'admin' || session?.user?.role === 'financial';
 
-  // OTIMIZAÇÃO: Só inicia a query quando o usuário do Firebase está carregado e sincronizado
+  // LOGICA 1: Query restrita para usuários comuns (vê apenas os seus)
+  // Garantimos que a query use o filtro userId para casar com as Security Rules
   const myReimbursementsQuery = useMemoFirebase(
     () => (firestore && user && !isFirebaseLoading ? query(
       collection(firestore, 'reimbursements'),
       where('userId', '==', user.uid),
       orderBy('createdAt', 'desc')
     ) : null),
-    [firestore, user, isFirebaseLoading]
+    [firestore, user?.uid, isFirebaseLoading]
   );
   const { data: myData, isLoading: isLoadingMy } = useCollection<Reimbursement>(myReimbursementsQuery);
 
+  // LOGICA 2: Query global para Financeiro/Admin (vê tudo)
   const allReimbursementsQuery = useMemoFirebase(
-    () => (firestore && user && isAdmin && !isFirebaseLoading ? query(
+    () => (firestore && user && isAdmin && !isFirebaseLoading && activeTab === 'todos' ? query(
       collection(firestore, 'reimbursements'),
       orderBy('createdAt', 'desc')
     ) : null),
-    [firestore, user, isAdmin, isFirebaseLoading]
+    [firestore, user?.uid, isAdmin, isFirebaseLoading, activeTab]
   );
   const { data: allData, isLoading: isLoadingAll } = useCollection<Reimbursement>(allReimbursementsQuery);
 

@@ -1,4 +1,3 @@
-
 import admin from 'firebase-admin';
 import { firebaseConfig } from './config';
 
@@ -23,6 +22,14 @@ if (!admin.apps.length) {
       if (serviceAccount.project_id !== firebaseConfig.projectId) {
         const error = `CRITICAL_CONFIG_ERROR: Project ID mismatch. Server: '${serviceAccount.project_id}' vs Client: '${firebaseConfig.projectId}'. Check your FIREBASE_SERVICE_ACCOUNT_JSON.`;
         console.error('[Firebase Admin]', error);
+        
+        console.error('\n' + '='.repeat(60));
+        console.error('❌ ERRO CRÍTICO DE CONFIGURAÇÃO FIREBASE');
+        console.error('SERVER ID:', serviceAccount.project_id);
+        console.error('CLIENT ID:', firebaseConfig.projectId);
+        console.error('AÇÃO: Baixe a chave JSON do projeto correto e atualize o .env.local');
+        console.error('='.repeat(60) + '\n');
+        
         throw new Error(error);
       }
 
