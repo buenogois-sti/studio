@@ -1,3 +1,4 @@
+
 'use client';
 import * as React from 'react';
 import {
@@ -9,7 +10,6 @@ import {
   DollarSign,
   History,
   FileText,
-  Copy,
   Gavel,
   ShieldAlert,
   Archive,
@@ -19,10 +19,9 @@ import {
   ChevronDown,
   ChevronUp,
   Calendar,
-  Clock,
-  MapPin,
   RefreshCw,
-  Timer
+  Timer,
+  UserCheck
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
@@ -38,7 +37,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, doc, deleteDoc } from 'firebase/firestore';
-import type { Process, Client, UserProfile, Hearing } from '@/lib/types';
+import type { Process, Client, Staff, Hearing } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/use-toast';
 import { FinancialEventDialog } from '@/components/process/FinancialEventDialog';
@@ -47,7 +46,6 @@ import { ProcessForm } from '@/components/process/ProcessForm';
 import { DocumentDraftingDialog } from '@/components/process/DocumentDraftingDialog';
 import { QuickHearingDialog } from '@/components/process/QuickHearingDialog';
 import { LegalDeadlineDialog } from '@/components/process/LegalDeadlineDialog';
-import { archiveProcess } from '@/lib/process-actions';
 import { syncProcessToDrive } from '@/lib/drive';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -75,7 +73,6 @@ export default function ProcessosPage() {
   const [expandedProcessId, setExpandedProcessId] = React.useState<string | null>(null);
 
   const { firestore, isUserLoading } = useFirebase();
-  const { data: session } = useSession();
   const { toast } = useToast();
   const searchParams = useSearchParams();
   const clientIdFilter = searchParams.get('clientId');
@@ -88,11 +85,13 @@ export default function ProcessosPage() {
 
   const clientsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'clients') : null), [firestore]);
   const { data: clientsData } = useCollection<Client>(clientsQuery);
-  
-  // OTIMIZAÇÃO: Memoize o mapa de clientes para evitar congelamento O(1)
-  const clientsMap = React.useMemo(() => new Map(clientsData?.map(c => [c.id, c])), [clientsData]);
 
-  // OTIMIZAÇÃO: Memoize o mapa de audiências por processo O(1)
+  const staffQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'staff') : null), [firestore]);
+  const { data: staffData } = useCollection<Staff>(staffQuery);
+  
+  const clientsMap = React.useMemo(() => new Map(clientsData?.map(c => [c.id, c])), [clientsData]);
+  const staffMap = React.useMemo(() => new Map(staffData?.map(s => [s.id, s])), [staffData]);
+
   const hearingsByProcessMap = React.useMemo(() => {
     const map = new Map<string, Hearing[]>();
     hearingsData?.forEach(h => {
@@ -102,20 +101,17 @@ export default function ProcessosPage() {
     return map;
   }, [hearingsData]);
 
-  // OTIMIZAÇÃO: Filtro memoizado para evitar lag ao digitar
   const filteredProcesses = React.useMemo(() => {
     if (!processesData) return [];
     return processesData.filter(p => {
         const matchesSearch = 
           p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
           p.processNumber?.includes(searchTerm);
-        
         const matchesClient = !clientIdFilter || p.clientId === clientIdFilter;
         return matchesSearch && matchesClient;
     });
   }, [processesData, searchTerm, clientIdFilter]);
 
-  // OTIMIZAÇÃO: Estatísticas memoizadas
   const stats = React.useMemo(() => {
     if (!processesData) return { active: 0, pending: 0, totalValue: 0 };
     return processesData.reduce((acc, p) => {
@@ -158,47 +154,12 @@ export default function ProcessosPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="bg-emerald-500/5 border-emerald-500/10">
-              <CardContent className="p-4 flex items-center gap-4">
-                  <div className="h-10 w-10 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400">
-                      <CheckCircle2 className="h-5 w-5" />
-                  </div>
-                  <div>
-                      <p className="text-[10px] font-black uppercase text-muted-foreground">Ativos</p>
-                      <p className="text-xl font-black text-white">{stats.active}</p>
-                  </div>
-              </CardContent>
-          </Card>
-          <Card className="bg-amber-500/5 border-amber-500/10">
-              <CardContent className="p-4 flex items-center gap-4">
-                  <div className="h-10 w-10 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-400">
-                      <ShieldAlert className="h-5 w-5" />
-                  </div>
-                  <div>
-                      <p className="text-[10px] font-black uppercase text-muted-foreground">Pendentes</p>
-                      <p className="text-xl font-black text-white">{stats.pending}</p>
-                  </div>
-              </CardContent>
-          </Card>
-          <Card className="bg-blue-500/5 border-blue-500/10">
-              <CardContent className="p-4 flex items-center gap-4">
-                  <div className="h-10 w-10 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-400">
-                      <TrendingUp className="h-5 w-5" />
-                  </div>
-                  <div>
-                      <p className="text-[10px] font-black uppercase text-muted-foreground">Valor Causa</p>
-                      <p className="text-xl font-black text-white">{stats.totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
-                  </div>
-              </CardContent>
-          </Card>
-      </div>
-
       <div className="grid gap-4">
         {isLoading ? (
           Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-32 w-full bg-card/50" />)
         ) : filteredProcesses.map((p) => {
             const client = clientsMap.get(p.clientId);
+            const leadLawyer = p.leadLawyerId ? staffMap.get(p.leadLawyerId) : null;
             const statusInfo = STATUS_CONFIG[p.status || 'Ativo'];
             const processHearings = hearingsByProcessMap.get(p.id) || [];
             const isExpanded = expandedProcessId === p.id;
@@ -218,6 +179,11 @@ export default function ProcessosPage() {
                         <div className="flex flex-wrap items-center gap-2">
                           {p.processNumber && <Badge variant="secondary" className="bg-white/10 text-slate-300 font-mono text-[10px]">{p.processNumber}</Badge>}
                           <Badge variant="outline" className="text-[9px] font-black uppercase border-primary/30 text-primary">{p.legalArea}</Badge>
+                          {leadLawyer && (
+                            <div className="flex items-center gap-1 text-[10px] font-bold text-emerald-400 uppercase bg-emerald-500/5 px-2 py-0.5 rounded border border-emerald-500/20">
+                              <UserCheck className="h-3 w-3" /> Dr(a). {leadLawyer.firstName} {leadLawyer.lastName}
+                            </div>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
@@ -234,14 +200,13 @@ export default function ProcessosPage() {
                             <DropdownMenuItem onSelect={() => setEventProcess(p)}><DollarSign className="mr-2 h-4 w-4 text-blue-400" /> Evento Financeiro</DropdownMenuItem>
                             <DropdownMenuSeparator className="bg-white/10" />
                             <DropdownMenuItem onClick={() => { setEditingProcess(p); setIsSheetOpen(true); }}><FileText className="mr-2 h-4 w-4" /> Editar</DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive" onClick={() => setProcessToDelete(p)}><X className="mr-2 h-4 w-4" /> Excluir</DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-4 text-xs">
-                      {client && <span className="font-bold text-slate-300">{client.firstName} {client.lastName}</span>}
+                      {client && <span className="font-bold text-slate-300">Cliente: {client.firstName} {client.lastName}</span>}
                       {processHearings.length > 0 && (
                         <Link href="/dashboard/audiencias" className="flex items-center gap-1.5 text-amber-400 font-bold hover:underline">
                           <Calendar className="h-3.5 w-3.5" /> <span>Audiência em {format(processHearings[0].date.toDate(), 'dd/MM/yy')}</span>
