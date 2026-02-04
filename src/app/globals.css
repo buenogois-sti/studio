@@ -4,34 +4,34 @@
 
 @layer base {
   :root {
-    /* Primary: Gold (#F5D030) -> hsl(48 91% 58%) */
-    --background: 210 31% 96%; /* #F0F4F8 - Light blue-gray background for dashboard */
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 48 91% 58%; /* #F5D030 - Dourado Bueno Gois */
-    --primary-foreground: 224 64% 10%; /* Dark Navy for text on gold */
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 224 64% 33%; /* Blue as accent */
+    /* Primary: Gold (#F5D030) */
+    --background: 222.2 84% 4.9%; /* #020617 - Fundo Escuro Navy */
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 6%; /* Pouco mais claro que o fundo */
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 5%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 48 91% 58%; /* Gold Bueno Gois */
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 12%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 48 91% 58%; /* Destaques em Dourado */
     --accent-foreground: 210 40% 98%;
-    --destructive: 0 84.2% 60.2%;
+    --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
     --ring: 48 91% 58%;
     --radius: 0.75rem;
-    --sidebar-background: 224 64% 15%; /* Darker Blue for sidebar */
-    --sidebar-foreground: 210 40% 98%;
+    --sidebar-background: 224 64% 4%;
+    --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 48 91% 58%;
-    --sidebar-primary-foreground: 224 64% 10%;
-    --sidebar-accent: 224 64% 25%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 224 64% 20%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 48 91% 58%;
   }
 }
@@ -45,7 +45,7 @@
   }
 }
 
-/* Advanced Animations */
+/* Animations */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
@@ -53,13 +53,7 @@
 
 .animate-fadeIn { animation: fadeIn 0.5s ease-out forwards; }
 
-/* WhatsApp animations */
-@keyframes whatsappBounce { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
-@keyframes whatsappSlideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes whatsappPulse { 0% { box-shadow: 0 0 0 0 rgba(37, 211, 102, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(37, 211, 102, 0); } 100% { box-shadow: 0 0 0 0 rgba(37, 211, 102, 0); } }
-@keyframes typingBounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
-
-.animate-whatsappBounce { animation: whatsappBounce 0.6s ease-in-out; }
-.animate-whatsappSlideUp { animation: whatsappSlideUp 0.4s ease-out forwards; }
-.animate-whatsappPulse { animation: whatsappPulse 2s infinite; }
-.animate-typingBounce { animation: typingBounce 1s ease-in-out infinite; }
+/* Custom utility for dark backgrounds in containers */
+.bg-navy-gradient {
+  background: linear-gradient(135deg, #020617 0%, #0f172a 100%);
+}
