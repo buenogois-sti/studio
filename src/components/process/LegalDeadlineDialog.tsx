@@ -4,7 +4,7 @@ import * as React from 'react';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { format, differenceInDays } from 'date-fns';
+import { format, addDays, differenceInDays } from 'date-fns';
 import { 
   Calendar as CalendarIcon, 
   Clock, 
@@ -16,7 +16,8 @@ import {
   Scale,
   Gavel,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Sparkles
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -53,6 +54,7 @@ import { countBusinessDays, cn } from '@/lib/utils';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { parseLegalPublication } from '@/ai/flows/parse-publication-flow';
 
 const deadlineSchema = z.object({
   type: z.string().min(1, 'O tipo de prazo é obrigatório.'),
@@ -88,6 +90,7 @@ const COMMON_DEADLINES = [
 
 export function LegalDeadlineDialog({ process, deadline, open, onOpenChange, onSuccess }: LegalDeadlineDialogProps) {
   const [isSaving, setIsSaving] = React.useState(false);
+  const [isAnalyzing, setIsAnalyzing] = React.useState(false);
   const [customType, setCustomType] = React.useState(false);
   const [isHelpOpen, setIsHelpOpen] = React.useState(false);
   const { toast } = useToast();
@@ -135,6 +138,7 @@ export function LegalDeadlineDialog({ process, deadline, open, onOpenChange, onS
   const startDate = form.watch('startDate');
   const endDate = form.watch('endDate');
   const countingMethod = form.watch('countingMethod');
+  const publicationText = form.watch('publicationText');
 
   const businessDays = React.useMemo(() => countBusinessDays(startDate, endDate), [startDate, endDate]);
   const calendarDays = React.useMemo(() => {
@@ -144,6 +148,38 @@ export function LegalDeadlineDialog({ process, deadline, open, onOpenChange, onS
       return diff < 0 ? 0 : diff;
     } catch (e) { return 0; }
   }, [startDate, endDate]);
+
+  const handleAIParse = async () => {
+    if (!publicationText || publicationText.length < 20) {
+      toast({ variant: 'destructive', title: 'Texto insuficiente', description: 'Cole a publicação completa para analisar.' });
+      return;
+    }
+
+    setIsAnalyzing(true);
+    try {
+      const result = await parseLegalPublication({ text: publicationText });
+      
+      if (result) {
+        form.setValue('type', result.deadlineType);
+        form.setValue('countingMethod', result.isBusinessDays ? 'useful' : 'calendar');
+        form.setValue('observations', `[IA] ${result.summary}`);
+        
+        // Sugestão inteligente de data fatal (baseada na data inicial + dias extraídos)
+        if (startDate && result.daysCount) {
+            const start = new Date(startDate);
+            // Simples adição de dias para sugerir ao usuário
+            const suggestedEnd = addDays(start, result.daysCount + (result.isBusinessDays ? 7 : 0)); 
+            form.setValue('endDate', format(suggestedEnd, 'yyyy-MM-dd'));
+        }
+
+        toast({ title: 'Análise Concluída!', description: 'Dados extraídos com sucesso. Revise as datas antes de salvar.' });
+      }
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Erro na IA', description: 'Não foi possível interpretar o texto automaticamente.' });
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
 
   const onSubmit = async (values: z.infer<typeof deadlineSchema>) => {
     if (!process) return;
@@ -197,6 +233,40 @@ export function LegalDeadlineDialog({ process, deadline, open, onOpenChange, onS
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 pt-4">
             
+            {/* Campo de Publicação com botão de IA */}
+            <FormField
+              control={form.control}
+              name="publicationText"
+              render={({ field }) => (
+                <FormItem>
+                  <div className="flex items-center justify-between mb-2">
+                    <FormLabel className="text-white flex items-center gap-2 font-bold">
+                        <FileText className="h-4 w-4 text-primary" /> Colar Publicação Oficial
+                    </FormLabel>
+                    <Button 
+                        type="button" 
+                        variant="outline" 
+                        size="sm" 
+                        className="h-8 border-primary/30 text-primary hover:bg-primary/10 gap-2 font-bold text-[10px] uppercase"
+                        onClick={handleAIParse}
+                        disabled={isAnalyzing || !publicationText}
+                    >
+                        {isAnalyzing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                        Analisar com IA
+                    </Button>
+                  </div>
+                  <FormControl>
+                    <Textarea 
+                      placeholder="Cole o texto da intimação para que a IA preencha o formulário..." 
+                      className="min-h-[120px] bg-background border-border resize-none text-[11px] leading-relaxed font-mono" 
+                      {...field} 
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <FormField
                 control={form.control}
@@ -332,58 +402,6 @@ export function LegalDeadlineDialog({ process, deadline, open, onOpenChange, onS
               />
             </div>
 
-            <Collapsible open={isHelpOpen} onOpenChange={setIsHelpOpen} className="w-full bg-blue-500/5 border border-blue-500/20 rounded-xl overflow-hidden">
-              <CollapsibleTrigger asChild>
-                <Button variant="ghost" className="w-full flex items-center justify-between p-4 hover:bg-blue-500/10 text-blue-400">
-                  <div className="flex items-center gap-2 font-bold text-xs">
-                    <Gavel className="h-4 w-4" />
-                    VER REGRAS DE CONTAGEM (CPC/CLT/CDC)
-                  </div>
-                  {isHelpOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                </Button>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="p-4 pt-0 space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <p className="text-[11px] font-bold text-blue-300 uppercase tracking-tighter">1. CPC & TRT (Processual)</p>
-                    <p className="text-[10px] text-blue-400 leading-relaxed">
-                      Contagem apenas em <strong>dias úteis</strong>. Exclui-se o dia do começo e inclui-se o do vencimento. O prazo inicia no 1º dia útil após a publicação.
-                    </p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-[11px] font-bold text-blue-300 uppercase tracking-tighter">2. CDC (Material)</p>
-                    <p className="text-[10px] text-blue-400 leading-relaxed">
-                      Prazos para reclamar vícios (30 ou 90 dias) são <strong>dias corridos</strong>. Se for prazo em juízo (processual), segue o CPC (úteis).
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-2 p-2 bg-amber-500/5 border border-amber-500/20 rounded text-amber-400 text-[9px] font-medium leading-tight">
-                  <Info className="h-3 w-3 shrink-0" />
-                  IMPORTANTE: No processo eletrônico, se não houver abertura em 10 dias corridos, o sistema faz leitura automática e o prazo inicia no dia útil seguinte.
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
-
-            <FormField
-              control={form.control}
-              name="publicationText"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-white flex items-center gap-2 font-bold">
-                    <FileText className="h-4 w-4 text-primary" /> Colar Publicação Oficial
-                  </FormLabel>
-                  <FormControl>
-                    <Textarea 
-                      placeholder="Cole o texto da intimação ou Diário Oficial..." 
-                      className="min-h-[100px] bg-background border-border resize-none text-[11px] leading-relaxed font-mono" 
-                      {...field} 
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
             <FormField
               control={form.control}
               name="observations"
@@ -408,7 +426,7 @@ export function LegalDeadlineDialog({ process, deadline, open, onOpenChange, onS
               </DialogClose>
               <Button 
                 type="submit" 
-                disabled={isSaving} 
+                disabled={isSaving || isAnalyzing} 
                 className="bg-primary text-primary-foreground hover:bg-primary/90 font-black uppercase tracking-widest text-[11px] px-8 h-11"
               >
                 {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CalendarIcon className="mr-2 h-4 w-4" />}
