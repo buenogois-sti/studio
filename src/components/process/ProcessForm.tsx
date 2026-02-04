@@ -183,7 +183,7 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
 
   return (
     <Form {...form}>
-      <div onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col h-screen">
+      <div onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col h-screen relative">
         <ProcessFormHeader
           steps={STEPS}
           currentStep={currentStep}
@@ -210,7 +210,7 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
           </fieldset>
         </div>
 
-        <div className="fixed bottom-0 left-0 right-0 border-t bg-background/95 backdrop-blur-sm z-50 shadow-lg">
+        <div className="absolute bottom-0 left-0 right-0 border-t bg-background/95 backdrop-blur-sm z-50 shadow-lg">
           <ProcessFormFooter
             currentStep={currentStep}
             totalSteps={STEPS.length}
