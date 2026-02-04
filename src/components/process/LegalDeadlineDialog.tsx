@@ -4,20 +4,17 @@ import * as React from 'react';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { format, addDays, differenceInDays } from 'date-fns';
+import { format, differenceInDays } from 'date-fns';
 import { 
   Calendar as CalendarIcon, 
   Clock, 
   Loader2, 
   AlertTriangle, 
   FileText, 
-  Info,
   CalendarDays,
   Scale,
-  Gavel,
   ChevronDown,
-  ChevronUp,
-  Sparkles
+  ChevronUp
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -53,8 +50,6 @@ import { createLegalDeadline, updateLegalDeadline } from '@/lib/deadline-actions
 import { countBusinessDays, cn } from '@/lib/utils';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { parseLegalPublication } from '@/ai/flows/parse-publication-flow';
 
 const deadlineSchema = z.object({
   type: z.string().min(1, 'O tipo de prazo é obrigatório.'),
@@ -90,9 +85,7 @@ const COMMON_DEADLINES = [
 
 export function LegalDeadlineDialog({ process, deadline, open, onOpenChange, onSuccess }: LegalDeadlineDialogProps) {
   const [isSaving, setIsSaving] = React.useState(false);
-  const [isAnalyzing, setIsAnalyzing] = React.useState(false);
   const [customType, setCustomType] = React.useState(false);
-  const [isHelpOpen, setIsHelpOpen] = React.useState(false);
   const { toast } = useToast();
 
   const isEdit = !!deadline;
@@ -138,7 +131,6 @@ export function LegalDeadlineDialog({ process, deadline, open, onOpenChange, onS
   const startDate = form.watch('startDate');
   const endDate = form.watch('endDate');
   const countingMethod = form.watch('countingMethod');
-  const publicationText = form.watch('publicationText');
 
   const businessDays = React.useMemo(() => countBusinessDays(startDate, endDate), [startDate, endDate]);
   const calendarDays = React.useMemo(() => {
@@ -148,38 +140,6 @@ export function LegalDeadlineDialog({ process, deadline, open, onOpenChange, onS
       return diff < 0 ? 0 : diff;
     } catch (e) { return 0; }
   }, [startDate, endDate]);
-
-  const handleAIParse = async () => {
-    if (!publicationText || publicationText.length < 20) {
-      toast({ variant: 'destructive', title: 'Texto insuficiente', description: 'Cole a publicação completa para analisar.' });
-      return;
-    }
-
-    setIsAnalyzing(true);
-    try {
-      const result = await parseLegalPublication({ text: publicationText });
-      
-      if (result) {
-        form.setValue('type', result.deadlineType);
-        form.setValue('countingMethod', result.isBusinessDays ? 'useful' : 'calendar');
-        form.setValue('observations', `[IA] ${result.summary}`);
-        
-        // Sugestão inteligente de data fatal (baseada na data inicial + dias extraídos)
-        if (startDate && result.daysCount) {
-            const start = new Date(startDate);
-            // Simples adição de dias para sugerir ao usuário
-            const suggestedEnd = addDays(start, result.daysCount + (result.isBusinessDays ? 7 : 0)); 
-            form.setValue('endDate', format(suggestedEnd, 'yyyy-MM-dd'));
-        }
-
-        toast({ title: 'Análise Concluída!', description: 'Dados extraídos com sucesso. Revise as datas antes de salvar.' });
-      }
-    } catch (error: any) {
-      toast({ variant: 'destructive', title: 'Erro na IA', description: 'Não foi possível interpretar o texto automaticamente.' });
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
 
   const onSubmit = async (values: z.infer<typeof deadlineSchema>) => {
     if (!process) return;
@@ -233,31 +193,17 @@ export function LegalDeadlineDialog({ process, deadline, open, onOpenChange, onS
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 pt-4">
             
-            {/* Campo de Publicação com botão de IA */}
             <FormField
               control={form.control}
               name="publicationText"
               render={({ field }) => (
                 <FormItem>
-                  <div className="flex items-center justify-between mb-2">
-                    <FormLabel className="text-white flex items-center gap-2 font-bold">
-                        <FileText className="h-4 w-4 text-primary" /> Colar Publicação Oficial
-                    </FormLabel>
-                    <Button 
-                        type="button" 
-                        variant="outline" 
-                        size="sm" 
-                        className="h-8 border-primary/30 text-primary hover:bg-primary/10 gap-2 font-bold text-[10px] uppercase"
-                        onClick={handleAIParse}
-                        disabled={isAnalyzing || !publicationText}
-                    >
-                        {isAnalyzing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-                        Analisar com IA
-                    </Button>
-                  </div>
+                  <FormLabel className="text-white flex items-center gap-2 font-bold mb-2">
+                      <FileText className="h-4 w-4 text-primary" /> Texto da Publicação / Despacho
+                  </FormLabel>
                   <FormControl>
                     <Textarea 
-                      placeholder="Cole o texto da intimação para que a IA preencha o formulário..." 
+                      placeholder="Cole aqui o texto oficial do Diário da Justiça ou do despacho judicial..." 
                       className="min-h-[120px] bg-background border-border resize-none text-[11px] leading-relaxed font-mono" 
                       {...field} 
                     />
@@ -354,13 +300,13 @@ export function LegalDeadlineDialog({ process, deadline, open, onOpenChange, onS
                         <RadioGroupItem value="useful" id="useful" />
                         <Label htmlFor="useful" className="text-xs cursor-pointer">
                           <strong>Dias Úteis</strong> (CPC/CLT)
-                          <p className="text-[10px] text-muted-foreground">Pula finais de semana</p>
+                          <p className="text-[10px] text-muted-foreground">Exclui sábados e domingos</p>
                         </Label>
                       </div>
                       <div className="flex items-center space-x-2 bg-muted/20 p-3 rounded-lg flex-1 border border-border/50">
                         <RadioGroupItem value="calendar" id="calendar" />
                         <Label htmlFor="calendar" className="text-xs cursor-pointer">
-                          <strong>Dias Corridos</strong> (CDC Material)
+                          <strong>Dias Corridos</strong> (Material)
                           <p className="text-[10px] text-muted-foreground">Conta todos os dias</p>
                         </Label>
                       </div>
@@ -377,7 +323,7 @@ export function LegalDeadlineDialog({ process, deadline, open, onOpenChange, onS
                 name="startDate"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-white font-bold">Início (Publicação/Leitura) *</FormLabel>
+                    <FormLabel className="text-white font-bold">Data da Publicação *</FormLabel>
                     <FormControl>
                       <Input type="date" className="bg-background border-border h-11 text-white" {...field} />
                     </FormControl>
@@ -410,7 +356,7 @@ export function LegalDeadlineDialog({ process, deadline, open, onOpenChange, onS
                   <FormLabel className="text-white font-bold">Observações Estratégicas</FormLabel>
                   <FormControl>
                     <Textarea 
-                      placeholder="Notas internas para a equipe..." 
+                      placeholder="Observações internas sobre o cumprimento deste prazo..." 
                       className="bg-background border-border resize-none text-sm" 
                       {...field} 
                     />
@@ -426,7 +372,7 @@ export function LegalDeadlineDialog({ process, deadline, open, onOpenChange, onS
               </DialogClose>
               <Button 
                 type="submit" 
-                disabled={isSaving || isAnalyzing} 
+                disabled={isSaving} 
                 className="bg-primary text-primary-foreground hover:bg-primary/90 font-black uppercase tracking-widest text-[11px] px-8 h-11"
               >
                 {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CalendarIcon className="mr-2 h-4 w-4" />}

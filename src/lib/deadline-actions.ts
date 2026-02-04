@@ -13,7 +13,7 @@ import { createNotification } from './notification-actions';
 import { revalidatePath } from 'next/cache';
 
 /**
- * Constrói a descrição detalhada do prazo para o Google Agenda seguindo o padrão Bueno Gois.
+ * Constrói a descrição detalhada do prazo para o Google Agenda e Tasks seguindo o padrão Bueno Gois.
  */
 function buildDeadlineCalendarDescription(data: {
   type: string;
@@ -39,7 +39,7 @@ function buildDeadlineCalendarDescription(data: {
     ``,
     `📅 Data do Prazo:`,
     `${dateFormatted}`,
-    `⏰ Horário limite: 06h00 (Sugestão Protocolo)`,
+    `⏰ Horário limite sugerido para protocolo: 06h00`,
     ``,
     `⚖️ Providência Processual`,
     `Ato: ${data.type}`,
@@ -60,18 +60,14 @@ function buildDeadlineCalendarDescription(data: {
     `👨‍⚖️ Responsável`,
     `Advogado: ${data.responsibleParty}`,
     ``,
-    `🚩 Status`,
-    `${data.status}`,
+    `🚩 Status atual no sistema: ${data.status}`,
     ``,
-    `💡 Observações`,
+    `💡 Observações Estratégicas`,
     `${data.observations || 'Nenhuma observação registrada.'}`,
     ``,
-    `🔔 Alertas`,
-    `1 dia antes`,
-    `12 horas antes`,
+    `🔔 Alertas configurados no sistema LexFlow`,
     ``,
-    `🔐 Controle Interno`,
-    `ID: ${data.id}`
+    `🔐 ID Interno: ${data.id}`
   ].join('\n');
 }
 
@@ -109,7 +105,7 @@ export async function createLegalDeadline(data: {
       }
     }
 
-    let responsibleName = session.user.name || 'Alan Bueno de Gois';
+    let responsibleName = session.user.name || 'Advogado Responsável';
     if (processData?.leadLawyerId) {
         const staffDoc = await firestoreAdmin.collection('staff').doc(processData.leadLawyerId).get();
         const staffData = staffDoc.data();
@@ -184,22 +180,27 @@ export async function createLegalDeadline(data: {
       googleCalendarEventId = createdEvent.data.id || undefined;
 
       // Criar Tarefa no Google Tasks
+      // NOTA: O campo 'due' no Google Tasks deve ser um RFC 3339 timestamp sem offset (Z).
       try {
+        const taskDate = new Date(data.endDate);
+        taskDate.setUTCHours(0, 0, 0, 0); 
+
         const createdTask = await tasks.tasks.insert({
           tasklist: '@default',
           requestBody: {
             title: `🚨 PRAZO: ${data.type} | ${processData?.name}`,
             notes: calendarDescription,
-            due: formatISO(new Date(data.endDate)),
+            due: taskDate.toISOString(),
           }
         });
         googleTaskId = createdTask.data.id || undefined;
-      } catch (taskErr) {
-        console.warn('Google Tasks sync failed:', taskErr);
+        console.log('[DeadlineActions] Google Task criada com sucesso:', googleTaskId);
+      } catch (taskErr: any) {
+        console.warn('[DeadlineActions] Falha ao sincronizar com Google Tasks:', taskErr.message);
       }
 
     } catch (calendarError: any) {
-      console.warn('Google Workspace sync failed for deadline:', calendarError.message);
+      console.warn('[DeadlineActions] Falha na sincronização Google Workspace:', calendarError.message);
     }
 
     if (googleCalendarEventId) deadlinePayload.googleCalendarEventId = googleCalendarEventId;
@@ -209,7 +210,7 @@ export async function createLegalDeadline(data: {
     const timelineEvent: TimelineEvent = {
       id: uuidv4(),
       type: 'deadline',
-      description: `PRAZO LANÇADO: ${data.type} (${data.daysCount} ${methodLabel}). Vencimento: ${new Date(data.endDate).toLocaleDateString('pt-BR')}. Sincronizado com Workspace (Agenda + Tarefas).`,
+      description: `PRAZO LANÇADO: ${data.type} (${data.daysCount} ${methodLabel}). Vencimento: ${new Date(data.endDate).toLocaleDateString('pt-BR')}. Tarefa criada no Workspace.`,
       date: Timestamp.now(),
       authorName: session.user.name || 'Sistema',
       endDate: Timestamp.fromDate(new Date(data.endDate)),
@@ -295,7 +296,7 @@ export async function updateLegalDeadline(id: string, data: {
         }
       }
 
-      let responsibleName = session.user.name || 'Alan Bueno de Gois';
+      let responsibleName = session.user.name || 'Advogado Responsável';
       if (processData?.leadLawyerId) {
           const staffDoc = await firestoreAdmin.collection('staff').doc(processData.leadLawyerId).get();
           const staffData = staffDoc.data();
@@ -338,18 +339,21 @@ export async function updateLegalDeadline(id: string, data: {
       }
 
       if (oldData.googleTaskId) {
+        const taskDate = new Date(data.endDate);
+        taskDate.setUTCHours(0, 0, 0, 0);
+
         await tasks.tasks.patch({
           tasklist: '@default',
           task: oldData.googleTaskId,
           requestBody: {
             title: `🚨 PRAZO: ${data.type} | ${processData?.name}`,
             notes: newDescription,
-            due: formatISO(new Date(data.endDate)),
+            due: taskDate.toISOString(),
           }
         });
       }
     } catch (e) {
-      console.warn('Failed to update Workspace for deadline:', id);
+      console.warn('Failed to update Workspace items for deadline:', id);
     }
 
     revalidatePath('/dashboard/prazos');
@@ -395,7 +399,7 @@ export async function updateDeadlineStatus(id: string, status: LegalDeadlineStat
         }
       }
 
-      let responsibleName = session.user.name || 'Alan Bueno de Gois';
+      let responsibleName = session.user.name || 'Advogado Responsável';
       if (processData?.leadLawyerId) {
           const staffDoc = await firestoreAdmin.collection('staff').doc(processData.leadLawyerId).get();
           const staffData = staffDoc.data();
@@ -444,7 +448,6 @@ export async function updateDeadlineStatus(id: string, status: LegalDeadlineStat
       console.warn('Failed to update Workspace status for deadline:', id);
     }
 
-    // Adicionar evento na timeline do processo
     const timelineEvent: TimelineEvent = {
       id: uuidv4(),
       type: 'note',
