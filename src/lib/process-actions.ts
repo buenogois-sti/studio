@@ -4,6 +4,7 @@ import type { Process } from './types';
 import type { firestore as adminFirestore } from 'firebase-admin';
 import { copyFile } from './drive-actions';
 import { syncProcessToDrive } from './drive';
+import { revalidatePath } from 'next/cache';
 
 function serializeProcess(doc: adminFirestore.DocumentSnapshot): Process | null {
     const data = doc.data();
@@ -60,6 +61,19 @@ export async function searchProcesses(query: string): Promise<Process[]> {
     } catch (error) {
         console.error("Error searching processes:", error);
         throw new Error('Ocorreu um erro ao buscar os processos.');
+    }
+}
+
+export async function archiveProcess(processId: string): Promise<{ success: boolean; error?: string }> {
+    if (!firestoreAdmin) throw new Error("Servidor indisponível.");
+    try {
+        await firestoreAdmin.collection('processes').doc(processId).update({
+            status: 'Arquivado',
+            updatedAt: new Date(),
+        });
+        return { success: true };
+    } catch (error: any) {
+        return { success: false, error: error.message };
     }
 }
 
