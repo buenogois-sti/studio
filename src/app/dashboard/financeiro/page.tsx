@@ -26,7 +26,8 @@ import {
   ShieldCheck,
   CheckCircle2,
   Coins,
-  Scale
+  Scale,
+  Stamp
 } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, Timestamp, query, orderBy, deleteDoc, doc, getDocs, where } from 'firebase/firestore';
@@ -256,87 +257,99 @@ function ReceiptDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-4xl bg-white text-slate-900 p-0 overflow-hidden border-none shadow-2xl">
-        <div className="p-12 space-y-8 print:p-0">
-          <div className="flex justify-between items-start border-b-4 border-slate-900 pb-8">
-            <div className="flex items-center gap-4">
-              <div className="bg-slate-900 p-3 rounded-xl">
-                <img src="/logo.png" alt="Logo" className="h-12 w-auto brightness-0 invert" />
+      <DialogContent className="sm:max-w-4xl bg-slate-50 text-slate-900 p-0 overflow-hidden border-none shadow-2xl">
+        <ScrollArea className="max-h-[90vh]">
+          <div className="p-8 md:p-12 space-y-8 bg-white print:p-0 print:shadow-none print:m-0" id="receipt-print-area">
+            {/* Cabeçalho Profissional */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b-2 border-slate-900 pb-8 gap-6">
+              <div className="flex items-center gap-4">
+                <div className="bg-slate-900 p-2 rounded-lg print:bg-transparent">
+                  <img src="/logo.png" alt="Logo Bueno Gois" className="h-14 w-auto print:brightness-0" />
+                </div>
+                <div className="space-y-0.5">
+                  <h2 className="text-xl font-black uppercase tracking-tighter text-slate-900">Bueno Gois Advogados</h2>
+                  <p className="text-[10px] text-slate-500 uppercase font-bold">Bueno Gois Advogados e Associados</p>
+                  <p className="text-[9px] text-slate-400">Rua Marechal Deodoro, 1594 - Sala 2, SBC/SP</p>
+                </div>
               </div>
-              <div className="space-y-1">
-                <h2 className="text-2xl font-black uppercase tracking-tighter text-slate-900">Bueno Gois Advogados</h2>
-                <p className="text-[10px] text-slate-600 uppercase font-bold">CNPJ: 00.000.000/0001-00 | OAB/SP 000.000</p>
-                <p className="text-[10px] text-slate-600">Rua Marechal Deodoro, 1594 - SBC/SP</p>
-              </div>
-            </div>
-            <div className="text-right">
-              <div className="text-3xl font-black text-slate-900 leading-none">RECIBO DE REPASSE</div>
-              <div className="text-xs font-bold text-slate-500 uppercase mt-2 tracking-widest">Controle: {title.id.substring(0, 8).toUpperCase()}</div>
-            </div>
-          </div>
-
-          <div className="py-6 space-y-6 text-lg leading-relaxed text-justify text-slate-800">
-            <p>
-              Declaramos para os devidos fins que o escritório <strong>Bueno Gois Advogados e Associados</strong> recebeu de <strong>{opposingParty}</strong> a importância bruta de <strong>{formattedTotal}</strong>, referente ao pagamento de <i>{title.description}</i> no âmbito do processo judicial nº <strong>{process?.processNumber || 'N/A'}</strong>.
-            </p>
-            
-            <p>
-              Pelo presente instrumento, o escritório efetua o repasse de valores ao cliente <strong>{client ? `${client.firstName} ${client.lastName}` : 'N/A'}</strong>, inscrito no CPF/CNPJ <strong>{client?.document || 'N/A'}</strong>, procedendo com a dedução da verba honorária advocatícia contratual, conforme demonstrativo discriminado abaixo:
-            </p>
-          </div>
-
-          <div className="bg-slate-50 border-2 border-slate-200 rounded-2xl overflow-hidden my-8">
-            <table className="w-full text-base">
-              <thead className="bg-slate-100 border-b border-slate-200">
-                <tr>
-                  <th className="px-6 py-4 text-left font-black uppercase text-xs tracking-widest text-slate-600">Discriminação das Verbas</th>
-                  <th className="px-6 py-4 text-right font-black uppercase text-xs tracking-widest text-slate-600">Valor (R$)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200">
-                <tr>
-                  <td className="px-6 py-4 font-semibold">Valor Bruto Recebido (Proveniente do Réu)</td>
-                  <td className="px-6 py-4 text-right font-bold">{formattedTotal}</td>
-                </tr>
-                <tr className="text-rose-600 bg-rose-50/30">
-                  <td className="px-6 py-4 font-semibold">(-) Honorários Advocatícios Contratuais ({feePercent}%)</td>
-                  <td className="px-6 py-4 text-right font-bold italic">({formattedFee})</td>
-                </tr>
-                <tr className="bg-emerald-50 font-black text-emerald-900 border-t-2 border-emerald-200">
-                  <td className="px-6 py-5 uppercase tracking-tighter text-lg">Valor Líquido a Repassar ao Cliente</td>
-                  <td className="px-6 py-5 text-right text-2xl">{formattedNet}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <div className="text-sm text-center italic text-slate-500 py-6 border-y border-slate-100">
-            "O cliente declara ter conferido os valores acima e dá plena, rasa e geral quitação para nada mais reclamar quanto ao objeto deste pagamento específico."
-          </div>
-
-          <div className="pt-12 flex flex-col items-center gap-16">
-            <p className="text-lg font-bold">São Bernardo do Campo, {today}</p>
-            
-            <div className="grid grid-cols-2 gap-20 w-full max-w-2xl pt-8">
-              <div className="flex flex-col items-center text-center">
-                <div className="w-full border-t-2 border-slate-900 mb-3" />
-                <p className="text-xs font-black uppercase tracking-widest">Bueno Gois Advogados</p>
-                <p className="text-[10px] text-slate-500 uppercase font-bold">Representante Legal</p>
-              </div>
-              <div className="flex flex-col items-center text-center">
-                <div className="w-full border-t-2 border-slate-900 mb-3" />
-                <p className="text-xs font-black uppercase tracking-widest">{client ? `${client.firstName} ${client.lastName}` : 'Beneficiário'}</p>
-                <p className="text-[10px] text-slate-500 uppercase font-bold">Assinatura do Cliente</p>
+              <div className="text-left md:text-right">
+                <div className="text-3xl font-black text-slate-900 leading-none">RECIBO DE REPASSE</div>
+                <p className="text-[10px] text-slate-500 font-bold mt-2 tracking-widest uppercase">Documento de Controle: {title.id.substring(0, 8).toUpperCase()}</p>
               </div>
             </div>
-          </div>
-        </div>
 
-        <DialogFooter className="p-6 bg-slate-100 border-t print:hidden">
-          <Button variant="outline" onClick={() => onOpenChange(false)} className="text-slate-600 border-slate-300">Fechar Janela</Button>
-          <Button onClick={handlePrint} className="gap-2 bg-slate-900 text-white hover:bg-slate-800 h-12 px-8 font-black uppercase tracking-widest text-xs">
-            <Printer className="h-4 w-4" /> Imprimir Documento
-          </Button>
+            {/* Texto do Recibo */}
+            <div className="py-4 space-y-6 text-base leading-relaxed text-justify text-slate-800">
+              <p>
+                Declaramos para os devidos fins que o escritório <strong className="text-slate-900">Bueno Gois Advogados e Associados</strong>, inscrito no CNPJ sob nº 00.000.000/0001-00, recebeu de <strong className="text-slate-900">{opposingParty}</strong> a importância bruta de <strong>{formattedTotal}</strong>, referente ao pagamento de <i>{title.description}</i> nos autos do processo judicial nº <strong className="text-slate-900">{process?.processNumber || 'N/A'}</strong>.
+              </p>
+              
+              <p>
+                Pelo presente instrumento, o escritório efetua neste ato o repasse de valores ao cliente <strong className="text-slate-900">{client ? `${client.firstName} ${client.lastName}` : 'N/A'}</strong>, portador do CPF/CNPJ <strong className="text-slate-900">{client?.document || 'N/A'}</strong>, procedendo com a regular dedução da verba honorária advocatícia contratual, conforme demonstrativo discriminado no quadro abaixo:
+              </p>
+            </div>
+
+            {/* Quadro de Valores Premium */}
+            <div className="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden my-8">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-100/50 border-b border-slate-200">
+                  <tr>
+                    <th className="px-6 py-3 text-left font-black uppercase text-[10px] tracking-widest text-slate-500">Discriminação das Verbas</th>
+                    <th className="px-6 py-3 text-right font-black uppercase text-[10px] tracking-widest text-slate-500">Valor (R$)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200">
+                  <tr className="hover:bg-slate-100/30 transition-colors">
+                    <td className="px-6 py-4 text-slate-700 font-medium">Valor Bruto Recebido (Proveniente da Parte Reclamada)</td>
+                    <td className="px-6 py-4 text-right font-bold text-slate-900">{formattedTotal}</td>
+                  </tr>
+                  <tr className="text-rose-600 bg-rose-50/20">
+                    <td className="px-6 py-4 font-medium flex items-center gap-2">
+                      <Scale className="h-3 w-3" /> Honorários Advocatícios Contratuais ({feePercent}%)
+                    </td>
+                    <td className="px-6 py-4 text-right font-bold italic">({formattedFee})</td>
+                  </tr>
+                  <tr className="bg-emerald-50/50 font-black text-emerald-900 border-t-2 border-emerald-200">
+                    <td className="px-6 py-5 uppercase tracking-tighter text-base">Valor Líquido de Repasse ao Cliente</td>
+                    <td className="px-6 py-5 text-right text-xl">{formattedNet}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* Termo de Quitação */}
+            <div className="text-xs text-center italic text-slate-500 px-12 py-6 border-y border-slate-100">
+              "O beneficiário acima identificado declara ter conferido os valores discriminados e dá plena, rasa e geral quitação ao escritório de advocacia para nada mais reclamar quanto ao objeto deste pagamento específico, servindo este como prova de recebimento."
+            </div>
+
+            {/* Local e Assinaturas */}
+            <div className="pt-12 flex flex-col items-center gap-16">
+              <p className="text-base font-bold text-slate-900">São Bernardo do Campo, {today}</p>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-12 md:gap-24 w-full max-w-2xl pt-8">
+                <div className="flex flex-col items-center text-center">
+                  <div className="w-full border-t border-slate-900 mb-3" />
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-900">Bueno Gois Advogados</p>
+                  <p className="text-[9px] text-slate-500 uppercase font-bold">Representante Legal</p>
+                </div>
+                <div className="flex flex-col items-center text-center">
+                  <div className="w-full border-t border-slate-900 mb-3" />
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-900">{client ? `${client.firstName} ${client.lastName}` : 'Beneficiário'}</p>
+                  <p className="text-[9px] text-slate-500 uppercase font-bold">Assinatura do Cliente</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </ScrollArea>
+
+        <DialogFooter className="p-6 bg-slate-100 border-t print:hidden flex items-center justify-between gap-4">
+          <p className="hidden md:block text-[10px] text-slate-500 font-bold uppercase tracking-widest">Bueno Gois Legal Engine</p>
+          <div className="flex gap-3">
+            <DialogClose asChild><Button variant="outline" className="text-slate-600 border-slate-300">Fechar</Button></DialogClose>
+            <Button onClick={handlePrint} className="gap-2 bg-slate-900 text-white hover:bg-slate-800 h-11 px-8 font-black uppercase tracking-widest text-[11px]">
+              <Printer className="h-4 w-4" /> Imprimir Documento
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -366,28 +379,31 @@ function HonorariosReceiptDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-4xl bg-white text-slate-900 p-0 overflow-hidden border-none shadow-2xl">
-        <div className="p-12 space-y-8 print:p-0">
+        <div className="p-12 space-y-10 print:p-0 print:m-0" id="honorarios-print-area">
           <div className="flex justify-between items-start border-b-4 border-slate-900 pb-8">
             <div className="flex items-center gap-4">
-              <div className="bg-slate-900 p-3 rounded-xl">
-                <img src="/logo.png" alt="Logo" className="h-12 w-auto brightness-0 invert" />
+              <div className="bg-slate-900 p-3 rounded-xl print:bg-transparent">
+                <img src="/logo.png" alt="Logo" className="h-12 w-auto print:brightness-0" />
               </div>
               <div className="space-y-1">
                 <h2 className="text-2xl font-black uppercase tracking-tighter text-slate-900">Bueno Gois Advogados</h2>
-                <p className="text-[10px] text-slate-600 uppercase font-bold">OAB/SP 000.000 | CONTABILIDADE INTERNA</p>
+                <p className="text-[10px] text-slate-600 uppercase font-bold tracking-widest">OAB/SP 000.000 | CONTABILIDADE INTERNA</p>
               </div>
             </div>
             <div className="text-right">
-              <div className="text-3xl font-black text-slate-900 leading-none">RECIBO DE HONORÁRIOS</div>
+              <div className="text-3xl font-black text-slate-900 leading-none">HONORÁRIOS</div>
               <div className="text-xs font-bold text-slate-500 mt-2">DOC: {title.id.substring(0, 8).toUpperCase()}</div>
             </div>
           </div>
 
-          <div className="py-8 space-y-8 text-xl leading-relaxed text-justify">
+          <div className="py-12 space-y-8 text-xl leading-relaxed text-justify border-l-4 border-primary/20 pl-8 bg-slate-50/50 rounded-r-3xl">
             <p>
-              Recebemos de <strong>{client ? `${client.firstName} ${client.lastName}` : 'N/A'}</strong> a importância de <strong>{formattedFee}</strong>, referente aos honorários advocatícios contratuais de {feePercent}% incidentes sobre o recebimento de <i>{title.description}</i>.
+              Confirmamos o recebimento de <strong className="text-slate-900 font-black">{formattedFee}</strong> do cliente <strong>{client ? `${client.firstName} ${client.lastName}` : 'N/A'}</strong>, referente aos honorários advocatícios contratuais de êxito ({feePercent}%) incidentes sobre a verba recebida em:
             </p>
-            <p className="text-sm text-slate-500 uppercase font-bold tracking-widest">
+            <p className="italic text-slate-600 bg-white p-4 rounded-xl border border-slate-200">
+              "{title.description}"
+            </p>
+            <p className="text-sm text-slate-500 uppercase font-black tracking-[0.2em]">
               Natureza da Verba: Honorários Advocatícios de Êxito / Quota Litis.
             </p>
           </div>
@@ -397,14 +413,14 @@ function HonorariosReceiptDialog({
             <div className="w-full max-w-md text-center">
               <div className="w-full border-t-2 border-slate-900 mb-3" />
               <p className="text-sm font-black uppercase tracking-widest text-slate-900">Bueno Gois Advogados e Associados</p>
-              <p className="text-xs text-slate-500 font-bold uppercase mt-1">Prestador de Serviços</p>
+              <p className="text-[10px] text-slate-500 font-bold uppercase mt-1">Prestador de Serviços Jurídicos</p>
             </div>
           </div>
         </div>
 
         <DialogFooter className="p-6 bg-slate-50 border-t print:hidden">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Fechar</Button>
-          <Button onClick={handlePrint} className="gap-2 bg-slate-900 text-white h-12 px-8 font-black uppercase text-xs">
+          <DialogClose asChild><Button variant="outline">Fechar</Button></DialogClose>
+          <Button onClick={handlePrint} className="gap-2 bg-slate-900 text-white h-12 px-10 font-black uppercase tracking-widest text-xs">
             <Printer className="h-4 w-4" /> Imprimir Recibo de Honorários
           </Button>
         </DialogFooter>
@@ -452,8 +468,8 @@ function RepassePaymentDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-xl bg-card border-border">
         <DialogHeader>
-          <DialogTitle className="text-white flex items-center gap-2">
-            <Wallet className="h-5 w-5 text-emerald-400" />
+          <DialogTitle className="text-white flex items-center gap-2 font-headline text-xl">
+            <Wallet className="h-6 w-6 text-emerald-400" />
             Processar Repasse de Honorários
           </DialogTitle>
           <DialogDescription className="text-slate-400">
@@ -462,43 +478,43 @@ function RepassePaymentDialog({
         </DialogHeader>
 
         <div className="space-y-6 py-4">
-          <div className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/20 text-center">
-            <p className="text-[10px] font-black uppercase text-emerald-400 mb-1">Valor Total a Pagar</p>
-            <p className="text-3xl font-black text-white">{totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+          <div className="p-6 rounded-2xl bg-emerald-500/5 border-2 border-emerald-500/20 text-center shadow-[0_0_30px_rgba(16,185,129,0.05)]">
+            <p className="text-[10px] font-black uppercase text-emerald-400 mb-1 tracking-[0.2em]">Valor Total Líquido a Pagar</p>
+            <p className="text-4xl font-black text-white tabular-nums">{totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
           </div>
 
           <div className="space-y-3">
-            <h4 className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Itens do Repasse ({credits.length})</h4>
-            <ScrollArea className="h-[200px] border border-white/5 rounded-lg p-2 bg-black/20">
+            <h4 className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Extrato de Créditos ({credits.length})</h4>
+            <ScrollArea className="h-[200px] border border-white/5 rounded-xl p-2 bg-black/40">
               <div className="space-y-2">
                 {credits.map(c => (
-                  <div key={c.id} className="flex items-center justify-between p-2 rounded-md bg-white/5 border border-white/5">
+                  <div key={c.id} className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/5 hover:border-emerald-500/30 transition-all">
                     <div className="min-w-0 flex-1">
                       <p className="text-xs font-bold text-slate-200 truncate">{c.description}</p>
-                      <p className="text-[9px] text-muted-foreground uppercase">{c.processId ? `Processo Vinculado` : 'Avulso'}</p>
+                      <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-tighter">{c.processId ? `Vínculo: Processo Ativo` : 'Vínculo: Honorário Avulso'}</p>
                     </div>
-                    <span className="text-xs font-black text-emerald-400 ml-4">{c.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                    <span className="text-sm font-black text-emerald-400 ml-4 tabular-nums">{c.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
                   </div>
                 ))}
               </div>
             </ScrollArea>
           </div>
 
-          <div className="flex items-start gap-3 p-3 rounded-lg bg-blue-500/5 border border-blue-500/20 text-[10px] text-blue-400 italic">
+          <div className="flex items-start gap-3 p-4 rounded-xl bg-blue-500/5 border border-blue-500/20 text-[11px] text-blue-400 italic leading-relaxed">
             <AlertCircle className="h-4 w-4 shrink-0" />
-            <p>Ao confirmar, o sistema registrará uma saída de caixa no financeiro e marcará estes honorários como pagos no histórico do profissional.</p>
+            <p>Esta operação é irreversível. Ao confirmar, o sistema registrará uma saída de caixa e dará quitação automática aos honorários deste profissional no histórico interno.</p>
           </div>
         </div>
 
         <DialogFooter className="gap-2">
-          <DialogClose asChild><Button variant="ghost" className="text-slate-400">Cancelar</Button></DialogClose>
+          <DialogClose asChild><Button variant="ghost" className="text-slate-400 hover:text-white">Cancelar</Button></DialogClose>
           <Button 
-            className="bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase tracking-widest"
+            className="bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase tracking-widest text-[11px] px-8 h-11 shadow-lg shadow-emerald-900/20"
             onClick={handlePay}
             disabled={isProcessing}
           >
             {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
-            Confirmar Pagamento
+            Confirmar e Emitir Recibo
           </Button>
         </DialogFooter>
       </DialogContent>
