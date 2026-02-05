@@ -128,14 +128,13 @@ function PaymentHistory({ onShowVoucher }: { onShowVoucher: (t: FinancialTitle) 
   if (isLoading) return <div className="space-y-4">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-16 w-full bg-white/5 rounded-xl" />)}</div>;
 
   if (error) {
-    const errorMsg = error instanceof Error ? error.message : "Erro desconhecido";
     return (
       <Card className="bg-rose-500/5 border-rose-500/20 p-12 text-center flex flex-col items-center gap-4">
         <AlertTriangle className="h-12 w-12 text-rose-500" />
         <div className="space-y-2">
-          <h3 className="text-xl font-bold text-white">Falha ao Carregar Histórico</h3>
+          <h3 className="text-xl font-bold text-white">Índice Requerido</h3>
           <p className="text-sm text-slate-400 max-w-sm">
-            {`Ocorreu um erro no servidor: ${errorMsg}`}
+            Para ver o histórico, o Firebase exige um índice composto para os campos 'origin' e 'paymentDate'.
           </p>
         </div>
       </Card>
@@ -159,6 +158,92 @@ function PaymentHistory({ onShowVoucher }: { onShowVoucher: (t: FinancialTitle) 
         </TableBody>
       </Table>
     </Card>
+  );
+}
+
+function StaffVoucherDialog({ 
+  staff, 
+  credits, 
+  totalValue, 
+  paymentDate, 
+  open, 
+  onOpenChange 
+}: { 
+  staff: Staff | null; 
+  credits: any[]; 
+  totalValue: number; 
+  paymentDate?: Date; 
+  open: boolean; 
+  onOpenChange: (open: boolean) => void 
+}) {
+  if (!staff) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-4xl bg-white text-slate-900 p-0 overflow-hidden border-none shadow-none print:shadow-none">
+        <ScrollArea className="max-h-[90vh] print:max-h-full">
+          <div className="p-10 space-y-8 bg-white" id="staff-voucher-print-area">
+            <div className="flex justify-between items-center border-b-2 border-slate-900 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="bg-slate-900 p-1.5 rounded-lg print:bg-transparent">
+                  <img src="/logo.png" alt="Logo" className="h-10 w-auto print:brightness-0" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-black uppercase tracking-tighter">Bueno Gois Advogados</h2>
+                  <p className="text-[8px] text-slate-500 uppercase font-bold tracking-widest">Recibo de Liquidação de Honorários/Salário</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-xl font-black text-slate-900 leading-none font-headline">COMPROVANTE</div>
+                <div className="text-[8px] font-bold text-slate-500 mt-1 uppercase tracking-widest">Data: {format(paymentDate || new Date(), 'dd/MM/yyyy')}</div>
+              </div>
+            </div>
+
+            <div className="space-y-4 text-sm leading-relaxed text-justify text-slate-800">
+              <p>
+                Confirmamos a liquidação de créditos em favor do profissional <strong className="text-slate-900">{staff.firstName} {staff.lastName}</strong>, portador do CPF <strong className="text-slate-900">{staff.bankInfo?.pixKey || 'N/A'}</strong>, referente aos lançamentos descritos abaixo, processados pelo financeiro central do escritório.
+              </p>
+            </div>
+
+            <div className="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden">
+              <table className="w-full text-xs">
+                <thead className="bg-slate-100 border-b border-slate-200">
+                  <tr>
+                    <th className="px-4 py-2 text-left font-black uppercase text-[9px] tracking-widest text-slate-500">Descrição do Lançamento</th>
+                    <th className="px-4 py-2 text-right font-black uppercase text-[9px] tracking-widest text-slate-500">Valor (R$)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200">
+                  {credits.map((c, i) => (
+                    <tr key={i}>
+                      <td className="px-4 py-2.5 text-slate-700">{c.description}</td>
+                      <td className="px-4 py-2.5 text-right font-bold text-slate-900">{c.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                    </tr>
+                  ))}
+                  <tr className="bg-slate-900 font-black text-white border-t-2">
+                    <td className="px-4 py-3 uppercase tracking-tighter text-sm">Total Líquido Liquidado</td>
+                    <td className="px-4 py-3 text-right text-lg">{totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div className="pt-10 flex flex-col items-center gap-12">
+              <p className="text-sm font-bold text-slate-900">São Bernardo do Campo, {format(paymentDate || new Date(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}</p>
+              <div className="w-full max-w-sm text-center">
+                <div className="w-full border-t border-slate-900 mb-1" />
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-900">Bueno Gois Advogados e Associados</p>
+                <p className="text-[8px] text-slate-500 uppercase font-bold">Setor Financeiro</p>
+              </div>
+            </div>
+          </div>
+        </ScrollArea>
+        <DialogFooter className="p-6 bg-slate-50 border-t print:hidden flex justify-end gap-3">
+          <DialogClose asChild><Button variant="ghost">Fechar</Button></DialogClose>
+          <Button onClick={() => window.print()} className="gap-2 bg-slate-900 text-white"><Printer className="h-4 w-4" /> Imprimir Comprovante</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -256,7 +341,7 @@ function ManageCreditsDialog({ staff, open, onOpenChange, onUpdate }: { staff: S
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-4xl bg-[#020617] border-white/10 p-0 overflow-hidden h-[85vh] flex flex-col">
         <DialogHeader className="p-6 border-b border-white/5 bg-white/5"><div className="flex items-center justify-between"><div className="flex items-center gap-4"><div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-black text-lg">{staff.firstName.charAt(0)}{staff.lastName.charAt(0)}</div><div><DialogTitle className="text-xl font-black text-white">{staff.firstName} {staff.lastName}</DialogTitle><DialogDescription className="text-slate-400">Auditoria e gestão de lançamentos pendentes</DialogDescription></div></div><Button size="sm" onClick={() => setIsAdding(true)} className="gap-2"><Plus className="h-4 w-4" /> Novo Lançamento</Button></div></DialogHeader>
-        <div className="flex-1 overflow-hidden flex flex-col"><div className="p-4 bg-black/20 flex items-center gap-2"><Button variant={filter === 'ALL' ? 'default' : 'ghost'} size="sm" onClick={() => setFilter('ALL')} className="text-[10px] uppercase font-black h-8">Todos Pendentes</Button><Button variant={filter === 'DISPONIVEL' ? 'default' : 'ghost'} size="sm" onClick={() => setFilter('DISPONIVEL')} className="text-[10px] uppercase font-black h-8 text-emerald-400">Disponíveis</Button><Button variant={filter === 'RETIDO' ? 'default' : 'ghost'} size="sm" onClick={() => setFilter('RETIDO')} className="text-[10px] uppercase font-black h-8 text-blue-400">Retidos</Button></div><ScrollArea className="flex-1"><div className="p-6">{isLoading ? (<div className="space-y-4">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-16 w-full bg-white/5" />)}</div>) : filteredCredits.length > 0 ? (<div className="space-y-3">{filteredCredits.map(c => (<div key={c.id} className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5 group hover:border-white/20 transition-all"><div className="flex-1 min-w-0 mr-4"><div className="flex items-center gap-2 mb-1"><Badge variant="outline" className={cn("text-[8px] font-black uppercase px-1.5 h-4 border-none", c.status === 'DISPONIVEL' ? "bg-emerald-500/20 text-emerald-400" : "bg-blue-500/20 text-blue-400")}>{c.status}</Badge><span className="text-[10px] text-muted-foreground font-medium">{c.date ? format(c.date.toDate(), 'dd/MM/yyyy') : 'N/A'}</span></div><p className="text-sm font-bold text-white truncate">{c.description}</p><p className="text-[10px] text-slate-500 uppercase font-bold">{c.type}</p></div><div className="flex items-center gap-6"><span className="text-sm font-black text-white tabular-nums">{c.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span><div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"><Button variant="ghost" size="icon" className="h-8 w-8 text-blue-400" onClick={() => setEditingCredit(c)}><Edit className="h-4 w-4" /></Button><Button variant="ghost" size="icon" className="h-8 w-8 text-rose-500" onClick={() => handleDelete(c.id)} disabled={isProcessing === c.id}>{isProcessing === c.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}</Button></div></div></div>))}</div>) : (<div className="text-center py-20 opacity-30"><FileText className="h-12 w-12 mx-auto mb-2" /><p className="text-sm font-bold uppercase">Nenhum lançamento encontrado</p></div>)}</div></ScrollArea></div>
+        <div className="flex-1 overflow-hidden flex flex-col"><div className="p-4 bg-black/20 flex items-center gap-2"><Button variant={filter === 'ALL' ? 'default' : 'ghost'} size="sm" onClick={() => setFilter('ALL')} className="text-[10px] uppercase font-black h-8">Todos Pendentes</Button><Button variant={filter === 'DISPONIVEL' ? 'default' : 'ghost'} size="sm" onClick={() => setFilter('DISPONIVEL')} className="text-[10px] uppercase font-black h-8 text-emerald-400">Disponíveis</Button><Button variant={filter === 'RETIDO' ? 'default' : 'ghost'} size="sm" onClick={() => setFilter('RETIDO')} className="text-[10px] uppercase font-black h-8 text-blue-400">Retidos</Button></div><ScrollArea className="flex-1"><div className="p-6">{isLoading ? (<div className="space-y-4">{[...Array(3)].map((_, i) => <Skeleton className="h-16 w-full bg-white/5" />)}</div>) : filteredCredits.length > 0 ? (<div className="space-y-3">{filteredCredits.map(c => (<div key={c.id} className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5 group hover:border-white/20 transition-all"><div className="flex-1 min-w-0 mr-4"><div className="flex items-center gap-2 mb-1"><Badge variant="outline" className={cn("text-[8px] font-black uppercase px-1.5 h-4 border-none", c.status === 'DISPONIVEL' ? "bg-emerald-500/20 text-emerald-400" : "bg-blue-500/20 text-blue-400")}>{c.status}</Badge><span className="text-[10px] text-muted-foreground font-medium">{c.date ? format(c.date.toDate(), 'dd/MM/yyyy') : 'N/A'}</span></div><p className="text-sm font-bold text-white truncate">{c.description}</p><p className="text-[10px] text-slate-500 uppercase font-bold">{c.type}</p></div><div className="flex items-center gap-6"><span className="text-sm font-black text-white tabular-nums">{c.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span><div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"><Button variant="ghost" size="icon" className="h-8 w-8 text-blue-400" onClick={() => setEditingCredit(c)}><Edit className="h-4 w-4" /></Button><Button variant="ghost" size="icon" className="h-8 w-8 text-rose-500" onClick={() => handleDelete(c.id)} disabled={isProcessing === c.id}>{isProcessing === c.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}</Button></div></div></div>))}</div>) : (<div className="text-center py-20 opacity-30"><FileText className="h-12 w-12 mx-auto mb-2" /><p className="text-sm font-bold uppercase">Nenhum lançamento encontrado</p></div>)}</div></ScrollArea></div>
         <DialogFooter className="p-6 border-t border-white/5 bg-black/20"><DialogClose asChild><Button variant="ghost">Fechar Painel</Button></DialogClose></DialogFooter>
       </DialogContent>
       <Dialog open={!!editingCredit} onOpenChange={(o) => !o && setEditingCredit(null)}><DialogContent className="bg-card border-border sm:max-w-md"><DialogHeader><DialogTitle>Editar Lançamento</DialogTitle><DialogDescription>Ajuste os dados do crédito.</DialogDescription></DialogHeader><EditCreditForm initialData={editingCredit} onSubmit={handleEditSubmit} isSaving={isProcessing === editingCredit?.id} /></DialogContent></Dialog>

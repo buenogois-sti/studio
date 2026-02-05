@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -71,9 +70,9 @@ function NewReimbursementDialog({
   currentUserId: string | null;
   currentUserName: string;
 }) {
+  const { firestore } = useFirebase();
   const [open, setOpen] = React.useState(false);
   const [isSaving, setIsSaving] = React.useState(false);
-  const { firestore } = useFirebase();
   const { toast } = useToast();
 
   const usersQuery = useMemoFirebase(() => (firestore && canManage ? collection(firestore, 'users') : null), [firestore, canManage]);
@@ -259,7 +258,6 @@ export default function ReembolsosPage() {
     }
   }, [canManage, activeTab]);
 
-  // Consulta para "Meus Pedidos" com ordenação descendente por data da despesa
   const myReimbursementsQuery = useMemoFirebase(
     () => (firestore && currentUserId ? query(
       collection(firestore, 'reimbursements'),
@@ -270,7 +268,6 @@ export default function ReembolsosPage() {
   );
   const { data: myData, isLoading: isLoadingMy, error: myError } = useCollection<Reimbursement>(myReimbursementsQuery);
 
-  // Consulta global para Fila Administrativa
   const allReimbursementsQuery = useMemoFirebase(
     () => (firestore && canManage ? query(
       collection(firestore, 'reimbursements'),
@@ -388,7 +385,7 @@ export default function ReembolsosPage() {
           </TabsList>
           
           {activeTab === 'todos' && canManage && (
-            <div className="relative w-full max-w-sm">
+            <div className="relative w-full max-sm:w-full max-w-sm">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input 
                 placeholder="Filtrar pedidos..." 
@@ -406,12 +403,12 @@ export default function ReembolsosPage() {
               <AlertTriangle className="h-4 w-4" />
               <AlertTitle>Índice Necessário no Banco de Dados</AlertTitle>
               <AlertDescription className="text-xs mt-2 space-y-4">
-                <p>Para visualizar seus pedidos, o Firebase exige a criação de um índice manual devido ao erro <strong>"query_scope"</strong> encontrado anteriormente.</p>
+                <p>Para visualizar seus pedidos, o Firebase exige a criação de um índice manual devido ao filtro de usuário combinado com ordenação.</p>
                 
                 <div className="bg-black/20 p-4 rounded-lg space-y-2 border border-white/10">
                   <p className="font-bold text-white">Siga estes passos no Firebase Console:</p>
                   <ol className="list-decimal list-inside space-y-1 text-slate-300">
-                    <li>Vá em <strong>Firestore Database</strong> -> <strong>Índices</strong>.</li>
+                    <li>Vá em <strong>Firestore Database</strong> &rarr; <strong>Índices</strong>.</li>
                     <li>Clique em <strong>"Adicionar Índice"</strong>.</li>
                     <li>ID da Coleção: <code className="bg-white/10 px-1 rounded">reimbursements</code></li>
                     <li>Campo 1: <code className="bg-white/10 px-1 rounded">userId</code> (Crescente)</li>
@@ -483,7 +480,7 @@ function ReimbursementTable({
       <div className="flex flex-col items-center justify-center py-20 text-center border-2 border-dashed border-border/50 rounded-2xl bg-white/5">
         <XCircle className="h-12 w-12 mb-4 text-muted-foreground/20" />
         <p className="font-bold text-lg text-white">Nenhum registro encontrado</p>
-        <p className="text-sm text-muted-foreground">Novas solicitações aparecerão aqui após a ativação do índice.</p>
+        <p className="text-sm text-muted-foreground">Novas solicitações aparecerão aqui conforme registradas.</p>
       </div>
     );
   }
