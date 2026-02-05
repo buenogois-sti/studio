@@ -86,7 +86,6 @@ const roleLabels: Record<string, string> = {
   partner: 'Sócio',
 };
 
-// --- Form Schemas ---
 const creditEditSchema = z.object({
   description: z.string().min(3, 'Descrição obrigatória'),
   value: z.coerce.number().positive('Valor deve ser positivo'),
@@ -97,8 +96,6 @@ const manualCreditSchema = z.object({
   value: z.coerce.number().positive('Valor deve ser positivo'),
   type: z.enum(['HONORARIOS', 'REEMBOLSO', 'SALARIO', 'PRODUCAO']),
 });
-
-// --- Components ---
 
 function ManageCreditsDialog({ 
   staff, 
@@ -118,7 +115,6 @@ function ManageCreditsDialog({
   const [isAdding, setIsAdding] = React.useState(false);
   const [editingCredit, setEditingCredit] = React.useState<any | null>(null);
 
-  // Queries
   const creditsQuery = useMemoFirebase(() => {
     if (!firestore || !staff) return null;
     const base = collection(firestore, `staff/${staff.id}/credits`);
@@ -600,7 +596,7 @@ function RepassePaymentDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl bg-[#020617] border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.5)] p-0 overflow-hidden">
+      <DialogContent className="sm:max-w-4xl bg-[#020617] border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.5)] p-0 overflow-hidden">
         <div className="p-8 space-y-8">
           <DialogHeader>
             <div className="flex items-center gap-4 mb-2">
@@ -618,11 +614,11 @@ function RepassePaymentDialog({
 
           <div className="relative group">
             <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500/20 to-primary/20 rounded-3xl blur opacity-25 group-hover:opacity-40 transition duration-1000"></div>
-            <div className="relative p-8 rounded-3xl bg-white/5 border border-white/10 text-center space-y-2">
+            <div className="relative p-10 rounded-3xl bg-white/5 border border-white/10 text-center space-y-2">
               <p className="text-[10px] font-black uppercase text-emerald-400 tracking-[0.25em] mb-1">Valor Total Líquido a Pagar</p>
               <div className="flex items-center justify-center gap-3">
                 <span className="text-2xl font-bold text-white/40 mt-2">R$</span>
-                <span className="text-5xl font-black text-white tracking-tighter tabular-nums">
+                <span className="text-6xl font-black text-white tracking-tighter tabular-nums">
                   {totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
@@ -632,39 +628,39 @@ function RepassePaymentDialog({
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h4 className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Extrato de Créditos Selecionados ({credits.length})</h4>
-              <Badge variant="outline" className="bg-white/5 border-white/10 text-slate-400 text-[9px] h-5">ID: {staff.id.substring(0, 6)}</Badge>
+              <Badge variant="outline" className="bg-white/5 border-white/10 text-slate-400 text-[9px] h-5 font-mono">REF: {staff.id.substring(0, 8).toUpperCase()}</Badge>
             </div>
             
-            <ScrollArea className="h-[240px] -mx-2 px-2">
-              <div className="space-y-2">
+            <ScrollArea className="h-[350px] -mx-2 px-2">
+              <div className="space-y-3">
                 {credits.map(c => (
-                  <div key={c.id} className="flex items-center justify-between p-4 rounded-2xl bg-[#0f172a] border border-white/5 hover:border-emerald-500/30 transition-all duration-300 group/item">
-                    <div className="min-w-0 flex-1 flex items-center gap-4">
+                  <div key={c.id} className="flex items-center justify-between p-5 rounded-2xl bg-[#0f172a] border border-white/5 hover:border-emerald-500/30 transition-all duration-300 group/item">
+                    <div className="min-w-0 flex-1 flex items-center gap-5">
                       <div className={cn(
-                        "h-10 w-10 rounded-xl flex items-center justify-center shrink-0 transition-transform group-hover/item:scale-110",
+                        "h-12 w-12 rounded-xl flex items-center justify-center shrink-0 transition-transform group-hover/item:scale-110 shadow-inner",
                         c.type === 'REEMBOLSO' ? "bg-blue-500/10" : c.type === 'SALARIO' ? "bg-purple-500/10" : "bg-emerald-500/10"
                       )}>
-                        {c.type === 'REEMBOLSO' ? <Receipt className="h-5 w-5 text-blue-400" /> : 
-                         c.type === 'SALARIO' ? <Briefcase className="h-5 w-5 text-purple-400" /> : 
-                         <Coins className="h-5 w-5 text-emerald-400" />}
+                        {c.type === 'REEMBOLSO' ? <Receipt className="h-6 w-6 text-blue-400" /> : 
+                         c.type === 'SALARIO' ? <Briefcase className="h-6 w-6 text-purple-400" /> : 
+                         <Coins className="h-6 w-6 text-emerald-400" />}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-bold text-slate-200 truncate leading-tight">{c.description}</p>
-                        <div className="flex items-center gap-2 mt-1">
+                        <p className="text-sm font-bold text-slate-200 truncate leading-tight mb-1">{c.description}</p>
+                        <div className="flex items-center gap-2">
                           <Badge variant="outline" className={cn(
-                            "text-[8px] font-black uppercase px-1.5 h-4 border-none",
+                            "text-[8px] font-black uppercase px-2 h-4.5 border-none",
                             c.type === 'REEMBOLSO' ? "bg-blue-500/20 text-blue-400" : 
                             c.type === 'SALARIO' ? "bg-purple-500/10 text-purple-400" : 
                             "bg-emerald-500/20 text-emerald-400"
                           )}>
                             {c.type === 'REEMBOLSO' ? 'Ressarcimento' : c.type === 'SALARIO' ? 'Pro-labore' : 'Participação'}
                           </Badge>
-                          {c.date && <span className="text-[9px] text-slate-500 font-medium">Ref: {format(c.date.toDate(), 'dd/MM/yy')}</span>}
+                          {c.date && <span className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">📅 {format(c.date.toDate(), 'dd/MM/yy')}</span>}
                         </div>
                       </div>
                     </div>
-                    <div className="text-right ml-4">
-                      <p className="text-sm font-black text-white tabular-nums">{c.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                    <div className="text-right ml-6 shrink-0">
+                      <p className="text-lg font-black text-white tabular-nums tracking-tight">{c.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
                     </div>
                   </div>
                 ))}
@@ -672,27 +668,27 @@ function RepassePaymentDialog({
             </ScrollArea>
           </div>
 
-          <div className="flex items-start gap-4 p-4 rounded-2xl bg-blue-500/5 border border-blue-500/20 text-[11px] text-blue-400/80 leading-relaxed animate-in fade-in slide-in-from-bottom-2 duration-500">
-            <div className="h-5 w-5 rounded-full bg-blue-500/10 flex items-center justify-center shrink-0">
-              <Info className="h-3 w-3" />
+          <div className="flex items-start gap-4 p-5 rounded-2xl bg-blue-500/5 border border-blue-500/20 text-[11px] text-blue-400/80 leading-relaxed animate-in fade-in slide-in-from-bottom-2 duration-500">
+            <div className="h-6 w-6 rounded-full bg-blue-500/10 flex items-center justify-center shrink-0">
+              <Info className="h-3.5 w-3.5" />
             </div>
-            <p>Esta operação registrará uma saída de caixa oficial no financeiro central do escritório e gerará um aviso de liquidação para o profissional.</p>
+            <p>Esta operação registrará uma saída de caixa oficial no financeiro central do escritório e gerará um aviso de liquidação para o profissional. Certifique-se de que os dados bancários estão corretos.</p>
           </div>
         </div>
 
         <DialogFooter className="bg-black/20 p-6 border-t border-white/5 gap-3">
           <DialogClose asChild>
-            <Button variant="ghost" className="text-slate-400 hover:text-white font-bold h-12 px-6">
+            <Button variant="ghost" className="text-slate-400 hover:text-white font-bold h-14 px-8 text-xs uppercase tracking-widest">
               Cancelar
             </Button>
           </DialogClose>
           <Button 
-            className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase tracking-widest text-[11px] h-12 shadow-lg shadow-emerald-900/20 group"
+            className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase tracking-widest text-[11px] h-14 shadow-xl shadow-emerald-900/20 group"
             onClick={handlePay}
             disabled={isProcessing}
           >
-            {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4 group-hover:scale-110 transition-transform" />}
-            Confirmar Pagamento
+            {isProcessing ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <CheckCircle2 className="mr-2 h-5 w-5 group-hover:scale-110 transition-transform" />}
+            Confirmar Pagamento e Emitir
           </Button>
         </DialogFooter>
       </DialogContent>
