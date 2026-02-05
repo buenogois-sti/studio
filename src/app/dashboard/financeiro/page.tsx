@@ -1,3 +1,4 @@
+
 'use client';
 import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -257,8 +258,8 @@ function ReceiptDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-4xl bg-white text-slate-900 p-0 overflow-hidden border-none shadow-2xl">
-        <ScrollArea className="max-h-[90vh]">
+      <DialogContent className="sm:max-w-4xl bg-white text-slate-900 p-0 overflow-hidden border-none shadow-2xl print:shadow-none print:max-w-full">
+        <ScrollArea className="max-h-[90vh] print:max-h-full">
           <div className="p-10 space-y-6 bg-white print:p-0 print:shadow-none print:m-0" id="receipt-print-area">
             {/* Cabeçalho Profissional Compacto */}
             <div className="flex justify-between items-center border-b-2 border-slate-900 pb-4">
@@ -374,7 +375,7 @@ function HonorariosReceiptDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-4xl bg-white text-slate-900 p-0 overflow-hidden border-none shadow-2xl">
+      <DialogContent className="sm:max-w-4xl bg-white text-slate-900 p-0 overflow-hidden border-none shadow-2xl print:shadow-none print:max-w-full">
         <div className="p-10 space-y-8 bg-white print:p-0 print:m-0" id="honorarios-print-area">
           <div className="flex justify-between items-center border-b-2 border-slate-900 pb-4">
             <div className="flex items-center gap-3">
