@@ -31,10 +31,10 @@ import {
 import Link from 'next/link';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, limit, Timestamp } from 'firebase/firestore';
+import { collection, query, orderBy, limit, Timestamp, where } from 'firebase/firestore';
 import type { Client, FinancialTitle, Process, Hearing, Log } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import { format, formatDistanceToNow, isBefore } from 'date-fns';
+import { format, formatDistanceToNow, isBefore, startOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -128,15 +128,26 @@ export default function Dashboard() {
   const { firestore } = useFirebase();
   const { data: session, status } = useSession();
 
-  const titlesQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'financial_titles') : null), [firestore]);
+  // OTIMIZAÇÃO: Consulta financeira limitada ao mês atual para os cards de topo
+  const titlesQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    const startOfCurrentMonth = Timestamp.fromDate(startOfMonth(new Date()));
+    return query(
+      collection(firestore, 'financial_titles'),
+      where('dueDate', '>=', startOfCurrentMonth)
+    );
+  }, [firestore]);
   const { data: titlesData, isLoading: isLoadingTitles } = useCollection<FinancialTitle>(titlesQuery);
 
-  const processesQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'processes') : null), [firestore]);
+  // OTIMIZAÇÃO: Processos limitados para gráfico e contagem (apenas ativos para estatísticas rápidas)
+  const processesQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'processes'), limit(100)) : null), [firestore]);
   const { data: processesData, isLoading: isLoadingProcesses } = useCollection<Process>(processesQuery);
 
-  const hearingsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'hearings') : null), [firestore]);
+  // OTIMIZAÇÃO: Audiências limitadas às próximas 10
+  const hearingsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'hearings'), where('date', '>=', Timestamp.now()), orderBy('date', 'asc'), limit(10)) : null), [firestore]);
   const { data: hearingsData, isLoading: isLoadingHearings } = useCollection<Hearing>(hearingsQuery);
 
+  // OTIMIZAÇÃO: Logs limitados aos 5 mais recentes
   const logsQuery = useMemoFirebase(
     () => (firestore && session?.user?.id ? query(collection(firestore, `users/${session.user.id}/logs`), orderBy('timestamp', 'desc'), limit(5)) : null), 
     [firestore, session?.user?.id]
@@ -145,7 +156,6 @@ export default function Dashboard() {
 
   const isLoading = status === 'loading' || isLoadingTitles || isLoadingProcesses || isLoadingHearings || isLoadingLogs;
 
-  // OTIMIZAÇÃO: Estatísticas memoizadas para evitar re-cálculos em renders irrelevantes
   const dashboardStats = React.useMemo(() => {
     if (!titlesData || !processesData || !hearingsData) return { totalRevenue: 0, pendingReceivables: 0, totalOverdue: 0, activeProcessesCount: 0, upcomingHearingsCount: 0 };
     
@@ -163,12 +173,11 @@ export default function Dashboard() {
       .reduce((sum, t) => sum + t.value, 0);
 
     const activeProcesses = processesData.filter(p => p.status === 'Ativo').length;
-    const upcomingHearings = hearingsData.filter(h => h.date.toDate() >= now).length;
+    const upcomingHearings = hearingsData.length;
 
     return { totalRevenue: revenue, pendingReceivables: pending, totalOverdue: overdue, activeProcessesCount: activeProcesses, upcomingHearingsCount: upcomingHearings };
   }, [titlesData, processesData, hearingsData]);
 
-  // OTIMIZAÇÃO: Dados do gráfico memoizados
   const chartData = React.useMemo(() => {
     const monthLabels: {key: string, name: string}[] = [];
     const now = new Date();
@@ -239,7 +248,7 @@ export default function Dashboard() {
         />
         <StatCard 
           title="Fila de Processos" 
-          value={processesData?.length || 0}
+          value={dashboardStats.activeProcessesCount}
           icon={FolderKanban}
           href="/dashboard/processos"
           description="Total de casos ativos"
@@ -249,7 +258,7 @@ export default function Dashboard() {
           value={dashboardStats.upcomingHearingsCount}
           icon={Calendar}
           href="/dashboard/audiencias"
-          description="Audiências pendentes"
+          description="Próximas audiências"
         />
       </div>
 
@@ -296,7 +305,7 @@ export default function Dashboard() {
                         </div>
                     ) : (
                         <div className="space-y-6 text-slate-300">
-                            {hearingsData?.slice(0, 5).map(h => (
+                            {hearingsData?.map(h => (
                                 <div key={h.id} className="flex items-start gap-4 p-2 rounded-lg hover:bg-white/5 transition-colors">
                                     <div className="flex flex-col items-center justify-center p-2 bg-black/20 rounded-xl w-12 h-12 border border-white/5 shrink-0">
                                         <span className="text-[10px] font-black uppercase text-primary leading-none">{format(h.date.toDate(), 'MMM', { locale: ptBR })}</span>

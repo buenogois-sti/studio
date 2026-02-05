@@ -1,6 +1,6 @@
 'use client';
 
-import React, { DependencyList, createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
+import React, { DependencyList, createContext, useContext, ReactNode, useMemo, useState, useEffect, useRef } from 'react';
 import { FirebaseApp } from 'firebase/app';
 import { Firestore } from 'firebase/firestore';
 import { Auth, User, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
@@ -59,45 +59,40 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
     isUserLoading: true,
     userError: null,
   });
+  
+  // Ref para evitar logins repetidos com o mesmo token
+  const lastTokenRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (sessionStatus === 'authenticated' && session?.customToken && auth) {
+      // Só tenta o login se o token for diferente do último processado com sucesso
+      if (lastTokenRef.current === session.customToken && auth.currentUser) {
+        return;
+      }
+
       console.log('[Firebase Auth] Sincronizando com Custom Token...');
       
-      signInWithCustomToken(auth, session.customToken).catch((error: any) => {
-        // Tratamento robusto do erro - pode ser um objeto vazio ou incompleto
+      signInWithCustomToken(auth, session.customToken).then(() => {
+        lastTokenRef.current = session.customToken!;
+      }).catch((error: any) => {
         const errorCode = error?.code || 'UNKNOWN_ERROR';
-        const errorMessage = error?.message || 'Erro desconhecido ao sincronizar com Firebase';
         const clientProject = auth.app.options.projectId;
         const expectedProject = 'studio-7080106838-23904';
         
-        console.error('[Firebase Auth] Erro Crítico:', {
-          code: errorCode,
-          message: errorMessage,
-          expectedProject,
-          clientProject,
-        });
-        
-        // Alerta amigável para o desenvolvedor sobre mismatch REAL de projeto
-        const isMismatch = !!clientProject && clientProject !== expectedProject;
-        if (isMismatch) {
-          const mismatchMsg = '⚠️ PROJECT ID MISMATCH: Sua chave de servidor (FIREBASE_SERVICE_ACCOUNT_JSON) não pertence a este projeto. Baixe a chave correta no console do Firebase.';
-          console.warn('[Firebase Auth]', mismatchMsg, { expectedProject, clientProject });
-        } else if (errorCode === 'auth/invalid-custom-token') {
-          console.warn('[Firebase Auth] Custom token inválido. Verifique a geração do token e o relógio do servidor.');
+        if (clientProject !== expectedProject) {
+          console.warn('[Firebase Auth] ⚠️ PROJECT ID MISMATCH detectado.');
         }
+        
         setUserAuthState((state) => ({ ...state, userError: error, isUserLoading: false }));
       });
     } else if (sessionStatus === 'unauthenticated') {
+      lastTokenRef.current = null;
       setUserAuthState((state) => ({ ...state, isUserLoading: false }));
     }
-  }, [session, sessionStatus, auth]);
+  }, [session?.customToken, sessionStatus, auth]);
 
   useEffect(() => {
-    if (!auth) {
-      setUserAuthState({ user: null, isUserLoading: false, userError: new Error('Auth service not provided.') });
-      return;
-    }
+    if (!auth) return;
 
     const unsubscribe = onAuthStateChanged(
       auth,
@@ -105,13 +100,7 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
         setUserAuthState({ user: firebaseUser, isUserLoading: false, userError: null });
       },
       (error) => {
-        // Tratamento robusto do erro no listener
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        console.error('[FirebaseProvider] onAuthStateChanged error:', {
-          message: errorMessage,
-          code: (error as any)?.code || 'UNKNOWN',
-          type: error?.constructor?.name || typeof error
-        });
+        console.error('[FirebaseProvider] onAuthStateChanged error:', error);
         setUserAuthState({ user: null, isUserLoading: false, userError: error as Error });
       }
     );
@@ -146,7 +135,7 @@ export const useFirebase = (): FirebaseServicesAndUser => {
     throw new Error('useFirebase must be used within a FirebaseProvider.');
   }
   if (!context.areServicesAvailable || !context.firebaseApp || !context.firestore || !context.auth) {
-    throw new Error('Firebase core services not available. Check FirebaseProvider props.');
+    throw new Error('Firebase core services not available.');
   }
   return {
     firebaseApp: context.firebaseApp,

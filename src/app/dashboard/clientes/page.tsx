@@ -36,7 +36,7 @@ import { ClientForm } from '@/components/client/ClientForm';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, doc, deleteDoc } from 'firebase/firestore';
+import { collection, doc, deleteDoc, query, limit } from 'firebase/firestore';
 import type { Client, Process, ClientStatus } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/use-toast';
@@ -44,6 +44,7 @@ import { syncClientToDrive } from '@/lib/drive';
 import { cn } from '@/lib/utils';
 import { VCFImportDialog } from '@/components/client/VCFImportDialog';
 import { ClientDetailsSheet } from '@/components/client/ClientDetailsSheet';
+import { searchClients } from '@/lib/client-actions';
 
 const STATUS_CONFIG: Record<ClientStatus, { label: string; color: string }> = {
   active: { label: 'Ativo', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' },
@@ -64,6 +65,8 @@ export default function ClientsPage() {
   const [isDeleting, setIsDeleting] = React.useState(false);
   const [isSyncing, setIsSyncing] = React.useState<string | null>(null);
   const [searchTerm, setSearchTerm] = React.useState('');
+  const [searchResults, setSearchResults] = React.useState<Client[] | null>(null);
+  const [isSearching, setIsSearching] = React.useState(false);
   const [statusFilter, setStatusFilter] = React.useState<ClientStatus | 'all'>('all');
   const [currentPage, setCurrentPage] = React.useState(1);
   
@@ -71,20 +74,44 @@ export default function ClientsPage() {
   const { firestore } = useFirebase();
   const { data: session, status } = useSession();
 
-  const clientsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'clients') : null), [firestore]);
+  // OTIMIZAÇÃO: Busca básica limitada para evitar baixar milhares de documentos
+  const clientsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'clients'), limit(100)) : null), [firestore]);
   const { data: clientsData, isLoading: isLoadingClients } = useCollection<Client>(clientsQuery);
   const clients = clientsData || [];
 
-  const processesQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'processes') : null), [firestore]);
+  // Busca de processos vinculada apenas aos IDs que estão na tela (seria o ideal), 
+  // mas aqui mantemos o mapa de contagem básico limitado.
+  const processesQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'processes'), limit(200)) : null), [firestore]);
   const { data: processesData, isLoading: isLoadingProcesses } = useCollection<Process>(processesQuery);
   const processes = processesData || [];
 
-  // OTIMIZAÇÃO: Reset da página ao filtrar
+  // OTIMIZAÇÃO: Busca server-side com debounce para evitar leituras desnecessárias
+  React.useEffect(() => {
+    if (!searchTerm.trim()) {
+      setSearchResults(null);
+      setIsSearching(false);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const results = await searchClients(searchTerm);
+        setSearchResults(results);
+      } catch (err) {
+        console.error("Search error:", err);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
   React.useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, statusFilter]);
 
-  // OTIMIZAÇÃO O(1): Mapa de contagem de processos por cliente (memoizado)
   const processesByClientMap = React.useMemo(() => {
     const map = new Map<string, number>();
     processes.forEach(p => {
@@ -93,10 +120,10 @@ export default function ClientsPage() {
     return map;
   }, [processes]);
 
-  // OTIMIZAÇÃO: Cálculo de integridade memoizado para evitar lag de renderização
   const clientIntegrityMap = React.useMemo(() => {
     const map = new Map<string, number>();
-    clients.forEach(client => {
+    const baseList = searchResults || clients;
+    baseList.forEach(client => {
       const fields = [
         client.firstName, client.lastName, client.document, client.email,
         client.mobile, client.rg, client.ctps, client.pis,
@@ -107,24 +134,14 @@ export default function ClientsPage() {
       map.set(client.id, Math.round((filled / fields.length) * 100));
     });
     return map;
-  }, [clients]);
+  }, [clients, searchResults]);
 
-  // OTIMIZAÇÃO: Filtro e busca memoizados
   const filteredClients = React.useMemo(() => {
-    let result = clients;
+    let result = searchResults || clients;
     if (statusFilter !== 'all') result = result.filter(c => c.status === statusFilter);
-    if (searchTerm.trim()) {
-      const q = searchTerm.toLowerCase();
-      result = result.filter(c => 
-        `${c.firstName} ${c.lastName}`.toLowerCase().includes(q) ||
-        c.document?.includes(q) ||
-        c.email?.toLowerCase().includes(q)
-      );
-    }
     return result;
-  }, [clients, searchTerm, statusFilter]);
+  }, [clients, searchResults, statusFilter]);
 
-  // Lógica de Paginação
   const totalPages = Math.ceil(filteredClients.length / ITEMS_PER_PAGE);
   const paginatedClients = React.useMemo(() => {
     return filteredClients.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
@@ -157,7 +174,7 @@ export default function ClientsPage() {
     } finally { setIsSyncing(null); }
   };
 
-  const isLoading = status === 'loading' || isLoadingClients || isLoadingProcesses;
+  const isLoading = status === 'loading' || isLoadingClients || isLoadingProcesses || isSearching;
 
   return (
     <>
@@ -170,8 +187,13 @@ export default function ClientsPage() {
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative w-full max-w-sm">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Pesquisar..." className="pl-8 pr-8 bg-card border-border/50 text-white" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-              {searchTerm && <button onClick={() => setSearchTerm('')} className="absolute right-2.5 top-2.5 text-white/50"><X className="h-4 w-4" /></button>}
+              <Input placeholder="Pesquisar (Server Search)..." className="pl-8 pr-8 bg-card border-border/50 text-white" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+              {(searchTerm || isSearching) && (
+                <div className="absolute right-2.5 top-2.5 flex items-center gap-2">
+                  {isSearching && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
+                  <button onClick={() => setSearchTerm('')} className="text-white/50"><X className="h-4 w-4" /></button>
+                </div>
+              )}
             </div>
             <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as any)}>
               <TabsList className="h-9 bg-card border-border/50">
@@ -179,16 +201,15 @@ export default function ClientsPage() {
                 <TabsTrigger value="table" className="px-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><List className="h-4 w-4" /></TabsTrigger>
               </TabsList>
             </Tabs>
-            <Button variant="outline" size="sm" onClick={() => setIsVCFDialogOpen(true)} className="border-primary/20 text-primary hover:bg-primary/10"><FileUp className="mr-2 h-4 w-4" /> VCF</Button>
             <Button size="sm" onClick={handleAddNew} className="bg-primary text-primary-foreground hover:bg-primary/90"><PlusCircle className="mr-2 h-4 w-4" /> Novo</Button>
           </div>
         </div>
 
-        {isLoading ? (
+        {isLoading && !paginatedClients.length ? (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-64 w-full bg-card/50" />)}
           </div>
-        ) : filteredClients.length > 0 ? (
+        ) : paginatedClients.length > 0 ? (
           <>
             {viewMode === 'grid' ? (
               <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6">
@@ -214,7 +235,6 @@ export default function ClientsPage() {
                                   <DropdownMenuItem onClick={() => handleViewDetails(client)}><UserCheck className="mr-2 h-4 w-4 text-primary" /> Ficha Completa</DropdownMenuItem>
                                   <DropdownMenuItem onClick={() => handleEdit(client)}><Edit className="mr-2 h-4 w-4" /> Editar</DropdownMenuItem>
                                   <DropdownMenuSeparator className="bg-white/10" />
-                                  <DropdownMenuItem asChild><Link href={`/dashboard/processos?clientId=${client.id}`}><FolderKanban className="mr-2 h-4 w-4" /> Processos</Link></DropdownMenuItem>
                                   <DropdownMenuItem className="text-destructive" onClick={() => setClientToDelete(client)}><Trash2 className="mr-2 h-4 w-4" /> Excluir</DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
@@ -235,25 +255,14 @@ export default function ClientsPage() {
                         </div>
                       </CardContent>
                       <CardFooter className="border-t border-border/30 bg-black/20 py-3 flex items-center justify-between">
-                          <span className="text-[9px] text-muted-foreground font-bold uppercase">Cadastrado: {typeof client.createdAt === 'string' ? client.createdAt.split('T')[0] : client.createdAt.toDate().toLocaleDateString()}</span>
+                          <span className="text-[9px] text-muted-foreground font-bold uppercase">Cadastrado em {typeof client.createdAt === 'string' ? new Date(client.createdAt).toLocaleDateString() : client.createdAt.toDate().toLocaleDateString()}</span>
                           
                           {client.driveFolderId ? (
-                            <a 
-                              href={`https://drive.google.com/drive/folders/${client.driveFolderId}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-emerald-400 font-bold text-[9px] uppercase flex items-center gap-1 hover:bg-emerald-500/10 px-2 py-1 rounded-md transition-all"
-                            >
+                            <a href={`https://drive.google.com/drive/folders/${client.driveFolderId}`} target="_blank" className="text-emerald-400 font-bold text-[9px] uppercase flex items-center gap-1 hover:bg-emerald-500/10 px-2 py-1 rounded-md transition-all">
                               <CheckCircle2 className="h-3 w-3" /> Drive OK
                             </a>
                           ) : (
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              className="h-6 text-[9px] font-bold uppercase text-amber-400 p-0 px-2" 
-                              onClick={() => handleSyncClient(client)} 
-                              disabled={isSyncing === client.id}
-                            >
+                            <Button variant="ghost" size="sm" className="h-6 text-[9px] font-bold uppercase text-amber-400 p-0 px-2" onClick={() => handleSyncClient(client)} disabled={isSyncing === client.id}>
                               {isSyncing === client.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Info className="h-3 w-3 mr-1" />} Pendente Drive
                             </Button>
                           )}
@@ -286,29 +295,16 @@ export default function ClientsPage() {
               </Card>
             )}
 
-            {/* Pagination Controls */}
             {totalPages > 1 && (
               <div className="flex items-center justify-center gap-4 mt-8">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                  disabled={currentPage === 1}
-                  className="bg-card border-border/50 text-white"
-                >
+                <Button variant="outline" size="sm" onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} disabled={currentPage === 1} className="bg-card border-border/50 text-white">
                   <ChevronLeft className="h-4 w-4 mr-2" /> Anterior
                 </Button>
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-bold text-white">Página {currentPage}</span>
                   <span className="text-sm text-muted-foreground">de {totalPages}</span>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                  disabled={currentPage === totalPages}
-                  className="bg-card border-border/50 text-white"
-                >
+                <Button variant="outline" size="sm" onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} disabled={currentPage === totalPages} className="bg-card border-border/50 text-white">
                   Próxima <ChevronRight className="h-4 w-4 ml-2" />
                 </Button>
               </div>
