@@ -54,6 +54,14 @@ import {
 import { format, startOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
+const roleLabels: Record<string, string> = {
+  lawyer: 'Advogado',
+  intern: 'Estagiário',
+  employee: 'Administrativo',
+  provider: 'Prestador / Fornecedor',
+  partner: 'Sócio',
+};
+
 function RepassePaymentDialog({ 
   staff, 
   credits, 
@@ -231,7 +239,7 @@ function PayoutList({ filterRole, onRefresh }: { filterRole?: string; onRefresh?
                 </TableCell>
                 <TableCell>
                   <Badge variant="outline" className="text-[10px] uppercase border-white/10 text-slate-400">
-                    {member.role === 'lawyer' ? 'Advogado' : member.role === 'intern' ? 'Estagiário' : member.role === 'employee' ? 'Administrativo' : member.role === 'provider' ? 'Fornecedor' : 'Sócio'}
+                    {roleLabels[member.role] || member.role}
                   </Badge>
                 </TableCell>
                 <TableCell className="text-right">

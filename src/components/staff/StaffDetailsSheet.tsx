@@ -44,9 +44,11 @@ interface StaffDetailsSheetProps {
 }
 
 const roleLabels: Record<string, string> = {
-  employee: 'Funcionário(a)',
+  employee: 'Administrativo',
   lawyer: 'Advogado(a)',
   intern: 'Estagiário(a)',
+  partner: 'Sócio(a)',
+  provider: 'Prestador / Fornecedor',
 };
 
 const remunerationLabels: Record<string, string> = {
@@ -200,7 +202,7 @@ export function StaffDetailsSheet({ staff, processes, open, onOpenChange }: Staf
           </div>
 
           {/* REGRA DE REMUNERAÇÃO (Destaque) */}
-          {staff.role === 'lawyer' && staff.remuneration && (
+          {(staff.role === 'lawyer' || staff.role === 'partner' || staff.role === 'provider') && staff.remuneration && (
               <section className="space-y-4">
                 <div className="flex items-center gap-2 mb-4">
                     <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">

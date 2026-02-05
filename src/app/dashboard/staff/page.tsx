@@ -66,9 +66,11 @@ import { cn } from '@/lib/utils';
 import Link from 'next/link';
 
 const roleLabels: { [key: string]: string } = {
-  employee: 'Funcionário',
+  employee: 'Administrativo',
   lawyer: 'Advogado',
   intern: 'Estagiário',
+  partner: 'Sócio',
+  provider: 'Prestador / Fornecedor',
 };
 
 function StaffBalance({ staffId }: { staffId: string }) {

@@ -95,7 +95,7 @@ const roleOptions = [
     { value: 'partner', label: 'Sócio(a)' },
     { value: 'employee', label: 'Administrativo' },
     { value: 'intern', label: 'Estagiário(a)' },
-    { value: 'provider', label: 'Correspondente / Fornecedor' },
+    { value: 'provider', label: 'Prestador / Fornecedor' },
 ];
 
 const remunerationOptions = [
