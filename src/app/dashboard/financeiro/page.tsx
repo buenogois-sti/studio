@@ -444,12 +444,20 @@ function ReceiptDialog({
           </div>
         </ScrollArea>
 
-        <DialogFooter className="p-4 bg-slate-50 border-t print:hidden flex items-center justify-between">
-          <p className="text-[9px] text-slate-400 font-bold uppercase">LexFlow Bueno Gois</p>
-          <div className="flex gap-2">
-            <DialogClose asChild><Button variant="outline" size="sm" className="h-8 text-xs">Fechar</Button></DialogClose>
-            <Button onClick={handlePrint} size="sm" className="gap-2 bg-slate-900 text-white h-8 px-6 font-black uppercase text-[10px]">
-              <Printer className="h-3.5 w-3.5" /> Imprimir Recibo
+        <DialogFooter className="p-6 bg-slate-50 border-t print:hidden flex items-center justify-between">
+          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">LexFlow Bueno Gois</p>
+          <div className="flex gap-3">
+            <DialogClose asChild>
+              <Button variant="ghost" size="sm" className="h-10 text-slate-600 font-bold hover:bg-slate-200">
+                Fechar
+              </Button>
+            </DialogClose>
+            <Button 
+              onClick={handlePrint} 
+              size="sm" 
+              className="gap-2 bg-slate-900 hover:bg-slate-800 text-white h-10 px-8 font-black uppercase text-[11px] tracking-wider border-b-4 border-primary rounded-lg transition-all active:translate-y-1 active:border-b-0"
+            >
+              <Printer className="h-4 w-4" /> Imprimir Recibo
             </Button>
           </div>
         </DialogFooter>
@@ -520,10 +528,18 @@ function HonorariosReceiptDialog({
           </div>
         </div>
 
-        <DialogFooter className="p-4 bg-slate-50 border-t print:hidden flex justify-end gap-2">
-          <DialogClose asChild><Button variant="outline" size="sm" className="h-8 text-xs">Fechar</Button></DialogClose>
-          <Button onClick={handlePrint} size="sm" className="gap-2 bg-slate-900 text-white h-8 px-6 font-black uppercase text-[10px]">
-            <Printer className="h-3.5 w-3.5" /> Imprimir Honorários
+        <DialogFooter className="p-6 bg-slate-50 border-t print:hidden flex justify-end gap-3">
+          <DialogClose asChild>
+            <Button variant="ghost" size="sm" className="h-10 text-slate-600 font-bold hover:bg-slate-200">
+              Fechar
+            </Button>
+          </DialogClose>
+          <Button 
+            onClick={handlePrint} 
+            size="sm" 
+            className="gap-2 bg-slate-900 hover:bg-slate-800 text-white h-10 px-8 font-black uppercase text-[11px] tracking-wider border-b-4 border-primary rounded-lg transition-all active:translate-y-1 active:border-b-0"
+          >
+            <Printer className="h-4 w-4" /> Imprimir Honorários
           </Button>
         </DialogFooter>
       </DialogContent>
