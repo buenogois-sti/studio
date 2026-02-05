@@ -1,4 +1,3 @@
-
 'use client';
 import * as React from 'react';
 import { z } from 'zod';
@@ -19,7 +18,7 @@ import type { Process } from '@/lib/types';
 import { createFinancialEventAndTitles } from '@/lib/finance-actions';
 
 const eventSchema = z.object({
-  type: z.enum(['ACORDO', 'SENTENCA', 'EXECUCAO', 'CONTRATO'], { required_error: 'O tipo do evento é obrigatório.'}),
+  type: z.enum(['ACORDO', 'SENTENCA', 'EXECUCAO', 'CONTRATO', 'CUSTAS', 'PERICIA', 'DESLOCAMENTO', 'ADICIONAL'], { required_error: 'O tipo do evento é obrigatório.'}),
   eventDate: z.coerce.date({ required_error: 'A data do evento é obrigatória.' }),
   description: z.string().min(3, 'A descrição é obrigatória.'),
   totalValue: z.coerce.number().positive('O valor total deve ser positivo.'),
@@ -131,6 +130,10 @@ export function FinancialEventDialog({ process, open, onOpenChange, onEventCreat
                         <SelectItem value="SENTENCA">Sentença</SelectItem>
                         <SelectItem value="EXECUCAO">Execução</SelectItem>
                         <SelectItem value="CONTRATO">Contrato de Honorários</SelectItem>
+                        <SelectItem value="CUSTAS">Custas Processuais</SelectItem>
+                        <SelectItem value="PERICIA">Perícia / Assistência</SelectItem>
+                        <SelectItem value="DESLOCAMENTO">Deslocamento / Diligência</SelectItem>
+                        <SelectItem value="ADICIONAL">Adicional / Extra</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />

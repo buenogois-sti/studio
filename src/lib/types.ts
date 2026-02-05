@@ -149,7 +149,7 @@ export type LegalDeadline = {
 export type FinancialEvent = {
   id: string;
   processId: string;
-  type: 'ACORDO' | 'SENTENCA' | 'EXECUCAO' | 'CONTRATO';
+  type: 'ACORDO' | 'SENTENCA' | 'EXECUCAO' | 'CONTRATO' | 'CUSTAS' | 'PERICIA' | 'DESLOCAMENTO' | 'ADICIONAL';
   eventDate: Date | Timestamp;
   description: string;
   totalValue: number;
@@ -177,7 +177,10 @@ export type FinancialTitle = {
     | 'IMPOSTOS_TAXAS'
     | 'MATERIAL_ESCRITORIO'
     | 'SERVICOS_TERCEIROS'
-    | 'OUTRAS_DESPESAS';
+    | 'OUTRAS_DESPESAS'
+    | 'PERICIA'
+    | 'DESLOCAMENTO'
+    | 'ADICIONAL';
   value: number;
   dueDate: Date | Timestamp;
   paymentDate?: Timestamp;

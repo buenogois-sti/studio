@@ -10,7 +10,7 @@ import { createNotification } from './notification-actions';
 
 interface CreateEventData {
   processId: string;
-  type: 'ACORDO' | 'SENTENCA' | 'EXECUCAO' | 'CONTRATO';
+  type: 'ACORDO' | 'SENTENCA' | 'EXECUCAO' | 'CONTRATO' | 'CUSTAS' | 'PERICIA' | 'DESLOCAMENTO' | 'ADICIONAL';
   eventDate: Date;
   description: string;
   totalValue: number;
@@ -23,6 +23,10 @@ const eventTypeToOriginMap: Record<CreateEventData['type'], FinancialTitle['orig
   'SENTENCA': 'SENTENCA',
   'EXECUCAO': 'SENTENCA',
   'CONTRATO': 'HONORARIOS_CONTRATUAIS',
+  'CUSTAS': 'CUSTAS_PROCESSUAIS',
+  'PERICIA': 'PERICIA',
+  'DESLOCAMENTO': 'DESLOCAMENTO',
+  'ADICIONAL': 'ADICIONAL',
 };
 
 export async function createFinancialEventAndTitles(data: CreateEventData) {
@@ -77,7 +81,10 @@ export async function createFinancialEventAndTitles(data: CreateEventData) {
   }
 
   // REGRA DE NEGÓCIO DE REPASSE (HONORÁRIOS SOBRE HONORÁRIOS)
-  if (leadLawyerId) {
+  // Apenas se for ACORDO, SENTENCA ou CONTRATO (verbas de êxito/contratuais)
+  const isRevenueSubjectToCommission = ['ACORDO', 'SENTENCA', 'EXECUCAO', 'CONTRATO'].includes(type);
+
+  if (leadLawyerId && isRevenueSubjectToCommission) {
     const lawyerDoc = await firestoreAdmin.collection('staff').doc(leadLawyerId).get();
     if (lawyerDoc.exists) {
       const lawyerData = lawyerDoc.data() as Staff;
