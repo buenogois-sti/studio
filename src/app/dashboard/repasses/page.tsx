@@ -23,7 +23,9 @@ import {
   X,
   ChevronDown,
   LayoutList,
-  FileCheck
+  FileCheck,
+  Coins,
+  Receipt
 } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, where, getDocs, FieldValue, Timestamp, doc, deleteDoc, orderBy, limit } from 'firebase/firestore';
@@ -251,61 +253,99 @@ function RepassePaymentDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-xl bg-card border-border shadow-2xl">
-        <DialogHeader>
-          <DialogTitle className="text-white flex items-center gap-2 font-headline text-xl">
-            <Wallet className="h-6 w-6 text-emerald-400" />
-            Processar Liquidação
-          </DialogTitle>
-          <DialogDescription className="text-slate-400">
-            Confirmando o pagamento para <span className="text-white font-bold">{staff.firstName} {staff.lastName}</span>.
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContent className="sm:max-w-2xl bg-[#020617] border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.5)] p-0 overflow-hidden">
+        <div className="p-8 space-y-8">
+          <DialogHeader>
+            <div className="flex items-center gap-4 mb-2">
+              <div className="h-12 w-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+                <Wallet className="h-6 w-6 text-emerald-400" />
+              </div>
+              <div className="text-left">
+                <DialogTitle className="text-2xl font-black text-white font-headline">Processar Liquidação</DialogTitle>
+                <DialogDescription className="text-slate-400 mt-1">
+                  Confirmando o pagamento para <span className="text-white font-bold">{staff.firstName} {staff.lastName}</span>.
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
 
-        <div className="space-y-6 py-4">
-          <div className="p-6 rounded-2xl bg-emerald-500/5 border-2 border-emerald-500/20 text-center shadow-[0_0_30px_rgba(16,185,129,0.05)]">
-            <p className="text-[10px] font-black uppercase text-emerald-400 mb-1 tracking-[0.2em]">Valor Total Líquido a Pagar</p>
-            <p className="text-4xl font-black text-white tabular-nums">{totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+          {/* Card de Valor de Destaque */}
+          <div className="relative group">
+            <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500/20 to-primary/20 rounded-3xl blur opacity-25 group-hover:opacity-40 transition duration-1000"></div>
+            <div className="relative p-8 rounded-3xl bg-white/5 border border-white/10 text-center space-y-2">
+              <p className="text-[10px] font-black uppercase text-emerald-400 tracking-[0.25em] mb-1">Valor Total Líquido a Pagar</p>
+              <div className="flex items-center justify-center gap-3">
+                <span className="text-2xl font-bold text-white/40 mt-2">R$</span>
+                <span className="text-5xl font-black text-white tracking-tighter tabular-nums">
+                  {totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+            </div>
           </div>
 
-          <div className="space-y-3">
-            <h4 className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Extrato de Créditos Selecionados ({credits.length})</h4>
-            <ScrollArea className="h-[200px] border border-white/5 rounded-xl p-2 bg-black/40">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h4 className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Extrato de Créditos Selecionados ({credits.length})</h4>
+              <Badge variant="outline" className="bg-white/5 border-white/10 text-slate-400 text-[9px] h-5">ID: {staff.id.substring(0, 6)}</Badge>
+            </div>
+            
+            <ScrollArea className="h-[240px] -mx-2 px-2">
               <div className="space-y-2">
                 {credits.map(c => (
-                  <div key={c.id} className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/5 hover:border-emerald-500/30 transition-all">
-                    <div className="min-w-0 flex-1 flex items-center gap-3">
-                      <div className="h-8 w-8 rounded-full bg-white/5 flex items-center justify-center shrink-0">
-                        {c.type === 'REEMBOLSO' ? <FileText className="h-4 w-4 text-blue-400" /> : <DollarSign className="h-4 w-4 text-emerald-400" />}
+                  <div key={c.id} className="flex items-center justify-between p-4 rounded-2xl bg-[#0f172a] border border-white/5 hover:border-emerald-500/30 transition-all duration-300 group/item">
+                    <div className="min-w-0 flex-1 flex items-center gap-4">
+                      <div className={cn(
+                        "h-10 w-10 rounded-xl flex items-center justify-center shrink-0 transition-transform group-hover/item:scale-110",
+                        c.type === 'REEMBOLSO' ? "bg-blue-500/10" : c.type === 'SALARIO' ? "bg-purple-500/10" : "bg-emerald-500/10"
+                      )}>
+                        {c.type === 'REEMBOLSO' ? <Receipt className="h-5 w-5 text-blue-400" /> : 
+                         c.type === 'SALARIO' ? <Briefcase className="h-5 w-5 text-purple-400" /> : 
+                         <Coins className="h-5 w-5 text-emerald-400" />}
                       </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold text-slate-200 truncate">{c.description}</p>
-                        <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-tighter">
-                          {c.type === 'REEMBOLSO' ? 'Natureza: Ressarcimento' : c.type === 'SALARIO' ? 'Natureza: Pro-labore' : 'Natureza: Participação'}
-                        </p>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-bold text-slate-200 truncate leading-tight">{c.description}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge variant="outline" className={cn(
+                            "text-[8px] font-black uppercase px-1.5 h-4 border-none",
+                            c.type === 'REEMBOLSO' ? "bg-blue-500/20 text-blue-400" : 
+                            c.type === 'SALARIO' ? "bg-purple-500/20 text-purple-400" : 
+                            "bg-emerald-500/20 text-emerald-400"
+                          )}>
+                            {c.type === 'REEMBOLSO' ? 'Ressarcimento' : c.type === 'SALARIO' ? 'Pro-labore' : 'Participação'}
+                          </Badge>
+                          {c.date && <span className="text-[9px] text-slate-500 font-medium">Ref: {format(c.date.toDate(), 'dd/MM/yy')}</span>}
+                        </div>
                       </div>
                     </div>
-                    <span className="text-sm font-black text-emerald-400 ml-4 tabular-nums">{c.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                    <div className="text-right ml-4">
+                      <p className="text-sm font-black text-white tabular-nums">{c.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                    </div>
                   </div>
                 ))}
               </div>
             </ScrollArea>
           </div>
 
-          <div className="flex items-start gap-3 p-4 rounded-xl bg-blue-500/5 border border-blue-500/20 text-[11px] text-blue-400 italic leading-relaxed">
-            <AlertCircle className="h-4 w-4 shrink-0" />
-            <p>Esta operação registrará uma saída de caixa no financeiro central e emitirá um aviso de depósito ao colaborador.</p>
+          <div className="flex items-start gap-4 p-4 rounded-2xl bg-blue-500/5 border border-blue-500/20 text-[11px] text-blue-400/80 leading-relaxed animate-in fade-in slide-in-from-bottom-2 duration-500">
+            <div className="h-5 w-5 rounded-full bg-blue-500/10 flex items-center justify-center shrink-0">
+              <Info className="h-3 w-3" />
+            </div>
+            <p>Esta operação registrará uma saída de caixa oficial no financeiro central do escritório e gerará um aviso de liquidação para o profissional.</p>
           </div>
         </div>
 
-        <DialogFooter className="gap-2">
-          <DialogClose asChild><Button variant="ghost" className="text-slate-400 hover:text-white">Cancelar</Button></DialogClose>
+        <DialogFooter className="bg-black/20 p-6 border-t border-white/5 gap-3">
+          <DialogClose asChild>
+            <Button variant="ghost" className="text-slate-400 hover:text-white font-bold h-12 px-6">
+              Cancelar
+            </Button>
+          </DialogClose>
           <Button 
-            className="bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase tracking-widest text-[11px] px-8 h-11 shadow-lg shadow-emerald-900/20"
+            className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase tracking-widest text-[11px] h-12 shadow-lg shadow-emerald-900/20 group"
             onClick={handlePay}
             disabled={isProcessing}
           >
-            {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
+            {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4 group-hover:scale-110 transition-transform" />}
             Confirmar Pagamento
           </Button>
         </DialogFooter>
@@ -677,4 +717,21 @@ export default function RepassesPage() {
       />
     </div>
   );
+}
+
+function RepasseValue({ staffId }: { staffId: string }) {
+  const { firestore } = useFirebase();
+  const [val, setVal] = React.useState(0);
+
+  React.useEffect(() => {
+    if (!firestore) return;
+    const creditsRef = collection(firestore, `staff/${staffId}/credits`);
+    const q = query(creditsRef, where('status', '==', 'DISPONIVEL'));
+    getDocs(q).then(snap => {
+      const total = snap.docs.reduce((sum, d) => sum + (d.data().value || 0), 0);
+      setVal(total);
+    });
+  }, [firestore, staffId]);
+
+  return <span className={cn("text-sm font-black", val > 0 ? "text-emerald-400" : "text-slate-500")}>{val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>;
 }
