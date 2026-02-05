@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Sheet,
   SheetContent,
@@ -21,7 +22,8 @@ import {
   Copy,
   History,
   User,
-  Gavel
+  Gavel,
+  ExternalLink
 } from 'lucide-react';
 import type { LegalDeadline, Process } from '@/lib/types';
 import { format } from 'date-fns';
@@ -39,8 +41,16 @@ interface DeadlineDetailsSheetProps {
 
 export function DeadlineDetailsSheet({ deadline, process, open, onOpenChange }: DeadlineDetailsSheetProps) {
   const { toast } = useToast();
+  const router = useRouter();
 
   if (!deadline) return null;
+
+  const handleGoToProcess = () => {
+    if (process) {
+      router.push(`/dashboard/processos?clientId=${process.clientId}`);
+      onOpenChange(false);
+    }
+  };
 
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
@@ -79,8 +89,19 @@ export function DeadlineDetailsSheet({ deadline, process, open, onOpenChange }: 
               </Button>
             </div>
           </div>
-          <SheetDescription className="text-slate-400 text-left">
-            Vinculado ao processo: <span className="text-white font-bold">{process?.name || 'Processo não encontrado'}</span>
+          <SheetDescription className="text-slate-400 text-left flex items-center gap-1.5 flex-wrap">
+            Vinculado ao processo:{' '}
+            {process ? (
+              <button 
+                onClick={handleGoToProcess}
+                className="text-primary hover:text-primary/80 hover:underline font-bold flex items-center gap-1 transition-colors group/proc"
+              >
+                {process.name}
+                <ExternalLink className="h-3 w-3 opacity-50 group-hover/proc:opacity-100" />
+              </button>
+            ) : (
+              <span className="text-white font-bold">Processo não encontrado</span>
+            )}
           </SheetDescription>
         </SheetHeader>
 

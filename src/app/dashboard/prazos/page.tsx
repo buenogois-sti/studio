@@ -270,7 +270,7 @@ export default function PrazosPage() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="bg-card border-border w-56">
                               <DropdownMenuLabel className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Opções do Prazo</DropdownMenuLabel>
-                              <DropdownMenuItem onClick={() => handleViewDetails(d)} className="gap-2 cursor-pointer">
+                              <DropdownMenuItem onClick={() => handleViewDetails(d)} className="gap-2 cursor-pointer focus:bg-primary/10">
                                 <Eye className="h-4 w-4 text-blue-400" /> <span className="font-bold">Ver Detalhes</span>
                               </DropdownMenuItem>
                               
@@ -293,7 +293,7 @@ export default function PrazosPage() {
                               </DropdownMenuItem>
 
                               <DropdownMenuSeparator className="bg-white/10" />
-                              <DropdownMenuItem className="text-rose-500 gap-2 cursor-pointer" onClick={() => handleDelete(d.id)}>
+                              <DropdownMenuItem className="text-rose-500 gap-2 cursor-pointer focus:bg-rose-500/10" onClick={() => handleDelete(d.id)}>
                                 <X className="h-4 w-4" /> <span className="font-bold">Excluir</span>
                               </DropdownMenuItem>
                             </DropdownMenuContent>
@@ -382,7 +382,12 @@ function DeadlineCard({
                   <Scale className="h-3 w-3" /> {deadline.isBusinessDays ? 'Úteis (CPC)' : 'Corridos'}
                 </span>
               </div>
-              <h3 className="text-base font-black text-white truncate leading-tight group-hover:text-primary transition-colors">{process?.name || 'Processo não encontrado'}</h3>
+              <h3 
+                className="text-base font-black text-white truncate leading-tight hover:text-primary transition-colors cursor-pointer"
+                onClick={() => onGoToProcess(deadline.processId)}
+              >
+                {process?.name || 'Processo não encontrado'}
+              </h3>
               <div className="flex items-center gap-3 text-[10px] font-bold text-muted-foreground">
                 <span className="font-mono">{process?.processNumber || 'N/A'}</span>
                 {process?.legalArea && <span className="uppercase text-slate-500">• {process.legalArea}</span>}
