@@ -299,7 +299,7 @@ function ManageCreditsDialog({ staff, open, onOpenChange, onUpdate }: { staff: S
           <ScrollArea className="flex-1">
             <div className="p-6">
               {isLoading ? (
-                <div className="space-y-4">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-16 w-full bg-white/5" />)}</div>
+                <div className="space-y-4">{[...Array(3)].map((_, i) => <Skeleton className="h-16 w-full bg-white/5" />)}</div>
               ) : filteredCredits.length > 0 ? (
                 <div className="space-y-3">
                   {filteredCredits.map(c => (
@@ -512,7 +512,7 @@ function PayoutList({ filterRole, onRefresh, onPaid }: { filterRole?: string; on
 }
 
 function PaymentHistory({ onShowVoucher }: { onShowVoucher: (t: FinancialTitle) => void }) {
-  const { firestore } = useFirebase();
+  const { firestore, userError } = useFirebase();
   const historyQuery = useMemoFirebase(() => (firestore ? query(
     collection(firestore, 'financial_titles'), 
     where('origin', '==', 'HONORARIOS_PAGOS'), 
@@ -521,6 +521,16 @@ function PaymentHistory({ onShowVoucher }: { onShowVoucher: (t: FinancialTitle) 
   ) : null), [firestore]);
   
   const { data: history, isLoading, error } = useCollection<FinancialTitle>(historyQuery);
+
+  if (userError) {
+    return (
+      <Card className="bg-rose-500/5 border-rose-500/20 p-8 text-center">
+        <AlertTriangle className="h-10 w-10 text-rose-500 mx-auto mb-4" />
+        <h3 className="text-white font-bold mb-2">Erro de Autenticação</h3>
+        <p className="text-xs text-slate-400">Verifique a sincronização com seu projeto Firebase no servidor.</p>
+      </Card>
+    );
+  }
 
   if (isLoading) return <div className="space-y-4">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-16 w-full bg-white/5 rounded-xl" />)}</div>;
 
