@@ -1,4 +1,3 @@
-
 'use client';
 import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -258,7 +257,7 @@ function ReceiptDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-4xl bg-white text-slate-900 p-0 overflow-hidden border-none shadow-2xl print:shadow-none print:max-w-full">
+      <DialogContent className="sm:max-w-4xl bg-white text-slate-900 p-0 overflow-hidden border-none shadow-none print:shadow-none print:max-w-full">
         <ScrollArea className="max-h-[90vh] print:max-h-full">
           <div className="p-10 space-y-6 bg-white print:p-0 print:shadow-none print:m-0" id="receipt-print-area">
             {/* Cabeçalho Profissional Compacto */}
@@ -375,7 +374,7 @@ function HonorariosReceiptDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-4xl bg-white text-slate-900 p-0 overflow-hidden border-none shadow-2xl print:shadow-none print:max-w-full">
+      <DialogContent className="sm:max-w-4xl bg-white text-slate-900 p-0 overflow-hidden border-none shadow-none print:shadow-none print:max-w-full">
         <div className="p-10 space-y-8 bg-white print:p-0 print:m-0" id="honorarios-print-area">
           <div className="flex justify-between items-center border-b-2 border-slate-900 pb-4">
             <div className="flex items-center gap-3">
@@ -393,11 +392,11 @@ function HonorariosReceiptDialog({
             </div>
           </div>
 
-          <div className="py-6 space-y-4 text-lg leading-relaxed text-justify border-l-4 border-primary/20 pl-6 bg-slate-50/50 rounded-r-2xl">
-            <p className="text-sm">
+          <div className="py-6 space-y-4 text-sm leading-relaxed text-justify border-l-4 border-primary/20 pl-6 bg-slate-50/50 rounded-r-2xl">
+            <p>
               Confirmamos o recebimento de <strong className="text-slate-900 font-black">{formattedFee}</strong> do cliente <strong>{client ? `${client.firstName} ${client.lastName}` : 'N/A'}</strong>, referente aos honorários contratuais de êxito ({feePercent}%) incidentes sobre a verba:
             </p>
-            <p className="italic text-slate-600 bg-white p-3 rounded-lg border border-slate-200 text-sm">
+            <p className="italic text-slate-600 bg-white p-3 rounded-lg border border-slate-200">
               "{title.description}"
             </p>
             <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest">
@@ -463,7 +462,7 @@ function RepassePaymentDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-xl bg-card border-border">
+      <DialogContent className="sm:max-w-xl bg-card border-border shadow-none">
         <DialogHeader>
           <DialogTitle className="text-white flex items-center gap-2 font-headline text-xl">
             <Wallet className="h-6 w-6 text-emerald-400" />
@@ -630,7 +629,8 @@ export default function FinanceiroPage() {
   const [honorariosTitle, setHonorariosTitle] = React.useState<FinancialTitle | null>(null);
   const { toast } = useToast();
 
-  const titlesQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'financial_titles'), orderBy('dueDate', 'desc')) : null), [firestore, refreshKey]);
+  // Ajuste de ordenação para ascendente (mais próximos primeiro)
+  const titlesQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'financial_titles'), orderBy('dueDate', 'asc')) : null), [firestore, refreshKey]);
   const { data: titlesData, isLoading: isLoadingTitles } = useCollection<FinancialTitle>(titlesQuery);
 
   const clientsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'clients') : null), [firestore]);
