@@ -20,7 +20,8 @@ import {
   Calendar,
   RefreshCw,
   Timer,
-  UserCheck
+  UserCheck,
+  Handshake
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
@@ -36,7 +37,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, doc, deleteDoc } from 'firebase/firestore';
-import type { Process, Client, Staff, Hearing } from '@/lib/types';
+import type { Process, Client, Staff, Hearing, FinancialEvent } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/use-toast';
 import { FinancialEventDialog } from '@/components/process/FinancialEventDialog';
@@ -87,6 +88,9 @@ export default function ProcessosPage() {
 
   const staffQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'staff') : null), [firestore]);
   const { data: staffData } = useCollection<Staff>(staffQuery);
+
+  const financialEventsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'financial_events') : null), [firestore]);
+  const { data: financialEventsData } = useCollection<FinancialEvent>(financialEventsQuery);
   
   // OTIMIZAÇÃO: Mapas memoizados para busca O(1) de dependências
   const clientsMap = React.useMemo(() => new Map(clientsData?.map(c => [c.id, c])), [clientsData]);
@@ -100,6 +104,14 @@ export default function ProcessosPage() {
     });
     return map;
   }, [hearingsData]);
+
+  const agreementsByProcessMap = React.useMemo(() => {
+    const map = new Map<string, FinancialEvent>();
+    financialEventsData?.forEach(e => {
+      if (e.type === 'ACORDO') map.set(e.processId, e);
+    });
+    return map;
+  }, [financialEventsData]);
 
   // OTIMIZAÇÃO: Filtro memoizado
   const filteredProcesses = React.useMemo(() => {
@@ -153,6 +165,7 @@ export default function ProcessosPage() {
             const leadLawyer = p.leadLawyerId ? staffMap.get(p.leadLawyerId) : null;
             const statusInfo = STATUS_CONFIG[p.status || 'Ativo'];
             const processHearings = hearingsByProcessMap.get(p.id) || [];
+            const processAgreement = agreementsByProcessMap.get(p.id);
             const isExpanded = expandedProcessId === p.id;
 
             return (
@@ -196,11 +209,18 @@ export default function ProcessosPage() {
                       </div>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-4 text-xs">
+                    <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs">
                       {client && <span className="font-bold text-slate-300">Cliente: {client.firstName} {client.lastName}</span>}
+                      
                       {processHearings.length > 0 && (
                         <Link href="/dashboard/audiencias" className="flex items-center gap-1.5 text-amber-400 font-bold hover:underline">
                           <Calendar className="h-3.5 w-3.5" /> <span>Audiência em {format(processHearings[0].date.toDate(), 'dd/MM/yy')}</span>
+                        </Link>
+                      )}
+
+                      {processAgreement && (
+                        <Link href="/dashboard/financeiro" className="flex items-center gap-1.5 text-emerald-400 font-black uppercase tracking-tighter hover:underline">
+                          <Handshake className="h-4 w-4" /> <span>Acordo Firmado</span>
                         </Link>
                       )}
                     </div>
