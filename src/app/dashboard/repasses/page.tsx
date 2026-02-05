@@ -16,11 +16,13 @@ import {
   Printer,
   ChevronRight,
   TrendingUp,
-  AlertCircle
+  AlertCircle,
+  Zap,
+  ShieldCheck
 } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, where, getDocs, FieldValue, Timestamp, doc, deleteDoc, orderBy } from 'firebase/firestore';
-import type { Staff, FinancialTitle } from '@/lib/types';
+import { collection, query, where, getDocs, FieldValue, Timestamp, doc, deleteDoc, orderBy, limit } from 'firebase/firestore';
+import type { Staff, FinancialTitle, StaffCredit } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -31,7 +33,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
 import { H1 } from '@/components/ui/typography';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { processRepasse } from '@/lib/finance-actions';
+import { processRepasse, launchPayroll } from '@/lib/finance-actions';
 import {
   Dialog,
   DialogContent,
@@ -119,7 +121,7 @@ function RepassePaymentDialog({
                       <div className="min-w-0">
                         <p className="text-xs font-bold text-slate-200 truncate">{c.description}</p>
                         <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-tighter">
-                          {c.type === 'REEMBOLSO' ? 'Natureza: Ressarcimento' : 'Natureza: Participação'}
+                          {c.type === 'REEMBOLSO' ? 'Natureza: Ressarcimento' : c.type === 'SALARIO' ? 'Natureza: Pro-labore' : 'Natureza: Participação'}
                         </p>
                       </div>
                     </div>
@@ -152,7 +154,7 @@ function RepassePaymentDialog({
   );
 }
 
-function PayoutList({ filterRole }: { filterRole?: string }) {
+function PayoutList({ filterRole, onRefresh }: { filterRole?: string; onRefresh?: () => void }) {
   const { firestore } = useFirebase();
   const [selectedStaff, setSelectedStaff] = React.useState<Staff | null>(null);
   const [staffCredits, setStaffCredits] = React.useState<any[]>([]);
@@ -196,7 +198,7 @@ function PayoutList({ filterRole }: { filterRole?: string }) {
         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
         <Input 
           placeholder="Pesquisar colaborador..." 
-          className="pl-8 bg-card border-border/50" 
+          className="pl-8 bg-card border-border/50 text-white" 
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
         />
@@ -215,7 +217,7 @@ function PayoutList({ filterRole }: { filterRole?: string }) {
           <TableBody>
             {isLoadingStaff ? (
               Array.from({ length: 3 }).map((_, i) => (
-                <TableRow key={i}><TableCell colSpan={4}><Skeleton className="h-10 w-full" /></TableCell></TableRow>
+                <TableRow key={i}><TableCell colSpan={4}><Skeleton className="h-10 w-full bg-white/5" /></TableCell></TableRow>
               ))
             ) : filteredStaff.map(member => (
               <TableRow key={member.id} className="border-white/5 hover:bg-white/5">
@@ -229,7 +231,7 @@ function PayoutList({ filterRole }: { filterRole?: string }) {
                 </TableCell>
                 <TableCell>
                   <Badge variant="outline" className="text-[10px] uppercase border-white/10 text-slate-400">
-                    {member.role === 'lawyer' ? 'Advogado' : member.role === 'intern' ? 'Estagiário' : member.role === 'employee' ? 'Funcionário' : 'Prestador'}
+                    {member.role === 'lawyer' ? 'Advogado' : member.role === 'intern' ? 'Estagiário' : member.role === 'employee' ? 'Administrativo' : member.role === 'provider' ? 'Fornecedor' : 'Sócio'}
                   </Badge>
                 </TableCell>
                 <TableCell className="text-right">
@@ -256,7 +258,10 @@ function PayoutList({ filterRole }: { filterRole?: string }) {
         credits={staffCredits} 
         open={isRepasseOpen} 
         onOpenChange={setIsRepasseOpen}
-        onPaid={() => setIsRepasseOpen(false)}
+        onPaid={() => {
+          setIsRepasseOpen(false);
+          onRefresh?.();
+        }}
       />
     </div>
   );
@@ -281,7 +286,7 @@ function RepasseValue({ staffId }: { staffId: string }) {
 
 function PaymentHistory() {
   const { firestore } = useFirebase();
-  const historyQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'financial_titles'), where('origin', '==', 'HONORARIOS_PAGOS'), orderBy('paymentDate', 'desc')) : null), [firestore]);
+  const historyQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'financial_titles'), where('origin', '==', 'HONORARIOS_PAGOS'), orderBy('paymentDate', 'desc'), limit(50)) : null), [firestore]);
   const { data: history, isLoading } = useCollection<FinancialTitle>(historyQuery);
 
   if (isLoading) return <Skeleton className="h-64 w-full bg-white/5" />;
@@ -327,60 +332,103 @@ function PaymentHistory() {
 
 export default function RepassesPage() {
   const { firestore } = useFirebase();
-  const [stats, setStats] = React.useState({ totalPending: 0, totalPaidMonth: 0, staffCount: 0 });
+  const { toast } = useToast();
+  const [isLaunching, setIsLaunching] = React.useState(false);
+  const [stats, setStats] = React.useState({ totalPending: 0, totalPaidMonth: 0, staffCount: 0, totalRetained: 0 });
+  const [refreshKey, setRefreshKey] = React.useState(0);
 
-  React.useEffect(() => {
+  const loadStats = React.useCallback(async () => {
     if (!firestore) return;
     
-    const loadStats = async () => {
-      // Simplificado: Buscar todos os staff e somar créditos disponíveis
-      const staffSnap = await getDocs(collection(firestore, 'staff'));
-      let pending = 0;
-      for (const s of staffSnap.docs) {
-        const credSnap = await getDocs(query(collection(firestore, `staff/${s.id}/credits`), where('status', '==', 'DISPONIVEL')));
-        pending += credSnap.docs.reduce((sum, d) => sum + (d.data().value || 0), 0);
-      }
-      
-      // Pagos no mês
-      const startOfMonth = new Date();
-      startOfMonth.setDate(1);
-      startOfMonth.setHours(0,0,0,0);
-      const paidSnap = await getDocs(query(collection(firestore, 'financial_titles'), where('origin', '==', 'HONORARIOS_PAGOS'), where('paymentDate', '>=', startOfMonth)));
-      const paid = paidSnap.docs.reduce((sum, d) => sum + (d.data().value || 0), 0);
+    // Buscar todos os staff
+    const staffSnap = await getDocs(collection(firestore, 'staff'));
+    let pending = 0;
+    let retained = 0;
 
-      setStats({ totalPending: pending, totalPaidMonth: paid, staffCount: staffSnap.size });
-    };
+    for (const s of staffSnap.docs) {
+      const credSnap = await getDocs(collection(firestore, `staff/${s.id}/credits`));
+      credSnap.docs.forEach(d => {
+        const val = d.data().value || 0;
+        if (d.data().status === 'DISPONIVEL') pending += val;
+        if (d.data().status === 'RETIDO') retained += val;
+      });
+    }
+    
+    // Pagos no mês
+    const startOfCurrentMonth = startOfMonth(new Date());
+    const paidSnap = await getDocs(query(
+      collection(firestore, 'financial_titles'), 
+      where('origin', '==', 'HONORARIOS_PAGOS'), 
+      where('paymentDate', '>=', Timestamp.fromDate(startOfCurrentMonth))
+    ));
+    const paid = paidSnap.docs.reduce((sum, d) => sum + (d.data().value || 0), 0);
 
-    loadStats();
+    setStats({ 
+      totalPending: pending, 
+      totalPaidMonth: paid, 
+      staffCount: staffSnap.size,
+      totalRetained: retained 
+    });
   }, [firestore]);
+
+  React.useEffect(() => {
+    loadStats();
+  }, [loadStats, refreshKey]);
+
+  const handleLaunchPayroll = async () => {
+    if (!confirm('Deseja processar a folha de pagamento fixa de todos os colaboradores ativos?')) return;
+    setIsLaunching(true);
+    try {
+      const res = await launchPayroll();
+      toast({ title: 'Folha Processada!', description: `${res.count} colaboradores receberam seus créditos mensais.` });
+      setRefreshKey(prev => prev + 1);
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Erro na folha', description: e.message });
+    } finally {
+      setIsLaunching(false);
+    }
+  };
 
   return (
     <div className="flex flex-col gap-8 pb-10">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <H1 className="text-white">Pagamentos & Repasses</H1>
-          <p className="text-sm text-muted-foreground">Gestão de remuneração variável, salários e fornecedores.</p>
+          <H1 className="text-white">Gestão de Repasses & Folha</H1>
+          <p className="text-sm text-muted-foreground">Controle central de salários, honorários e pagamentos externos.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" className="border-primary/20 text-primary hover:bg-primary/5">
+          <Button 
+            variant="outline" 
+            className="border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/5 h-10"
+            onClick={handleLaunchPayroll}
+            disabled={isLaunching}
+          >
+            {isLaunching ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Zap className="mr-2 h-4 w-4" />}
+            Rodar Folha Mensal
+          </Button>
+          <Button variant="outline" className="border-primary/20 text-primary hover:bg-primary/5 h-10" onClick={() => setRefreshKey(k => k + 1)}>
             <TrendingUp className="mr-2 h-4 w-4" />
-            Relatório de Performance
+            Recarregar Saldos
           </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="bg-emerald-500/5 border-emerald-500/20">
-          <CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-emerald-400">Total Liquidado (Mês)</CardTitle></CardHeader>
+          <CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-emerald-400">Pago este Mês</CardTitle></CardHeader>
           <CardContent className="p-4 pt-0"><p className="text-2xl font-black text-white">{stats.totalPaidMonth.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p></CardContent>
         </Card>
         <Card className="bg-amber-500/5 border-amber-500/20">
-          <CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-amber-400">Saldo Pendente de Repasse</CardTitle></CardHeader>
+          <CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-amber-400">Disponível p/ Saque</CardTitle></CardHeader>
           <CardContent className="p-4 pt-0"><p className="text-2xl font-black text-white">{stats.totalPending.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p></CardContent>
         </Card>
+        <Card className="bg-blue-500/5 border-blue-500/20">
+          <CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-blue-400">Aguardando Clientes</CardTitle></CardHeader>
+          <CardContent className="p-4 pt-0"><p className="text-2xl font-black text-white">{stats.totalRetained.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p></CardContent>
+        </Card>
         <Card className="bg-white/5 border-white/10">
-          <CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-slate-400">Quadro de Colaboradores</CardTitle></CardHeader>
-          <CardContent className="p-4 pt-0"><p className="text-2xl font-black text-white">{stats.staffCount} Ativos</p></CardContent>
+          <CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-slate-400">Total Equipe</CardTitle></CardHeader>
+          <CardContent className="p-4 pt-0"><p className="text-2xl font-black text-white">{stats.staffCount} Profissionais</p></CardContent>
         </Card>
       </div>
 
@@ -393,7 +441,7 @@ export default function RepassesPage() {
             <Users className="h-4 w-4" /> Administrativo
           </TabsTrigger>
           <TabsTrigger value="providers" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-            <Wallet className="h-4 w-4" /> Fornecedores
+            <ShieldCheck className="h-4 w-4" /> Fornecedores
           </TabsTrigger>
           <TabsTrigger value="history" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             <History className="h-4 w-4" /> Histórico
@@ -401,15 +449,15 @@ export default function RepassesPage() {
         </TabsList>
 
         <TabsContent value="lawyers" className="mt-6">
-          <PayoutList filterRole="lawyer" />
+          <PayoutList filterRole="lawyer" onRefresh={() => setRefreshKey(k => k + 1)} />
         </TabsContent>
 
         <TabsContent value="staff" className="mt-6">
-          <PayoutList filterRole="employee" />
+          <PayoutList filterRole="employee" onRefresh={() => setRefreshKey(k => k + 1)} />
         </TabsContent>
 
         <TabsContent value="providers" className="mt-6">
-          <PayoutList filterRole="provider" />
+          <PayoutList filterRole="provider" onRefresh={() => setRefreshKey(k => k + 1)} />
         </TabsContent>
 
         <TabsContent value="history" className="mt-6">

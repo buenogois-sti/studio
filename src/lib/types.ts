@@ -212,6 +212,23 @@ export type StaffRole = 'employee' | 'lawyer' | 'intern' | 'provider' | 'partner
 export type OABStatus = 'Ativa' | 'Suspensa' | 'Inativa' | 'Pendente';
 export type RemunerationType = 'SUCUMBENCIA' | 'PRODUCAO' | 'QUOTA_LITIS' | 'FIXO_MENSAL' | 'AUDIENCISTA';
 
+export type StaffCreditStatus = 'RETIDO' | 'DISPONIVEL' | 'PAGO';
+export type StaffCreditType = 'HONORARIOS' | 'REEMBOLSO' | 'SALARIO' | 'PRODUCAO';
+
+export type StaffCredit = {
+  id: string;
+  type: StaffCreditType;
+  description: string;
+  value: number;
+  status: StaffCreditStatus;
+  date: Timestamp;
+  processId?: string;
+  financialEventId?: string;
+  reimbursementId?: string;
+  paymentDate?: Timestamp;
+  paidBy?: string;
+};
+
 export type Staff = {
   id: string;
   role: StaffRole;

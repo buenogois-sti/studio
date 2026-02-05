@@ -1,8 +1,9 @@
 'use server';
 import { firestoreAdmin } from '@/firebase/admin';
-import type { FinancialTitle, Process, FinancialEvent, Staff } from './types';
+import type { FinancialTitle, Process, FinancialEvent, Staff, StaffCredit } from './types';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
-import { addMonths } from 'date-fns';
+import { addMonths, format, startOfMonth } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/options';
 import { createNotification } from './notification-actions';
@@ -91,19 +92,17 @@ export async function createFinancialEventAndTitles(data: CreateEventData) {
         if ((rem.type === 'SUCUMBENCIA' || rem.type === 'QUOTA_LITIS') && rem.lawyerPercentage) {
           // O advogado recebe X% dos 30% do escritório
           lawyerValue = officeFeeTotal * (rem.lawyerPercentage / 100);
-        } else if (rem.type === 'FIXO_MENSAL' || rem.type === 'AUDIENCISTA') {
-          // Casos fixos não geram crédito variável por evento de processo automaticamente aqui
         }
 
         if (lawyerValue > 0) {
           const creditRef = firestoreAdmin.collection(`staff/${leadLawyerId}/credits`).doc();
-          const newCredit: any = {
+          const newCredit: Omit<StaffCredit, 'id'> = {
             type: 'HONORARIOS',
             processId,
             description: `Part. Honorários (${rem.type}): ${description}`,
             value: lawyerValue,
             status: 'RETIDO', // Fica retido até o título ser pago
-            date: new Date(),
+            date: Timestamp.now(),
             financialEventId: eventRef.id
           };
           batch.set(creditRef, newCredit);
@@ -242,18 +241,32 @@ export async function launchPayroll() {
   const staffSnap = await firestoreAdmin.collection('staff').get();
   let count = 0;
 
+  const currentMonthKey = format(new Date(), 'yyyy-MM');
+
   for (const doc of staffSnap.docs) {
     const data = doc.data() as Staff;
+    
+    // Regra: Apenas se tiver remuneração fixa configurada
     if (data.remuneration?.type === 'FIXO_MENSAL' && data.remuneration.fixedMonthlyValue) {
-      const creditRef = doc.ref.collection('credits').doc();
-      batch.set(creditRef, {
-        type: 'SALARIO',
-        description: `Pro-labore/Salário: ${format(new Date(), 'MMMM/yyyy', { locale: ptBR })}`,
-        value: data.remuneration.fixedMonthlyValue,
-        status: 'DISPONIVEL',
-        date: FieldValue.serverTimestamp()
-      });
-      count++;
+      
+      // Checar se já foi rodado este mês para este colaborador (Evitar duplicidade)
+      const existingRef = await doc.ref.collection('credits')
+        .where('monthKey', '==', currentMonthKey)
+        .where('type', '==', 'SALARIO')
+        .get();
+
+      if (existingRef.empty) {
+        const creditRef = doc.ref.collection('credits').doc();
+        batch.set(creditRef, {
+          type: 'SALARIO',
+          description: `Pro-labore/Salário: ${format(new Date(), 'MMMM/yyyy', { locale: ptBR })}`,
+          value: data.remuneration.fixedMonthlyValue,
+          status: 'DISPONIVEL',
+          date: FieldValue.serverTimestamp(),
+          monthKey: currentMonthKey
+        });
+        count++;
+      }
     }
   }
 
