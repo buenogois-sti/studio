@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -85,6 +86,19 @@ function NewReimbursementDialog({
     }
   });
 
+  const handleValueChange = (e: React.ChangeEvent<HTMLInputElement>, onChange: (val: number) => void) => {
+    const rawValue = e.target.value.replace(/\D/g, '');
+    const numericValue = Number(rawValue) / 100;
+    onChange(numericValue);
+  };
+
+  const formatCurrencyValue = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value || 0);
+  };
+
   const onSubmit = async (values: z.infer<typeof reimbursementFormSchema>) => {
     setIsSaving(true);
     try {
@@ -167,7 +181,17 @@ function NewReimbursementDialog({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-white">Valor (R$) *</FormLabel>
-                    <FormControl><Input className="bg-background border-border" type="number" step="0.01" {...field} /></FormControl>
+                    <FormControl>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-bold">R$</span>
+                        <Input 
+                          className="bg-background border-border pl-9" 
+                          type="text"
+                          value={formatCurrencyValue(field.value)}
+                          onChange={(e) => handleValueChange(e, field.onChange)}
+                        />
+                      </div>
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}

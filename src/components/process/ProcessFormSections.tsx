@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState } from 'react';
@@ -339,9 +340,9 @@ export function IdentificationSection({ control }: { control: Control<ProcessFor
 
   const formatCurrencyBRL = (value?: number | string) => {
     if (value === null || value === undefined || value === '') return '';
-    const numericValue = typeof value === 'number' ? value : Number(String(value).replace(/[^\d.-]/g, ''));
-    if (Number.isNaN(numericValue)) return '';
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(numericValue);
+    const numericValue = typeof value === 'number' ? value : parseFloat(value.toString().replace(/[^\d.-]/g, ''));
+    if (isNaN(numericValue)) return '';
+    return new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(numericValue);
   };
 
   const handleCurrencyChange = (raw: string) => {
@@ -484,18 +485,21 @@ export function IdentificationSection({ control }: { control: Control<ProcessFor
         <FormField
           control={control}
           name="caseValue"
-          render={() => (
+          render={({ field }) => (
             <FormItem>
               <FormLabel className="text-sm font-bold">Valor da Causa (R$)</FormLabel>
               <FormControl>
-                <Input 
-                  type="text"
-                  inputMode="decimal"
-                  className="h-11 border-2"
-                  onKeyDown={(e) => e.stopPropagation()}
-                  value={formatCurrencyBRL(caseValue)}
-                  onChange={(e) => handleCurrencyChange(e.target.value)}
-                />
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-bold">R$</span>
+                  <Input 
+                    type="text"
+                    inputMode="decimal"
+                    className="h-11 border-2 pl-9"
+                    onKeyDown={(e) => e.stopPropagation()}
+                    value={formatCurrencyBRL(field.value)}
+                    onChange={(e) => handleCurrencyChange(e.target.value)}
+                  />
+                </div>
               </FormControl>
               <FormMessage />
             </FormItem>

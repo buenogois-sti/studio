@@ -1,3 +1,4 @@
+
 'use client';
 import * as React from 'react';
 import { z } from 'zod';
@@ -108,7 +109,7 @@ export function FinancialEventDialog({ process, open, onOpenChange, onEventCreat
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle>Novo Evento Financeiro</DialogTitle>
           <DialogDescription>
@@ -173,13 +174,16 @@ export function FinancialEventDialog({ process, open, onOpenChange, onEventCreat
                       <FormItem>
                       <FormLabel>Valor Total (R$) *</FormLabel>
                       <FormControl>
-                        <Input
-                          type="text"
-                          placeholder="0,00"
-                          {...field}
-                          value={formatCurrencyForDisplay(field.value)}
-                          onChange={(e) => handleCurrencyChange(e, field)}
-                        />
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-bold">R$</span>
+                          <Input
+                            type="text"
+                            placeholder="0,00"
+                            className="pl-9"
+                            value={formatCurrencyForDisplay(field.value)}
+                            onChange={(e) => handleCurrencyChange(e, field)}
+                          />
+                        </div>
                       </FormControl>
                       <FormMessage />
                       </FormItem>

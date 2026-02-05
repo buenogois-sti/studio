@@ -1,3 +1,4 @@
+
 'use client';
 import * as React from 'react';
 import { z } from 'zod';
@@ -179,6 +180,19 @@ export function StaffForm({
   
   const watchedRole = form.watch('role');
   const watchedRemuneration = form.watch('remuneration_type');
+
+  const handleCurrencyValueChange = (e: React.ChangeEvent<HTMLInputElement>, onChange: (val: number) => void) => {
+    const rawValue = e.target.value.replace(/\D/g, '');
+    const numericValue = Number(rawValue) / 100;
+    onChange(numericValue);
+  };
+
+  const formatCurrencyValue = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value || 0);
+  };
 
   const searchAddressByCep = React.useCallback(async (cep: string) => {
     const cleanCep = cep.replace(/\D/g, '');
@@ -434,8 +448,13 @@ export function StaffForm({
                                         <FormLabel className="text-xs font-bold uppercase">Valor Fixo Pro-Labore (R$)</FormLabel>
                                         <FormControl>
                                             <div className="relative">
-                                                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                                <Input type="number" className="h-11 pl-10 bg-background" placeholder="0,00" {...field} />
+                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-bold">R$</span>
+                                                <Input 
+                                                  type="text" 
+                                                  className="h-11 pl-9 bg-background" 
+                                                  value={formatCurrencyValue(field.value)} 
+                                                  onChange={(e) => handleCurrencyValueChange(e, field.onChange)}
+                                                />
                                             </div>
                                         </FormControl>
                                     </FormItem>
@@ -452,8 +471,13 @@ export function StaffForm({
                                         <FormLabel className="text-xs font-bold uppercase">Valor por Audiência Realizada (R$)</FormLabel>
                                         <FormControl>
                                             <div className="relative">
-                                                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                                <Input type="number" className="h-11 pl-10 bg-background" placeholder="0,00" {...field} />
+                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-bold">R$</span>
+                                                <Input 
+                                                  type="text" 
+                                                  className="h-11 pl-9 bg-background" 
+                                                  value={formatCurrencyValue(field.value)} 
+                                                  onChange={(e) => handleCurrencyValueChange(e, field.onChange)}
+                                                />
                                             </div>
                                         </FormControl>
                                     </FormItem>
@@ -471,8 +495,13 @@ export function StaffForm({
                                             <FormLabel className="text-xs font-bold uppercase">Valor por Peça Processual (R$)</FormLabel>
                                             <FormControl>
                                                 <div className="relative">
-                                                    <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                                    <Input type="number" className="h-11 pl-10 bg-background" placeholder="0,00" {...field} />
+                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-bold">R$</span>
+                                                    <Input 
+                                                      type="text" 
+                                                      className="h-11 pl-9 bg-background" 
+                                                      value={formatCurrencyValue(field.value)} 
+                                                      onChange={(e) => handleCurrencyValueChange(e, field.onChange)}
+                                                    />
                                                 </div>
                                             </FormControl>
                                         </FormItem>
@@ -486,8 +515,13 @@ export function StaffForm({
                                             <FormLabel className="text-xs font-bold uppercase">Valor por Diligência (R$)</FormLabel>
                                             <FormControl>
                                                 <div className="relative">
-                                                    <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                                    <Input type="number" className="h-11 pl-10 bg-background" placeholder="0,00" {...field} />
+                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-bold">R$</span>
+                                                    <Input 
+                                                      type="text" 
+                                                      className="h-11 pl-9 bg-background" 
+                                                      value={formatCurrencyValue(field.value)} 
+                                                      onChange={(e) => handleCurrencyValueChange(e, field.onChange)}
+                                                    />
                                                 </div>
                                             </FormControl>
                                         </FormItem>

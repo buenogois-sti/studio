@@ -1,3 +1,4 @@
+
 'use client';
 import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -43,7 +44,7 @@ import {
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/form';
 import { Input } from '@/components/ui/input';
 import { format, isBefore } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -97,6 +98,19 @@ function NewTitleDialog({ onCreated }: { onCreated: () => void }) {
       dueDate: format(new Date(), 'yyyy-MM-dd'),
     }
   });
+
+  const handleValueChange = (e: React.ChangeEvent<HTMLInputElement>, onChange: (val: number) => void) => {
+    const rawValue = e.target.value.replace(/\D/g, '');
+    const numericValue = Number(rawValue) / 100;
+    onChange(numericValue);
+  };
+
+  const formatCurrencyValue = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value || 0);
+  };
 
   const onSubmit = async (values: z.infer<typeof titleFormSchema>) => {
     setIsSaving(true);
@@ -186,8 +200,18 @@ function NewTitleDialog({ onCreated }: { onCreated: () => void }) {
                 name="value"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-white">Valor (R$)</FormLabel>
-                    <FormControl><Input type="number" step="0.01" className="bg-background border-border" {...field} /></FormControl>
+                    <FormLabel className="text-white">Valor (R$) *</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-bold">R$</span>
+                        <Input 
+                          className="bg-background border-border pl-9" 
+                          type="text"
+                          value={formatCurrencyValue(field.value)}
+                          onChange={(e) => handleValueChange(e, field.onChange)}
+                        />
+                      </div>
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
