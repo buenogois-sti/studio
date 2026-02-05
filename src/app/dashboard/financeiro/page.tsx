@@ -1,4 +1,3 @@
-
 'use client';
 import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -113,7 +112,6 @@ function NewTitleDialog({ onCreated }: { onCreated: () => void }) {
     }
   });
 
-  // Busca de processos com debounce
   React.useEffect(() => {
     if (processSearch.length < 2) {
       setProcessResults([]);
@@ -228,7 +226,6 @@ function NewTitleDialog({ onCreated }: { onCreated: () => void }) {
               />
             </div>
 
-            {/* Vínculo com Processo */}
             <div className="space-y-2">
               <FormLabel className="text-white">Vincular a um Processo (Opcional)</FormLabel>
               {selectedProcess ? (
@@ -372,7 +369,7 @@ function ReceiptDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-4xl bg-white text-slate-900 p-0 overflow-hidden border-none shadow-none print:shadow-none print:max-w-full">
         <ScrollArea className="max-h-[90vh] print:max-h-full">
-          <div className="p-10 space-y-6 bg-white print:p-0 print:shadow-none print:m-0" id="receipt-print-area">
+          <div className="p-10 space-y-6 bg-white print:p-0" id="receipt-print-area">
             <div className="flex justify-between items-center border-b-2 border-slate-900 pb-4">
               <div className="flex items-center gap-3">
                 <div className="bg-slate-900 p-1.5 rounded-lg print:bg-transparent">
@@ -384,7 +381,7 @@ function ReceiptDialog({
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-xl font-black text-slate-900 leading-none">RECIBO DE REPASSE</div>
+                <div className="text-xl font-black text-slate-900 leading-none font-headline">RECIBO DE REPASSE</div>
                 <p className="text-[8px] text-slate-500 font-bold mt-1 uppercase tracking-widest">Controle: {title.id.substring(0, 8).toUpperCase()}</p>
               </div>
             </div>
@@ -399,9 +396,9 @@ function ReceiptDialog({
               </p>
             </div>
 
-            <div className="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden">
+            <div className="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden print:bg-white">
               <table className="w-full text-xs">
-                <thead className="bg-slate-100 border-b border-slate-200">
+                <thead className="bg-slate-100 border-b border-slate-200 print:bg-slate-50">
                   <tr>
                     <th className="px-4 py-2 text-left font-black uppercase text-[9px] tracking-widest text-slate-500">Discriminação</th>
                     <th className="px-4 py-2 text-right font-black uppercase text-[9px] tracking-widest text-slate-500">Valor (R$)</th>
@@ -412,11 +409,11 @@ function ReceiptDialog({
                     <td className="px-4 py-2.5 text-slate-700">Valor Bruto Recebido (Proveniente da Parte Reclamada)</td>
                     <td className="px-4 py-2.5 text-right font-bold text-slate-900">{formattedTotal}</td>
                   </tr>
-                  <tr className="text-rose-600 bg-rose-50/10">
+                  <tr className="text-rose-600 bg-rose-50/10 print:bg-white">
                     <td className="px-4 py-2.5 font-medium italic">Honorários Advocatícios Contratuais ({feePercent}%)</td>
                     <td className="px-4 py-2.5 text-right font-bold">({formattedFee})</td>
                   </tr>
-                  <tr className="bg-emerald-50 font-black text-emerald-900 border-t-2 border-emerald-200">
+                  <tr className="bg-emerald-50 font-black text-emerald-900 border-t-2 border-emerald-200 print:bg-white">
                     <td className="px-4 py-3 uppercase tracking-tighter text-sm">Valor Líquido de Repasse ao Cliente</td>
                     <td className="px-4 py-3 text-right text-lg">{formattedNet}</td>
                   </tr>
@@ -484,7 +481,7 @@ function HonorariosReceiptDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-4xl bg-white text-slate-900 p-0 overflow-hidden border-none shadow-none print:shadow-none print:max-w-full">
-        <div className="p-10 space-y-8 bg-white print:p-0 print:m-0" id="honorarios-print-area">
+        <div className="p-10 space-y-8 bg-white print:p-0" id="honorarios-print-area">
           <div className="flex justify-between items-center border-b-2 border-slate-900 pb-4">
             <div className="flex items-center gap-3">
               <div className="bg-slate-900 p-1.5 rounded-lg print:bg-transparent">
@@ -496,16 +493,16 @@ function HonorariosReceiptDialog({
               </div>
             </div>
             <div className="text-right">
-              <div className="text-xl font-black text-slate-900 leading-none">HONORÁRIOS</div>
+              <div className="text-xl font-black text-slate-900 leading-none font-headline">HONORÁRIOS</div>
               <div className="text-[8px] font-bold text-slate-500 mt-1 uppercase">ID: {title.id.substring(0, 8).toUpperCase()}</div>
             </div>
           </div>
 
-          <div className="py-6 space-y-4 text-sm leading-relaxed text-justify border-l-4 border-primary/20 pl-6 bg-slate-50/50 rounded-r-2xl">
+          <div className="py-6 space-y-4 text-sm leading-relaxed text-justify border-l-4 border-primary/20 pl-6 bg-slate-50/50 rounded-r-2xl print:bg-white print:border-l-2 print:border-slate-300">
             <p>
               Confirmamos o recebimento de <strong className="text-slate-900 font-black">{formattedFee}</strong> do cliente <strong>{client ? `${client.firstName} ${client.lastName}` : 'N/A'}</strong>, referente aos honorários contratuais de êxito ({feePercent}%) incidentes sobre a verba:
             </p>
-            <p className="italic text-slate-600 bg-white p-3 rounded-lg border border-slate-200">
+            <p className="italic text-slate-600 bg-white p-3 rounded-lg border border-slate-200 print:bg-slate-50">
               "{title.description}"
             </p>
             <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest">
@@ -601,7 +598,6 @@ export default function FinanceiroPage() {
   const isLoading = isUserLoading || isLoadingTitles;
 
   const TitleTable = ({ data, type }: { data: FinancialTitle[], type: 'RECEITA' | 'DESPESA' }) => {
-    // Agrupamento por Mês/Ano
     const groupedData = React.useMemo(() => {
       const groups: { monthLabel: string; titles: FinancialTitle[] }[] = [];
       data.forEach(t => {

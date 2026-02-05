@@ -82,44 +82,91 @@
   background: hsl(var(--primary) / 0.5);
 }
 
-/* Print Styles */
+/* Print Styles - Professional Document Mode */
 @media print {
   @page {
     margin: 0;
     size: auto;
   }
 
+  /* Force white background and hide UI */
   body {
     background: white !important;
     color: black !important;
-    margin: 1cm; /* Margem de segurança para o conteúdo */
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
   }
 
-  /* Oculta URL, rodapés do navegador, Toasts e elementos de UI */
-  .no-print, 
+  /* Hide ALL standard UI and Layout elements */
+  header, 
+  aside, 
+  nav, 
   button, 
-  [role="status"], 
-  [role="region"],
-  [data-radix-portal] > div:not([role="dialog"]),
-  header {
+  .no-print, 
+  [role="status"],
+  .sidebar-inset,
+  .sidebar-provider,
+  [data-sidebar] {
     display: none !important;
   }
 
-  .bg-card {
-    background: white !important;
-    border: 1px solid #ddd !important;
+  /* Handle the Dialog Overlay and Portal */
+  [data-radix-portal] {
+    position: static !important;
   }
 
-  /* Remove todas as sombras e efeitos durante a impressão */
+  /* Hide the dark modal overlay */
+  div[data-state="open"].fixed.inset-0.bg-black\/80 {
+    display: none !important;
+  }
+
+  /* Reset the Dialog Content to be a flat white document */
+  [role="dialog"] {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    height: auto !important;
+    transform: none !important;
+    background: white !important;
+    color: black !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: block !important;
+  }
+
+  /* Close button inside modal MUST go */
+  [role="dialog"] > button[type="button"] {
+    display: none !important;
+  }
+
+  /* Container for the printable content */
+  #receipt-print-area, 
+  #honorarios-print-area {
+    width: 100% !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 1.5cm !important; /* Safety margin for printer */
+    background: white !important;
+    visibility: visible !important;
+    display: block !important;
+  }
+
+  /* Ensure colors are printed accurately */
   * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
     box-shadow: none !important;
     text-shadow: none !important;
-    filter: none !important;
-    -webkit-print-color-adjust: exact;
   }
 
-  /* Garante fundo branco para áreas de impressão */
-  .print-white {
-    background-color: white !important;
+  /* Reset scroll area heights for print */
+  [data-radix-scroll-area-viewport] {
+    height: auto !important;
+    overflow: visible !important;
   }
 }
