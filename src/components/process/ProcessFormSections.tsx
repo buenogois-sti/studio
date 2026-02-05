@@ -47,17 +47,17 @@ interface SectionHeaderProps {
 
 export function SectionHeader({ icon, title, description, isOptional }: SectionHeaderProps) {
   return (
-    <div className="space-y-2 border-b pb-4 mb-6 animate-in fade-in slide-in-from-left-2 duration-300">
+    <div className="space-y-2 border-b border-white/5 pb-4 mb-6 animate-in fade-in slide-in-from-left-2 duration-300">
       <div className="flex items-center gap-3">
-        <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center text-primary hover:scale-110 transition-transform">
+        <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary hover:scale-110 transition-transform">
           {icon}
         </div>
         <div>
-          <h3 className="text-xs font-black uppercase tracking-widest text-foreground">{title}</h3>
-          {isOptional && <p className="text-[10px] text-muted-foreground">Opcional</p>}
+          <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-white">{title}</h3>
+          {isOptional && <p className="text-[9px] text-muted-foreground font-bold uppercase">Opcional</p>}
         </div>
       </div>
-      {description && <p className="text-xs text-muted-foreground ml-11">{description}</p>}
+      {description && <p className="text-xs text-slate-400 ml-11 font-medium">{description}</p>}
     </div>
   );
 }
@@ -85,7 +85,7 @@ export function ClientsSection({ control, onClientSelect }: ClientsSectionProps)
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 max-w-3xl mx-auto">
       <SectionHeader 
         icon={<Users className="h-4 w-4" />} 
         title="Partes do Processo"
@@ -93,23 +93,25 @@ export function ClientsSection({ control, onClientSelect }: ClientsSectionProps)
       />
       
       <div className={cn(
-        "space-y-6 p-6 rounded-2xl border-2 transition-colors",
-        hasMainClient ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900" : "bg-muted/20 border-border/50"
+        "space-y-6 p-8 rounded-3xl border-2 transition-all duration-500",
+        hasMainClient 
+          ? "bg-emerald-500/[0.03] border-emerald-500/30 shadow-[0_0_40px_rgba(16,185,129,0.05)]" 
+          : "bg-white/[0.02] border-white/5"
       )}>
         <FormField
           control={control}
           name="clientRole"
           render={({ field }) => (
             <FormItem>
-              <FormLabel className="text-sm font-bold">Polo Processual *</FormLabel>
+              <FormLabel className="text-xs font-black uppercase text-slate-400 tracking-wider">Polo Processual *</FormLabel>
               <FormControl>
                 <Select value={field.value} onValueChange={field.onChange}>
-                  <SelectTrigger className="h-10">
-                    <SelectValue placeholder="Selecione" />
+                  <SelectTrigger className="h-12 bg-black/40 border-white/10 hover:border-primary/50 transition-colors">
+                    <SelectValue placeholder="Selecione o papel do cliente" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Polo Ativo">Polo Ativo</SelectItem>
-                    <SelectItem value="Polo Passivo">Polo Passivo</SelectItem>
+                    <SelectItem value="Polo Ativo">Polo Ativo (Autor/Reclamante)</SelectItem>
+                    <SelectItem value="Polo Passivo">Polo Passivo (Réu/Reclamado)</SelectItem>
                   </SelectContent>
                 </Select>
               </FormControl>
@@ -123,20 +125,20 @@ export function ClientsSection({ control, onClientSelect }: ClientsSectionProps)
           name="clientId"
           render={({ field }) => (
             <FormItem>
-              <div className="flex items-center gap-2">
-                <FormLabel className="text-sm font-bold">Cliente Principal *</FormLabel>
-                {hasMainClient && <CheckCircle2 className="h-4 w-4 text-emerald-600" />}
+              <div className="flex items-center justify-between mb-1">
+                <FormLabel className="text-xs font-black uppercase text-slate-400 tracking-wider">Cliente Principal *</FormLabel>
+                {hasMainClient && (
+                  <Badge variant="outline" className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 gap-1 text-[9px] font-black h-5">
+                    <CheckCircle2 className="h-3 w-3" /> SELECIONADO
+                  </Badge>
+                )}
               </div>
               <FormControl>
-                <div className="flex gap-2">
-                  <div className="flex-1">
-                    <ClientSearchInput 
-                      selectedClientId={field.value} 
-                      onSelect={onClientSelect}
-                      onCreateNew={() => setShowCreateModal(true)}
-                    />
-                  </div>
-                </div>
+                <ClientSearchInput 
+                  selectedClientId={field.value} 
+                  onSelect={onClientSelect}
+                  onCreateNew={() => setShowCreateModal(true)}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -144,23 +146,23 @@ export function ClientsSection({ control, onClientSelect }: ClientsSectionProps)
         />
 
         {hasMainClient && (
-          <div className="space-y-4 pt-2 border-t border-border/50 animate-in slide-in-from-bottom-2">
+          <div className="space-y-4 pt-6 border-t border-white/5 animate-in fade-in slide-in-from-bottom-2 duration-500">
             <div className="flex items-center justify-between">
-              <FormLabel className="text-sm font-bold">Autores Secundários / Co-autores</FormLabel>
+              <FormLabel className="text-xs font-black uppercase text-slate-400 tracking-wider">Co-autores / Litisconsortes</FormLabel>
               <Button
                 type="button"
-                variant="outline"
+                variant="ghost"
                 size="sm"
                 onClick={() => addSecondary('')}
-                className="h-8 text-[10px] font-black uppercase border-primary/30 text-primary hover:bg-primary/5"
+                className="h-8 text-[10px] font-black uppercase text-primary hover:bg-primary/10"
               >
-                <UserPlus className="h-3 w-3 mr-1" /> Adicionar Autor
+                <UserPlus className="h-3 w-3 mr-1.5" /> Adicionar Outro
               </Button>
             </div>
 
             <div className="grid gap-3">
               {secondaryFields.map((field, index) => (
-                <div key={field.id} className="flex items-center gap-3 bg-background p-3 rounded-xl border-2 hover:border-primary/50 transition-colors animate-in fade-in duration-300">
+                <div key={field.id} className="flex items-center gap-3 bg-black/20 p-3 rounded-2xl border border-white/5 hover:border-primary/30 transition-all duration-300 animate-in zoom-in-95">
                   <div className="flex-1">
                     <FormField
                       control={control}
@@ -178,7 +180,7 @@ export function ClientsSection({ control, onClientSelect }: ClientsSectionProps)
                     variant="ghost"
                     size="icon"
                     onClick={() => removeSecondary(index)}
-                    className="text-destructive hover:bg-destructive/10 shrink-0 h-9 w-9"
+                    className="text-rose-500 hover:bg-rose-500/10 shrink-0 h-10 w-10 rounded-xl"
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -208,22 +210,22 @@ interface PartiesSectionProps {
 
 export function PartiesSection({ control, partyFields, onAddParty, onRemoveParty }: PartiesSectionProps) {
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 max-w-3xl mx-auto">
       <SectionHeader 
         icon={<Scale className="h-4 w-4" />} 
-        title="Parte Contrária (Réus)"
-        description="Adicione todos os réus/partes contrárias no processo"
+        title="Polo Passivo (Réus)"
+        description="Identifique todas as empresas ou pessoas físicas processadas"
         isOptional
       />
 
-      <div className="space-y-6 bg-muted/20 p-6 rounded-2xl border-2 border-border/50">
+      <div className="space-y-6 bg-white/[0.02] p-8 rounded-3xl border-2 border-white/5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <FormLabel className="text-sm font-bold">Polo passivo</FormLabel>
+            <FormLabel className="text-xs font-black uppercase text-slate-400 tracking-wider">Lista de Réus</FormLabel>
             {partyFields.length > 0 && (
-              <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full font-bold">
+              <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20 text-[10px] font-black">
                 {partyFields.length}
-              </span>
+              </Badge>
             )}
           </div>
           <Button
@@ -231,30 +233,29 @@ export function PartiesSection({ control, partyFields, onAddParty, onRemoveParty
             variant="outline"
             size="sm"
             onClick={onAddParty}
-            className="h-8 text-[10px] font-black uppercase text-primary border-primary/30 hover:bg-primary/5"
+            className="h-9 text-[10px] font-black uppercase text-primary border-primary/20 hover:bg-primary/10"
           >
-            <Plus className="h-3 w-3 mr-1" /> Novo Réu
+            <Plus className="h-3.5 w-3.5 mr-1.5" /> Novo Réu
           </Button>
         </div>
 
         <div className="grid gap-4">
           {partyFields.length > 0 ? (
             partyFields.map((field, index) => (
-              <div key={field.id} className="p-4 rounded-xl border-2 bg-background hover:border-primary/50 transition-colors space-y-3 animate-in fade-in duration-300">
+              <div key={field.id} className="p-6 rounded-2xl border border-white/10 bg-black/40 hover:border-primary/40 transition-all duration-300 space-y-4 animate-in slide-in-from-right-2">
                 <div className="flex items-start justify-between gap-4">
                   <FormField
                     control={control}
                     name={`opposingParties.${index}.name`}
                     render={({ field: nameField }) => (
                       <FormItem className="flex-1">
-                        <FormLabel className="text-[10px] uppercase font-bold flex items-center gap-1.5">
-                          Nome do Réu / Empresa 
-                          <span className="text-destructive">*</span>
+                        <FormLabel className="text-[10px] uppercase font-black text-primary tracking-widest">
+                          Razão Social / Nome Completo *
                         </FormLabel>
                         <FormControl>
                           <Input
-                            placeholder="Digite o nome completo..."
-                            className="h-10"
+                            placeholder="Digite o nome oficial..."
+                            className="h-11 bg-black/20 border-white/10"
                             onKeyDown={(e) => e.stopPropagation()}
                             {...nameField}
                           />
@@ -268,24 +269,25 @@ export function PartiesSection({ control, partyFields, onAddParty, onRemoveParty
                     variant="ghost"
                     size="icon"
                     onClick={() => onRemoveParty(index)}
-                    className="mt-6 text-destructive hover:bg-destructive/10 h-9 w-9"
+                    className="mt-7 text-rose-500 hover:bg-rose-500/10 h-10 w-10 rounded-xl"
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-border/30">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-white/5">
                   <FormField
                     control={control}
                     name={`opposingParties.${index}.email`}
                     render={({ field: emailField }) => (
                       <FormItem>
+                        <FormLabel className="text-[9px] uppercase font-bold text-slate-500">Email de Contato</FormLabel>
                         <FormControl>
                           <div className="relative">
-                            <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                            <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500" />
                             <Input 
-                              placeholder="E-mail de contato" 
-                              className="pl-9 h-9 text-xs" 
+                              placeholder="juridico@empresa.com" 
+                              className="pl-10 h-10 text-xs bg-black/20" 
                               {...emailField} 
                               onKeyDown={(e) => e.stopPropagation()} 
                             />
@@ -300,12 +302,13 @@ export function PartiesSection({ control, partyFields, onAddParty, onRemoveParty
                     name={`opposingParties.${index}.phone`}
                     render={({ field: phoneField }) => (
                       <FormItem>
+                        <FormLabel className="text-[9px] uppercase font-bold text-slate-500">Telefone / RH</FormLabel>
                         <FormControl>
                           <div className="relative">
-                            <Smartphone className="absolute left-3 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                            <Smartphone className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500" />
                             <Input 
-                              placeholder="Telefone / WhatsApp" 
-                              className="pl-9 h-9 text-xs" 
+                              placeholder="(00) 0000-0000" 
+                              className="pl-10 h-10 text-xs bg-black/20" 
                               {...phoneField} 
                               onKeyDown={(e) => e.stopPropagation()} 
                             />
@@ -318,10 +321,11 @@ export function PartiesSection({ control, partyFields, onAddParty, onRemoveParty
               </div>
             ))
           ) : (
-            <div className="text-center py-12 border-2 border-dashed rounded-xl text-muted-foreground space-y-2">
-              <AlertCircle className="h-8 w-8 mx-auto opacity-30" />
-              <p className="text-sm italic">Nenhum réu adicionado ainda.</p>
-              <p className="text-xs">Adicione os réus/partes contrárias ao processo</p>
+            <div className="text-center py-16 border-2 border-dashed border-white/5 rounded-3xl text-slate-500 space-y-3">
+              <div className="h-12 w-12 rounded-full bg-white/[0.02] flex items-center justify-center mx-auto">
+                <AlertCircle className="h-6 w-6 opacity-20" />
+              </div>
+              <p className="text-sm font-medium italic">Nenhum réu adicionado ao polo passivo.</p>
             </div>
           )}
         </div>
@@ -334,7 +338,6 @@ export function PartiesSection({ control, partyFields, onAddParty, onRemoveParty
 export function IdentificationSection({ control }: { control: Control<ProcessFormValues> }) {
   const name = useWatch({ control, name: 'name' });
   const legalArea = useWatch({ control, name: 'legalArea' });
-  const caseValue = useWatch({ control, name: 'caseValue' });
   const { setValue } = useFormContext<ProcessFormValues>();
   const isValid = !!name && !!legalArea;
 
@@ -355,7 +358,7 @@ export function IdentificationSection({ control }: { control: Control<ProcessFor
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 max-w-3xl mx-auto">
       <SectionHeader 
         icon={<LayoutGrid className="h-4 w-4" />} 
         title="Dados do Processo"
@@ -363,22 +366,24 @@ export function IdentificationSection({ control }: { control: Control<ProcessFor
       />
 
       <div className={cn(
-        "grid grid-cols-1 md:grid-cols-2 gap-6 p-6 rounded-2xl border-2 transition-colors",
-        isValid ? "bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900" : "bg-muted/20 border-border/50"
+        "grid grid-cols-1 md:grid-cols-2 gap-6 p-8 rounded-3xl border-2 transition-all duration-500",
+        isValid 
+          ? "bg-blue-500/[0.03] border-blue-500/30 shadow-[0_0_40px_rgba(59,130,246,0.05)]" 
+          : "bg-white/[0.02] border-white/5"
       )}>
         <FormField
           control={control}
           name="name"
           render={({ field }) => (
             <FormItem className="md:col-span-2">
-              <div className="flex items-center gap-2">
-                <FormLabel className="text-sm font-bold">Título / Nome do Processo *</FormLabel>
-                {name && <CheckCircle2 className="h-4 w-4 text-blue-600" />}
+              <div className="flex items-center justify-between mb-1">
+                <FormLabel className="text-xs font-black uppercase text-slate-400 tracking-wider">Título do Processo *</FormLabel>
+                {name && <CheckCircle2 className="h-3 w-3 text-blue-400" />}
               </div>
               <FormControl>
                 <Input
                   placeholder="Ex: Reclamatória Trabalhista - João Silva"
-                  className="h-11 border-2"
+                  className="h-12 bg-black/40 border-white/10 text-base font-bold focus:border-primary transition-all"
                   onKeyDown={(e) => e.stopPropagation()}
                   {...field}
                 />
@@ -393,14 +398,14 @@ export function IdentificationSection({ control }: { control: Control<ProcessFor
           name="status"
           render={({ field }) => (
             <FormItem>
-              <FormLabel className="text-sm font-bold">Status Operacional *</FormLabel>
+              <FormLabel className="text-xs font-black uppercase text-slate-400 tracking-wider">Status Operacional *</FormLabel>
               <Select onValueChange={field.onChange} value={field.value}>
                 <FormControl>
-                  <SelectTrigger className="h-11 border-2">
-                    <SelectValue placeholder="Status..." />
+                  <SelectTrigger className="h-11 bg-black/40 border-white/10">
+                    <SelectValue placeholder="Defina o status..." />
                   </SelectTrigger>
                 </FormControl>
-                <SelectContent>
+                <SelectContent className="bg-[#0f172a] border-white/10">
                   <SelectItem value="Ativo">
                     <span className="flex items-center gap-2">
                       <span className="h-2 w-2 bg-emerald-500 rounded-full" /> Ativo
@@ -413,7 +418,7 @@ export function IdentificationSection({ control }: { control: Control<ProcessFor
                   </SelectItem>
                   <SelectItem value="Arquivado">
                     <span className="flex items-center gap-2">
-                      <span className="h-2 w-2 bg-gray-500 rounded-full" /> Arquivado
+                      <span className="h-2 w-2 bg-slate-500 rounded-full" /> Arquivado
                     </span>
                   </SelectItem>
                 </SelectContent>
@@ -428,33 +433,20 @@ export function IdentificationSection({ control }: { control: Control<ProcessFor
           name="legalArea"
           render={({ field }) => (
             <FormItem>
-              <div className="flex items-center gap-2">
-                <FormLabel className="text-sm font-bold">Área Jurídica *</FormLabel>
-                {legalArea && <CheckCircle2 className="h-4 w-4 text-blue-600" />}
-              </div>
+              <FormLabel className="text-xs font-black uppercase text-slate-400 tracking-wider">Área Jurídica *</FormLabel>
               <Select onValueChange={field.onChange} value={field.value}>
                 <FormControl>
-                  <SelectTrigger className="h-11 border-2">
+                  <SelectTrigger className="h-11 bg-black/40 border-white/10">
                     <SelectValue placeholder="Tipo de Ação..." />
                   </SelectTrigger>
                 </FormControl>
-                <SelectContent>
+                <SelectContent className="bg-[#0f172a] border-white/10">
                   <SelectItem value="Trabalhista">Trabalhista</SelectItem>
                   <SelectItem value="Cível">Cível</SelectItem>
                   <SelectItem value="Criminal">Criminal</SelectItem>
                   <SelectItem value="Tributário">Tributário</SelectItem>
-                  <SelectItem value="Empresarial">Empresarial</SelectItem>
-                  <SelectItem value="Administrativo">Administrativo</SelectItem>
-                  <SelectItem value="Consumidor">Consumidor</SelectItem>
-                  <SelectItem value="Imobiliário">Imobiliário</SelectItem>
-                  <SelectItem value="Ambiental">Ambiental</SelectItem>
-                  <SelectItem value="Eleitoral">Eleitoral</SelectItem>
-                  <SelectItem value="Bancário">Bancário</SelectItem>
                   <SelectItem value="Previdenciário">Previdenciário</SelectItem>
                   <SelectItem value="Família">Família</SelectItem>
-                  <SelectItem value="Sucessões">Sucessões</SelectItem>
-                  <SelectItem value="Propriedade Intelectual">Propriedade Intelectual</SelectItem>
-                  <SelectItem value="Trânsito">Trânsito</SelectItem>
                   <SelectItem value="Outro">Outro</SelectItem>
                 </SelectContent>
               </Select>
@@ -468,16 +460,15 @@ export function IdentificationSection({ control }: { control: Control<ProcessFor
           name="processNumber"
           render={({ field }) => (
             <FormItem>
-              <FormLabel className="text-sm font-bold">Número CNJ</FormLabel>
+              <FormLabel className="text-xs font-black uppercase text-slate-400 tracking-wider">Número CNJ</FormLabel>
               <FormControl>
                 <Input 
                   placeholder="0000000-00.0000.0.00.0000" 
-                  className="h-11 font-mono border-2" 
+                  className="h-11 font-mono text-sm bg-black/40 border-white/10 tracking-widest" 
                   onKeyDown={(e) => e.stopPropagation()}
                   {...field} 
                 />
               </FormControl>
-              <p className="text-[10px] text-muted-foreground">Opcional</p>
             </FormItem>
           )}
         />
@@ -487,14 +478,14 @@ export function IdentificationSection({ control }: { control: Control<ProcessFor
           name="caseValue"
           render={({ field }) => (
             <FormItem>
-              <FormLabel className="text-sm font-bold">Valor da Causa (R$)</FormLabel>
+              <FormLabel className="text-xs font-black uppercase text-slate-400 tracking-wider">Valor da Causa (R$)</FormLabel>
               <FormControl>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-bold">R$</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-primary font-black text-sm">R$</span>
                   <Input 
                     type="text"
                     inputMode="decimal"
-                    className="h-11 border-2 pl-9"
+                    className="h-11 bg-black/40 border-white/10 pl-10 font-bold text-white"
                     onKeyDown={(e) => e.stopPropagation()}
                     value={formatCurrencyBRL(field.value)}
                     onChange={(e) => handleCurrencyChange(e.target.value)}
@@ -516,7 +507,7 @@ export function CourtSection({ control }: { control: Control<ProcessFormValues> 
   const hasLocation = !!court;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 max-w-3xl mx-auto">
       <SectionHeader 
         icon={<Building className="h-4 w-4" />} 
         title="Juízo e Localização"
@@ -525,8 +516,10 @@ export function CourtSection({ control }: { control: Control<ProcessFormValues> 
       />
 
       <div className={cn(
-        "grid grid-cols-1 md:grid-cols-2 gap-6 p-6 rounded-2xl border-2 transition-colors",
-        hasLocation ? "bg-purple-50 dark:bg-purple-950/20 border-purple-200 dark:border-purple-900" : "bg-muted/20 border-border/50"
+        "grid grid-cols-1 md:grid-cols-2 gap-6 p-8 rounded-3xl border-2 transition-all duration-500",
+        hasLocation 
+          ? "bg-purple-500/[0.03] border-purple-500/30 shadow-[0_0_40px_rgba(168,85,247,0.05)]" 
+          : "bg-white/[0.02] border-white/5"
       )}>
         <div className="md:col-span-2">
           <FormField
@@ -534,15 +527,15 @@ export function CourtSection({ control }: { control: Control<ProcessFormValues> 
             name="court"
             render={({ field }) => (
               <FormItem>
-                <div className="flex items-center gap-2">
-                  <FormLabel className="text-sm font-bold">Busca de Tribunal / Fórum</FormLabel>
-                  {hasLocation && <CheckCircle2 className="h-4 w-4 text-purple-600" />}
+                <div className="flex items-center justify-between mb-1">
+                  <FormLabel className="text-xs font-black uppercase text-slate-400 tracking-wider">Pesquisar Fórum / Comarca</FormLabel>
+                  {hasLocation && <CheckCircle2 className="h-3 w-3 text-purple-400" />}
                 </div>
                 <FormControl>
                   <LocationSearch
                     value={field.value || ''}
                     onSelect={(val) => field.onChange(val)}
-                    placeholder="Digite o nome do fórum ou um endereço..."
+                    placeholder="Digite o nome do fórum..."
                   />
                 </FormControl>
                 <FormMessage />
@@ -556,16 +549,15 @@ export function CourtSection({ control }: { control: Control<ProcessFormValues> 
           name="courtBranch"
           render={({ field }) => (
             <FormItem className="md:col-span-2">
-              <FormLabel className="text-sm font-bold">Vara / Câmara / Turma</FormLabel>
+              <FormLabel className="text-xs font-black uppercase text-slate-400 tracking-wider">Vara / Câmara / Turma</FormLabel>
               <FormControl>
                 <Input 
-                  placeholder="Ex: 2ª Vara do Trabalho de SBC" 
-                  className="h-11 border-2" 
+                  placeholder="Ex: 2ª Vara do Trabalho de São Bernardo do Campo" 
+                  className="h-11 bg-black/40 border-white/10" 
                   onKeyDown={(e) => e.stopPropagation()}
                   {...field} 
                 />
               </FormControl>
-              <p className="text-[10px] text-muted-foreground">Opcional</p>
             </FormItem>
           )}
         />
@@ -575,17 +567,16 @@ export function CourtSection({ control }: { control: Control<ProcessFormValues> 
           name="courtWebsite"
           render={({ field }) => (
             <FormItem className="md:col-span-2">
-              <FormLabel className="text-sm font-bold">Link do Tribunal</FormLabel>
+              <FormLabel className="text-xs font-black uppercase text-slate-400 tracking-wider">Link de Acompanhamento (Tribunal)</FormLabel>
               <FormControl>
                 <Input 
                   type="url"
-                  placeholder="https://www.tst.jus.br/" 
-                  className="h-11 border-2" 
+                  placeholder="https://pje.trt2.jus.br/pjekz/..." 
+                  className="h-11 bg-black/40 border-white/10 font-mono text-[10px]" 
                   onKeyDown={(e) => e.stopPropagation()}
                   {...field} 
                 />
               </FormControl>
-              <p className="text-[10px] text-muted-foreground">Opcional</p>
             </FormItem>
           )}
         />
@@ -604,44 +595,45 @@ interface TeamSectionProps {
 }
 
 export function TeamSection({ control, staff, teamFields, onAddMember, onRemoveMember }: TeamSectionProps) {
-  const lawyers = staff.filter((s) => s.role === 'lawyer');
+  const lawyers = staff.filter((s) => s.role === 'lawyer' || s.role === 'partner');
   const leadLawyerId = useWatch({ control, name: 'leadLawyerId' });
   const hasLeadLawyer = !!leadLawyerId;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 max-w-3xl mx-auto">
       <SectionHeader 
         icon={<ShieldCheck className="h-4 w-4" />} 
-        title="Equipe e Honorários"
-        description="Advogado responsável e membros de apoio"
+        title="Equipe Responsável"
+        description="Defina o advogado líder e membros de apoio para este processo"
       />
 
-      <div className="space-y-6 bg-muted/20 p-6 rounded-2xl border-2 border-border/50">
+      <div className={cn(
+        "space-y-6 p-8 rounded-3xl border-2 transition-all duration-500",
+        hasLeadLawyer 
+          ? "bg-emerald-500/[0.03] border-emerald-500/30" 
+          : "bg-white/[0.02] border-white/5"
+      )}>
         <FormField
           control={control}
           name="leadLawyerId"
           render={({ field }) => (
             <FormItem>
-              <div className="flex items-center gap-2">
-                <FormLabel className="text-sm font-bold">Advogado Responsável (Titular) *</FormLabel>
-                {hasLeadLawyer && <CheckCircle2 className="h-4 w-4 text-emerald-600" />}
+              <div className="flex items-center justify-between mb-1">
+                <FormLabel className="text-xs font-black uppercase text-slate-400 tracking-wider">Advogado Titular *</FormLabel>
+                {hasLeadLawyer && <CheckCircle2 className="h-3 w-3 text-emerald-400" />}
               </div>
               <Select onValueChange={field.onChange} value={field.value}>
                 <FormControl>
-                  <SelectTrigger className="h-11 border-2">
-                    <SelectValue placeholder="Selecione o advogado líder..." />
+                  <SelectTrigger className="h-12 bg-black/40 border-white/10 text-base font-bold">
+                    <SelectValue placeholder="Selecione o responsável pelo caso..." />
                   </SelectTrigger>
                 </FormControl>
-                <SelectContent>
-                  {lawyers.length > 0 ? (
-                    lawyers.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
-                        Dr(a). {s.firstName} {s.lastName}
-                      </SelectItem>
-                    ))
-                  ) : (
-                    <div className="p-2 text-sm text-muted-foreground">Nenhum advogado cadastrado</div>
-                  )}
+                <SelectContent className="bg-[#0f172a] border-white/10">
+                  {lawyers.map((s) => (
+                    <SelectItem key={s.id} value={s.id} className="font-bold">
+                      Dr(a). {s.firstName} {s.lastName}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               <FormMessage />
@@ -650,30 +642,23 @@ export function TeamSection({ control, staff, teamFields, onAddMember, onRemoveM
         />
 
         {hasLeadLawyer && (
-          <div className="space-y-4 pt-2 border-t border-border/50 animate-in slide-in-from-bottom-2">
+          <div className="space-y-4 pt-6 border-t border-white/5 animate-in fade-in slide-in-from-bottom-2 duration-500">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <FormLabel className="text-sm font-bold">Advogados de Apoio / Parcerias</FormLabel>
-                {teamFields.length > 0 && (
-                  <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full font-bold">
-                    {teamFields.length}
-                  </span>
-                )}
-              </div>
+              <FormLabel className="text-xs font-black uppercase text-slate-400 tracking-wider">Equipe de Apoio / Parcerias</FormLabel>
               <Button
                 type="button"
-                variant="outline"
+                variant="ghost"
                 size="sm"
                 onClick={onAddMember}
-                className="h-8 text-[10px] font-black uppercase text-primary border-primary/30 hover:bg-primary/5"
+                className="h-8 text-[10px] font-black uppercase text-primary hover:bg-primary/10"
               >
-                <Plus className="h-3 w-3 mr-1" /> Adicionar Membro
+                <Plus className="h-3 w-3 mr-1.5" /> Adicionar Membro
               </Button>
             </div>
 
             <div className="grid gap-3">
               {teamFields.map((field, index) => (
-                <div key={field.id} className="grid grid-cols-12 gap-3 items-end p-3 rounded-xl border-2 bg-background hover:border-primary/50 transition-colors animate-in slide-in-from-right-2">
+                <div key={field.id} className="grid grid-cols-12 gap-3 items-center p-4 rounded-2xl border border-white/5 bg-black/20 hover:border-primary/30 transition-all duration-300">
                   <div className="col-span-7">
                     <FormField
                       control={control}
@@ -682,11 +667,11 @@ export function TeamSection({ control, staff, teamFields, onAddMember, onRemoveM
                         <FormItem>
                           <Select onValueChange={memberField.onChange} value={memberField.value}>
                             <FormControl>
-                              <SelectTrigger className="h-10">
-                                <SelectValue placeholder="Selecionar..." />
+                              <SelectTrigger className="h-10 bg-black/20 border-white/5">
+                                <SelectValue placeholder="Selecionar profissional..." />
                               </SelectTrigger>
                             </FormControl>
-                            <SelectContent>
+                            <SelectContent className="bg-[#0f172a] border-white/10">
                               {staff.map((s) => (
                                 <SelectItem key={s.id} value={s.id}>
                                   {s.firstName} {s.lastName}
@@ -694,7 +679,6 @@ export function TeamSection({ control, staff, teamFields, onAddMember, onRemoveM
                               ))}
                             </SelectContent>
                           </Select>
-                          <FormMessage className="text-[10px]" />
                         </FormItem>
                       )}
                     />
@@ -707,12 +691,12 @@ export function TeamSection({ control, staff, teamFields, onAddMember, onRemoveM
                         <FormItem>
                           <FormControl>
                             <div className="relative">
-                              <Percent className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                              <Percent className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500" />
                               <Input 
                                 type="number" 
                                 min="0"
                                 placeholder="0" 
-                                className="h-10 pl-7 text-xs" 
+                                className="h-10 pl-8 text-sm bg-black/20 border-white/5 font-bold" 
                                 onKeyDown={(e) => e.stopPropagation()}
                                 {...pctField} 
                               />
@@ -728,7 +712,7 @@ export function TeamSection({ control, staff, teamFields, onAddMember, onRemoveM
                       variant="ghost"
                       size="icon"
                       onClick={() => onRemoveMember(index)}
-                      className="h-10 w-10 text-destructive hover:bg-destructive/10"
+                      className="h-10 w-10 text-rose-500 hover:bg-rose-500/10 rounded-xl"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -749,39 +733,38 @@ export function StrategySection({ control }: { control: Control<ProcessFormValue
   const hasNotes = !!description?.trim();
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 max-w-3xl mx-auto">
       <SectionHeader 
         icon={<Sparkles className="h-4 w-4" />} 
-        title="Notas e Estratégia Jurídica"
-        description="Estratégia, prazos e observações importantes"
+        title="Notas & Estratégia"
+        description="Defina as diretrizes, riscos e observações críticas para o caso"
         isOptional
       />
 
       <div className={cn(
-        "p-6 rounded-2xl border-2 transition-colors",
-        hasNotes ? "bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-900" : "bg-muted/20 border-border/50"
+        "p-8 rounded-3xl border-2 transition-all duration-500",
+        hasNotes 
+          ? "bg-amber-500/[0.03] border-amber-500/30 shadow-[0_0_40px_rgba(245,158,11,0.05)]" 
+          : "bg-white/[0.02] border-white/5"
       )}>
         <FormField
           control={control}
           name="description"
           render={({ field }) => (
             <FormItem>
-              <div className="flex items-center gap-2 mb-2">
-                <FormLabel className="text-sm font-bold">Ideias, Prazos e Observações</FormLabel>
-                {hasNotes && <CheckCircle2 className="h-4 w-4 text-orange-600" />}
+              <div className="flex items-center justify-between mb-2">
+                <FormLabel className="text-xs font-black uppercase text-slate-400 tracking-wider">Observações Internas</FormLabel>
+                <div className="text-[10px] font-bold text-slate-500 uppercase">{description?.length || 0} caracteres</div>
               </div>
               <FormControl>
                 <Textarea
-                  placeholder="Detalhamento estratégico para o advogado responsável e equipe de apoio..."
-                  className="min-h-[250px] resize-none text-sm bg-background border-2 p-4 leading-relaxed"
+                  placeholder="Detalhamento estratégico para o advogado responsável e equipe de apoio. Cite prazos, teses jurídicas e particularidades do cliente..."
+                  className="min-h-[300px] resize-none text-sm bg-black/40 border-white/10 p-6 leading-relaxed font-medium focus:border-primary transition-all"
                   onKeyDown={(e) => e.stopPropagation()}
                   {...field}
                 />
               </FormControl>
-              <div className="flex justify-between items-center pt-2 text-[10px] text-muted-foreground">
-                <FormMessage />
-                <span>{description?.length || 0} caracteres</span>
-              </div>
+              <FormMessage />
             </FormItem>
           )}
         />
