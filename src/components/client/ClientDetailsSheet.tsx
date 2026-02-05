@@ -25,7 +25,8 @@ import {
   Hash,
   ShieldCheck,
   AlertCircle,
-  MessageSquare
+  MessageSquare,
+  Building
 } from 'lucide-react';
 import type { Client } from '@/lib/types';
 import { useToast } from '@/components/ui/use-toast';
@@ -45,13 +46,19 @@ export function ClientDetailsSheet({ client, open, onOpenChange }: ClientDetails
 
   if (!client) return null;
 
+  const isPJ = client.clientType === 'Pessoa Jurídica';
+
   const calculateIntegrity = () => {
-    const fields = [
-      client.firstName, client.lastName, client.document, client.email,
-      client.mobile, client.rg, client.ctps, client.pis,
-      client.address?.street, client.address?.zipCode,
+    const commonFields = [
+      client.firstName, client.document, client.email,
+      client.mobile, client.address?.street, client.address?.zipCode,
       client.bankInfo?.pixKey
     ];
+    
+    const pfFields = [client.lastName, client.rg, client.motherName];
+    const pjFields = [client.stateRegistration, client.municipalRegistration];
+
+    const fields = isPJ ? [...commonFields, ...pjFields] : [...commonFields, ...pfFields];
     const filled = fields.filter(f => !!f).length;
     return Math.round((filled / fields.length) * 100);
   };
@@ -79,22 +86,20 @@ export function ClientDetailsSheet({ client, open, onOpenChange }: ClientDetails
 
   const handleCopyAll = () => {
     const summary = `
-FICHA CADASTRAL - ${client.firstName} ${client.lastName}
+FICHA CADASTRAL - ${client.firstName} ${client.lastName || ''}
 --------------------------------------------------
-DADOS PESSOAIS
+DADOS ${isPJ ? 'DA EMPRESA' : 'PESSOAIS'}
 Tipo: ${client.clientType || 'Não informado'}
-CPF/CNPJ: ${client.document}
-RG: ${client.rg || 'Não informado'}
-Nome da Mãe: ${client.motherName || 'Não informado'}
-CTPS: ${client.ctps || 'Não informado'}
-PIS/PASEP: ${client.pis || 'Não informado'}
+${isPJ ? 'CNPJ' : 'CPF'}: ${client.document}
+${isPJ ? `Inscrição Estadual: ${client.stateRegistration || 'Não informado'}
+Inscrição Municipal: ${client.municipalRegistration || 'Não informado'}` : `RG: ${client.rg || 'Não informado'}
+Nome da Mãe: ${client.motherName || 'Não informado'}`}
 Área: ${client.legalArea || 'Não informado'}
 
 CONTATO
 E-mail: ${client.email}
 Celular: ${client.mobile || 'Não informado'}
 Telefone: ${client.phone || 'Não informado'}
-Emergência: ${client.emergencyContact || 'Não informado'}
 
 ENDEREÇO
 Rua: ${client.address?.street || 'Não informado'}, ${client.address?.number || 'S/N'}
@@ -104,7 +109,7 @@ Cidade/UF: ${client.address?.city || 'Não informado'} - ${client.address?.state
 CEP: ${client.address?.zipCode || 'Não informado'}
 
 DADOS BANCÁRIOS
-Favorecido: ${client.bankInfo?.bankBeneficiary || `${client.firstName} ${client.lastName}`}
+Favorecido: ${client.bankInfo?.bankBeneficiary || `${client.firstName} ${client.lastName || ''}`}
 Banco: ${client.bankInfo?.bankName || 'Não informado'}
 Agência: ${client.bankInfo?.agency || 'Não informado'}
 Conta: ${client.bankInfo?.account || 'Não informado'}
@@ -218,7 +223,7 @@ Gerado em: ${format(new Date(), "dd/MM/yyyy HH:mm")}
         <SheetHeader className="print:hidden">
           <div className="flex items-center justify-between gap-4 mb-2">
             <div className="flex flex-col text-left">
-                <SheetTitle className="text-2xl font-headline font-bold">{client.firstName} {client.lastName}</SheetTitle>
+                <SheetTitle className="text-2xl font-headline font-bold">{client.firstName} {client.lastName || ''}</SheetTitle>
                 <div className="flex items-center gap-2 mt-1">
                     <Progress value={integrity} className="h-1.5 w-24" />
                     <span className="text-[10px] font-black text-muted-foreground uppercase">{integrity}% Integridade</span>
@@ -242,29 +247,39 @@ Gerado em: ${format(new Date(), "dd/MM/yyyy HH:mm")}
                   <AlertCircle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
                   <div className="space-y-1">
                       <p className="text-sm font-bold text-amber-700">Pendências de Cadastro</p>
-                      <p className="text-xs text-amber-600 leading-relaxed">Existem campos vazios que podem ser necessários para petições automáticas. Recomendamos completar o perfil.</p>
+                      <p className="text-xs text-amber-600 leading-relaxed">Existem campos vazios que podem ser necessários para automações. Recomendamos completar o perfil.</p>
                   </div>
               </div>
           )}
 
-          {/* Sessão: Dados Pessoais */}
+          {/* Sessão: Dados Pessoais / Empresa */}
           <section>
             <div className="flex items-center gap-2 mb-4">
                 <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                    <User className="h-4 w-4 text-primary" />
+                    {isPJ ? <Building className="h-4 w-4 text-primary" /> : <User className="h-4 w-4 text-primary" />}
                 </div>
-                <h3 className="font-black text-xs uppercase tracking-widest text-muted-foreground">Dados Pessoais</h3>
+                <h3 className="font-black text-xs uppercase tracking-widest text-muted-foreground">{isPJ ? 'Dados da Empresa' : 'Dados Pessoais'}</h3>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 bg-muted/20 p-6 rounded-2xl border border-border/50">
-                <InfoRow icon={Hash} label="Documento Principal" value={client.document} actionType="copy" />
-                <InfoRow icon={FileText} label="Tipo de Cliente" value={client.clientType} />
-                <InfoRow icon={FileText} label="RG" value={client.rg} actionType="copy" />
-                <InfoRow icon={Briefcase} label="Área Jurídica" value={client.legalArea} />
-                <InfoRow icon={User} label="Nome da Mãe" value={client.motherName} className="col-span-1 sm:col-span-2" />
-                <div className="grid grid-cols-2 gap-4 col-span-1 sm:col-span-2">
+                <InfoRow icon={Hash} label={isPJ ? "CNPJ" : "CPF"} value={client.document} actionType="copy" />
+                <InfoRow icon={FileText} label="Pessoa" value={client.clientType} />
+                
+                {isPJ ? (
+                  <>
+                    <InfoRow icon={FileText} label="Inscrição Estadual" value={client.stateRegistration} actionType="copy" />
+                    <InfoRow icon={FileText} label="Inscrição Municipal" value={client.municipalRegistration} actionType="copy" />
+                    <InfoRow icon={Building} label="Razão Social" value={client.firstName} className="col-span-full" />
+                    <InfoRow icon={Sparkles} label="Nome Fantasia" value={client.lastName} className="col-span-full" />
+                  </>
+                ) : (
+                  <>
+                    <InfoRow icon={FileText} label="RG" value={client.rg} actionType="copy" />
+                    <InfoRow icon={Briefcase} label="Área Jurídica" value={client.legalArea} />
+                    <InfoRow icon={User} label="Nome da Mãe" value={client.motherName} className="col-span-full" />
                     <InfoRow icon={FileText} label="CTPS" value={client.ctps} actionType="copy" />
                     <InfoRow icon={FileText} label="PIS/PASEP" value={client.pis} actionType="copy" />
-                </div>
+                  </>
+                )}
             </div>
           </section>
 
@@ -277,10 +292,9 @@ Gerado em: ${format(new Date(), "dd/MM/yyyy HH:mm")}
                 <h3 className="font-black text-xs uppercase tracking-widest text-muted-foreground">Canais de Contato</h3>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 bg-muted/20 p-6 rounded-2xl border border-border/50">
-                <InfoRow icon={AtSign} label="E-mail" value={client.email} actionType="email" className="col-span-1 sm:col-span-2" />
-                <InfoRow icon={Smartphone} label="Celular / WhatsApp" value={client.mobile} actionType="whatsapp" />
-                <InfoRow icon={Phone} label="Telefone Fixo" value={client.phone} actionType="phone" />
-                <InfoRow icon={Smartphone} label="Contato Emergência" value={client.emergencyContact} actionType="phone" className="col-span-1 sm:col-span-2" />
+                <InfoRow icon={AtSign} label="E-mail" value={client.email} actionType="email" className="col-span-full" />
+                <InfoRow icon={Smartphone} label="WhatsApp" value={client.mobile} actionType="whatsapp" />
+                <InfoRow icon={Phone} label="Telefone" value={client.phone} actionType="phone" />
             </div>
           </section>
 
@@ -290,7 +304,7 @@ Gerado em: ${format(new Date(), "dd/MM/yyyy HH:mm")}
                 <div className="h-8 w-8 rounded-lg bg-rose-500/10 flex items-center justify-center">
                     <MapPin className="h-4 w-4 text-rose-500" />
                 </div>
-                <h3 className="font-black text-xs uppercase tracking-widest text-muted-foreground">Endereço Residencial</h3>
+                <h3 className="font-black text-xs uppercase tracking-widest text-muted-foreground">Localização</h3>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 bg-muted/20 p-6 rounded-2xl border border-border/50">
                 <InfoRow 
@@ -298,7 +312,7 @@ Gerado em: ${format(new Date(), "dd/MM/yyyy HH:mm")}
                     label="Logradouro" 
                     value={client.address?.street ? `${client.address.street}, ${client.address.number || 'S/N'}` : undefined} 
                     actionType="copy"
-                    className="col-span-1 sm:col-span-2" 
+                    className="col-span-full" 
                 />
                 <InfoRow icon={MapPin} label="Complemento" value={client.address?.complement} />
                 <InfoRow icon={MapPin} label="Bairro" value={client.address?.neighborhood} />
@@ -313,19 +327,19 @@ Gerado em: ${format(new Date(), "dd/MM/yyyy HH:mm")}
                 <div className="h-8 w-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
                     <CreditCard className="h-4 w-4 text-emerald-500" />
                 </div>
-                <h3 className="font-black text-xs uppercase tracking-widest text-muted-foreground">Dados Financeiros</h3>
+                <h3 className="font-black text-xs uppercase tracking-widest text-muted-foreground">Dados p/ Repasses</h3>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 bg-muted/20 p-6 rounded-2xl border border-border/50">
                 <InfoRow 
                     icon={User} 
-                    label="Favorecido da Conta" 
-                    value={client.bankInfo?.bankBeneficiary || `${client.firstName} ${client.lastName}`} 
+                    label="Favorecido" 
+                    value={client.bankInfo?.bankBeneficiary || `${client.firstName} ${client.lastName || ''}`} 
                     actionType="copy"
                     className="col-span-full"
                 />
                 <InfoRow icon={CreditCard} label="Banco" value={client.bankInfo?.bankName} actionType="copy" />
                 <InfoRow icon={CreditCard} label="Agência / Conta" value={client.bankInfo?.agency ? `${client.bankInfo.agency} / ${client.bankInfo.account || ''}` : undefined} actionType="copy" />
-                <InfoRow icon={Smartphone} label="Chave PIX" value={client.bankInfo?.pixKey} actionType="copy" className="col-span-1 sm:col-span-2" />
+                <InfoRow icon={Smartphone} label="Chave PIX" value={client.bankInfo?.pixKey} actionType="copy" className="col-span-full" />
             </div>
           </section>
 

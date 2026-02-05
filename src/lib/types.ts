@@ -35,6 +35,8 @@ export type Client = {
   rg?: string;
   ctps?: string;
   pis?: string;
+  stateRegistration?: string; // Inscrição Estadual
+  municipalRegistration?: string; // Inscrição Municipal
   phone?: string;
   mobile?: string;
   emergencyContact?: string;
@@ -282,16 +284,6 @@ export type ClientKitTemplate = {
   destination: string;
 };
 
-export type DocumentTemplate = {
-  id: string;
-  name: string;
-  description: string;
-  category: string;
-  templateFileId: string;
-  createdAt: Timestamp;
-  updatedAt?: Timestamp;
-};
-
 export type NotificationType = 'info' | 'success' | 'warning' | 'error' | 'finance' | 'deadline' | 'hearing';
 
 export type Notification = {
@@ -303,4 +295,14 @@ export type Notification = {
   isRead: boolean;
   type?: NotificationType;
   createdAt: Timestamp;
+};
+
+export type DocumentTemplate = {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  templateFileId: string;
+  createdAt: Timestamp;
+  updatedAt?: Timestamp;
 };

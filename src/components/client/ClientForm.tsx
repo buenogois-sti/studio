@@ -33,30 +33,32 @@ import { useToast } from '@/components/ui/use-toast';
 const clientSchema = z.object({
   status: z.enum(['lead', 'active', 'inactive']).default('active'),
   clientType: z.string().min(1, { message: 'Selecione o tipo de cliente.' }),
-  firstName: z.string().min(2, { message: 'O nome deve ter pelo menos 2 caracteres.' }),
-  lastName: z.string().min(2, { message: 'O sobrenome deve ter pelo menos 2 caracteres.' }),
+  firstName: z.string().min(2, { message: 'O nome / razão social deve ter pelo menos 2 caracteres.' }),
+  lastName: z.string().optional().or(z.literal('')),
   email: z.string().email({ message: 'Por favor, insira um email válido.' }),
   document: z.string().min(11, { message: 'O documento deve ser um CPF ou CNPJ válido.' }),
-  motherName: z.string().optional(),
-  rg: z.string().optional(),
-  ctps: z.string().optional(),
-  pis: z.string().optional(),
-  phone: z.string().optional(),
-  mobile: z.string().optional(),
-  emergencyContact: z.string().optional(),
-  legalArea: z.string().optional(),
-  address_street: z.string().optional(),
-  address_number: z.string().optional(),
-  address_complement: z.string().optional(),
-  address_zipCode: z.string().optional(),
-  address_neighborhood: z.string().optional(),
-  address_city: z.string().optional(),
-  address_state: z.string().optional(),
-  bankBeneficiary: z.string().optional(),
-  bankName: z.string().optional(),
-  agency: z.string().optional(),
-  account: z.string().optional(),
-  pixKey: z.string().optional(),
+  motherName: z.string().optional().or(z.literal('')),
+  rg: z.string().optional().or(z.literal('')),
+  ctps: z.string().optional().or(z.literal('')),
+  pis: z.string().optional().or(z.literal('')),
+  stateRegistration: z.string().optional().or(z.literal('')),
+  municipalRegistration: z.string().optional().or(z.literal('')),
+  phone: z.string().optional().or(z.literal('')),
+  mobile: z.string().optional().or(z.literal('')),
+  emergencyContact: z.string().optional().or(z.literal('')),
+  legalArea: z.string().optional().or(z.literal('')),
+  address_street: z.string().optional().or(z.literal('')),
+  address_number: z.string().optional().or(z.literal('')),
+  address_complement: z.string().optional().or(z.literal('')),
+  address_zipCode: z.string().optional().or(z.literal('')),
+  address_neighborhood: z.string().optional().or(z.literal('')),
+  address_city: z.string().optional().or(z.literal('')),
+  address_state: z.string().optional().or(z.literal('')),
+  bankBeneficiary: z.string().optional().or(z.literal('')),
+  bankName: z.string().optional().or(z.literal('')),
+  agency: z.string().optional().or(z.literal('')),
+  account: z.string().optional().or(z.literal('')),
+  pixKey: z.string().optional().or(z.literal('')),
 });
 
 
@@ -81,7 +83,7 @@ export function ClientForm({
     resolver: zodResolver(clientSchema),
     defaultValues: {
       status: client?.status ?? 'active',
-      clientType: client?.clientType ?? '',
+      clientType: client?.clientType ?? 'Pessoa Física',
       firstName: client?.firstName ?? '',
       lastName: client?.lastName ?? '',
       email: client?.email ?? '',
@@ -90,6 +92,8 @@ export function ClientForm({
       rg: client?.rg ?? '',
       ctps: client?.ctps ?? '',
       pis: client?.pis ?? '',
+      stateRegistration: client?.stateRegistration ?? '',
+      municipalRegistration: client?.municipalRegistration ?? '',
       phone: client?.phone ?? '',
       mobile: client?.mobile ?? '',
       emergencyContact: client?.emergencyContact ?? '',
@@ -108,6 +112,9 @@ export function ClientForm({
       pixKey: client?.bankInfo?.pixKey ?? '',
     },
   });
+
+  const watchedType = form.watch('clientType');
+  const isPJ = watchedType === 'Pessoa Jurídica';
 
   const handleCepSearch = React.useCallback(async () => {
     const cep = form.getValues('address_zipCode');
@@ -141,7 +148,6 @@ export function ClientForm({
               title: 'Endereço encontrado!',
               description: `${data.logradouro}, ${data.localidade}`
             });
-            // Focus on number field after success
             setTimeout(() => {
               const numInput = document.getElementsByName('address_number')[0];
               if (numInput) numInput.focus();
@@ -179,35 +185,6 @@ export function ClientForm({
       delete flatClientData.address;
       delete flatClientData.bankInfo;
       form.reset(flatClientData);
-    } else {
-      form.reset({
-        status: 'active',
-        clientType: '',
-        firstName: '',
-        lastName: '',
-        email: '',
-        document: '',
-        motherName: '',
-        rg: '',
-        ctps: '',
-        pis: '',
-        phone: '',
-        mobile: '',
-        emergencyContact: '',
-        legalArea: '',
-        address_street: '',
-        address_number: '',
-        address_complement: '',
-        address_zipCode: '',
-        address_neighborhood: '',
-        address_city: '',
-        address_state: '',
-        bankBeneficiary: '',
-        bankName: '',
-        agency: '',
-        account: '',
-        pixKey: '',
-      });
     }
   }, [client, form]);
 
@@ -243,12 +220,12 @@ export function ClientForm({
         }
       };
 
-      const displayName = `${clientData.firstName} ${clientData.lastName}`;
+      const displayName = `${clientData.firstName} ${clientData.lastName || ''}`.trim();
 
       if (client?.id) {
         const clientRef = doc(firestore, 'clients', client.id);
         await updateDoc(clientRef, { ...clientData, updatedAt: serverTimestamp() });
-        toast({ title: 'Cliente atualizado!', description: `Os dados de ${displayName} foram salvos.` });
+        toast({ title: 'Cadastro atualizado!', description: `Os dados de ${displayName} foram salvos.` });
       } else {
         const clientsCollection = collection(firestore, 'clients');
         const newClientPayload = {
@@ -265,7 +242,7 @@ export function ClientForm({
             avatar: ''
         };
 
-        toast({ title: 'Cliente cadastrado!', description: `${displayName} foi adicionado com sucesso.` });
+        toast({ title: 'Cadastro concluído!', description: `${displayName} foi adicionado à base.` });
         onSaveSuccess?.(newClient);
       }
       onSave();
@@ -287,14 +264,14 @@ export function ClientForm({
         <fieldset disabled={isSaving} className="space-y-6">
           
           <section>
-            <H2>Dados Pessoais</H2>
+            <H2>{isPJ ? 'Dados da Empresa' : 'Dados Pessoais'}</H2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
               <FormField
                 control={form.control}
                 name="status"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Status do Cliente *</FormLabel>
+                    <FormLabel>Status do Cadastro *</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger ref={field.ref}>
@@ -316,8 +293,8 @@ export function ClientForm({
                 name="clientType"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Tipo de Cliente *</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormLabel>Tipo de Pessoa *</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger ref={field.ref}>
                           <SelectValue placeholder="Selecionar tipo..." />
@@ -336,9 +313,9 @@ export function ClientForm({
                 name="document"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>CPF / CNPJ *</FormLabel>
+                    <FormLabel>{isPJ ? 'CNPJ *' : 'CPF *'}</FormLabel>
                     <FormControl>
-                      <Input placeholder="00.000.000/0000-00" {...field} />
+                      <Input placeholder={isPJ ? "00.000.000/0000-00" : "000.000.000-00"} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -349,9 +326,9 @@ export function ClientForm({
                 name="firstName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Nome *</FormLabel>
+                    <FormLabel>{isPJ ? 'Razão Social *' : 'Nome *'}</FormLabel>
                     <FormControl>
-                      <Input placeholder="Primeiro nome" {...field} />
+                      <Input placeholder={isPJ ? "Nome oficial da empresa" : "Primeiro nome"} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -362,72 +339,103 @@ export function ClientForm({
                 name="lastName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Sobrenome *</FormLabel>
+                    <FormLabel>{isPJ ? 'Nome Fantasia' : 'Sobrenome *'}</FormLabel>
                     <FormControl>
-                      <Input placeholder="Sobrenome completo" {...field} />
+                      <Input placeholder={isPJ ? "Como a empresa é conhecida" : "Sobrenome completo"} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="motherName"
-                render={({ field }) => (
-                  <FormItem className="md:col-span-2">
-                    <FormLabel>Nome da Mãe</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Nome completo da mãe" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="rg"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>RG</FormLabel>
-                    <FormControl>
-                      <Input placeholder="00.000.000-0" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="ctps"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>CTPS</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Nº da Carteira de Trabalho" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-               <FormField
-                control={form.control}
-                name="pis"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>PIS/PASEP</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Nº do PIS/PASEP" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+
+              {isPJ ? (
+                <>
+                  <FormField
+                    control={form.control}
+                    name="stateRegistration"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Inscrição Estadual (IE)</FormLabel>
+                        <FormControl><Input placeholder="Isento ou nº" {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="municipalRegistration"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Inscrição Municipal (IM)</FormLabel>
+                        <FormControl><Input placeholder="Nº de registro na prefeitura" {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </>
+              ) : (
+                <>
+                  <FormField
+                    control={form.control}
+                    name="motherName"
+                    render={({ field }) => (
+                      <FormItem className="md:col-span-2">
+                        <FormLabel>Nome da Mãe</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Nome completo da mãe" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="rg"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>RG</FormLabel>
+                        <FormControl>
+                          <Input placeholder="00.000.000-0" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="ctps"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>CTPS</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Nº da Carteira de Trabalho" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="pis"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>PIS/PASEP</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Nº do PIS/PASEP" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </>
+              )}
+
               <FormField
                 control={form.control}
                 name="legalArea"
                 render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Área Jurídica</FormLabel>
+                      <FormLabel>Área Jurídica de Atendimento</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
                             <SelectTrigger ref={field.ref}>
@@ -455,7 +463,7 @@ export function ClientForm({
                       <FormItem className="md:col-span-2">
                         <FormLabel>Email *</FormLabel>
                         <FormControl>
-                            <Input placeholder="contato@email.com" {...field} />
+                            <Input placeholder="contato@empresa.com.br" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -466,7 +474,7 @@ export function ClientForm({
                 name="mobile"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Celular / WhatsApp *</FormLabel>
+                    <FormLabel>Celular / WhatsApp Principal *</FormLabel>
                     <FormControl>
                       <Input placeholder="(00) 00000-0000" {...field} />
                     </FormControl>
@@ -479,22 +487,9 @@ export function ClientForm({
                 name="phone"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Telefone Fixo</FormLabel>
+                    <FormLabel>Telefone Fixo / PABX</FormLabel>
                     <FormControl>
                       <Input placeholder="(00) 0000-0000" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="emergencyContact"
-                render={({ field }) => (
-                  <FormItem className="md:col-span-2">
-                    <FormLabel>Contato de Emergência (Recado)</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Nome e telefone" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -532,7 +527,7 @@ export function ClientForm({
                   name="address_street"
                   render={({ field }) => (
                       <FormItem className="md:col-span-2">
-                      <FormLabel>Endereço</FormLabel>
+                      <FormLabel>Logradouro</FormLabel>
                       <FormControl>
                         <div className="relative">
                           <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -563,7 +558,7 @@ export function ClientForm({
                   <FormItem>
                     <FormLabel>Complemento</FormLabel>
                     <FormControl>
-                      <Input placeholder="Apto, sala, etc" {...field} />
+                      <Input placeholder="Conjunto, sala, andar" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -589,7 +584,7 @@ export function ClientForm({
                   <FormItem>
                     <FormLabel>Cidade</FormLabel>
                     <FormControl>
-                      <Input placeholder="São Paulo" {...field} />
+                      <Input placeholder="São Bernardo do Campo" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -612,7 +607,7 @@ export function ClientForm({
           </section>
 
           <section>
-              <H2>Dados Bancários</H2>
+              <H2>Dados Bancários p/ Recebimento</H2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                   <FormField
                       control={form.control}
@@ -620,7 +615,7 @@ export function ClientForm({
                       render={({ field }) => (
                           <FormItem className="md:col-span-2">
                               <FormLabel>Nome do Favorecido</FormLabel>
-                              <FormControl><Input placeholder="Deixe em branco se for o próprio cliente" {...field} /></FormControl>
+                              <FormControl><Input placeholder={isPJ ? "Razão Social da Empresa" : "Deixe em branco se for o próprio cliente"} {...field} /></FormControl>
                               <FormMessage />
                           </FormItem>
                       )}
@@ -631,7 +626,7 @@ export function ClientForm({
                       render={({ field }) => (
                           <FormItem>
                               <FormLabel>Banco</FormLabel>
-                              <FormControl><Input placeholder="Nome do banco" {...field} /></FormControl>
+                              <FormControl><Input placeholder="Ex: Itaú, Santander..." {...field} /></FormControl>
                               <FormMessage />
                           </FormItem>
                       )}
@@ -664,7 +659,7 @@ export function ClientForm({
                       render={({ field }) => (
                           <FormItem>
                               <FormLabel>Chave PIX</FormLabel>
-                              <FormControl><Input placeholder="CPF, e-mail, telefone, etc." {...field} /></FormControl>
+                              <FormControl><Input placeholder="CNPJ, E-mail ou Telefone" {...field} /></FormControl>
                               <FormMessage />
                           </FormItem>
                       )}
@@ -680,7 +675,7 @@ export function ClientForm({
             </Button>
             <Button type="submit" disabled={isSaving}>
                 {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isSaving ? 'Salvando...' : (client ? 'Salvar Alterações' : 'Salvar Cliente')}
+                {isSaving ? 'Salvando...' : (client ? 'Salvar Alterações' : 'Salvar Cadastro')}
             </Button>
         </SheetFooter>
       </form>
