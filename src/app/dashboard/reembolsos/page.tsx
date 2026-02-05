@@ -31,7 +31,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useFirebase, useCollection, useMemoFirebase, useDoc } from '@/firebase';
-import { collection, query, where, orderBy, doc } from 'firebase/firestore';
+import { collection, query, where, orderBy, doc, Timestamp } from 'firebase/firestore';
 import type { Reimbursement, ReimbursementStatus, UserProfile } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose, DialogTrigger } from '@/components/ui/dialog';
@@ -315,23 +315,6 @@ export default function ReembolsosPage() {
   const isLoading = isFirebaseLoading || isProfileLoading || (activeTab === 'todos' ? isLoadingAll : isLoadingMy);
   const currentError = activeTab === 'todos' ? allError : myError;
 
-  if (userError && (userError.message.includes('400') || userError.message.includes('custom-token'))) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 text-center space-y-6">
-        <div className="h-20 w-20 rounded-full bg-rose-500/10 flex items-center justify-center animate-bounce">
-          <AlertTriangle className="h-10 w-10 text-rose-500" />
-        </div>
-        <div className="space-y-2">
-          <h2 className="text-2xl font-black text-white font-headline">Falha na Autenticação</h2>
-          <p className="text-slate-400 max-w-md mx-auto">
-            O servidor está sincronizado com um projeto diferente. Verifique as chaves do Firebase.
-          </p>
-        </div>
-        <Button variant="outline" onClick={() => window.location.reload()} className="border-white/10 text-white">Tentar Reconectar</Button>
-      </div>
-    );
-  }
-
   const stats = React.useMemo(() => {
     const list = activeTab === 'todos' ? allData : myData;
     if (!list) return { total: 0, pending: 0, paid: 0 };
@@ -421,16 +404,22 @@ export default function ReembolsosPage() {
           <div className="mb-6">
             <Alert variant="destructive" className="bg-rose-500/10 border-rose-500/20 text-rose-400">
               <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>Erro na Consulta ao Banco de Dados</AlertTitle>
-              <AlertDescription className="text-xs mt-2 space-y-2">
-                <p>Esta visualização exige um índice composto no Firebase que ainda não foi ativado.</p>
-                {currentError.message.includes('index') && (
-                  <Button variant="outline" size="sm" className="mt-2 text-white border-white/20 h-8" asChild>
-                    <a href="https://console.firebase.google.com/v1/r/project/studio-7080106838-23904/firestore/indexes?create_composite=CmBwcm9qZWN0cy9zdHVkaW8tNzA4MDEwNjgzOC0yMzkwNC9kYXRhYmFzZXMvKGRlZmF1bHQpL2NvbGxlY3Rpb25Hcm91cHMvcmVpbWJ1cnNlbWVudHMvaW5kZXhlcy9fEAEaCgoGdXNlcklkEAEaDwoLcmVxdWVzdERhdGUQAhoMCghfX25hbWVfXxAC" target="_blank">
-                      Criar Índice Automaticamente
-                    </a>
-                  </Button>
-                )}
+              <AlertTitle>Índice Necessário no Banco de Dados</AlertTitle>
+              <AlertDescription className="text-xs mt-2 space-y-4">
+                <p>Para visualizar seus pedidos, o Firebase exige a criação de um índice manual devido ao erro <strong>"query_scope"</strong> encontrado anteriormente.</p>
+                
+                <div className="bg-black/20 p-4 rounded-lg space-y-2 border border-white/10">
+                  <p className="font-bold text-white">Siga estes passos no Firebase Console:</p>
+                  <ol className="list-decimal list-inside space-y-1 text-slate-300">
+                    <li>Vá em <strong>Firestore Database</strong> -> <strong>Índices</strong>.</li>
+                    <li>Clique em <strong>"Adicionar Índice"</strong>.</li>
+                    <li>ID da Coleção: <code className="bg-white/10 px-1 rounded">reimbursements</code></li>
+                    <li>Campo 1: <code className="bg-white/10 px-1 rounded">userId</code> (Crescente)</li>
+                    <li>Campo 2: <code className="bg-white/10 px-1 rounded">requestDate</code> (Decrescente)</li>
+                    <li>Escopo da Consulta: <strong>"Coleção"</strong></li>
+                    <li>Clique em <strong>"Salvar"</strong> e aguarde o status "Ativo".</li>
+                  </ol>
+                </div>
               </AlertDescription>
             </Alert>
           </div>
@@ -494,7 +483,7 @@ function ReimbursementTable({
       <div className="flex flex-col items-center justify-center py-20 text-center border-2 border-dashed border-border/50 rounded-2xl bg-white/5">
         <XCircle className="h-12 w-12 mb-4 text-muted-foreground/20" />
         <p className="font-bold text-lg text-white">Nenhum registro encontrado</p>
-        <p className="text-sm text-muted-foreground">Novas solicitações aparecerão aqui.</p>
+        <p className="text-sm text-muted-foreground">Novas solicitações aparecerão aqui após a ativação do índice.</p>
       </div>
     );
   }
