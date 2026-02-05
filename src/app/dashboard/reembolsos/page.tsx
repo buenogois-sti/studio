@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -17,7 +16,9 @@ import {
   X,
   FileText,
   Trash2,
-  AlertTriangle
+  AlertTriangle,
+  AlertCircle,
+  Info
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { z } from 'zod';
@@ -42,6 +43,7 @@ import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const reimbursementFormSchema = z.object({
   description: z.string().min(3, 'A descrição deve ter pelo menos 3 caracteres.'),
@@ -136,13 +138,22 @@ function NewReimbursementDialog({
           Solicitar Reembolso
         </Button>
       </DialogTrigger>
-      <DialogContent className="bg-card border-border">
+      <DialogContent className="bg-card border-border sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="text-white">Nova Solicitação</DialogTitle>
           <DialogDescription className="text-slate-400">Preencha os detalhes da despesa para reembolso.</DialogDescription>
         </DialogHeader>
+        
+        <Alert className="bg-amber-500/10 border-amber-500/30 text-amber-200">
+          <AlertCircle className="h-4 w-4 text-amber-400" />
+          <AlertTitle className="text-xs font-black uppercase tracking-widest text-amber-400">Aviso Importante</AlertTitle>
+          <AlertDescription className="text-[11px] leading-relaxed">
+            O comprovante original de pagamento deve ser enviado obrigatoriamente ao e-mail do financeiro após a conclusão desta solicitação. <strong>Pedidos sem comprovante enviado não serão aprovados.</strong>
+          </AlertDescription>
+        </Alert>
+
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-2">
             {canManage && (
               <FormField
                 control={form.control}
