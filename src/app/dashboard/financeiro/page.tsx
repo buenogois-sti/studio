@@ -10,24 +10,17 @@ import {
   PlusCircle, 
   Loader2, 
   Check, 
-  Receipt, 
   RefreshCw, 
   MoreVertical,
   Trash2,
   Calendar,
   AlertCircle,
-  FileText,
-  DollarSign,
   Users,
   Handshake,
   Printer,
-  ChevronRight,
   Wallet,
-  ShieldCheck,
   CheckCircle2,
-  Coins,
-  Scale,
-  Stamp
+  Scale
 } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, Timestamp, query, orderBy, deleteDoc, doc, getDocs, where } from 'firebase/firestore';
@@ -64,7 +57,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 const titleFormSchema = z.object({
@@ -260,7 +252,6 @@ function ReceiptDialog({
       <DialogContent className="sm:max-w-4xl bg-white text-slate-900 p-0 overflow-hidden border-none shadow-none print:shadow-none print:max-w-full">
         <ScrollArea className="max-h-[90vh] print:max-h-full">
           <div className="p-10 space-y-6 bg-white print:p-0 print:shadow-none print:m-0" id="receipt-print-area">
-            {/* Cabeçalho Profissional Compacto */}
             <div className="flex justify-between items-center border-b-2 border-slate-900 pb-4">
               <div className="flex items-center gap-3">
                 <div className="bg-slate-900 p-1.5 rounded-lg print:bg-transparent">
@@ -277,7 +268,6 @@ function ReceiptDialog({
               </div>
             </div>
 
-            {/* Texto do Recibo em Tamanho Reduzido */}
             <div className="space-y-4 text-sm leading-relaxed text-justify text-slate-800">
               <p>
                 Declaramos para os devidos fins que o escritório <strong className="text-slate-900">Bueno Gois Advogados e Associados</strong>, recebeu de <strong className="text-slate-900">{opposingParty}</strong> a importância bruta de <strong>{formattedTotal}</strong>, referente ao pagamento de <i>{title.description}</i> nos autos do processo nº <strong className="text-slate-900">{process?.processNumber || 'N/A'}</strong>.
@@ -288,7 +278,6 @@ function ReceiptDialog({
               </p>
             </div>
 
-            {/* Quadro de Valores Otimizado */}
             <div className="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden">
               <table className="w-full text-xs">
                 <thead className="bg-slate-100 border-b border-slate-200">
@@ -318,7 +307,6 @@ function ReceiptDialog({
               "O beneficiário declara ter conferido os valores e dá plena quitação ao escritório quanto ao objeto deste pagamento, servindo este como prova de recebimento."
             </p>
 
-            {/* Local e Assinaturas Compactas */}
             <div className="pt-4 flex flex-col items-center gap-10">
               <p className="text-sm font-bold text-slate-900">São Bernardo do Campo, {today}</p>
               
@@ -629,7 +617,6 @@ export default function FinanceiroPage() {
   const [honorariosTitle, setHonorariosTitle] = React.useState<FinancialTitle | null>(null);
   const { toast } = useToast();
 
-  // Ajuste de ordenação para ascendente (mais próximos primeiro)
   const titlesQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'financial_titles'), orderBy('dueDate', 'asc')) : null), [firestore, refreshKey]);
   const { data: titlesData, isLoading: isLoadingTitles } = useCollection<FinancialTitle>(titlesQuery);
 
@@ -648,7 +635,7 @@ export default function FinanceiroPage() {
       if (t.type === 'RECEITA') {
         if (t.status === 'PAGO') {
           acc.totalReceitas += val;
-          acc.officeRevenue += (val * 0.3); // 30% de honorários como receita real
+          acc.officeRevenue += (val * 0.3); 
         } else {
           acc.pendenteReceita += val;
         }
@@ -688,101 +675,127 @@ export default function FinanceiroPage() {
 
   const isLoading = isUserLoading || isLoadingTitles;
 
-  const TitleTable = ({ data, type }: { data: FinancialTitle[], type: 'RECEITA' | 'DESPESA' }) => (
-    <Card className="bg-[#0f172a] border-white/5 overflow-hidden">
-      <Table>
-        <TableHeader>
-          <TableRow className="border-white/5 hover:bg-transparent">
-            <TableHead className="text-muted-foreground">Descrição</TableHead>
-            <TableHead className="text-muted-foreground">Vencimento</TableHead>
-            <TableHead className="text-center text-muted-foreground">Status</TableHead>
-            <TableHead className="text-right text-muted-foreground">Valor Bruto</TableHead>
-            <TableHead className="text-right text-muted-foreground">Ações</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {data.map(t => {
-            const dueDate = t.dueDate instanceof Timestamp ? t.dueDate.toDate() : new Date(t.dueDate);
-            const isOverdue = t.status === 'PENDENTE' && isBefore(dueDate, new Date());
-            
-            return (
-              <TableRow key={t.id} className="border-white/5 hover:bg-white/5 transition-colors">
-                <TableCell>
-                  <div className="flex flex-col">
-                    <span className="font-medium text-white">{t.description}</span>
-                    <span className="text-[10px] text-muted-foreground uppercase">{t.origin}</span>
-                  </div>
-                </TableCell>
-                <TableCell className={cn("text-slate-400 text-xs", isOverdue && "text-rose-500 font-bold")}>
-                  <div className="flex items-center gap-1.5">
-                    <Calendar className="h-3 w-3" />
-                    {format(dueDate, 'dd/MM/yyyy')}
-                    {isOverdue && <Badge variant="outline" className="h-4 text-[8px] border-rose-500/50 text-rose-500 bg-rose-500/5">VENCIDO</Badge>}
-                  </div>
-                </TableCell>
-                <TableCell className="text-center">
-                  <Badge className={cn(
-                    "text-[9px] font-black uppercase tracking-widest px-2 h-5",
-                    t.status === 'PAGO' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 'bg-amber-500/20 text-amber-400 border-amber-500/30'
-                  )} variant="outline">
-                    {t.status}
-                  </Badge>
-                </TableCell>
-                <TableCell className={cn("text-right font-bold tabular-nums", type === 'RECEITA' ? 'text-emerald-400' : 'text-rose-400')}>
-                  {formatCurrency(t.value)}
-                </TableCell>
-                <TableCell className="text-right">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-white/50">
-                        {isProcessing === t.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreVertical className="h-4 w-4" />}
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="bg-card border-border w-64">
-                      <DropdownMenuLabel className="text-white text-[10px] font-black uppercase">Gerenciar Título</DropdownMenuLabel>
-                      {t.status === 'PENDENTE' ? (
-                        <DropdownMenuItem onClick={() => handleUpdateStatus(t.id, 'PAGO')}>
-                          <Check className="mr-2 h-4 w-4 text-emerald-500" /> Marcar como Pago
-                        </DropdownMenuItem>
-                      ) : (
-                        <DropdownMenuItem onClick={() => handleUpdateStatus(t.id, 'PENDENTE')}>
-                          <RefreshCw className="mr-2 h-4 w-4 text-amber-500" /> Estornar Pagamento
-                        </DropdownMenuItem>
-                      )}
-                      
-                      {type === 'RECEITA' && t.status === 'PAGO' && (
-                        <>
-                          <DropdownMenuSeparator className="bg-white/10" />
-                          <DropdownMenuItem onClick={() => setReceiptTitle(t)}>
-                            <Users className="mr-2 h-4 w-4 text-blue-400" /> Recibo de Repasse (Cliente)
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => setHonorariosTitle(t)}>
-                            <Scale className="mr-2 h-4 w-4 text-primary" /> Recibo de Honorários (Escritório)
-                          </DropdownMenuItem>
-                        </>
-                      )}
+  const TitleTable = ({ data, type }: { data: FinancialTitle[], type: 'RECEITA' | 'DESPESA' }) => {
+    // Agrupamento por Mês/Ano
+    const groupedData = React.useMemo(() => {
+      const groups: { monthLabel: string; titles: FinancialTitle[] }[] = [];
+      data.forEach(t => {
+        const date = t.dueDate instanceof Timestamp ? t.dueDate.toDate() : new Date(t.dueDate);
+        const label = format(date, 'MMMM yyyy', { locale: ptBR });
+        let group = groups.find(g => g.monthLabel === label);
+        if (!group) {
+          group = { monthLabel: label, titles: [] };
+          groups.push(group);
+        }
+        group.titles.push(t);
+      });
+      return groups;
+    }, [data]);
 
-                      <DropdownMenuSeparator className="bg-white/10" />
-                      <DropdownMenuItem className="text-rose-500" onClick={() => handleDelete(t.id)}>
-                        <Trash2 className="mr-2 h-4 w-4" /> Excluir Registro
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
-              </TableRow>
-            );
-          })}
-          {data.length === 0 && (
-            <TableRow>
-              <TableCell colSpan={5} className="h-32 text-center text-muted-foreground italic">
-                Nenhum título encontrado nesta categoria.
-              </TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
-    </Card>
-  );
+    return (
+      <div className="space-y-8">
+        {groupedData.map((group) => (
+          <Card key={group.monthLabel} className="bg-[#0f172a] border-white/5 overflow-hidden">
+            <CardHeader className="bg-white/5 py-3 border-b border-white/5">
+              <CardTitle className="text-xs font-black uppercase text-primary tracking-widest flex items-center gap-2">
+                <Calendar className="h-4 w-4" />
+                {group.monthLabel}
+              </CardTitle>
+            </CardHeader>
+            <Table>
+              <TableHeader className="sr-only md:not-sr-only">
+                <TableRow className="border-white/5 hover:bg-transparent">
+                  <TableHead className="text-muted-foreground">Descrição</TableHead>
+                  <TableHead className="text-muted-foreground">Vencimento</TableHead>
+                  <TableHead className="text-center text-muted-foreground">Status</TableHead>
+                  <TableHead className="text-right text-muted-foreground">Valor Bruto</TableHead>
+                  <TableHead className="text-right text-muted-foreground">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {group.titles.map(t => {
+                  const dueDate = t.dueDate instanceof Timestamp ? t.dueDate.toDate() : new Date(t.dueDate);
+                  const isOverdue = t.status === 'PENDENTE' && isBefore(dueDate, new Date());
+                  
+                  return (
+                    <TableRow key={t.id} className="border-white/5 hover:bg-white/5 transition-colors">
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span className="font-medium text-white">{t.description}</span>
+                          <span className="text-[10px] text-muted-foreground uppercase">{t.origin}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className={cn("text-slate-400 text-xs", isOverdue && "text-rose-500 font-bold")}>
+                        <div className="flex items-center gap-1.5">
+                          <Calendar className="h-3 w-3" />
+                          {format(dueDate, 'dd/MM/yyyy')}
+                          {isOverdue && <Badge variant="outline" className="h-4 text-[8px] border-rose-500/50 text-rose-500 bg-rose-50/5">VENCIDO</Badge>}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge className={cn(
+                          "text-[9px] font-black uppercase tracking-widest px-2 h-5",
+                          t.status === 'PAGO' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 'bg-amber-500/20 text-amber-400 border-amber-500/30'
+                        )} variant="outline">
+                          {t.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className={cn("text-right font-bold tabular-nums", type === 'RECEITA' ? 'text-emerald-400' : 'text-rose-400')}>
+                        {formatCurrency(t.value)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-white/50">
+                              {isProcessing === t.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreVertical className="h-4 w-4" />}
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="bg-card border-border w-64">
+                            <DropdownMenuLabel className="text-white text-[10px] font-black uppercase">Gerenciar Título</DropdownMenuLabel>
+                            {t.status === 'PENDENTE' ? (
+                              <DropdownMenuItem onClick={() => handleUpdateStatus(t.id, 'PAGO')}>
+                                <Check className="mr-2 h-4 w-4 text-emerald-500" /> Marcar como Pago
+                              </DropdownMenuItem>
+                            ) : (
+                              <DropdownMenuItem onClick={() => handleUpdateStatus(t.id, 'PENDENTE')}>
+                                <RefreshCw className="mr-2 h-4 w-4 text-amber-500" /> Estornar Pagamento
+                              </DropdownMenuItem>
+                            )}
+                            
+                            {type === 'RECEITA' && t.status === 'PAGO' && (
+                              <>
+                                <DropdownMenuSeparator className="bg-white/10" />
+                                <DropdownMenuItem onClick={() => setReceiptTitle(t)}>
+                                  <Users className="mr-2 h-4 w-4 text-blue-400" /> Recibo de Repasse (Cliente)
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => setHonorariosTitle(t)}>
+                                  <Scale className="mr-2 h-4 w-4 text-primary" /> Recibo de Honorários (Escritório)
+                                </DropdownMenuItem>
+                              </>
+                            )}
+
+                            <DropdownMenuSeparator className="bg-white/10" />
+                            <DropdownMenuItem className="text-rose-500" onClick={() => handleDelete(t.id)}>
+                              <Trash2 className="mr-2 h-4 w-4" /> Excluir Registro
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </Card>
+        ))}
+        {data.length === 0 && (
+          <Card className="bg-[#0f172a] border-white/5 p-12 text-center text-muted-foreground italic">
+            Nenhum título encontrado nesta categoria.
+          </Card>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6 p-1">
@@ -822,10 +835,10 @@ export default function FinanceiroPage() {
               <ArrowDownRight className="h-4 w-4 mr-2" /> Despesas
             </TabsTrigger>
             <TabsTrigger value="repasses" className="rounded-md data-[state=active]:bg-blue-500/20 data-[state=active]:text-blue-400">
-              <Handshake className="h-4 w-4 mr-2" /> Repasses
+              <Wallet className="h-4 w-4 mr-2" /> Repasses
             </TabsTrigger>
             <TabsTrigger value="relatorios" className="rounded-md data-[state=active]:bg-purple-500/20 data-[state=active]:text-purple-400">
-              <FileText className="h-4 w-4 mr-2" /> Relatórios
+              <ArrowUpRight className="h-4 w-4 mr-2 rotate-45" /> Relatórios
             </TabsTrigger>
         </TabsList>
 
@@ -848,7 +861,7 @@ export default function FinanceiroPage() {
         <TabsContent value="relatorios" className="flex-1 mt-4">
           <Card className="bg-[#0f172a] border-white/5 p-12 text-center flex flex-col items-center gap-4">
             <div className="h-16 w-16 rounded-full bg-purple-500/10 flex items-center justify-center text-purple-400">
-              <FileText className="h-8 w-8" />
+              <ArrowUpRight className="h-8 w-8" />
             </div>
             <div className="space-y-2">
               <h3 className="text-xl font-bold text-white">Relatórios Gerenciais</h3>
