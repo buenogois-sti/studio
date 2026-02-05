@@ -31,7 +31,7 @@ import {
   Info
 } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, where, getDocs, FieldValue, Timestamp, doc, deleteDoc, orderBy, limit } from 'firebase/firestore';
+import { collection, query, where, getDocs, getDoc, FieldValue, Timestamp, doc, deleteDoc, orderBy, limit } from 'firebase/firestore';
 import type { Staff, FinancialTitle, StaffCredit } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -537,18 +537,18 @@ function StaffVoucherDialog({
             <Button 
               variant="outline" 
               size="sm" 
-              className={cn("h-9 px-4 text-[10px] font-black uppercase gap-2 transition-all", isDetailed && "bg-slate-900 text-white border-slate-900")}
+              className={cn("h-10 px-4 text-[10px] font-black uppercase gap-2 transition-all", isDetailed ? "bg-slate-900 text-white border-slate-900" : "bg-white text-slate-600")}
               onClick={() => setIsDetailed(!isDetailed)}
             >
-              {isDetailed ? <FileCheck className="h-3.5 w-3.5" /> : <LayoutList className="h-3.5 w-3.5" />}
+              {isDetailed ? <FileCheck className="h-4 w-4" /> : <LayoutList className="h-4 w-4" />}
               {isDetailed ? 'Ver Modo Simples' : 'Ver Modo Detalhado'}
             </Button>
           </div>
           <div className="flex gap-3">
-            <DialogClose asChild><Button variant="ghost" className="font-bold text-slate-500">Fechar</Button></DialogClose>
+            <DialogClose asChild><Button variant="ghost" className="font-bold text-slate-500 h-10 px-6">Fechar</Button></DialogClose>
             <Button 
               onClick={handlePrint} 
-              className="gap-2 bg-slate-900 hover:bg-slate-800 text-white h-10 px-8 font-black uppercase text-[11px] border-b-4 border-primary rounded-lg"
+              className="gap-2 bg-slate-900 hover:bg-slate-800 text-white h-10 px-8 font-black uppercase text-[11px] border-b-4 border-primary rounded-lg transition-all active:translate-y-1 active:border-b-0"
             >
               <Printer className="h-4 w-4" /> Imprimir Comprovante
             </Button>
@@ -850,7 +850,7 @@ function RepasseValue({ staffId }: { staffId: string }) {
   return <span className={cn("text-sm font-black", val > 0 ? "text-emerald-400" : "text-slate-500")}>{val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>;
 }
 
-function PaymentHistory({ onShowVoucher }: { onPaid: () => void; onShowVoucher: (t: FinancialTitle) => void }) {
+function PaymentHistory({ onShowVoucher }: { onShowVoucher: (t: FinancialTitle) => void }) {
   const { firestore } = useFirebase();
   const historyQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'financial_titles'), where('origin', '==', 'HONORARIOS_PAGOS'), orderBy('paymentDate', 'desc'), limit(50)) : null), [firestore]);
   const { data: history, isLoading } = useCollection<FinancialTitle>(historyQuery);
@@ -975,8 +975,9 @@ export default function RepassesPage() {
     if (!firestore || !title.paidToStaffId) return;
     
     try {
-      const staffDoc = await getDocs(query(collection(firestore, 'staff'), where('id', '==', title.paidToStaffId)));
-      const staff = staffDoc.docs[0]?.exists() ? { id: staffDoc.docs[0].id, ...staffDoc.docs[0].data() } as Staff : null;
+      const staffRef = doc(firestore, 'staff', title.paidToStaffId);
+      const staffSnap = await getDoc(staffRef);
+      const staff = staffSnap.exists() ? { id: staffSnap.id, ...staffSnap.data() } as Staff : null;
       
       setVoucherData({
         staff,
@@ -1062,7 +1063,7 @@ export default function RepassesPage() {
         </TabsContent>
 
         <TabsContent value="history" className="mt-6">
-          <PaymentHistory onPaid={() => setRefreshKey(k => k + 1)} onShowVoucher={handleShowVoucherFromHistory} />
+          <PaymentHistory onShowVoucher={handleShowVoucherFromHistory} />
         </TabsContent>
       </Tabs>
 
@@ -1075,5 +1076,73 @@ export default function RepassesPage() {
         onOpenChange={setIsVoucherOpen}
       />
     </div>
+  );
+}
+
+function RepasseValue({ staffId }: { staffId: string }) {
+  const { firestore } = useFirebase();
+  const [val, setVal] = React.useState(0);
+
+  React.useEffect(() => {
+    if (!firestore) return;
+    const creditsRef = collection(firestore, `staff/${staffId}/credits`);
+    const q = query(creditsRef, where('status', '==', 'DISPONIVEL'));
+    getDocs(q).then(snap => {
+      const total = snap.docs.reduce((sum, d) => sum + (d.data().value || 0), 0);
+      setVal(total);
+    });
+  }, [firestore, staffId]);
+
+  return <span className={cn("text-sm font-black", val > 0 ? "text-emerald-400" : "text-slate-500")}>{val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>;
+}
+
+function PaymentHistory({ onShowVoucher }: { onShowVoucher: (t: FinancialTitle) => void }) {
+  const { firestore } = useFirebase();
+  const historyQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'financial_titles'), where('origin', '==', 'HONORARIOS_PAGOS'), orderBy('paymentDate', 'desc'), limit(50)) : null), [firestore]);
+  const { data: history, isLoading } = useCollection<FinancialTitle>(historyQuery);
+
+  if (isLoading) return <Skeleton className="h-64 w-full bg-white/5" />;
+
+  return (
+    <Card className="bg-[#0f172a] border-white/5 overflow-hidden">
+      <Table>
+        <TableHeader>
+          <TableRow className="border-white/5">
+            <TableHead className="text-muted-foreground">Data Pagamento</TableHead>
+            <TableHead className="text-muted-foreground">Descrição</TableHead>
+            <TableHead className="text-right text-muted-foreground">Valor Liquidado</TableHead>
+            <TableHead className="text-right text-muted-foreground">Ações</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {history?.map(t => (
+            <TableRow key={t.id} className="border-white/5 hover:bg-white/5">
+              <TableCell className="text-xs text-slate-400">
+                {t.paymentDate && format(t.paymentDate.toDate(), 'dd/MM/yyyy')}
+              </TableCell>
+              <TableCell>
+                <div className="flex flex-col">
+                  <span className="font-bold text-white">{t.description}</span>
+                  <span className="text-[9px] text-muted-foreground uppercase font-black">Ref ID: {t.id.substring(0, 8)}</span>
+                </div>
+              </TableCell>
+              <TableCell className="text-right font-black text-emerald-400">
+                {t.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+              </TableCell>
+              <TableCell className="text-right">
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-white/50" onClick={() => onShowVoucher(t)}>
+                  <Printer className="h-4 w-4" />
+                </Button>
+              </TableCell>
+            </TableRow>
+          ))}
+          {history?.length === 0 && (
+            <TableRow>
+              <TableCell colSpan={4} className="h-24 text-center text-muted-foreground italic">Nenhum pagamento registrado no histórico.</TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
+    </Card>
   );
 }
