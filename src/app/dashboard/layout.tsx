@@ -1,4 +1,3 @@
-
 'use client';
 
 import Link from 'next/link';
@@ -46,7 +45,8 @@ import {
   BarChart,
   Archive,
   Receipt,
-  Timer
+  Timer,
+  Wallet
 } from 'lucide-react';
 import type { UserProfile } from '@/lib/types';
 import {
@@ -103,6 +103,12 @@ const navItems = [
     roles: ['admin', 'financial'],
   },
   {
+    href: '/dashboard/repasses',
+    label: 'Pagamentos',
+    icon: Wallet,
+    roles: ['admin', 'financial'],
+  },
+  {
     href: '/dashboard/relatorios',
     label: 'Relatórios',
     icon: BarChart,
@@ -142,6 +148,7 @@ const BreadcrumbMap: { [key: string]: string } = {
   '/dashboard/audiencias': 'Audiências',
   '/dashboard/reembolsos': 'Reembolsos',
   '/dashboard/financeiro': 'Financeiro',
+  '/dashboard/repasses': 'Repasses & Folha',
   '/dashboard/relatorios': 'Relatórios Gerenciais',
   '/dashboard/acervo': 'Acervo de Modelos',
   '/dashboard/arquivo': 'Arquivo Digital',

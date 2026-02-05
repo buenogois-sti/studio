@@ -50,7 +50,7 @@ import { Input } from '@/components/ui/input';
 import { format, isBefore } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { createFinancialTitle, updateFinancialTitleStatus, processRepasse } from '@/lib/finance-actions';
+import { createFinancialTitle, updateFinancialTitleStatus } from '@/lib/finance-actions';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -60,6 +60,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import Link from 'next/link';
 
 const titleFormSchema = z.object({
   description: z.string().min(3, 'Descrição obrigatória'),
@@ -438,209 +439,6 @@ function HonorariosReceiptDialog({
   );
 }
 
-function RepassePaymentDialog({ 
-  staff, 
-  credits, 
-  open, 
-  onOpenChange,
-  onPaid
-}: { 
-  staff: Staff | null; 
-  credits: any[]; 
-  open: boolean; 
-  onOpenChange: (open: boolean) => void;
-  onPaid: () => void;
-}) {
-  const [isProcessing, setIsProcessing] = React.useState(false);
-  const { toast } = useToast();
-
-  const totalValue = React.useMemo(() => credits.reduce((sum, c) => sum + c.value, 0), [credits]);
-
-  const handlePay = async () => {
-    if (!staff) return;
-    setIsProcessing(true);
-    try {
-      await processRepasse(staff.id, credits.map(c => c.id), totalValue);
-      toast({ title: 'Repasse Concluído!', description: `Valor de ${totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} repassado com sucesso.` });
-      onPaid();
-      onOpenChange(false);
-    } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Erro no repasse', description: e.message });
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  if (!staff) return null;
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-xl bg-card border-border shadow-none">
-        <DialogHeader>
-          <DialogTitle className="text-white flex items-center gap-2 font-headline text-xl">
-            <Wallet className="h-6 w-6 text-emerald-400" />
-            Processar Repasse Consolidado
-          </DialogTitle>
-          <DialogDescription className="text-slate-400">
-            Confirmando o pagamento para <span className="text-white font-bold">{staff.firstName} {staff.lastName}</span>.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-6 py-4">
-          <div className="p-6 rounded-2xl bg-emerald-500/5 border-2 border-emerald-500/20 text-center shadow-[0_0_30px_rgba(16,185,129,0.05)]">
-            <p className="text-[10px] font-black uppercase text-emerald-400 mb-1 tracking-[0.2em]">Valor Total Líquido a Pagar</p>
-            <p className="text-4xl font-black text-white tabular-nums">{totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
-          </div>
-
-          <div className="space-y-3">
-            <h4 className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Extrato de Créditos e Reembolsos ({credits.length})</h4>
-            <ScrollArea className="h-[200px] border border-white/5 rounded-xl p-2 bg-black/40">
-              <div className="space-y-2">
-                {credits.map(c => (
-                  <div key={c.id} className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/5 hover:border-emerald-500/30 transition-all">
-                    <div className="min-w-0 flex-1 flex items-center gap-3">
-                      <div className="h-8 w-8 rounded-full bg-white/5 flex items-center justify-center shrink-0">
-                        {c.type === 'REEMBOLSO' ? <FileText className="h-4 w-4 text-blue-400" /> : <DollarSign className="h-4 w-4 text-emerald-400" />}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold text-slate-200 truncate">{c.description}</p>
-                        <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-tighter">
-                          {c.type === 'REEMBOLSO' ? 'Natureza: Ressarcimento de Despesa' : 'Natureza: Participação em Honorários'}
-                        </p>
-                      </div>
-                    </div>
-                    <span className="text-sm font-black text-emerald-400 ml-4 tabular-nums">{c.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-                  </div>
-                ))}
-              </div>
-            </ScrollArea>
-          </div>
-
-          <div className="flex items-start gap-3 p-4 rounded-xl bg-blue-500/5 border border-blue-500/20 text-[11px] text-blue-400 italic leading-relaxed">
-            <AlertCircle className="h-4 w-4 shrink-0" />
-            <p>Esta operação é irreversível. Ao confirmar, o sistema registrará uma saída de caixa e dará quitação automática aos honorários e reembolsos deste profissional.</p>
-          </div>
-        </div>
-
-        <DialogFooter className="gap-2">
-          <DialogClose asChild><Button variant="ghost" className="text-slate-400 hover:text-white">Cancelar</Button></DialogClose>
-          <Button 
-            className="bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase tracking-widest text-[11px] px-8 h-11 shadow-lg shadow-emerald-900/20"
-            onClick={handlePay}
-            disabled={isProcessing}
-          >
-            {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
-            Confirmar e Emitir Recibo
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function RepassesTab() {
-  const { firestore } = useFirebase();
-  const [selectedStaff, setSelectedStaff] = React.useState<Staff | null>(null);
-  const [staffCredits, setStaffCredits] = React.useState<any[]>([]);
-  const [isRepasseOpen, setIsRepasseOpen] = React.useState(false);
-
-  const staffQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'staff') : null), [firestore]);
-  const { data: staffData, isLoading: isLoadingStaff } = useCollection<Staff>(staffQuery);
-
-  const handleOpenRepasse = async (member: Staff) => {
-    if (!firestore) return;
-    const creditsRef = collection(firestore, `staff/${member.id}/credits`);
-    const q = query(creditsRef, where('status', '==', 'DISPONIVEL'));
-    const snapshot = await getDocs(q);
-    const credits = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    
-    if (credits.length === 0) {
-      alert("Este profissional não possui créditos ou reembolsos disponíveis para saque no momento.");
-      return;
-    }
-
-    setStaffCredits(credits);
-    setSelectedStaff(member);
-    setIsRepasseOpen(true);
-  };
-
-  return (
-    <>
-      <Card className="bg-[#0f172a] border-white/5 overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow className="border-white/5">
-              <TableHead className="text-muted-foreground">Profissional</TableHead>
-              <TableHead className="text-muted-foreground">Perfil</TableHead>
-              <TableHead className="text-right text-muted-foreground">Total Disponível (Honorários + Reembolsos)</TableHead>
-              <TableHead className="text-right text-muted-foreground">Ação</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoadingStaff ? (
-              Array.from({ length: 3 }).map((_, i) => (
-                <TableRow key={i}><TableCell colSpan={4}><Skeleton className="h-10 w-full" /></TableCell></TableRow>
-              ))
-            ) : staffData?.map(member => (
-              <TableRow key={member.id} className="border-white/5 hover:bg-white/5">
-                <TableCell>
-                  <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-                      {member.firstName.charAt(0)}{member.lastName.charAt(0)}
-                    </div>
-                    <span className="font-bold text-white">{member.firstName} {member.lastName}</span>
-                  </div>
-                </TableCell>
-                <TableCell><Badge variant="outline" className="text-[10px] uppercase">{member.role}</Badge></TableCell>
-                <TableCell className="text-right">
-                  <div className="flex flex-col items-end">
-                    <RepasseValue staffId={member.id} />
-                  </div>
-                </TableCell>
-                <TableCell className="text-right">
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="h-8 text-[10px] font-black uppercase text-primary hover:bg-primary/10"
-                    onClick={() => handleOpenRepasse(member)}
-                  >
-                    Pagar Agora
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </Card>
-
-      <RepassePaymentDialog 
-        staff={selectedStaff} 
-        credits={staffCredits} 
-        open={isRepasseOpen} 
-        onOpenChange={setIsRepasseOpen}
-        onPaid={() => setIsRepasseOpen(false)}
-      />
-    </>
-  );
-}
-
-function RepasseValue({ staffId }: { staffId: string }) {
-  const { firestore } = useFirebase();
-  const [val, setVal] = React.useState(0);
-
-  React.useEffect(() => {
-    if (!firestore) return;
-    const creditsRef = collection(firestore, `staff/${staffId}/credits`);
-    const q = query(creditsRef, where('status', '==', 'DISPONIVEL'));
-    getDocs(q).then(snap => {
-      const total = snap.docs.reduce((sum, d) => sum + (d.data().value || 0), 0);
-      setVal(total);
-    });
-  }, [firestore, staffId]);
-
-  return <span className={cn("text-sm font-black", val > 0 ? "text-emerald-400" : "text-slate-500")}>{val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>;
-}
-
 export default function FinanceiroPage() {
   const { firestore, isUserLoading } = useFirebase();
   const [refreshKey, setRefreshKey] = React.useState(0);
@@ -834,9 +632,16 @@ export default function FinanceiroPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-white/5">
         <div>
           <H1 className="text-white">Financeiro</H1>
-          <p className="text-sm text-muted-foreground">Controle estratégico de faturamento, despesas e repasses.</p>
+          <p className="text-sm text-muted-foreground">Controle estratégico de faturamento e despesas operacionais.</p>
         </div>
-        <NewTitleDialog onCreated={() => setRefreshKey(k => k + 1)} />
+        <div className="flex items-center gap-2">
+          <Button variant="outline" className="border-primary/20 text-primary" asChild>
+            <Link href="/dashboard/repasses">
+              <Wallet className="mr-2 h-4 w-4" /> Ir para Repasses & Folha
+            </Link>
+          </Button>
+          <NewTitleDialog onCreated={() => setRefreshKey(k => k + 1)} />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -859,18 +664,15 @@ export default function FinanceiroPage() {
       </div>
 
       <Tabs defaultValue="receitas" className="flex-1 flex flex-col">
-        <TabsList className="grid w-full grid-cols-4 bg-[#0f172a] border border-white/5 rounded-lg p-1 gap-1">
+        <TabsList className="grid w-full grid-cols-3 bg-[#0f172a] border border-white/5 rounded-lg p-1 gap-1">
             <TabsTrigger value="receitas" className="rounded-md data-[state=active]:bg-emerald-500/20 data-[state=active]:text-emerald-400">
               <ArrowUpRight className="h-4 w-4 mr-2" /> Receitas
             </TabsTrigger>
             <TabsTrigger value="despesas" className="rounded-md data-[state=active]:bg-rose-500/20 data-[state=active]:text-rose-400">
               <ArrowDownRight className="h-4 w-4 mr-2" /> Despesas
             </TabsTrigger>
-            <TabsTrigger value="repasses" className="rounded-md data-[state=active]:bg-blue-500/20 data-[state=active]:text-blue-400">
-              <Wallet className="h-4 w-4 mr-2" /> Repasses
-            </TabsTrigger>
             <TabsTrigger value="relatorios" className="rounded-md data-[state=active]:bg-purple-500/20 data-[state=active]:text-purple-400">
-              <ArrowUpRight className="h-4 w-4 mr-2 rotate-45" /> Relatórios
+              <BarChart className="h-4 w-4 mr-2" /> Painel BI
             </TabsTrigger>
         </TabsList>
 
@@ -886,10 +688,6 @@ export default function FinanceiroPage() {
           )}
         </TabsContent>
 
-        <TabsContent value="repasses" className="flex-1 mt-4">
-            <RepassesTab />
-        </TabsContent>
-
         <TabsContent value="relatorios" className="flex-1 mt-4">
           <Card className="bg-[#0f172a] border-white/5 p-12 text-center flex flex-col items-center gap-4">
             <div className="h-16 w-16 rounded-full bg-purple-500/10 flex items-center justify-center text-purple-400">
@@ -900,7 +698,7 @@ export default function FinanceiroPage() {
               <p className="text-muted-foreground max-w-sm">Acesse a página consolidada de BI para visualizar gráficos de crescimento, lucratividade e performance da equipe.</p>
             </div>
             <Button variant="outline" className="border-purple-500/30 text-purple-400 hover:bg-purple-500/10" asChild>
-              <a href="/dashboard/relatorios">Ver Painel de BI</a>
+              <Link href="/dashboard/relatorios">Ver Painel de BI</Link>
             </Button>
           </Card>
         </TabsContent>

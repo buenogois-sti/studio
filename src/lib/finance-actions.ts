@@ -93,7 +93,6 @@ export async function createFinancialEventAndTitles(data: CreateEventData) {
           lawyerValue = officeFeeTotal * (rem.lawyerPercentage / 100);
         } else if (rem.type === 'FIXO_MENSAL' || rem.type === 'AUDIENCISTA') {
           // Casos fixos não geram crédito variável por evento de processo automaticamente aqui
-          // Mas poderiam ser lançados conforme a necessidade
         }
 
         if (lawyerValue > 0) {
@@ -232,4 +231,35 @@ export async function processRepasse(staffId: string, creditIds: string[], total
   } catch (error: any) {
     throw new Error(error.message);
   }
+}
+
+export async function launchPayroll() {
+  if (!firestoreAdmin) throw new Error("Servidor indisponível.");
+  const session = await getServerSession(authOptions);
+  if (!session || session.user.role !== 'admin') throw new Error("Apenas administradores podem processar folha.");
+
+  const batch = firestoreAdmin.batch();
+  const staffSnap = await firestoreAdmin.collection('staff').get();
+  let count = 0;
+
+  for (const doc of staffSnap.docs) {
+    const data = doc.data() as Staff;
+    if (data.remuneration?.type === 'FIXO_MENSAL' && data.remuneration.fixedMonthlyValue) {
+      const creditRef = doc.ref.collection('credits').doc();
+      batch.set(creditRef, {
+        type: 'SALARIO',
+        description: `Pro-labore/Salário: ${format(new Date(), 'MMMM/yyyy', { locale: ptBR })}`,
+        value: data.remuneration.fixedMonthlyValue,
+        status: 'DISPONIVEL',
+        date: FieldValue.serverTimestamp()
+      });
+      count++;
+    }
+  }
+
+  if (count > 0) {
+    await batch.commit();
+  }
+  
+  return { success: true, count };
 }

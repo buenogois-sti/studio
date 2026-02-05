@@ -143,7 +143,7 @@ export type LegalDeadline = {
   googleCalendarEventId?: string;
   googleTaskId?: string;
   createdAt: Timestamp;
-  updatedAt?: Timestamp;
+  updatedAt: Timestamp;
 };
 
 export type FinancialEvent = {
@@ -208,7 +208,7 @@ export type Log = {
     timestamp: Timestamp;
 };
 
-export type StaffRole = 'employee' | 'lawyer' | 'intern';
+export type StaffRole = 'employee' | 'lawyer' | 'intern' | 'provider' | 'partner';
 export type OABStatus = 'Ativa' | 'Suspensa' | 'Inativa' | 'Pendente';
 export type RemunerationType = 'SUCUMBENCIA' | 'PRODUCAO' | 'QUOTA_LITIS' | 'FIXO_MENSAL' | 'AUDIENCISTA';
 

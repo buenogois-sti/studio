@@ -1,4 +1,3 @@
-
 'use client';
 import * as React from 'react';
 import { z } from 'zod';
@@ -33,7 +32,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
 
 const staffSchema = z.object({
-  role: z.enum(['employee', 'lawyer', 'intern'], { required_error: 'O perfil é obrigatório.'}),
+  role: z.enum(['employee', 'lawyer', 'intern', 'provider', 'partner'], { required_error: 'O perfil é obrigatório.'}),
   firstName: z.string().min(2, { message: 'O nome é obrigatório.' }),
   lastName: z.string().min(2, { message: 'O sobrenome é obrigatório.' }),
   email: z.string().email({ message: 'E-mail inválido.' }),
@@ -80,21 +79,23 @@ const staffSchema = z.object({
     message: "A situação da OAB é obrigatória para Advogado/Estagiário.",
     path: ["oabStatus"],
 }).refine((data) => {
-    if (data.role === 'lawyer') {
+    if (data.role === 'lawyer' || data.role === 'partner') {
         return !!data.remuneration_type;
     }
     return true;
 }, {
-    message: "A regra de remuneração é obrigatória para advogados.",
+    message: "A regra de remuneração é obrigatória.",
     path: ["remuneration_type"],
 });
 
 type StaffFormValues = z.infer<typeof staffSchema>;
 
 const roleOptions = [
-    { value: 'employee', label: 'Funcionário(a)' },
     { value: 'lawyer', label: 'Advogado(a)' },
+    { value: 'partner', label: 'Sócio(a)' },
+    { value: 'employee', label: 'Administrativo' },
     { value: 'intern', label: 'Estagiário(a)' },
+    { value: 'provider', label: 'Correspondente / Fornecedor' },
 ];
 
 const remunerationOptions = [
@@ -168,7 +169,7 @@ export function StaffForm({
         agency: '',
         account: '',
         pixKey: '',
-        remuneration_type: 'SUCUMBENCIA' as any,
+        remuneration_type: 'FIXO_MENSAL' as any,
         remuneration_officePercentage: 0,
         remuneration_lawyerPercentage: 0,
         remuneration_fixedMonthlyValue: 0,
@@ -235,7 +236,6 @@ export function StaffForm({
         ...restOfValues
       } = values;
 
-      // Construção segura do objeto para evitar 'undefined' no Firestore
       const staffData: any = { 
         ...restOfValues,
         phone: values.phone || "",
@@ -244,7 +244,6 @@ export function StaffForm({
         oabStatus: values.oabStatus || "Ativa"
       };
 
-      // Endereço
       staffData.address = {
         street: address_street || "",
         number: address_number || "",
@@ -255,7 +254,6 @@ export function StaffForm({
         state: address_state || "",
       };
 
-      // Banco
       staffData.bankInfo = {
         bankName: bankName || "",
         agency: agency || "",
@@ -263,10 +261,8 @@ export function StaffForm({
         pixKey: pixKey || "",
       };
 
-      // Remuneração (Apenas para Advogados)
-      if (values.role === 'lawyer' && remuneration_type) {
+      if (remuneration_type) {
         const rem: any = { type: remuneration_type };
-        
         if (remuneration_type === 'SUCUMBENCIA') {
             rem.officePercentage = remuneration_officePercentage ?? 0;
             rem.lawyerPercentage = remuneration_lawyerPercentage ?? 0;
@@ -282,7 +278,6 @@ export function StaffForm({
                 diligence: remuneration_priceDiligence ?? 0,
             };
         }
-        
         staffData.remuneration = rem;
       }
 
@@ -360,179 +355,177 @@ export function StaffForm({
             </div>
           </section>
 
-          {watchedRole === 'lawyer' && (
-            <section className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-500">
-                <div className="flex items-center gap-2 mb-2">
-                    <DollarSign className="h-5 w-5 text-primary" />
-                    <H2 className="text-white border-primary/20">Regras de Remuneração</H2>
-                </div>
-                <div className="bg-primary/5 p-6 rounded-2xl border-2 border-primary/20 space-y-6">
-                    <FormField
-                        control={form.control}
-                        name="remuneration_type"
-                        render={({ field }) => (
-                        <FormItem>
-                            <FormLabel className="text-xs font-black uppercase text-primary tracking-widest">Modalidade de Pagamento *</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl><SelectTrigger className="h-12 bg-background border-primary/30"><SelectValue placeholder="Selecione a regra base..." /></SelectTrigger></FormControl>
-                            <SelectContent>
-                                {remunerationOptions.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
-                            </SelectContent>
-                            </Select>
-                            <FormMessage />
-                        </FormItem>
-                        )}
-                    />
+          <section className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-500">
+              <div className="flex items-center gap-2 mb-2">
+                  <DollarSign className="h-5 w-5 text-primary" />
+                  <H2 className="text-white border-primary/20">Regras de Remuneração</H2>
+              </div>
+              <div className="bg-primary/5 p-6 rounded-2xl border-2 border-primary/20 space-y-6">
+                  <FormField
+                      control={form.control}
+                      name="remuneration_type"
+                      render={({ field }) => (
+                      <FormItem>
+                          <FormLabel className="text-xs font-black uppercase text-primary tracking-widest">Modalidade de Pagamento *</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl><SelectTrigger className="h-12 bg-background border-primary/30"><SelectValue placeholder="Selecione a regra base..." /></SelectTrigger></FormControl>
+                          <SelectContent>
+                              {remunerationOptions.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
+                          </SelectContent>
+                          </Select>
+                          <FormMessage />
+                      </FormItem>
+                      )}
+                  />
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-primary/10">
-                        {watchedRemuneration === 'SUCUMBENCIA' && (
-                            <>
-                                <FormField
-                                    control={form.control}
-                                    name="remuneration_officePercentage"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel className="text-xs font-bold uppercase">Cota Escritório (%)</FormLabel>
-                                            <FormControl>
-                                                <div className="relative">
-                                                    <Percent className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                                    <Input type="number" className="h-11 pl-10 bg-background" placeholder="Ex: 70" {...field} />
-                                                </div>
-                                            </FormControl>
-                                        </FormItem>
-                                    )}
-                                />
-                                <FormField
-                                    control={form.control}
-                                    name="remuneration_lawyerPercentage"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel className="text-xs font-bold uppercase">Cota Advogado (%)</FormLabel>
-                                            <FormControl>
-                                                <div className="relative">
-                                                    <Percent className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                                    <Input type="number" className="h-11 pl-10 bg-background" placeholder="Ex: 30" {...field} />
-                                                </div>
-                                            </FormControl>
-                                        </FormItem>
-                                    )}
-                                />
-                            </>
-                        )}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-primary/10">
+                      {watchedRemuneration === 'SUCUMBENCIA' && (
+                          <>
+                              <FormField
+                                  control={form.control}
+                                  name="remuneration_officePercentage"
+                                  render={({ field }) => (
+                                      <FormItem>
+                                          <FormLabel className="text-xs font-bold uppercase">Cota Escritório (%)</FormLabel>
+                                          <FormControl>
+                                              <div className="relative">
+                                                  <Percent className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                                  <Input type="number" className="h-11 pl-10 bg-background" placeholder="Ex: 70" {...field} />
+                                              </div>
+                                          </FormControl>
+                                      </FormItem>
+                                  )}
+                              />
+                              <FormField
+                                  control={form.control}
+                                  name="remuneration_lawyerPercentage"
+                                  render={({ field }) => (
+                                      <FormItem>
+                                          <FormLabel className="text-xs font-bold uppercase">Cota Advogado (%)</FormLabel>
+                                          <FormControl>
+                                              <div className="relative">
+                                                  <Percent className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                                  <Input type="number" className="h-11 pl-10 bg-background" placeholder="Ex: 30" {...field} />
+                                              </div>
+                                          </FormControl>
+                                      </FormItem>
+                                  )}
+                              />
+                          </>
+                      )}
 
-                        {watchedRemuneration === 'QUOTA_LITIS' && (
-                            <FormField
-                                control={form.control}
-                                name="remuneration_lawyerPercentage"
-                                render={({ field }) => (
-                                    <FormItem className="md:col-span-2">
-                                        <FormLabel className="text-xs font-bold uppercase">Participação sobre o Êxito (%)</FormLabel>
-                                        <FormControl>
-                                            <div className="relative">
-                                                <Percent className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                                <Input type="number" className="h-11 pl-10 bg-background" placeholder="Ex: 10" {...field} />
-                                            </div>
-                                        </FormControl>
-                                        <p className="text-[10px] text-primary/60 italic">Pagamento condicionado ao recebimento efetivo pelo cliente.</p>
-                                    </FormItem>
-                                )}
-                            />
-                        )}
+                      {watchedRemuneration === 'QUOTA_LITIS' && (
+                          <FormField
+                              control={form.control}
+                              name="remuneration_lawyerPercentage"
+                              render={({ field }) => (
+                                  <FormItem className="md:col-span-2">
+                                      <FormLabel className="text-xs font-bold uppercase">Participação sobre o Êxito (%)</FormLabel>
+                                      <FormControl>
+                                          <div className="relative">
+                                              <Percent className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                              <Input type="number" className="h-11 pl-10 bg-background" placeholder="Ex: 10" {...field} />
+                                          </div>
+                                      </FormControl>
+                                      <p className="text-[10px] text-primary/60 italic">Pagamento condicionado ao recebimento efetivo pelo cliente.</p>
+                                  </FormItem>
+                              )}
+                          />
+                      )}
 
-                        {watchedRemuneration === 'FIXO_MENSAL' && (
-                            <FormField
-                                control={form.control}
-                                name="remuneration_fixedMonthlyValue"
-                                render={({ field }) => (
-                                    <FormItem className="md:col-span-2">
-                                        <FormLabel className="text-xs font-bold uppercase">Valor Fixo Pro-Labore (R$)</FormLabel>
-                                        <FormControl>
-                                            <div className="relative">
-                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-bold">R$</span>
-                                                <Input 
-                                                  type="text" 
-                                                  className="h-11 pl-9 bg-background" 
-                                                  value={formatCurrencyValue(field.value)} 
-                                                  onChange={(e) => handleCurrencyValueChange(e, field.onChange)}
-                                                />
-                                            </div>
-                                        </FormControl>
-                                    </FormItem>
-                                )}
-                            />
-                        )}
+                      {watchedRemuneration === 'FIXO_MENSAL' && (
+                          <FormField
+                              control={form.control}
+                              name="remuneration_fixedMonthlyValue"
+                              render={({ field }) => (
+                                  <FormItem className="md:col-span-2">
+                                      <FormLabel className="text-xs font-bold uppercase">Valor Fixo Pro-Labore / Salário (R$)</FormLabel>
+                                      <FormControl>
+                                          <div className="relative">
+                                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-bold">R$</span>
+                                              <Input 
+                                                type="text" 
+                                                className="h-11 pl-9 bg-background" 
+                                                value={formatCurrencyValue(field.value)} 
+                                                onChange={(e) => handleCurrencyValueChange(e, field.onChange)}
+                                              />
+                                          </div>
+                                      </FormControl>
+                                  </FormItem>
+                              )}
+                          />
+                      )}
 
-                        {watchedRemuneration === 'AUDIENCISTA' && (
-                            <FormField
-                                control={form.control}
-                                name="remuneration_valuePerHearing"
-                                render={({ field }) => (
-                                    <FormItem className="md:col-span-2">
-                                        <FormLabel className="text-xs font-bold uppercase">Valor por Audiência Realizada (R$)</FormLabel>
-                                        <FormControl>
-                                            <div className="relative">
-                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-bold">R$</span>
-                                                <Input 
-                                                  type="text" 
-                                                  className="h-11 pl-9 bg-background" 
-                                                  value={formatCurrencyValue(field.value)} 
-                                                  onChange={(e) => handleCurrencyValueChange(e, field.onChange)}
-                                                />
-                                            </div>
-                                        </FormControl>
-                                    </FormItem>
-                                )}
-                            />
-                        )}
+                      {watchedRemuneration === 'AUDIENCISTA' && (
+                          <FormField
+                              control={form.control}
+                              name="remuneration_valuePerHearing"
+                              render={({ field }) => (
+                                  <FormItem className="md:col-span-2">
+                                      <FormLabel className="text-xs font-bold uppercase">Valor por Audiência Realizada (R$)</FormLabel>
+                                      <FormControl>
+                                          <div className="relative">
+                                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-bold">R$</span>
+                                              <Input 
+                                                type="text" 
+                                                className="h-11 pl-9 bg-background" 
+                                                value={formatCurrencyValue(field.value)} 
+                                                onChange={(e) => handleCurrencyValueChange(e, field.onChange)}
+                                              />
+                                          </div>
+                                      </FormControl>
+                                  </FormItem>
+                              )}
+                          />
+                      )}
 
-                        {watchedRemuneration === 'PRODUCAO' && (
-                            <>
-                                <FormField
-                                    control={form.control}
-                                    name="remuneration_priceDrafting"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel className="text-xs font-bold uppercase">Valor por Peça Processual (R$)</FormLabel>
-                                            <FormControl>
-                                                <div className="relative">
-                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-bold">R$</span>
-                                                    <Input 
-                                                      type="text" 
-                                                      className="h-11 pl-9 bg-background" 
-                                                      value={formatCurrencyValue(field.value)} 
-                                                      onChange={(e) => handleCurrencyValueChange(e, field.onChange)}
-                                                    />
-                                                </div>
-                                            </FormControl>
-                                        </FormItem>
-                                    )}
-                                />
-                                <FormField
-                                    control={form.control}
-                                    name="remuneration_priceDiligence"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel className="text-xs font-bold uppercase">Valor por Diligência (R$)</FormLabel>
-                                            <FormControl>
-                                                <div className="relative">
-                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-bold">R$</span>
-                                                    <Input 
-                                                      type="text" 
-                                                      className="h-11 pl-9 bg-background" 
-                                                      value={formatCurrencyValue(field.value)} 
-                                                      onChange={(e) => handleCurrencyValueChange(e, field.onChange)}
-                                                    />
-                                                </div>
-                                            </FormControl>
-                                        </FormItem>
-                                    )}
-                                />
-                            </>
-                        )}
-                    </div>
-                </div>
-            </section>
-          )}
+                      {watchedRemuneration === 'PRODUCAO' && (
+                          <>
+                              <FormField
+                                  control={form.control}
+                                  name="remuneration_priceDrafting"
+                                  render={({ field }) => (
+                                      <FormItem>
+                                          <FormLabel className="text-xs font-bold uppercase">Valor por Peça Processual (R$)</FormLabel>
+                                          <FormControl>
+                                              <div className="relative">
+                                                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-bold">R$</span>
+                                                  <Input 
+                                                    type="text" 
+                                                    className="h-11 pl-9 bg-background" 
+                                                    value={formatCurrencyValue(field.value)} 
+                                                    onChange={(e) => handleCurrencyValueChange(e, field.onChange)}
+                                                  />
+                                              </div>
+                                          </FormControl>
+                                      </FormItem>
+                                  )}
+                              />
+                              <FormField
+                                  control={form.control}
+                                  name="remuneration_priceDiligence"
+                                  render={({ field }) => (
+                                      <FormItem>
+                                          <FormLabel className="text-xs font-bold uppercase">Valor por Diligência (R$)</FormLabel>
+                                          <FormControl>
+                                              <div className="relative">
+                                                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-bold">R$</span>
+                                                  <Input 
+                                                    type="text" 
+                                                    className="h-11 pl-9 bg-background" 
+                                                    value={formatCurrencyValue(field.value)} 
+                                                    onChange={(e) => handleCurrencyValueChange(e, field.onChange)}
+                                                  />
+                                              </div>
+                                          </FormControl>
+                                      </FormItem>
+                                  )}
+                              />
+                          </>
+                      )}
+                  </div>
+              </div>
+          </section>
           
           <section className="space-y-4">
             <H2 className="text-white border-primary/20">Contatos & Localização</H2>
@@ -629,7 +622,7 @@ export function StaffForm({
             </div>
           </section>
           
-          {(watchedRole === 'lawyer' || watchedRole === 'intern') && (
+          {(watchedRole === 'lawyer' || watchedRole === 'intern' || watchedRole === 'partner') && (
             <section className="space-y-4">
                 <H2 className="text-white border-primary/20">Habilitação Profissional</H2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white/5 p-6 rounded-2xl border border-white/10">
@@ -661,6 +654,52 @@ export function StaffForm({
                 </div>
             </section>
           )}
+
+          <section className="space-y-4">
+              <H2 className="text-white border-primary/20">Dados Bancários para Repasse</H2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white/5 p-6 rounded-2xl border border-white/10">
+                  <FormField
+                      control={form.control}
+                      name="bankName"
+                      render={({ field }) => (
+                          <FormItem>
+                              <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">Banco</FormLabel>
+                              <FormControl><Input className="h-11 bg-background" placeholder="Ex: Itaú, Nubank..." {...field} /></FormControl>
+                          </FormItem>
+                      )}
+                  />
+                  <FormField
+                      control={form.control}
+                      name="agency"
+                      render={({ field }) => (
+                          <FormItem>
+                              <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">Agência</FormLabel>
+                              <FormControl><Input className="h-11 bg-background" placeholder="0000" {...field} /></FormControl>
+                          </FormItem>
+                      )}
+                  />
+                  <FormField
+                      control={form.control}
+                      name="account"
+                      render={({ field }) => (
+                          <FormItem>
+                              <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">Conta com Dígito</FormLabel>
+                              <FormControl><Input className="h-11 bg-background" placeholder="00000-0" {...field} /></FormControl>
+                          </FormItem>
+                      )}
+                  />
+                  <FormField
+                      control={form.control}
+                      name="pixKey"
+                      render={({ field }) => (
+                          <FormItem>
+                              <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">Chave PIX Principal</FormLabel>
+                              <FormControl><Input className="h-11 bg-background" placeholder="CPF, e-mail ou telefone" {...field} /></FormControl>
+                          </FormItem>
+                      )}
+                  />
+              </div>
+          </section>
 
         </fieldset>
 
