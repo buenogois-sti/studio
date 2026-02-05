@@ -133,12 +133,12 @@ function NewReimbursementDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90">
+        <Button className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90 font-bold">
           <PlusCircle className="h-4 w-4" />
           Solicitar Reembolso
         </Button>
       </DialogTrigger>
-      <DialogContent className="bg-card border-border sm:max-w-lg">
+      <DialogContent className="bg-[#0f172a] border-white/10 sm:max-w-lg text-white">
         <DialogHeader>
           <DialogTitle className="text-white">Nova Solicitação</DialogTitle>
           <DialogDescription className="text-slate-400">Preencha os detalhes da despesa para reembolso.</DialogDescription>
@@ -162,8 +162,8 @@ function NewReimbursementDialog({
                   <FormItem>
                     <FormLabel className="text-white">Colaborador (Admin)</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl><SelectTrigger className="bg-background border-border"><SelectValue placeholder="Selecione o usuário" /></SelectTrigger></FormControl>
-                      <SelectContent className="bg-card border-border">
+                      <FormControl><SelectTrigger className="bg-black/40 border-white/10"><SelectValue placeholder="Selecione o usuário" /></SelectTrigger></FormControl>
+                      <SelectContent className="bg-[#0f172a] border-white/10 text-white">
                         {users?.map(u => (
                           <SelectItem key={u.id} value={u.id}>{u.firstName} {u.lastName}</SelectItem>
                         ))}
@@ -180,7 +180,7 @@ function NewReimbursementDialog({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel className="text-white">Descrição da Despesa *</FormLabel>
-                  <FormControl><Input className="bg-background border-border" placeholder="Ex: Cópias de Processo - Fórum SBC" {...field} /></FormControl>
+                  <FormControl><Input className="bg-black/40 border-white/10 text-white" placeholder="Ex: Cópias de Processo - Fórum SBC" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )}
@@ -196,7 +196,7 @@ function NewReimbursementDialog({
                       <div className="relative">
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-bold">R$</span>
                         <Input 
-                          className="bg-background border-border pl-9" 
+                          className="bg-black/40 border-white/10 pl-9 text-white" 
                           type="text"
                           value={formatCurrencyValue(field.value)}
                           onChange={(e) => handleValueChange(e, field.onChange)}
@@ -213,15 +213,15 @@ function NewReimbursementDialog({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-white">Data da Despesa *</FormLabel>
-                    <FormControl><Input className="bg-background border-border" type="date" {...field} /></FormControl>
+                    <FormControl><Input className="bg-black/40 border-white/10 text-white" type="date" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
             </div>
             <DialogFooter className="pt-4">
-              <DialogClose asChild><Button variant="outline" className="text-slate-400 hover:text-white" type="button">Cancelar</Button></DialogClose>
-              <Button type="submit" disabled={isSaving} className="bg-primary text-primary-foreground">
+              <DialogClose asChild><Button variant="outline" className="text-slate-400 hover:text-white border-white/10" type="button">Cancelar</Button></DialogClose>
+              <Button type="submit" disabled={isSaving} className="bg-primary text-primary-foreground font-bold">
                 {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 Enviar Pedido
               </Button>
@@ -241,7 +241,6 @@ export default function ReembolsosPage() {
   const [isUpdating, setIsUpdating] = React.useState<string | null>(null);
   const [searchTerm, setSearchTerm] = React.useState('');
 
-  // Sincronização de Role baseada no Firestore (mais confiável para permissões do que o Session puro)
   const userProfileRef = useMemoFirebase(
     () => (firestore && user?.uid ? doc(firestore, 'users', user.uid) : null),
     [firestore, user?.uid]
@@ -260,23 +259,22 @@ export default function ReembolsosPage() {
     }
   }, [canManage, activeTab]);
 
-  // LOGICA 1: Query restrita para usuários comuns (vê apenas os seus)
+  // LOGICA 1: Consulta ordenada pela data da despesa (mais nova primeiro)
   const myReimbursementsQuery = useMemoFirebase(
     () => (firestore && currentUserId ? query(
       collection(firestore, 'reimbursements'),
       where('userId', '==', currentUserId),
-      orderBy('createdAt', 'desc')
+      orderBy('requestDate', 'desc')
     ) : null),
     [firestore, currentUserId]
   );
   const { data: myData, isLoading: isLoadingMy } = useCollection<Reimbursement>(myReimbursementsQuery);
 
-  // LOGICA 2: Query global para Financeiro/Admin (vê tudo)
-  // Só dispara se o perfil do Firestore confirmar que é admin
+  // LOGICA 2: Consulta global para Financeiro/Admin ordenada por data da despesa
   const allReimbursementsQuery = useMemoFirebase(
     () => (firestore && canManage && !isProfileLoading ? query(
       collection(firestore, 'reimbursements'),
-      orderBy('createdAt', 'desc')
+      orderBy('requestDate', 'desc')
     ) : null),
     [firestore, canManage, isProfileLoading]
   );
@@ -305,6 +303,7 @@ export default function ReembolsosPage() {
   };
 
   const handleDelete = async (id: string) => {
+    if (!confirm('Tem certeza que deseja remover esta solicitação?')) return;
     try {
       await deleteReimbursement(id);
       toast({ title: 'Cancelado', description: 'O pedido foi removido.' });
@@ -315,7 +314,6 @@ export default function ReembolsosPage() {
 
   const isLoading = isFirebaseLoading || isProfileLoading || (canManage && activeTab === 'todos' ? isLoadingAll : isLoadingMy);
 
-  // Tratamento de Erro de Project ID mismatch
   if (userError && (userError.message.includes('400') || userError.message.includes('custom-token'))) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center space-y-6">
@@ -329,23 +327,7 @@ export default function ReembolsosPage() {
             <strong> Solução:</strong> Atualize a variável <code>FIREBASE_SERVICE_ACCOUNT_JSON</code> no seu servidor com a chave do projeto <code>studio-7080106838-23904</code>.
           </p>
         </div>
-        <Button variant="outline" onClick={() => window.location.reload()}>Tentar Reconectar</Button>
-      </div>
-    );
-  }
-
-  if (!isProfileLoading && role && !canAccess) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 text-center space-y-6">
-        <div className="h-20 w-20 rounded-full bg-rose-500/10 flex items-center justify-center">
-          <AlertTriangle className="h-10 w-10 text-rose-500" />
-        </div>
-        <div className="space-y-2">
-          <h2 className="text-2xl font-black text-white font-headline">Acesso Negado</h2>
-          <p className="text-slate-400 max-w-md mx-auto">
-            Seu perfil não possui permissão para acessar o módulo de reembolsos.
-          </p>
-        </div>
+        <Button variant="outline" onClick={() => window.location.reload()} className="border-white/10 text-white">Tentar Reconectar</Button>
       </div>
     );
   }
@@ -418,8 +400,8 @@ export default function ReembolsosPage() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <TabsList className="bg-white/5 p-1 border border-white/10">
-            <TabsTrigger value="meus" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Meus Pedidos</TabsTrigger>
-            {canManage && <TabsTrigger value="todos" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Fila Administrativa (Todos)</TabsTrigger>}
+            <TabsTrigger value="meus" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold">Meus Pedidos</TabsTrigger>
+            {canManage && <TabsTrigger value="todos" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold">Fila Administrativa (Todos)</TabsTrigger>}
           </TabsList>
           
           {activeTab === 'todos' && canManage && (
@@ -589,15 +571,15 @@ function ReimbursementTable({
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-white/50"><MoreVertical className="h-4 w-4" /></Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="bg-card border-border">
+                      <DropdownMenuContent align="end" className="bg-[#0f172a] border-white/10 text-white">
                         <DropdownMenuLabel className="text-white">Opções</DropdownMenuLabel>
-                        <DropdownMenuItem className="text-slate-300" onSelect={() => window.print()}>
+                        <DropdownMenuItem className="text-slate-300 focus:bg-white/5 focus:text-white" onSelect={() => window.print()}>
                           <FileText className="mr-2 h-4 w-4" /> Imprimir Comprovante
                         </DropdownMenuItem>
                         {((canManage || (r.userId === currentUserId && r.status === 'SOLICITADO'))) && (
                           <>
                             <DropdownMenuSeparator className="bg-white/10" />
-                            <DropdownMenuItem className="text-rose-500" onClick={() => onDelete?.(r.id)}>
+                            <DropdownMenuItem className="text-rose-500 focus:bg-rose-500/10 focus:text-rose-400" onClick={() => onDelete?.(r.id)}>
                               <Trash2 className="mr-2 h-4 w-4" /> Excluir Registro
                             </DropdownMenuItem>
                           </>
