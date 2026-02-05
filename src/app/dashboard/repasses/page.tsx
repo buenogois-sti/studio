@@ -287,7 +287,6 @@ function ManageCreditsDialog({
         </DialogFooter>
       </DialogContent>
 
-      {/* Internal Dialog for Editing */}
       <Dialog open={!!editingCredit} onOpenChange={(o) => !o && setEditingCredit(null)}>
         <DialogContent className="bg-card border-border sm:max-w-md">
           <DialogHeader>
@@ -302,7 +301,6 @@ function ManageCreditsDialog({
         </DialogContent>
       </Dialog>
 
-      {/* Internal Dialog for Manual Add */}
       <Dialog open={isAdding} onOpenChange={setIsAdding}>
         <DialogContent className="bg-card border-border sm:max-w-md">
           <DialogHeader>
@@ -424,8 +422,6 @@ function ManualCreditForm({ onSubmit, isSaving }: { onSubmit: (vals: any) => voi
   );
 }
 
-// --- Voucher & Payment Logic ---
-
 function StaffVoucherDialog({ 
   staff, 
   credits, 
@@ -453,7 +449,6 @@ function StaffVoucherDialog({
       <DialogContent className="sm:max-w-4xl bg-white text-slate-900 p-0 overflow-hidden border-none shadow-none print:max-w-full">
         <ScrollArea className="max-h-[90vh] print:max-h-full">
           <div className="p-10 space-y-8 bg-white print:p-0" id="staff-voucher-print-area">
-            {/* Header Timbrado */}
             <div className="flex justify-between items-center border-b-2 border-slate-900 pb-4">
               <div className="flex items-center gap-3">
                 <div className="bg-slate-900 p-1.5 rounded-lg print:bg-transparent">
@@ -470,7 +465,6 @@ function StaffVoucherDialog({
               </div>
             </div>
 
-            {/* Texto do Recibo */}
             <div className="py-6 space-y-6 text-sm leading-relaxed text-justify">
               <p>
                 Declaramos para os devidos fins que o escritório <strong className="text-slate-900">Bueno Gois Advogados e Associados</strong> efetuou o pagamento da importância líquida de <strong className="text-lg font-black underline">{formattedTotal}</strong> ao colaborador(a) <strong className="text-slate-900">{staff.firstName} {staff.lastName}</strong>, portador(a) do CPF/CNPJ <strong className="text-slate-900">{staff.oabNumber ? `OAB ${staff.oabNumber}` : '---'}</strong>.
@@ -511,7 +505,6 @@ function StaffVoucherDialog({
               )}
             </div>
 
-            {/* Dados Bancários de Destino */}
             <div className="grid grid-cols-2 gap-8 text-[10px] bg-slate-50 p-4 rounded-xl border border-slate-100">
               <div>
                 <p className="font-black uppercase text-slate-400 mb-1">Destino do Crédito</p>
@@ -524,10 +517,8 @@ function StaffVoucherDialog({
               </div>
             </div>
 
-            {/* Assinaturas */}
             <div className="pt-12 flex flex-col items-center gap-12">
               <p className="text-sm font-bold text-slate-900">São Bernardo do Campo, {todayFormatted}</p>
-              
               <div className="grid grid-cols-2 gap-12 w-full max-w-2xl">
                 <div className="text-center">
                   <div className="w-full border-t border-slate-900 mb-1" />
@@ -624,7 +615,6 @@ function RepassePaymentDialog({
             </div>
           </DialogHeader>
 
-          {/* Card de Valor de Destaque */}
           <div className="relative group">
             <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500/20 to-primary/20 rounded-3xl blur opacity-25 group-hover:opacity-40 transition duration-1000"></div>
             <div className="relative p-8 rounded-3xl bg-white/5 border border-white/10 text-center space-y-2">
@@ -921,7 +911,6 @@ export default function RepassesPage() {
   const [stats, setStats] = React.useState({ totalPending: 0, totalPaidMonth: 0, staffCount: 0, totalRetained: 0 });
   const [refreshKey, setRefreshKey] = React.useState(0);
 
-  // Estados para o Comprovante (Voucher)
   const [isVoucherOpen, setIsVoucherOpen] = React.useState(false);
   const [voucherData, setVoucherData] = React.useState<{ staff: Staff | null, credits: any[], total: number, date?: Date }>({
     staff: null,
@@ -932,7 +921,6 @@ export default function RepassesPage() {
   const loadStats = React.useCallback(async () => {
     if (!firestore) return;
     
-    // Buscar todos os staff
     const staffSnap = await getDocs(collection(firestore, 'staff'));
     let pending = 0;
     let retained = 0;
@@ -946,7 +934,6 @@ export default function RepassesPage() {
       });
     }
     
-    // Pagos no mês
     const startOfCurrentMonth = startOfMonth(new Date());
     const paidSnap = await getDocs(query(
       collection(firestore, 'financial_titles'), 
@@ -991,12 +978,9 @@ export default function RepassesPage() {
     if (!firestore || !title.paidToStaffId) return;
     
     try {
-      // 1. Buscar dados do profissional
       const staffDoc = await getDocs(query(collection(firestore, 'staff'), where('id', '==', title.paidToStaffId)));
       const staff = staffDoc.docs[0]?.exists() ? { id: staffDoc.docs[0].id, ...staffDoc.docs[0].data() } as Staff : null;
       
-      // 2. Buscar créditos vinculados a este pagamento (se existirem metadados)
-      // Como a relação crédito <-> título é complexa, no histórico mostramos o modo Simples com o valor do título.
       setVoucherData({
         staff,
         credits: [{ description: title.description, value: title.value, type: 'HONORARIOS' }],
@@ -1049,7 +1033,7 @@ export default function RepassesPage() {
         <Card className="bg-white/5 border-white/10">
           <CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-slate-400">Total Equipe</CardTitle></CardHeader>
           <CardContent className="p-4 pt-0"><p className="text-2xl font-black text-white">{stats.staffCount} Profissionais</p></CardContent>
-        </div>
+        </Card>
       </div>
 
       <Tabs defaultValue="lawyers" className="w-full">
