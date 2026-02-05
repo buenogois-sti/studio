@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -249,7 +250,6 @@ export default function ReembolsosPage() {
 
   const role = userProfile?.role;
   const canManage = role === 'admin' || role === 'financial';
-  const canAccess = role ? ['admin', 'financial', 'lawyer', 'assistant'].includes(role) : false;
   const currentUserId = user?.uid || null;
   const currentUserName = userProfile ? `${userProfile.firstName} ${userProfile.lastName}`.trim() : (session?.user?.name || 'Usuário');
 
@@ -259,7 +259,7 @@ export default function ReembolsosPage() {
     }
   }, [canManage, activeTab]);
 
-  // LOGICA 1: Consulta ordenada pela data da despesa (mais nova primeiro)
+  // Consulta para "Meus Pedidos" com ordenação descendente por data da despesa
   const myReimbursementsQuery = useMemoFirebase(
     () => (firestore && currentUserId ? query(
       collection(firestore, 'reimbursements'),
@@ -268,17 +268,17 @@ export default function ReembolsosPage() {
     ) : null),
     [firestore, currentUserId]
   );
-  const { data: myData, isLoading: isLoadingMy } = useCollection<Reimbursement>(myReimbursementsQuery);
+  const { data: myData, isLoading: isLoadingMy, error: myError } = useCollection<Reimbursement>(myReimbursementsQuery);
 
-  // LOGICA 2: Consulta global para Financeiro/Admin ordenada por data da despesa
+  // Consulta global para Fila Administrativa
   const allReimbursementsQuery = useMemoFirebase(
-    () => (firestore && canManage && !isProfileLoading ? query(
+    () => (firestore && canManage ? query(
       collection(firestore, 'reimbursements'),
       orderBy('requestDate', 'desc')
     ) : null),
-    [firestore, canManage, isProfileLoading]
+    [firestore, canManage]
   );
-  const { data: allData, isLoading: isLoadingAll } = useCollection<Reimbursement>(allReimbursementsQuery);
+  const { data: allData, isLoading: isLoadingAll, error: allError } = useCollection<Reimbursement>(allReimbursementsQuery);
 
   const filteredAllData = React.useMemo(() => {
     if (!allData) return [];
@@ -312,7 +312,8 @@ export default function ReembolsosPage() {
     }
   };
 
-  const isLoading = isFirebaseLoading || isProfileLoading || (canManage && activeTab === 'todos' ? isLoadingAll : isLoadingMy);
+  const isLoading = isFirebaseLoading || isProfileLoading || (activeTab === 'todos' ? isLoadingAll : isLoadingMy);
+  const currentError = activeTab === 'todos' ? allError : myError;
 
   if (userError && (userError.message.includes('400') || userError.message.includes('custom-token'))) {
     return (
@@ -321,10 +322,9 @@ export default function ReembolsosPage() {
           <AlertTriangle className="h-10 w-10 text-rose-500" />
         </div>
         <div className="space-y-2">
-          <h2 className="text-2xl font-black text-white font-headline">Falha Crítica na Autenticação</h2>
+          <h2 className="text-2xl font-black text-white font-headline">Falha na Autenticação</h2>
           <p className="text-slate-400 max-w-md mx-auto">
-            O servidor tentou gerar um acesso para um projeto diferente do atual. 
-            <strong> Solução:</strong> Atualize a variável <code>FIREBASE_SERVICE_ACCOUNT_JSON</code> no seu servidor com a chave do projeto <code>studio-7080106838-23904</code>.
+            O servidor está sincronizado com um projeto diferente. Verifique as chaves do Firebase.
           </p>
         </div>
         <Button variant="outline" onClick={() => window.location.reload()} className="border-white/10 text-white">Tentar Reconectar</Button>
@@ -333,7 +333,7 @@ export default function ReembolsosPage() {
   }
 
   const stats = React.useMemo(() => {
-    const list = canManage && activeTab === 'todos' ? allData : myData;
+    const list = activeTab === 'todos' ? allData : myData;
     if (!list) return { total: 0, pending: 0, paid: 0 };
     return list.reduce((acc, r) => {
       acc.total += r.value;
@@ -341,7 +341,7 @@ export default function ReembolsosPage() {
       if (r.status === 'REEMBOLSADO') acc.paid += r.value;
       return acc;
     }, { total: 0, pending: 0, paid: 0 });
-  }, [myData, allData, canManage, activeTab]);
+  }, [myData, allData, activeTab]);
 
   return (
     <div className="flex flex-col gap-8">
@@ -416,6 +416,25 @@ export default function ReembolsosPage() {
             </div>
           )}
         </div>
+
+        {currentError && (
+          <div className="mb-6">
+            <Alert variant="destructive" className="bg-rose-500/10 border-rose-500/20 text-rose-400">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>Erro na Consulta ao Banco de Dados</AlertTitle>
+              <AlertDescription className="text-xs mt-2 space-y-2">
+                <p>Esta visualização exige um índice composto no Firebase que ainda não foi ativado.</p>
+                {currentError.message.includes('index') && (
+                  <Button variant="outline" size="sm" className="mt-2 text-white border-white/20 h-8" asChild>
+                    <a href="https://console.firebase.google.com/v1/r/project/studio-7080106838-23904/firestore/indexes?create_composite=CmBwcm9qZWN0cy9zdHVkaW8tNzA4MDEwNjgzOC0yMzkwNC9kYXRhYmFzZXMvKGRlZmF1bHQpL2NvbGxlY3Rpb25Hcm91cHMvcmVpbWJ1cnNlbWVudHMvaW5kZXhlcy9fEAEaCgoGdXNlcklkEAEaDwoLcmVxdWVzdERhdGUQAhoMCghfX25hbWVfXxAC" target="_blank">
+                      Criar Índice Automaticamente
+                    </a>
+                  </Button>
+                )}
+              </AlertDescription>
+            </Alert>
+          </div>
+        )}
 
         <TabsContent value="meus" className="mt-0">
           <ReimbursementTable 
