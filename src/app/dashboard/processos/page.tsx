@@ -19,13 +19,15 @@ import {
   RefreshCw,
   Timer,
   UserCheck,
-  Handshake,
   User,
   ExternalLink,
   Info,
   Building,
   Users,
-  FilePlus2
+  FilePlus2,
+  ChevronLeft,
+  ChevronRight,
+  Handshake
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
@@ -40,7 +42,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, doc, deleteDoc } from 'firebase/firestore';
+import { collection, doc, deleteDoc, query, limit } from 'firebase/firestore';
 import type { Process, Client, Staff, Hearing, FinancialEvent } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/use-toast';
@@ -61,6 +63,8 @@ const STATUS_CONFIG = {
   'Arquivado': { label: 'Arquivado', color: 'bg-slate-500/10 text-slate-400 border-slate-500/20', icon: Archive },
 };
 
+const ITEMS_PER_PAGE = 5;
+
 export default function ProcessosPage() {
   const [isSheetOpen, setIsSheetOpen] = React.useState(false);
   const [isTimelineOpen, setIsTimelineOpen] = React.useState(false);
@@ -69,18 +73,18 @@ export default function ProcessosPage() {
   const [isDeadlineOpen, setIsDeadlineOpen] = React.useState(false);
   const [editingProcess, setEditingProcess] = React.useState<Process | null>(null);
   const [selectedProcess, setSelectedProcess] = React.useState<Process | null>(null);
-  const [processToDelete, setProcessToDelete] = React.useState<Process | null>(null);
   const [isSyncing, setIsSyncing] = React.useState<string | null>(null);
   const [searchTerm, setSearchTerm] = React.useState('');
   const [eventProcess, setEventProcess] = React.useState<Process | null>(null);
   const [expandedProcessId, setExpandedProcessId] = React.useState<string | null>(null);
+  const [currentPage, setCurrentPage] = React.useState(1);
 
   const { firestore, isUserLoading } = useFirebase();
   const { toast } = useToast();
   const searchParams = useSearchParams();
   const clientIdFilter = searchParams.get('clientId');
 
-  const processesQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'processes') : null), [firestore]);
+  const processesQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'processes'), limit(100)) : null), [firestore]);
   const { data: processesData, isLoading: isLoadingProcesses } = useCollection<Process>(processesQuery);
 
   const hearingsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'hearings') : null), [firestore]);
@@ -126,6 +130,15 @@ export default function ProcessosPage() {
     });
   }, [processesData, searchTerm, clientIdFilter]);
 
+  const totalPages = Math.ceil(filteredProcesses.length / ITEMS_PER_PAGE);
+  const paginatedProcesses = React.useMemo(() => {
+    return filteredProcesses.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+  }, [filteredProcesses, currentPage]);
+
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, clientIdFilter]);
+
   const handleSyncProcess = React.useCallback(async (process: Process) => {
     setIsSyncing(process.id);
     try {
@@ -159,9 +172,10 @@ export default function ProcessosPage() {
       </div>
 
       <div className="grid gap-4">
-        {isLoading ? (
+        {isLoading && !paginatedProcesses.length ? (
           Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-48 w-full bg-card/50 rounded-2xl" />)
-        ) : filteredProcesses.map((p) => {
+        ) : paginatedProcesses.length > 0 ? (
+          paginatedProcesses.map((p) => {
             const client = clientsMap.get(p.clientId);
             const leadLawyer = p.leadLawyerId ? staffMap.get(p.leadLawyerId) : null;
             const statusInfo = STATUS_CONFIG[p.status || 'Ativo'];
@@ -354,7 +368,48 @@ export default function ProcessosPage() {
                 </CardContent>
               </Card>
             );
-        })}
+          })
+        ) : (
+          <div className="text-center py-20 bg-[#0f172a] rounded-2xl border-2 border-dashed border-white/5 opacity-40">
+            <FolderKanban className="h-12 w-12 mx-auto mb-4" />
+            <p className="font-bold text-white uppercase tracking-widest text-[10px]">Nenhum processo encontrado</p>
+          </div>
+        )}
+
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center gap-6 mt-8 py-4 border-t border-white/5">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => {
+                setCurrentPage(prev => Math.max(prev - 1, 1));
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }} 
+              disabled={currentPage === 1} 
+              className="bg-[#0f172a] border-border/50 text-white hover:bg-primary/10 hover:text-primary transition-all px-4"
+            >
+              <ChevronLeft className="h-4 w-4 mr-2" /> Anterior
+            </Button>
+            
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-black text-white bg-primary/10 px-2.5 py-1 rounded-md">Página {currentPage}</span>
+              <span className="text-sm text-muted-foreground font-medium">de {totalPages}</span>
+            </div>
+            
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => {
+                setCurrentPage(prev => Math.min(prev + 1, totalPages));
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }} 
+              disabled={currentPage === totalPages} 
+              className="bg-[#0f172a] border-border/50 text-white hover:bg-primary/10 hover:text-primary transition-all px-4"
+            >
+              Próxima <ChevronRight className="h-4 w-4 ml-2" />
+            </Button>
+          </div>
+        )}
       </div>
 
       <Sheet open={isSheetOpen} onOpenChange={(open) => { if (!open) setEditingProcess(null); setIsSheetOpen(open); }}>

@@ -6,14 +6,12 @@ import {
   PlusCircle,
   Search,
   Loader2,
-  FolderKanban,
   LayoutGrid,
   List,
   MessageSquare,
   Mail,
   Trash2,
   Edit,
-  FileUp,
   X,
   UserCheck,
   CheckCircle2,
@@ -42,7 +40,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/use-toast';
 import { syncClientToDrive } from '@/lib/drive';
 import { cn } from '@/lib/utils';
-import { VCFImportDialog } from '@/components/client/VCFImportDialog';
 import { ClientDetailsSheet } from '@/components/client/ClientDetailsSheet';
 import { searchClients } from '@/lib/client-actions';
 
@@ -57,7 +54,6 @@ const ITEMS_PER_PAGE = 9;
 export default function ClientsPage() {
   const [viewMode, setViewMode] = React.useState<'grid' | 'table'>('grid');
   const [isSheetOpen, setIsSheetOpen] = React.useState(false);
-  const [isVCFDialogOpen, setIsVCFDialogOpen] = React.useState(false);
   const [isDetailsOpen, setIsDetailsOpen] = React.useState(false);
   const [selectedClientForDetails, setSelectedClientForDetails] = React.useState<Client | null>(null);
   const [editingClient, setEditingClient] = React.useState<Client | null>(null);
@@ -74,18 +70,14 @@ export default function ClientsPage() {
   const { firestore } = useFirebase();
   const { data: session, status } = useSession();
 
-  // OTIMIZAÇÃO: Busca básica limitada para evitar baixar milhares de documentos
   const clientsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'clients'), limit(100)) : null), [firestore]);
   const { data: clientsData, isLoading: isLoadingClients } = useCollection<Client>(clientsQuery);
   const clients = clientsData || [];
 
-  // Busca de processos vinculada apenas aos IDs que estão na tela (seria o ideal), 
-  // mas aqui mantemos o mapa de contagem básico limitado.
   const processesQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'processes'), limit(200)) : null), [firestore]);
   const { data: processesData, isLoading: isLoadingProcesses } = useCollection<Process>(processesQuery);
   const processes = processesData || [];
 
-  // OTIMIZAÇÃO: Busca server-side com debounce para evitar leituras desnecessárias
   React.useEffect(() => {
     if (!searchTerm.trim()) {
       setSearchResults(null);
@@ -296,15 +288,35 @@ export default function ClientsPage() {
             )}
 
             {totalPages > 1 && (
-              <div className="flex items-center justify-center gap-4 mt-8">
-                <Button variant="outline" size="sm" onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} disabled={currentPage === 1} className="bg-card border-border/50 text-white">
+              <div className="flex items-center justify-center gap-6 mt-12 py-4 border-t border-white/5">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => {
+                    setCurrentPage(prev => Math.max(prev - 1, 1));
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }} 
+                  disabled={currentPage === 1} 
+                  className="bg-[#0f172a] border-border/50 text-white hover:bg-primary/10 hover:text-primary transition-all px-4"
+                >
                   <ChevronLeft className="h-4 w-4 mr-2" /> Anterior
                 </Button>
+                
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold text-white">Página {currentPage}</span>
-                  <span className="text-sm text-muted-foreground">de {totalPages}</span>
+                  <span className="text-sm font-black text-white bg-primary/10 px-2.5 py-1 rounded-md">Página {currentPage}</span>
+                  <span className="text-sm text-muted-foreground font-medium">de {totalPages}</span>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} disabled={currentPage === totalPages} className="bg-card border-border/50 text-white">
+                
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => {
+                    setCurrentPage(prev => Math.min(prev + 1, totalPages));
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }} 
+                  disabled={currentPage === totalPages} 
+                  className="bg-[#0f172a] border-border/50 text-white hover:bg-primary/10 hover:text-primary transition-all px-4"
+                >
                   Próxima <ChevronRight className="h-4 w-4 ml-2" />
                 </Button>
               </div>
@@ -336,7 +348,6 @@ export default function ClientsPage() {
       </Sheet>
 
       <ClientDetailsSheet client={selectedClientForDetails} open={isDetailsOpen} onOpenChange={setIsDetailsOpen} />
-      <VCFImportDialog open={isVCFDialogOpen} onOpenChange={setIsVCFDialogOpen} onImportSuccess={() => {}} />
 
       <AlertDialog open={!!clientToDelete} onOpenChange={(open) => !isDeleting && !open && setClientToDelete(null)}>
         <AlertDialogContent className="bg-[#0f172a] border-border"><AlertDialogHeader><AlertDialogTitle className="text-white">Excluir Cliente?</AlertDialogTitle><AlertDialogDescription className="text-slate-400">Isso removerá os dados de <strong>{clientToDelete?.firstName} {clientToDelete?.lastName}</strong> permanentemente.</AlertDialogDescription></AlertDialogHeader>
