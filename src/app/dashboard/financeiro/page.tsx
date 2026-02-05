@@ -1,4 +1,3 @@
-
 'use client';
 import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -26,7 +25,8 @@ import {
   Wallet,
   ShieldCheck,
   CheckCircle2,
-  Coins
+  Coins,
+  Scale
 } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, Timestamp, query, orderBy, deleteDoc, doc, getDocs, where } from 'firebase/firestore';
@@ -256,21 +256,26 @@ function ReceiptDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl bg-white text-slate-900 p-0 overflow-hidden border-none shadow-2xl">
-        <div className="p-8 space-y-6 print:p-0">
-          <div className="flex justify-between items-start border-b-2 border-slate-900 pb-6">
-            <div className="space-y-1">
-              <h2 className="text-xl font-bold uppercase tracking-tighter text-slate-900">Bueno Gois Advogados</h2>
-              <p className="text-[10px] text-slate-600 uppercase font-bold">CNPJ: 00.000.000/0001-00 | OAB/SP 000.000</p>
-              <p className="text-[10px] text-slate-600">Rua Marechal Deodoro, 1594 - SBC/SP</p>
+      <DialogContent className="sm:max-w-4xl bg-white text-slate-900 p-0 overflow-hidden border-none shadow-2xl">
+        <div className="p-12 space-y-8 print:p-0">
+          <div className="flex justify-between items-start border-b-4 border-slate-900 pb-8">
+            <div className="flex items-center gap-4">
+              <div className="bg-slate-900 p-3 rounded-xl">
+                <img src="/logo.png" alt="Logo" className="h-12 w-auto brightness-0 invert" />
+              </div>
+              <div className="space-y-1">
+                <h2 className="text-2xl font-black uppercase tracking-tighter text-slate-900">Bueno Gois Advogados</h2>
+                <p className="text-[10px] text-slate-600 uppercase font-bold">CNPJ: 00.000.000/0001-00 | OAB/SP 000.000</p>
+                <p className="text-[10px] text-slate-600">Rua Marechal Deodoro, 1594 - SBC/SP</p>
+              </div>
             </div>
             <div className="text-right">
-              <div className="text-2xl font-black text-slate-900 leading-none">RECIBO DE REPASSE</div>
-              <div className="text-[10px] font-bold text-slate-500 uppercase mt-1">Controle: {title.id.substring(0, 8).toUpperCase()}</div>
+              <div className="text-3xl font-black text-slate-900 leading-none">RECIBO DE REPASSE</div>
+              <div className="text-xs font-bold text-slate-500 uppercase mt-2 tracking-widest">Controle: {title.id.substring(0, 8).toUpperCase()}</div>
             </div>
           </div>
 
-          <div className="py-4 space-y-6 text-base leading-relaxed text-justify">
+          <div className="py-6 space-y-6 text-lg leading-relaxed text-justify text-slate-800">
             <p>
               Declaramos para os devidos fins que o escritório <strong>Bueno Gois Advogados e Associados</strong> recebeu de <strong>{opposingParty}</strong> a importância bruta de <strong>{formattedTotal}</strong>, referente ao pagamento de <i>{title.description}</i> no âmbito do processo judicial nº <strong>{process?.processNumber || 'N/A'}</strong>.
             </p>
@@ -280,57 +285,127 @@ function ReceiptDialog({
             </p>
           </div>
 
-          <div className="bg-slate-50 border-2 border-slate-200 rounded-xl overflow-hidden my-6">
-            <table className="w-full text-sm">
+          <div className="bg-slate-50 border-2 border-slate-200 rounded-2xl overflow-hidden my-8">
+            <table className="w-full text-base">
               <thead className="bg-slate-100 border-b border-slate-200">
                 <tr>
-                  <th className="px-4 py-3 text-left font-bold uppercase text-[10px] tracking-widest text-slate-600">Discriminação das Verbas</th>
-                  <th className="px-4 py-3 text-right font-bold uppercase text-[10px] tracking-widest text-slate-600">Valor (R$)</th>
+                  <th className="px-6 py-4 text-left font-black uppercase text-xs tracking-widest text-slate-600">Discriminação das Verbas</th>
+                  <th className="px-6 py-4 text-right font-black uppercase text-xs tracking-widest text-slate-600">Valor (R$)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
                 <tr>
-                  <td className="px-4 py-3 font-medium">Valor Bruto Recebido do Réu</td>
-                  <td className="px-4 py-3 text-right font-bold">{formattedTotal}</td>
+                  <td className="px-6 py-4 font-semibold">Valor Bruto Recebido (Proveniente do Réu)</td>
+                  <td className="px-6 py-4 text-right font-bold">{formattedTotal}</td>
                 </tr>
                 <tr className="text-rose-600 bg-rose-50/30">
-                  <td className="px-4 py-3 font-medium">(-) Honorários Advocatícios Contratuais ({feePercent}%)</td>
-                  <td className="px-4 py-3 text-right font-bold italic">({formattedFee})</td>
+                  <td className="px-6 py-4 font-semibold">(-) Honorários Advocatícios Contratuais ({feePercent}%)</td>
+                  <td className="px-6 py-4 text-right font-bold italic">({formattedFee})</td>
                 </tr>
                 <tr className="bg-emerald-50 font-black text-emerald-900 border-t-2 border-emerald-200">
-                  <td className="px-4 py-3 uppercase tracking-tighter">Valor Líquido a Repassar ao Cliente</td>
-                  <td className="px-4 py-3 text-right text-lg">{formattedNet}</td>
+                  <td className="px-6 py-5 uppercase tracking-tighter text-lg">Valor Líquido a Repassar ao Cliente</td>
+                  <td className="px-6 py-5 text-right text-2xl">{formattedNet}</td>
                 </tr>
               </tbody>
             </table>
           </div>
 
-          <div className="text-sm text-center italic text-slate-600 py-4">
-            "O cliente declara ter conferido os valores acima e dá plena, rasa e geral quitação para nada mais reclamar quanto ao objeto deste pagamento."
+          <div className="text-sm text-center italic text-slate-500 py-6 border-y border-slate-100">
+            "O cliente declara ter conferido os valores acima e dá plena, rasa e geral quitação para nada mais reclamar quanto ao objeto deste pagamento específico."
           </div>
 
-          <div className="pt-8 flex flex-col items-center gap-12">
-            <p className="text-sm font-bold">São Bernardo do Campo, {today}</p>
+          <div className="pt-12 flex flex-col items-center gap-16">
+            <p className="text-lg font-bold">São Bernardo do Campo, {today}</p>
             
-            <div className="grid grid-cols-2 gap-12 w-full max-w-lg pt-4">
+            <div className="grid grid-cols-2 gap-20 w-full max-w-2xl pt-8">
               <div className="flex flex-col items-center text-center">
-                <div className="w-full border-t border-slate-900 mb-2" />
-                <p className="text-[9px] font-black uppercase tracking-widest">Bueno Gois Advogados</p>
-                <p className="text-[8px] text-slate-500">Representante Legal</p>
+                <div className="w-full border-t-2 border-slate-900 mb-3" />
+                <p className="text-xs font-black uppercase tracking-widest">Bueno Gois Advogados</p>
+                <p className="text-[10px] text-slate-500 uppercase font-bold">Representante Legal</p>
               </div>
               <div className="flex flex-col items-center text-center">
-                <div className="w-full border-t border-slate-900 mb-2" />
-                <p className="text-[9px] font-black uppercase tracking-widest">{client ? `${client.firstName} ${client.lastName}` : 'Beneficiário'}</p>
-                <p className="text-[8px] text-slate-500">Cliente / Beneficiário</p>
+                <div className="w-full border-t-2 border-slate-900 mb-3" />
+                <p className="text-xs font-black uppercase tracking-widest">{client ? `${client.firstName} ${client.lastName}` : 'Beneficiário'}</p>
+                <p className="text-[10px] text-slate-500 uppercase font-bold">Assinatura do Cliente</p>
               </div>
             </div>
           </div>
         </div>
 
-        <DialogFooter className="p-4 bg-slate-100 border-t print:hidden">
+        <DialogFooter className="p-6 bg-slate-100 border-t print:hidden">
           <Button variant="outline" onClick={() => onOpenChange(false)} className="text-slate-600 border-slate-300">Fechar Janela</Button>
-          <Button onClick={handlePrint} className="gap-2 bg-slate-900 text-white hover:bg-slate-800">
+          <Button onClick={handlePrint} className="gap-2 bg-slate-900 text-white hover:bg-slate-800 h-12 px-8 font-black uppercase tracking-widest text-xs">
             <Printer className="h-4 w-4" /> Imprimir Documento
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function HonorariosReceiptDialog({ 
+  title, 
+  client,
+  open, 
+  onOpenChange 
+}: { 
+  title: FinancialTitle | null; 
+  client?: Client; 
+  open: boolean; 
+  onOpenChange: (open: boolean) => void 
+}) {
+  if (!title) return null;
+
+  const handlePrint = () => { window.print(); };
+  
+  const feePercent = 30; 
+  const feeValue = title.value * (feePercent / 100);
+  const formattedFee = feeValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const today = format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-4xl bg-white text-slate-900 p-0 overflow-hidden border-none shadow-2xl">
+        <div className="p-12 space-y-8 print:p-0">
+          <div className="flex justify-between items-start border-b-4 border-slate-900 pb-8">
+            <div className="flex items-center gap-4">
+              <div className="bg-slate-900 p-3 rounded-xl">
+                <img src="/logo.png" alt="Logo" className="h-12 w-auto brightness-0 invert" />
+              </div>
+              <div className="space-y-1">
+                <h2 className="text-2xl font-black uppercase tracking-tighter text-slate-900">Bueno Gois Advogados</h2>
+                <p className="text-[10px] text-slate-600 uppercase font-bold">OAB/SP 000.000 | CONTABILIDADE INTERNA</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-3xl font-black text-slate-900 leading-none">RECIBO DE HONORÁRIOS</div>
+              <div className="text-xs font-bold text-slate-500 mt-2">DOC: {title.id.substring(0, 8).toUpperCase()}</div>
+            </div>
+          </div>
+
+          <div className="py-8 space-y-8 text-xl leading-relaxed text-justify">
+            <p>
+              Recebemos de <strong>{client ? `${client.firstName} ${client.lastName}` : 'N/A'}</strong> a importância de <strong>{formattedFee}</strong>, referente aos honorários advocatícios contratuais de {feePercent}% incidentes sobre o recebimento de <i>{title.description}</i>.
+            </p>
+            <p className="text-sm text-slate-500 uppercase font-bold tracking-widest">
+              Natureza da Verba: Honorários Advocatícios de Êxito / Quota Litis.
+            </p>
+          </div>
+
+          <div className="pt-20 flex flex-col items-center gap-16">
+            <p className="text-lg font-bold">São Bernardo do Campo, {today}</p>
+            <div className="w-full max-w-md text-center">
+              <div className="w-full border-t-2 border-slate-900 mb-3" />
+              <p className="text-sm font-black uppercase tracking-widest text-slate-900">Bueno Gois Advogados e Associados</p>
+              <p className="text-xs text-slate-500 font-bold uppercase mt-1">Prestador de Serviços</p>
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter className="p-6 bg-slate-50 border-t print:hidden">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Fechar</Button>
+          <Button onClick={handlePrint} className="gap-2 bg-slate-900 text-white h-12 px-8 font-black uppercase text-xs">
+            <Printer className="h-4 w-4" /> Imprimir Recibo de Honorários
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -539,6 +614,7 @@ export default function FinanceiroPage() {
   const [refreshKey, setRefreshKey] = React.useState(0);
   const [isProcessing, setIsProcessing] = React.useState<string | null>(null);
   const [receiptTitle, setReceiptTitle] = React.useState<FinancialTitle | null>(null);
+  const [honorariosTitle, setHonorariosTitle] = React.useState<FinancialTitle | null>(null);
   const { toast } = useToast();
 
   const titlesQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'financial_titles'), orderBy('dueDate', 'desc')) : null), [firestore, refreshKey]);
@@ -553,18 +629,22 @@ export default function FinanceiroPage() {
   const processesMap = React.useMemo(() => new Map(processesData?.map(p => [p.id, p])), [processesData]);
   
   const stats = React.useMemo(() => {
-    if (!titlesData) return { totalReceitas: 0, totalDespesas: 0, pendenteReceita: 0, pendenteDespesa: 0, aRepassar: 0 };
+    if (!titlesData) return { totalReceitas: 0, totalDespesas: 0, pendenteReceita: 0, pendenteDespesa: 0, officeRevenue: 0 };
     return titlesData.reduce((acc, t) => {
       const val = t.value || 0;
       if (t.type === 'RECEITA') {
-        if (t.status === 'PAGO') acc.totalReceitas += val;
-        else acc.pendenteReceita += val;
+        if (t.status === 'PAGO') {
+          acc.totalReceitas += val;
+          acc.officeRevenue += (val * 0.3); // 30% de honorários como receita real
+        } else {
+          acc.pendenteReceita += val;
+        }
       } else {
         if (t.status === 'PAGO') acc.totalDespesas += val;
         else acc.pendenteDespesa += val;
       }
       return acc;
-    }, { totalReceitas: 0, totalDespesas: 0, pendenteReceita: 0, pendenteDespesa: 0, aRepassar: 0 });
+    }, { totalReceitas: 0, totalDespesas: 0, pendenteReceita: 0, pendenteDespesa: 0, officeRevenue: 0 });
   }, [titlesData]);
 
   const handleUpdateStatus = async (id: string, status: 'PAGO' | 'PENDENTE') => {
@@ -603,7 +683,7 @@ export default function FinanceiroPage() {
             <TableHead className="text-muted-foreground">Descrição</TableHead>
             <TableHead className="text-muted-foreground">Vencimento</TableHead>
             <TableHead className="text-center text-muted-foreground">Status</TableHead>
-            <TableHead className="text-right text-muted-foreground">Valor</TableHead>
+            <TableHead className="text-right text-muted-foreground">Valor Bruto</TableHead>
             <TableHead className="text-right text-muted-foreground">Ações</TableHead>
           </TableRow>
         </TableHeader>
@@ -645,7 +725,7 @@ export default function FinanceiroPage() {
                         {isProcessing === t.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreVertical className="h-4 w-4" />}
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="bg-card border-border w-52">
+                    <DropdownMenuContent align="end" className="bg-card border-border w-64">
                       <DropdownMenuLabel className="text-white text-[10px] font-black uppercase">Gerenciar Título</DropdownMenuLabel>
                       {t.status === 'PENDENTE' ? (
                         <DropdownMenuItem onClick={() => handleUpdateStatus(t.id, 'PAGO')}>
@@ -658,9 +738,15 @@ export default function FinanceiroPage() {
                       )}
                       
                       {type === 'RECEITA' && t.status === 'PAGO' && (
-                        <DropdownMenuItem onClick={() => setReceiptTitle(t)}>
-                          <Receipt className="mr-2 h-4 w-4 text-primary" /> Emitir Recibo
-                        </DropdownMenuItem>
+                        <>
+                          <DropdownMenuSeparator className="bg-white/10" />
+                          <DropdownMenuItem onClick={() => setReceiptTitle(t)}>
+                            <Users className="mr-2 h-4 w-4 text-blue-400" /> Recibo de Repasse (Cliente)
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setHonorariosTitle(t)}>
+                            <Scale className="mr-2 h-4 w-4 text-primary" /> Recibo de Honorários (Escritório)
+                          </DropdownMenuItem>
+                        </>
                       )}
 
                       <DropdownMenuSeparator className="bg-white/10" />
@@ -696,8 +782,12 @@ export default function FinanceiroPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card className="bg-primary/5 border-primary/20 border-2">
+          <CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-primary">Receita Real (Honorários 30%)</CardTitle></CardHeader>
+          <CardContent className="p-4 pt-0"><p className="text-2xl font-black text-primary tabular-nums">{formatCurrency(stats.officeRevenue)}</p></CardContent>
+        </Card>
         <Card className="bg-emerald-500/5 border-emerald-500/10">
-          <CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-emerald-400">Total Recebido (Mês)</CardTitle></CardHeader>
+          <CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-emerald-400">Total Bruto Recebido</CardTitle></CardHeader>
           <CardContent className="p-4 pt-0"><p className="text-2xl font-black text-emerald-400 tabular-nums">{formatCurrency(stats.totalReceitas)}</p></CardContent>
         </Card>
         <Card className="bg-amber-500/5 border-amber-500/10">
@@ -705,12 +795,8 @@ export default function FinanceiroPage() {
           <CardContent className="p-4 pt-0"><p className="text-2xl font-black text-amber-400 tabular-nums">{formatCurrency(stats.pendenteReceita)}</p></CardContent>
         </Card>
         <Card className="bg-rose-500/5 border-rose-500/10">
-          <CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-rose-400">Total Pago (Mês)</CardTitle></CardHeader>
+          <CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-rose-400">Total de Custos (Saídas)</CardTitle></CardHeader>
           <CardContent className="p-4 pt-0"><p className="text-2xl font-black text-rose-400 tabular-nums">{formatCurrency(stats.totalDespesas)}</p></CardContent>
-        </Card>
-        <Card className="bg-blue-500/5 border-blue-500/10">
-          <CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-blue-400">Saldo Operacional</CardTitle></CardHeader>
-          <CardContent className="p-4 pt-0"><p className="text-2xl font-black text-white tabular-nums">{formatCurrency(stats.totalReceitas - stats.totalDespesas)}</p></CardContent>
         </Card>
       </div>
 
@@ -768,6 +854,13 @@ export default function FinanceiroPage() {
         process={receiptTitle?.processId ? processesMap.get(receiptTitle.processId) : undefined}
         open={!!receiptTitle} 
         onOpenChange={(open) => !open && setReceiptTitle(null)} 
+      />
+
+      <HonorariosReceiptDialog 
+        title={honorariosTitle}
+        client={honorariosTitle?.clientId ? clientsMap.get(honorariosTitle.clientId) : undefined}
+        open={!!honorariosTitle}
+        onOpenChange={(open) => !open && setHonorariosTitle(null)}
       />
     </div>
   );
