@@ -324,7 +324,7 @@ export default function ReembolsosPage() {
       if (r.status === 'REEMBOLSADO') acc.paid += r.value;
       return acc;
     }, { total: 0, pending: 0, paid: 0 });
-  }, [myData, allData, isAdmin, activeTab]);
+  }, [myData, allData, canManage, activeTab]);
 
   return (
     <div className="flex flex-col gap-8">
