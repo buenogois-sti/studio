@@ -696,6 +696,23 @@ function RepassePaymentDialog({
   );
 }
 
+function RepasseValue({ staffId }: { staffId: string }) {
+  const { firestore } = useFirebase();
+  const [val, setVal] = React.useState(0);
+
+  React.useEffect(() => {
+    if (!firestore) return;
+    const creditsRef = collection(firestore, `staff/${staffId}/credits`);
+    const q = query(creditsRef, where('status', '==', 'DISPONIVEL'));
+    getDocs(q).then(snap => {
+      const total = snap.docs.reduce((sum, d) => sum + (d.data().value || 0), 0);
+      setVal(total);
+    });
+  }, [firestore, staffId]);
+
+  return <span className={cn("text-sm font-black", val > 0 ? "text-emerald-400" : "text-slate-500")}>{val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>;
+}
+
 function PayoutList({ filterRole, onRefresh, onPaid }: { filterRole?: string; onRefresh?: () => void; onPaid: (total: number, credits: any[], staff: Staff) => void }) {
   const { firestore } = useFirebase();
   const [selectedStaff, setSelectedStaff] = React.useState<Staff | null>(null);
@@ -831,23 +848,6 @@ function PayoutList({ filterRole, onRefresh, onPaid }: { filterRole?: string; on
       />
     </div>
   );
-}
-
-function RepasseValue({ staffId }: { staffId: string }) {
-  const { firestore } = useFirebase();
-  const [val, setVal] = React.useState(0);
-
-  React.useEffect(() => {
-    if (!firestore) return;
-    const creditsRef = collection(firestore, `staff/${staffId}/credits`);
-    const q = query(creditsRef, where('status', '==', 'DISPONIVEL'));
-    getDocs(q).then(snap => {
-      const total = snap.docs.reduce((sum, d) => sum + (d.data().value || 0), 0);
-      setVal(total);
-    });
-  }, [firestore, staffId]);
-
-  return <span className={cn("text-sm font-black", val > 0 ? "text-emerald-400" : "text-slate-500")}>{val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>;
 }
 
 function PaymentHistory({ onShowVoucher }: { onShowVoucher: (t: FinancialTitle) => void }) {
@@ -1076,73 +1076,5 @@ export default function RepassesPage() {
         onOpenChange={setIsVoucherOpen}
       />
     </div>
-  );
-}
-
-function RepasseValue({ staffId }: { staffId: string }) {
-  const { firestore } = useFirebase();
-  const [val, setVal] = React.useState(0);
-
-  React.useEffect(() => {
-    if (!firestore) return;
-    const creditsRef = collection(firestore, `staff/${staffId}/credits`);
-    const q = query(creditsRef, where('status', '==', 'DISPONIVEL'));
-    getDocs(q).then(snap => {
-      const total = snap.docs.reduce((sum, d) => sum + (d.data().value || 0), 0);
-      setVal(total);
-    });
-  }, [firestore, staffId]);
-
-  return <span className={cn("text-sm font-black", val > 0 ? "text-emerald-400" : "text-slate-500")}>{val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>;
-}
-
-function PaymentHistory({ onShowVoucher }: { onShowVoucher: (t: FinancialTitle) => void }) {
-  const { firestore } = useFirebase();
-  const historyQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'financial_titles'), where('origin', '==', 'HONORARIOS_PAGOS'), orderBy('paymentDate', 'desc'), limit(50)) : null), [firestore]);
-  const { data: history, isLoading } = useCollection<FinancialTitle>(historyQuery);
-
-  if (isLoading) return <Skeleton className="h-64 w-full bg-white/5" />;
-
-  return (
-    <Card className="bg-[#0f172a] border-white/5 overflow-hidden">
-      <Table>
-        <TableHeader>
-          <TableRow className="border-white/5">
-            <TableHead className="text-muted-foreground">Data Pagamento</TableHead>
-            <TableHead className="text-muted-foreground">Descrição</TableHead>
-            <TableHead className="text-right text-muted-foreground">Valor Liquidado</TableHead>
-            <TableHead className="text-right text-muted-foreground">Ações</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {history?.map(t => (
-            <TableRow key={t.id} className="border-white/5 hover:bg-white/5">
-              <TableCell className="text-xs text-slate-400">
-                {t.paymentDate && format(t.paymentDate.toDate(), 'dd/MM/yyyy')}
-              </TableCell>
-              <TableCell>
-                <div className="flex flex-col">
-                  <span className="font-bold text-white">{t.description}</span>
-                  <span className="text-[9px] text-muted-foreground uppercase font-black">Ref ID: {t.id.substring(0, 8)}</span>
-                </div>
-              </TableCell>
-              <TableCell className="text-right font-black text-emerald-400">
-                {t.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-              </TableCell>
-              <TableCell className="text-right">
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-white/50" onClick={() => onShowVoucher(t)}>
-                  <Printer className="h-4 w-4" />
-                </Button>
-              </TableCell>
-            </TableRow>
-          ))}
-          {history?.length === 0 && (
-            <TableRow>
-              <TableCell colSpan={4} className="h-24 text-center text-muted-foreground italic">Nenhum pagamento registrado no histórico.</TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
-    </Card>
   );
 }

@@ -444,7 +444,7 @@ export function StaffDetailsSheet({ staff, processes, open, onOpenChange }: Staf
             </div>
             <div className="font-mono opacity-50">ID: {staff.id}</div>
           </div>
-        </div>
+        </Tabs>
       </SheetContent>
     </Sheet>
   );
