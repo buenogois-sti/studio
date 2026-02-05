@@ -98,10 +98,12 @@
     overflow: visible !important;
   }
 
-  /* Hide ALL standard UI and Layout elements */
+  /* Hide ALL standard UI and Layout elements including main content */
   header, 
   aside, 
   nav, 
+  main,
+  footer,
   button, 
   .no-print, 
   [role="status"],
@@ -154,6 +156,7 @@
     background: white !important;
     visibility: visible !important;
     display: block !important;
+    box-shadow: none !important;
   }
 
   /* Ensure colors are printed accurately */
