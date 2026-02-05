@@ -257,97 +257,93 @@ function ReceiptDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-4xl bg-slate-50 text-slate-900 p-0 overflow-hidden border-none shadow-2xl">
+      <DialogContent className="sm:max-w-4xl bg-white text-slate-900 p-0 overflow-hidden border-none shadow-2xl">
         <ScrollArea className="max-h-[90vh]">
-          <div className="p-8 md:p-12 space-y-8 bg-white print:p-0 print:shadow-none print:m-0" id="receipt-print-area">
-            {/* Cabeçalho Profissional */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b-2 border-slate-900 pb-8 gap-6">
-              <div className="flex items-center gap-4">
-                <div className="bg-slate-900 p-2 rounded-lg print:bg-transparent">
-                  <img src="/logo.png" alt="Logo Bueno Gois" className="h-14 w-auto print:brightness-0" />
+          <div className="p-10 space-y-6 bg-white print:p-0 print:shadow-none print:m-0" id="receipt-print-area">
+            {/* Cabeçalho Profissional Compacto */}
+            <div className="flex justify-between items-center border-b-2 border-slate-900 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="bg-slate-900 p-1.5 rounded-lg print:bg-transparent">
+                  <img src="/logo.png" alt="Bueno Gois" className="h-10 w-auto print:brightness-0" />
                 </div>
-                <div className="space-y-0.5">
-                  <h2 className="text-xl font-black uppercase tracking-tighter text-slate-900">Bueno Gois Advogados</h2>
-                  <p className="text-[10px] text-slate-500 uppercase font-bold">Bueno Gois Advogados e Associados</p>
-                  <p className="text-[9px] text-slate-400">Rua Marechal Deodoro, 1594 - Sala 2, SBC/SP</p>
+                <div>
+                  <h2 className="text-lg font-black uppercase tracking-tighter text-slate-900">Bueno Gois Advogados</h2>
+                  <p className="text-[8px] text-slate-500 uppercase font-bold">Bueno Gois Advogados e Associados</p>
                 </div>
               </div>
-              <div className="text-left md:text-right">
-                <div className="text-3xl font-black text-slate-900 leading-none">RECIBO DE REPASSE</div>
-                <p className="text-[10px] text-slate-500 font-bold mt-2 tracking-widest uppercase">Documento de Controle: {title.id.substring(0, 8).toUpperCase()}</p>
+              <div className="text-right">
+                <div className="text-xl font-black text-slate-900 leading-none">RECIBO DE REPASSE</div>
+                <p className="text-[8px] text-slate-500 font-bold mt-1 uppercase tracking-widest">Controle: {title.id.substring(0, 8).toUpperCase()}</p>
               </div>
             </div>
 
-            {/* Texto do Recibo */}
-            <div className="py-4 space-y-6 text-base leading-relaxed text-justify text-slate-800">
+            {/* Texto do Recibo em Tamanho Reduzido */}
+            <div className="space-y-4 text-sm leading-relaxed text-justify text-slate-800">
               <p>
-                Declaramos para os devidos fins que o escritório <strong className="text-slate-900">Bueno Gois Advogados e Associados</strong>, inscrito no CNPJ sob nº 00.000.000/0001-00, recebeu de <strong className="text-slate-900">{opposingParty}</strong> a importância bruta de <strong>{formattedTotal}</strong>, referente ao pagamento de <i>{title.description}</i> nos autos do processo judicial nº <strong className="text-slate-900">{process?.processNumber || 'N/A'}</strong>.
+                Declaramos para os devidos fins que o escritório <strong className="text-slate-900">Bueno Gois Advogados e Associados</strong>, recebeu de <strong className="text-slate-900">{opposingParty}</strong> a importância bruta de <strong>{formattedTotal}</strong>, referente ao pagamento de <i>{title.description}</i> nos autos do processo nº <strong className="text-slate-900">{process?.processNumber || 'N/A'}</strong>.
               </p>
               
               <p>
-                Pelo presente instrumento, o escritório efetua neste ato o repasse de valores ao cliente <strong className="text-slate-900">{client ? `${client.firstName} ${client.lastName}` : 'N/A'}</strong>, portador do CPF/CNPJ <strong className="text-slate-900">{client?.document || 'N/A'}</strong>, procedendo com a regular dedução da verba honorária advocatícia contratual, conforme demonstrativo discriminado no quadro abaixo:
+                Pelo presente instrumento, o escritório efetua neste ato o repasse de valores ao cliente <strong className="text-slate-900">{client ? `${client.firstName} ${client.lastName}` : 'N/A'}</strong>, portador do CPF/CNPJ <strong className="text-slate-900">{client?.document || 'N/A'}</strong>, procedendo com a regular dedução da verba honorária contratual, conforme demonstrativo abaixo:
               </p>
             </div>
 
-            {/* Quadro de Valores Premium */}
-            <div className="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden my-8">
-              <table className="w-full text-sm">
-                <thead className="bg-slate-100/50 border-b border-slate-200">
+            {/* Quadro de Valores Otimizado */}
+            <div className="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden">
+              <table className="w-full text-xs">
+                <thead className="bg-slate-100 border-b border-slate-200">
                   <tr>
-                    <th className="px-6 py-3 text-left font-black uppercase text-[10px] tracking-widest text-slate-500">Discriminação das Verbas</th>
-                    <th className="px-6 py-3 text-right font-black uppercase text-[10px] tracking-widest text-slate-500">Valor (R$)</th>
+                    <th className="px-4 py-2 text-left font-black uppercase text-[9px] tracking-widest text-slate-500">Discriminação</th>
+                    <th className="px-4 py-2 text-right font-black uppercase text-[9px] tracking-widest text-slate-500">Valor (R$)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
-                  <tr className="hover:bg-slate-100/30 transition-colors">
-                    <td className="px-6 py-4 text-slate-700 font-medium">Valor Bruto Recebido (Proveniente da Parte Reclamada)</td>
-                    <td className="px-6 py-4 text-right font-bold text-slate-900">{formattedTotal}</td>
+                  <tr>
+                    <td className="px-4 py-2.5 text-slate-700">Valor Bruto Recebido (Proveniente da Parte Reclamada)</td>
+                    <td className="px-4 py-2.5 text-right font-bold text-slate-900">{formattedTotal}</td>
                   </tr>
-                  <tr className="text-rose-600 bg-rose-50/20">
-                    <td className="px-6 py-4 font-medium flex items-center gap-2">
-                      <Scale className="h-3 w-3" /> Honorários Advocatícios Contratuais ({feePercent}%)
-                    </td>
-                    <td className="px-6 py-4 text-right font-bold italic">({formattedFee})</td>
+                  <tr className="text-rose-600 bg-rose-50/10">
+                    <td className="px-4 py-2.5 font-medium italic">Honorários Advocatícios Contratuais ({feePercent}%)</td>
+                    <td className="px-4 py-2.5 text-right font-bold">({formattedFee})</td>
                   </tr>
-                  <tr className="bg-emerald-50/50 font-black text-emerald-900 border-t-2 border-emerald-200">
-                    <td className="px-6 py-5 uppercase tracking-tighter text-base">Valor Líquido de Repasse ao Cliente</td>
-                    <td className="px-6 py-5 text-right text-xl">{formattedNet}</td>
+                  <tr className="bg-emerald-50 font-black text-emerald-900 border-t-2 border-emerald-200">
+                    <td className="px-4 py-3 uppercase tracking-tighter text-sm">Valor Líquido de Repasse ao Cliente</td>
+                    <td className="px-4 py-3 text-right text-lg">{formattedNet}</td>
                   </tr>
                 </tbody>
               </table>
             </div>
 
-            {/* Termo de Quitação */}
-            <div className="text-xs text-center italic text-slate-500 px-12 py-6 border-y border-slate-100">
-              "O beneficiário acima identificado declara ter conferido os valores discriminados e dá plena, rasa e geral quitação ao escritório de advocacia para nada mais reclamar quanto ao objeto deste pagamento específico, servindo este como prova de recebimento."
-            </div>
+            <p className="text-[10px] text-center italic text-slate-500 py-2 border-y border-slate-100 px-8">
+              "O beneficiário declara ter conferido os valores e dá plena quitação ao escritório quanto ao objeto deste pagamento, servindo este como prova de recebimento."
+            </p>
 
-            {/* Local e Assinaturas */}
-            <div className="pt-12 flex flex-col items-center gap-16">
-              <p className="text-base font-bold text-slate-900">São Bernardo do Campo, {today}</p>
+            {/* Local e Assinaturas Compactas */}
+            <div className="pt-4 flex flex-col items-center gap-10">
+              <p className="text-sm font-bold text-slate-900">São Bernardo do Campo, {today}</p>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-12 md:gap-24 w-full max-w-2xl pt-8">
-                <div className="flex flex-col items-center text-center">
-                  <div className="w-full border-t border-slate-900 mb-3" />
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-900">Bueno Gois Advogados</p>
-                  <p className="text-[9px] text-slate-500 uppercase font-bold">Representante Legal</p>
+              <div className="grid grid-cols-2 gap-12 w-full max-w-2xl">
+                <div className="text-center">
+                  <div className="w-full border-t border-slate-900 mb-1" />
+                  <p className="text-[9px] font-black uppercase tracking-widest text-slate-900">Bueno Gois Advogados</p>
+                  <p className="text-[8px] text-slate-500 uppercase font-bold">Representante Legal</p>
                 </div>
-                <div className="flex flex-col items-center text-center">
-                  <div className="w-full border-t border-slate-900 mb-3" />
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-900">{client ? `${client.firstName} ${client.lastName}` : 'Beneficiário'}</p>
-                  <p className="text-[9px] text-slate-500 uppercase font-bold">Assinatura do Cliente</p>
+                <div className="text-center">
+                  <div className="w-full border-t border-slate-900 mb-1" />
+                  <p className="text-[9px] font-black uppercase tracking-widest text-slate-900">{client ? `${client.firstName} ${client.lastName}` : 'Beneficiário'}</p>
+                  <p className="text-[8px] text-slate-500 uppercase font-bold">Assinatura do Cliente</p>
                 </div>
               </div>
             </div>
           </div>
         </ScrollArea>
 
-        <DialogFooter className="p-6 bg-slate-100 border-t print:hidden flex items-center justify-between gap-4">
-          <p className="hidden md:block text-[10px] text-slate-500 font-bold uppercase tracking-widest">Bueno Gois Legal Engine</p>
-          <div className="flex gap-3">
-            <DialogClose asChild><Button variant="outline" className="text-slate-600 border-slate-300">Fechar</Button></DialogClose>
-            <Button onClick={handlePrint} className="gap-2 bg-slate-900 text-white hover:bg-slate-800 h-11 px-8 font-black uppercase tracking-widest text-[11px]">
-              <Printer className="h-4 w-4" /> Imprimir Documento
+        <DialogFooter className="p-4 bg-slate-50 border-t print:hidden flex items-center justify-between">
+          <p className="text-[9px] text-slate-400 font-bold uppercase">LexFlow Bueno Gois</p>
+          <div className="flex gap-2">
+            <DialogClose asChild><Button variant="outline" size="sm" className="h-8 text-xs">Fechar</Button></DialogClose>
+            <Button onClick={handlePrint} size="sm" className="gap-2 bg-slate-900 text-white h-8 px-6 font-black uppercase text-[10px]">
+              <Printer className="h-3.5 w-3.5" /> Imprimir Recibo
             </Button>
           </div>
         </DialogFooter>
@@ -379,49 +375,49 @@ function HonorariosReceiptDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-4xl bg-white text-slate-900 p-0 overflow-hidden border-none shadow-2xl">
-        <div className="p-12 space-y-10 print:p-0 print:m-0" id="honorarios-print-area">
-          <div className="flex justify-between items-start border-b-4 border-slate-900 pb-8">
-            <div className="flex items-center gap-4">
-              <div className="bg-slate-900 p-3 rounded-xl print:bg-transparent">
-                <img src="/logo.png" alt="Logo" className="h-12 w-auto print:brightness-0" />
+        <div className="p-10 space-y-8 bg-white print:p-0 print:m-0" id="honorarios-print-area">
+          <div className="flex justify-between items-center border-b-2 border-slate-900 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="bg-slate-900 p-1.5 rounded-lg print:bg-transparent">
+                <img src="/logo.png" alt="Logo" className="h-10 w-auto print:brightness-0" />
               </div>
-              <div className="space-y-1">
-                <h2 className="text-2xl font-black uppercase tracking-tighter text-slate-900">Bueno Gois Advogados</h2>
-                <p className="text-[10px] text-slate-600 uppercase font-bold tracking-widest">OAB/SP 000.000 | CONTABILIDADE INTERNA</p>
+              <div>
+                <h2 className="text-lg font-black uppercase tracking-tighter text-slate-900">Bueno Gois Advogados</h2>
+                <p className="text-[8px] text-slate-500 uppercase font-bold tracking-widest">OAB/SP 000.000 | CONTABILIDADE</p>
               </div>
             </div>
             <div className="text-right">
-              <div className="text-3xl font-black text-slate-900 leading-none">HONORÁRIOS</div>
-              <div className="text-xs font-bold text-slate-500 mt-2">DOC: {title.id.substring(0, 8).toUpperCase()}</div>
+              <div className="text-xl font-black text-slate-900 leading-none">HONORÁRIOS</div>
+              <div className="text-[8px] font-bold text-slate-500 mt-1 uppercase">ID: {title.id.substring(0, 8).toUpperCase()}</div>
             </div>
           </div>
 
-          <div className="py-12 space-y-8 text-xl leading-relaxed text-justify border-l-4 border-primary/20 pl-8 bg-slate-50/50 rounded-r-3xl">
-            <p>
-              Confirmamos o recebimento de <strong className="text-slate-900 font-black">{formattedFee}</strong> do cliente <strong>{client ? `${client.firstName} ${client.lastName}` : 'N/A'}</strong>, referente aos honorários advocatícios contratuais de êxito ({feePercent}%) incidentes sobre a verba recebida em:
+          <div className="py-6 space-y-4 text-lg leading-relaxed text-justify border-l-4 border-primary/20 pl-6 bg-slate-50/50 rounded-r-2xl">
+            <p className="text-sm">
+              Confirmamos o recebimento de <strong className="text-slate-900 font-black">{formattedFee}</strong> do cliente <strong>{client ? `${client.firstName} ${client.lastName}` : 'N/A'}</strong>, referente aos honorários contratuais de êxito ({feePercent}%) incidentes sobre a verba:
             </p>
-            <p className="italic text-slate-600 bg-white p-4 rounded-xl border border-slate-200">
+            <p className="italic text-slate-600 bg-white p-3 rounded-lg border border-slate-200 text-sm">
               "{title.description}"
             </p>
-            <p className="text-sm text-slate-500 uppercase font-black tracking-[0.2em]">
-              Natureza da Verba: Honorários Advocatícios de Êxito / Quota Litis.
+            <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest">
+              Natureza: Honorários Advocatícios de Êxito / Quota Litis.
             </p>
           </div>
 
-          <div className="pt-20 flex flex-col items-center gap-16">
-            <p className="text-lg font-bold">São Bernardo do Campo, {today}</p>
-            <div className="w-full max-w-md text-center">
-              <div className="w-full border-t-2 border-slate-900 mb-3" />
-              <p className="text-sm font-black uppercase tracking-widest text-slate-900">Bueno Gois Advogados e Associados</p>
-              <p className="text-[10px] text-slate-500 font-bold uppercase mt-1">Prestador de Serviços Jurídicos</p>
+          <div className="pt-10 flex flex-col items-center gap-12">
+            <p className="text-sm font-bold">São Bernardo do Campo, {today}</p>
+            <div className="w-full max-w-sm text-center">
+              <div className="w-full border-t border-slate-900 mb-1" />
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-900">Bueno Gois Advogados e Associados</p>
+              <p className="text-[8px] text-slate-500 font-bold uppercase">Prestador de Serviços Jurídicos</p>
             </div>
           </div>
         </div>
 
-        <DialogFooter className="p-6 bg-slate-50 border-t print:hidden">
-          <DialogClose asChild><Button variant="outline">Fechar</Button></DialogClose>
-          <Button onClick={handlePrint} className="gap-2 bg-slate-900 text-white h-12 px-10 font-black uppercase tracking-widest text-xs">
-            <Printer className="h-4 w-4" /> Imprimir Recibo de Honorários
+        <DialogFooter className="p-4 bg-slate-50 border-t print:hidden flex justify-end gap-2">
+          <DialogClose asChild><Button variant="outline" size="sm" className="h-8 text-xs">Fechar</Button></DialogClose>
+          <Button onClick={handlePrint} size="sm" className="gap-2 bg-slate-900 text-white h-8 px-6 font-black uppercase text-[10px]">
+            <Printer className="h-3.5 w-3.5" /> Imprimir Honorários
           </Button>
         </DialogFooter>
       </DialogContent>
