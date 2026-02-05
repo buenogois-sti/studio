@@ -29,7 +29,8 @@ import {
   Trash2,
   Plus,
   Info,
-  Check
+  Check,
+  AlertTriangle
 } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, where, getDocs, getDoc, FieldValue, Timestamp, doc, deleteDoc, orderBy, limit } from 'firebase/firestore';
@@ -707,7 +708,7 @@ function RepasseValue({ staffId }: { staffId: string }) {
     getDocs(q).then(snap => {
       const total = snap.docs.reduce((sum, d) => sum + (d.data().value || 0), 0);
       setVal(total);
-    });
+    }).catch(() => setVal(0));
   }, [firestore, staffId]);
 
   return <span className={cn("text-sm font-black", val > 0 ? "text-emerald-400" : "text-slate-500")}>{val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>;
@@ -852,10 +853,45 @@ function PayoutList({ filterRole, onRefresh, onPaid }: { filterRole?: string; on
 
 function PaymentHistory({ onShowVoucher }: { onShowVoucher: (t: FinancialTitle) => void }) {
   const { firestore } = useFirebase();
-  const historyQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'financial_titles'), where('origin', '==', 'HONORARIOS_PAGOS'), orderBy('paymentDate', 'desc'), limit(50)) : null), [firestore]);
-  const { data: history, isLoading } = useCollection<FinancialTitle>(historyQuery);
+  const historyQuery = useMemoFirebase(() => (firestore ? query(
+    collection(firestore, 'financial_titles'), 
+    where('origin', '==', 'HONORARIOS_PAGOS'), 
+    orderBy('paymentDate', 'desc'), 
+    limit(50)
+  ) : null), [firestore]);
+  
+  const { data: history, isLoading, error } = useCollection<FinancialTitle>(historyQuery);
 
   if (isLoading) return <Skeleton className="h-64 w-full bg-white/5" />;
+
+  if (error) {
+    const isIndexError = error.message.includes('index');
+    return (
+      <Card className="bg-rose-500/5 border-rose-500/20 p-12 text-center flex flex-col items-center gap-4">
+        <AlertTriangle className="h-12 w-12 text-rose-500" />
+        <div className="space-y-2">
+          <h3 className="text-xl font-bold text-white">Falha ao Carregar Histórico</h3>
+          <p className="text-sm text-slate-400 max-w-sm">
+            {isIndexError 
+              ? "O Firestore exige um índice composto para esta consulta. Verifique o console do navegador (F12) para o link de criação."
+              : "Ocorreu um erro ao buscar os registros de pagamento no servidor."}
+          </p>
+        </div>
+        {isIndexError && (
+          <div className="p-4 bg-black/40 rounded-xl border border-white/5 text-left space-y-3">
+            <p className="text-[10px] font-black uppercase text-rose-400 tracking-widest">Instruções de Resolução:</p>
+            <ol className="text-[10px] text-slate-300 space-y-1.5 list-decimal pl-4 leading-relaxed">
+              <li>Pressione <strong>F12</strong> no teclado para abrir o console.</li>
+              <li>Procure pela mensagem de erro do Firebase.</li>
+              <li>Clique no link azul que começa com <strong>console.firebase.google.com</strong>.</li>
+              <li>Na página do Firebase Console, clique no botão <strong>"Criar Índice"</strong>.</li>
+              <li>Aguarde cerca de 3 a 5 minutos e atualize esta página.</li>
+            </ol>
+          </div>
+        )}
+      </Card>
+    );
+  }
 
   return (
     <Card className="bg-[#0f172a] border-white/5 overflow-hidden">
@@ -890,7 +926,7 @@ function PaymentHistory({ onShowVoucher }: { onShowVoucher: (t: FinancialTitle) 
               </TableCell>
             </TableRow>
           ))}
-          {history?.length === 0 && (
+          {history && history.length === 0 && (
             <TableRow>
               <TableCell colSpan={4} className="h-24 text-center text-muted-foreground italic">Nenhum pagamento registrado no histórico.</TableCell>
             </TableRow>
@@ -918,33 +954,37 @@ export default function RepassesPage() {
   const loadStats = React.useCallback(async () => {
     if (!firestore) return;
     
-    const staffSnap = await getDocs(collection(firestore, 'staff'));
-    let pending = 0;
-    let retained = 0;
+    try {
+      const staffSnap = await getDocs(collection(firestore, 'staff'));
+      let pending = 0;
+      let retained = 0;
 
-    for (const s of staffSnap.docs) {
-      const credSnap = await getDocs(collection(firestore, `staff/${s.id}/credits`));
-      credSnap.docs.forEach(d => {
-        const val = d.data().value || 0;
-        if (d.data().status === 'DISPONIVEL') pending += val;
-        if (d.data().status === 'RETIDO') retained += val;
+      for (const s of staffSnap.docs) {
+        const credSnap = await getDocs(collection(firestore, `staff/${s.id}/credits`));
+        credSnap.docs.forEach(d => {
+          const val = d.data().value || 0;
+          if (d.data().status === 'DISPONIVEL') pending += val;
+          if (d.data().status === 'RETIDO') retained += val;
+        });
+      }
+      
+      const startOfCurrentMonth = startOfMonth(new Date());
+      const paidSnap = await getDocs(query(
+        collection(firestore, 'financial_titles'), 
+        where('origin', '==', 'HONORARIOS_PAGOS'), 
+        where('paymentDate', '>=', Timestamp.fromDate(startOfCurrentMonth))
+      ));
+      const paid = paidSnap.docs.reduce((sum, d) => sum + (d.data().value || 0), 0);
+
+      setStats({ 
+        totalPending: pending, 
+        totalPaidMonth: paid, 
+        staffCount: staffSnap.size,
+        totalRetained: retained 
       });
+    } catch (e) {
+      console.warn('[RepassesStats] Failed to load full stats, likely missing index.');
     }
-    
-    const startOfCurrentMonth = startOfMonth(new Date());
-    const paidSnap = await getDocs(query(
-      collection(firestore, 'financial_titles'), 
-      where('origin', '==', 'HONORARIOS_PAGOS'), 
-      where('paymentDate', '>=', Timestamp.fromDate(startOfCurrentMonth))
-    ));
-    const paid = paidSnap.docs.reduce((sum, d) => sum + (d.data().value || 0), 0);
-
-    setStats({ 
-      totalPending: pending, 
-      totalPaidMonth: paid, 
-      staffCount: staffSnap.size,
-      totalRetained: retained 
-    });
   }, [firestore]);
 
   React.useEffect(() => {
