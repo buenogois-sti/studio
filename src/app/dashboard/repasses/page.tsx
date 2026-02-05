@@ -10,7 +10,7 @@ import {
   Clock, 
   Briefcase, 
   FileText,
-  Search,
+  Search, 
   MoreVertical,
   Loader2,
   Printer,
@@ -72,7 +72,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { format, startOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Separator } from '@/components/ui/separator';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -96,223 +95,6 @@ const manualCreditSchema = z.object({
   value: z.coerce.number().positive('Valor deve ser positivo'),
   type: z.enum(['HONORARIOS', 'REEMBOLSO', 'SALARIO', 'PRODUCAO']),
 });
-
-function ManageCreditsDialog({ 
-  staff, 
-  open, 
-  onOpenChange,
-  onUpdate 
-}: { 
-  staff: Staff | null; 
-  open: boolean; 
-  onOpenChange: (open: boolean) => void;
-  onUpdate: () => void;
-}) {
-  const { firestore } = useFirebase();
-  const { toast } = useToast();
-  const [filter, setFilter] = React.useState<'ALL' | 'DISPONIVEL' | 'RETIDO'>('ALL');
-  const [isProcessing, setIsProcessing] = React.useState<string | null>(null);
-  const [isAdding, setIsAdding] = React.useState(false);
-  const [editingCredit, setEditingCredit] = React.useState<any | null>(null);
-
-  const creditsQuery = useMemoFirebase(() => {
-    if (!firestore || !staff) return null;
-    const base = collection(firestore, `staff/${staff.id}/credits`);
-    return query(base, orderBy('date', 'desc'));
-  }, [firestore, staff, open]);
-
-  const { data: credits, isLoading } = useCollection<any>(creditsQuery);
-
-  const filteredCredits = React.useMemo(() => {
-    if (!credits) return [];
-    if (filter === 'ALL') return credits.filter(c => c.status !== 'PAGO');
-    return credits.filter(c => c.status === filter);
-  }, [credits, filter]);
-
-  const handleDelete = async (id: string) => {
-    if (!staff || !confirm("Deseja realmente excluir este lançamento?")) return;
-    setIsProcessing(id);
-    try {
-      await deleteStaffCredit(staff.id, id);
-      toast({ title: 'Lançamento excluído' });
-      onUpdate();
-    } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Erro', description: e.message });
-    } finally {
-      setIsProcessing(null);
-    }
-  };
-
-  const handleEditSubmit = async (values: any) => {
-    if (!staff || !editingCredit) return;
-    setIsProcessing(editingCredit.id);
-    try {
-      await updateStaffCredit(staff.id, editingCredit.id, values);
-      toast({ title: 'Lançamento atualizado' });
-      setEditingCredit(null);
-      onUpdate();
-    } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Erro', description: e.message });
-    } finally {
-      setIsProcessing(null);
-    }
-  };
-
-  const handleManualAdd = async (values: any) => {
-    if (!staff) return;
-    setIsProcessing('adding');
-    try {
-      await addManualStaffCredit(staff.id, values);
-      toast({ title: 'Crédito manual adicionado' });
-      setIsAdding(false);
-      onUpdate();
-    } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Erro', description: e.message });
-    } finally {
-      setIsProcessing(null);
-    }
-  };
-
-  if (!staff) return null;
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-4xl bg-[#020617] border-white/10 p-0 overflow-hidden h-[85vh] flex flex-col">
-        <DialogHeader className="p-6 border-b border-white/5 bg-white/5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-black text-lg">
-                {staff.firstName.charAt(0)}{staff.lastName.charAt(0)}
-              </div>
-              <div>
-                <DialogTitle className="text-xl font-black text-white">{staff.firstName} {staff.lastName}</DialogTitle>
-                <DialogDescription className="text-slate-400">Auditoria e gestão de lançamentos pendentes</DialogDescription>
-              </div>
-            </div>
-            <Button size="sm" onClick={() => setIsAdding(true)} className="gap-2">
-              <Plus className="h-4 w-4" /> Novo Lançamento
-            </Button>
-          </div>
-        </DialogHeader>
-
-        <div className="flex-1 overflow-hidden flex flex-col">
-          <div className="p-4 bg-black/20 flex items-center gap-2">
-            <Button 
-              variant={filter === 'ALL' ? 'default' : 'ghost'} 
-              size="sm" 
-              onClick={() => setFilter('ALL')}
-              className="text-[10px] uppercase font-black h-8"
-            >Todos Pendentes</Button>
-            <Button 
-              variant={filter === 'DISPONIVEL' ? 'default' : 'ghost'} 
-              size="sm" 
-              onClick={() => setFilter('DISPONIVEL')}
-              className="text-[10px] uppercase font-black h-8 text-emerald-400"
-            >Disponíveis</Button>
-            <Button 
-              variant={filter === 'RETIDO' ? 'default' : 'ghost'} 
-              size="sm" 
-              onClick={() => setFilter('RETIDO')}
-              className="text-[10px] uppercase font-black h-8 text-blue-400"
-            >Retidos</Button>
-          </div>
-
-          <ScrollArea className="flex-1">
-            <div className="p-6">
-              {isLoading ? (
-                <div className="space-y-4">
-                  {[...Array(3)].map((_, i) => <Skeleton className="h-16 w-full bg-white/5" />)}
-                </div>
-              ) : filteredCredits.length > 0 ? (
-                <div className="space-y-3">
-                  {filteredCredits.map(c => (
-                    <div key={c.id} className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5 group hover:border-white/20 transition-all">
-                      <div className="flex-1 min-w-0 mr-4">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Badge variant="outline" className={cn(
-                            "text-[8px] font-black uppercase px-1.5 h-4 border-none",
-                            c.status === 'DISPONIVEL' ? "bg-emerald-500/20 text-emerald-400" : "bg-blue-500/20 text-blue-400"
-                          )}>
-                            {c.status}
-                          </Badge>
-                          <span className="text-[10px] text-muted-foreground font-medium">
-                            {c.date ? format(c.date.toDate(), 'dd/MM/yyyy') : 'N/A'}
-                          </span>
-                        </div>
-                        <p className="text-sm font-bold text-white truncate">{c.description}</p>
-                        <p className="text-[10px] text-slate-500 uppercase font-bold">{c.type}</p>
-                      </div>
-                      <div className="flex items-center gap-6">
-                        <span className="text-sm font-black text-white tabular-nums">
-                          {c.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                        </span>
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 text-blue-400"
-                            onClick={() => setEditingCredit(c)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 text-rose-500"
-                            onClick={() => handleDelete(c.id)}
-                            disabled={isProcessing === c.id}
-                          >
-                            {isProcessing === c.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-20 opacity-30">
-                  <FileText className="h-12 w-12 mx-auto mb-2" />
-                  <p className="text-sm font-bold uppercase">Nenhum lançamento encontrado</p>
-                </div>
-              )}
-            </div>
-          </ScrollArea>
-        </div>
-
-        <DialogFooter className="p-6 border-t border-white/5 bg-black/20">
-          <DialogClose asChild><Button variant="ghost">Fechar Painel</Button></DialogClose>
-        </DialogFooter>
-      </DialogContent>
-
-      <Dialog open={!!editingCredit} onOpenChange={(o) => !o && setEditingCredit(null)}>
-        <DialogContent className="bg-card border-border sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Editar Lançamento</DialogTitle>
-            <DialogDescription>Ajuste os dados do crédito para o profissional.</DialogDescription>
-          </DialogHeader>
-          <EditCreditForm 
-            initialData={editingCredit} 
-            onSubmit={handleEditSubmit} 
-            isSaving={isProcessing === editingCredit?.id} 
-          />
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={isAdding} onOpenChange={setIsAdding}>
-        <DialogContent className="bg-card border-border sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Novo Crédito Manual</DialogTitle>
-            <DialogDescription>Lançar bônus, reembolso ou ajuste manual.</DialogDescription>
-          </DialogHeader>
-          <ManualCreditForm 
-            onSubmit={handleManualAdd} 
-            isSaving={isProcessing === 'adding'} 
-          />
-        </DialogContent>
-      </Dialog>
-    </Dialog>
-  );
-}
 
 function EditCreditForm({ initialData, onSubmit, isSaving }: { initialData: any; onSubmit: (vals: any) => void; isSaving: boolean }) {
   const form = useForm({
@@ -416,6 +198,223 @@ function ManualCreditForm({ onSubmit, isSaving }: { onSubmit: (vals: any) => voi
         </Button>
       </form>
     </Form>
+  );
+}
+
+function ManageCreditsDialog({ 
+  staff, 
+  open, 
+  onOpenChange,
+  onUpdate 
+}: { 
+  staff: Staff | null; 
+  open: boolean; 
+  onOpenChange: (open: boolean) => void;
+  onUpdate: () => void;
+}) {
+  const { firestore } = useFirebase();
+  const { toast } = useToast();
+  const [filter, setFilter] = React.useState<'ALL' | 'DISPONIVEL' | 'RETIDO'>('ALL');
+  const [isProcessing, setIsProcessing] = React.useState<string | null>(null);
+  const [isAdding, setIsAdding] = React.useState(false);
+  const [editingCredit, setEditingCredit] = React.useState<any | null>(null);
+
+  const creditsQuery = useMemoFirebase(() => {
+    if (!firestore || !staff) return null;
+    const base = collection(firestore, `staff/${staff.id}/credits`);
+    return query(base, orderBy('date', 'desc'));
+  }, [firestore, staff?.id, open]);
+
+  const { data: credits, isLoading } = useCollection<any>(creditsQuery);
+
+  const filteredCredits = React.useMemo(() => {
+    if (!credits) return [];
+    if (filter === 'ALL') return credits.filter(c => c.status !== 'PAGO');
+    return credits.filter(c => c.status === filter);
+  }, [credits, filter]);
+
+  const handleDelete = async (id: string) => {
+    if (!staff || !confirm("Deseja realmente excluir este lançamento?")) return;
+    setIsProcessing(id);
+    try {
+      await deleteStaffCredit(staff.id, id);
+      toast({ title: 'Lançamento excluído' });
+      onUpdate();
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Erro', description: e.message });
+    } finally {
+      setIsProcessing(null);
+    }
+  };
+
+  const handleEditSubmit = async (values: any) => {
+    if (!staff || !editingCredit) return;
+    setIsProcessing(editingCredit.id);
+    try {
+      await updateStaffCredit(staff.id, editingCredit.id, values);
+      toast({ title: 'Lançamento atualizado' });
+      setEditingCredit(null);
+      onUpdate();
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Erro', description: e.message });
+    } finally {
+      setIsProcessing(null);
+    }
+  };
+
+  const handleManualAdd = async (values: any) => {
+    if (!staff) return;
+    setIsProcessing('adding');
+    try {
+      await addManualStaffCredit(staff.id, values);
+      toast({ title: 'Crédito manual adicionado' });
+      setIsAdding(false);
+      onUpdate();
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Erro', description: e.message });
+    } finally {
+      setIsProcessing(null);
+    }
+  };
+
+  if (!staff) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-4xl bg-[#020617] border-white/10 p-0 overflow-hidden h-[85vh] flex flex-col">
+        <DialogHeader className="p-6 border-b border-white/5 bg-white/5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-black text-lg">
+                {staff.firstName.charAt(0)}{staff.lastName.charAt(0)}
+              </div>
+              <div>
+                <DialogTitle className="text-xl font-black text-white">{staff.firstName} {staff.lastName}</DialogTitle>
+                <DialogDescription className="text-slate-400">Auditoria e gestão de lançamentos pendentes</DialogDescription>
+              </div>
+            </div>
+            <Button size="sm" onClick={() => setIsAdding(true)} className="gap-2">
+              <Plus className="h-4 w-4" /> Novo Lançamento
+            </Button>
+          </div>
+        </DialogHeader>
+
+        <div className="flex-1 overflow-hidden flex flex-col">
+          <div className="p-4 bg-black/20 flex items-center gap-2">
+            <Button 
+              variant={filter === 'ALL' ? 'default' : 'ghost'} 
+              size="sm" 
+              onClick={() => setFilter('ALL')}
+              className="text-[10px] uppercase font-black h-8"
+            >Todos Pendentes</Button>
+            <Button 
+              variant={filter === 'DISPONIVEL' ? 'default' : 'ghost'} 
+              size="sm" 
+              onClick={() => setFilter('DISPONIVEL')}
+              className="text-[10px] uppercase font-black h-8 text-emerald-400"
+            >Disponíveis</Button>
+            <Button 
+              variant={filter === 'RETIDO' ? 'default' : 'ghost'} 
+              size="sm" 
+              onClick={() => setFilter('RETIDO')}
+              className="text-[10px] uppercase font-black h-8 text-blue-400"
+            >Retidos</Button>
+          </div>
+
+          <ScrollArea className="flex-1">
+            <div className="p-6">
+              {isLoading ? (
+                <div className="space-y-4">
+                  {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-16 w-full bg-white/5" />)}
+                </div>
+              ) : filteredCredits.length > 0 ? (
+                <div className="space-y-3">
+                  {filteredCredits.map(c => (
+                    <div key={c.id} className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5 group hover:border-white/20 transition-all">
+                      <div className="flex-1 min-w-0 mr-4">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Badge variant="outline" className={cn(
+                            "text-[8px] font-black uppercase px-1.5 h-4 border-none",
+                            c.status === 'DISPONIVEL' ? "bg-emerald-500/20 text-emerald-400" : "bg-blue-500/20 text-blue-400"
+                          )}>
+                            {c.status}
+                          </Badge>
+                          <span className="text-[10px] text-muted-foreground font-medium">
+                            {c.date ? format(c.date.toDate(), 'dd/MM/yyyy') : 'N/A'}
+                          </span>
+                        </div>
+                        <p className="text-sm font-bold text-white truncate">{c.description}</p>
+                        <p className="text-[10px] text-slate-500 uppercase font-bold">{c.type}</p>
+                      </div>
+                      <div className="flex items-center gap-6">
+                        <span className="text-sm font-black text-white tabular-nums">
+                          {c.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        </span>
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 text-blue-400"
+                            onClick={() => setEditingCredit(c)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 text-rose-500"
+                            onClick={() => handleDelete(c.id)}
+                            disabled={isProcessing === c.id}
+                          >
+                            {isProcessing === c.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-20 opacity-30">
+                  <FileText className="h-12 w-12 mx-auto mb-2" />
+                  <p className="text-sm font-bold uppercase">Nenhum lançamento encontrado</p>
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+        </div>
+
+        <DialogFooter className="p-6 border-t border-white/5 bg-black/20">
+          <DialogClose asChild><Button variant="ghost">Fechar Painel</Button></DialogClose>
+        </DialogFooter>
+      </DialogContent>
+
+      <Dialog open={!!editingCredit} onOpenChange={(o) => !o && setEditingCredit(null)}>
+        <DialogContent className="bg-card border-border sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Editar Lançamento</DialogTitle>
+            <DialogDescription>Ajuste os dados do crédito para o profissional.</DialogDescription>
+          </DialogHeader>
+          <EditCreditForm 
+            initialData={editingCredit} 
+            onSubmit={handleEditSubmit} 
+            isSaving={isProcessing === editingCredit?.id} 
+          />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isAdding} onOpenChange={setIsAdding}>
+        <DialogContent className="bg-card border-border sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Novo Crédito Manual</DialogTitle>
+            <DialogDescription>Lançar bônus, reembolso ou ajuste manual.</DialogDescription>
+          </DialogHeader>
+          <ManualCreditForm 
+            onSubmit={handleManualAdd} 
+            isSaving={isProcessing === 'adding'} 
+          />
+        </DialogContent>
+      </Dialog>
+    </Dialog>
   );
 }
 

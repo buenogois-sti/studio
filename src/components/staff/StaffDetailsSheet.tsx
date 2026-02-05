@@ -27,12 +27,10 @@ import {
   GraduationCap,
   MessageSquare,
   DollarSign,
-  PieChart,
   History,
   Activity,
   CheckCircle2,
-  Clock,
-  ArrowUpRight
+  Clock
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -73,7 +71,7 @@ export function StaffDetailsSheet({ staff, processes, open, onOpenChange }: Staf
   const { firestore } = useFirebase();
   const { toast } = useToast();
 
-  // Queries para Histórico e Atividades
+  // Hooks declarados no topo absoluto para evitar erro 310
   const creditsQuery = useMemoFirebase(
     () => (firestore && staff?.id ? query(collection(firestore, `staff/${staff.id}/credits`), orderBy('date', 'desc')) : null),
     [firestore, staff?.id, open]
@@ -86,11 +84,6 @@ export function StaffDetailsSheet({ staff, processes, open, onOpenChange }: Staf
   );
   const { data: logs, isLoading: isLoadingLogs } = useCollection<Log>(logsQuery);
 
-  if (!staff) return null;
-
-  const staffProcesses = processes.filter(p => staff.id && p.responsibleStaffIds?.includes(staff.id));
-  const activeCount = staffProcesses.filter(p => p.status === 'Ativo').length;
-
   const financialSummary = React.useMemo(() => {
     if (!credits) return { paid: 0, available: 0, retained: 0 };
     return credits.reduce((acc, c) => {
@@ -100,6 +93,15 @@ export function StaffDetailsSheet({ staff, processes, open, onOpenChange }: Staf
       return acc;
     }, { paid: 0, available: 0, retained: 0 });
   }, [credits]);
+
+  const staffProcesses = React.useMemo(() => {
+    if (!staff) return [];
+    return processes.filter(p => staff.id && p.responsibleStaffIds?.includes(staff.id));
+  }, [staff, processes]);
+
+  const activeCount = React.useMemo(() => staffProcesses.filter(p => p.status === 'Ativo').length, [staffProcesses]);
+
+  if (!staff) return null;
 
   const formatDate = (date: any) => {
     if (!date) return 'N/A';
@@ -136,7 +138,6 @@ export function StaffDetailsSheet({ staff, processes, open, onOpenChange }: Staf
     copyValue?: string
   }) => {
     const isInteractive = !!value && !!actionType;
-
     const getHref = () => {
         if (!value) return undefined;
         const cleanValue = value.replace(/\D/g, '');
@@ -147,21 +148,7 @@ export function StaffDetailsSheet({ staff, processes, open, onOpenChange }: Staf
             default: return undefined;
         }
     };
-
     const href = getHref();
-
-    const Content = () => (
-        <div className="flex flex-col text-left">
-            <span className="text-[10px] uppercase font-black text-muted-foreground leading-none mb-1 tracking-widest">{label}</span>
-            <span className={cn(
-                "text-sm font-medium break-all", 
-                !value && "text-muted-foreground italic font-normal",
-                isInteractive && "group-hover:text-primary transition-colors"
-            )}>
-                {value || 'Não informado'}
-            </span>
-        </div>
-    );
 
     return (
         <div className={cn(
@@ -175,23 +162,28 @@ export function StaffDetailsSheet({ staff, processes, open, onOpenChange }: Staf
             }
         }}
         >
-            <div className={cn(
-                "mt-0.5 shrink-0 transition-transform",
-                isInteractive && "group-hover:scale-110"
-            )}>
+            <div className={cn("mt-0.5 shrink-0 transition-transform", isInteractive && "group-hover:scale-110")}>
                 <Icon className="h-4 w-4 text-muted-foreground" />
             </div>
-            
-            {href ? (
-                <a href={href} target={actionType === 'whatsapp' ? '_blank' : undefined} className="flex-1">
-                    <Content />
-                </a>
-            ) : (
-                <div className="flex-1">
-                    <Content />
-                </div>
-            )}
-
+            <div className="flex-1">
+                {href ? (
+                    <a href={href} target={actionType === 'whatsapp' ? '_blank' : undefined}>
+                        <div className="flex flex-col text-left">
+                            <span className="text-[10px] uppercase font-black text-muted-foreground leading-none mb-1 tracking-widest">{label}</span>
+                            <span className={cn("text-sm font-medium break-all", !value && "text-muted-foreground italic font-normal", isInteractive && "group-hover:text-primary transition-colors")}>
+                                {value || 'Não informado'}
+                            </span>
+                        </div>
+                    </a>
+                ) : (
+                    <div className="flex flex-col text-left">
+                        <span className="text-[10px] uppercase font-black text-muted-foreground leading-none mb-1 tracking-widest">{label}</span>
+                        <span className={cn("text-sm font-medium break-all", !value && "text-muted-foreground italic font-normal")}>
+                            {value || 'Não informado'}
+                        </span>
+                    </div>
+                )}
+            </div>
             {isInteractive && actionType === 'copy' && (
                 <Copy className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity ml-auto self-center" />
             )}
@@ -231,7 +223,6 @@ export function StaffDetailsSheet({ staff, processes, open, onOpenChange }: Staf
 
           <ScrollArea className="flex-1">
             <div className="p-6">
-              {/* ABA: PERFIL */}
               <TabsContent value="profile" className="m-0 space-y-8 animate-in fade-in duration-300">
                 <div className="grid grid-cols-2 gap-4">
                     <div className="p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/10 flex flex-col items-center text-center">
@@ -340,7 +331,6 @@ export function StaffDetailsSheet({ staff, processes, open, onOpenChange }: Staf
                 </section>
               </TabsContent>
 
-              {/* ABA: HISTÓRICO FINANCEIRO */}
               <TabsContent value="financial" className="m-0 space-y-8 animate-in fade-in duration-300">
                 <div className="grid grid-cols-3 gap-4">
                   <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-center">
@@ -397,7 +387,6 @@ export function StaffDetailsSheet({ staff, processes, open, onOpenChange }: Staf
                 </div>
               </TabsContent>
 
-              {/* ABA: RELATÓRIO DE ATIVIDADES */}
               <TabsContent value="activity" className="m-0 space-y-8 animate-in fade-in duration-300">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
