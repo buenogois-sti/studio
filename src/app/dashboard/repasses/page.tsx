@@ -51,7 +51,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { format } from 'date-fns';
+import { format, startOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 function RepassePaymentDialog({ 

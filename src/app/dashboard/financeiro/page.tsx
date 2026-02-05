@@ -22,7 +22,8 @@ import {
   CheckCircle2,
   Scale,
   FileText,
-  DollarSign
+  DollarSign,
+  BarChart3
 } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, Timestamp, query, orderBy, deleteDoc, doc, getDocs, where } from 'firebase/firestore';
@@ -45,7 +46,7 @@ import {
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { format, isBefore } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -672,7 +673,7 @@ export default function FinanceiroPage() {
               <ArrowDownRight className="h-4 w-4 mr-2" /> Despesas
             </TabsTrigger>
             <TabsTrigger value="relatorios" className="rounded-md data-[state=active]:bg-purple-500/20 data-[state=active]:text-purple-400">
-              <BarChart className="h-4 w-4 mr-2" /> Painel BI
+              <BarChart3 className="h-4 w-4 mr-2" /> Painel BI
             </TabsTrigger>
         </TabsList>
 
