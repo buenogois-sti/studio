@@ -28,7 +28,8 @@ import {
   Edit,
   Trash2,
   Plus,
-  Info
+  Info,
+  Check
 } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, where, getDocs, getDoc, FieldValue, Timestamp, doc, deleteDoc, orderBy, limit } from 'firebase/firestore';

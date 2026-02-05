@@ -13,8 +13,6 @@ import {
   ShieldAlert,
   Archive,
   CheckCircle2,
-  TrendingUp,
-  FilePlus2,
   ChevronDown,
   ChevronUp,
   Calendar,
@@ -26,7 +24,8 @@ import {
   ExternalLink,
   Info,
   Building,
-  Users
+  Users,
+  FilePlus2
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
@@ -55,7 +54,6 @@ import { syncProcessToDrive } from '@/lib/drive';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 
 const STATUS_CONFIG = {
   'Ativo': { label: 'Ativo', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20', icon: CheckCircle2 },
@@ -175,7 +173,6 @@ export default function ProcessosPage() {
               <Card key={p.id} className="border-none shadow-xl overflow-hidden bg-[#0f172a] hover:bg-card/80 transition-all duration-300 group">
                 <CardContent className="p-0">
                   <div className="p-5 flex flex-col gap-4">
-                    {/* Camada 1: Título e Status Principal */}
                     <div className="flex items-start justify-between gap-4">
                       <div className="space-y-1">
                         <div className="flex items-center gap-3">
@@ -234,9 +231,7 @@ export default function ProcessosPage() {
                       </div>
                     </div>
 
-                    {/* Camada 2: Painel de Links Contextuais (Utilitário) */}
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 py-4 border-y border-white/5">
-                      {/* Link Cliente */}
                       <Link 
                         href={`/dashboard/clientes?searchTerm=${client?.firstName}`} 
                         className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/5 transition-all group/link"
@@ -252,7 +247,6 @@ export default function ProcessosPage() {
                         </div>
                       </Link>
 
-                      {/* Link Audiência */}
                       <Link 
                         href="/dashboard/audiencias" 
                         className={cn(
@@ -271,7 +265,6 @@ export default function ProcessosPage() {
                         </div>
                       </Link>
 
-                      {/* Link Acordos / Financeiro */}
                       <Link 
                         href="/dashboard/financeiro" 
                         className={cn(
@@ -290,7 +283,6 @@ export default function ProcessosPage() {
                         </div>
                       </Link>
 
-                      {/* Link Prazos */}
                       <Link 
                         href="/dashboard/prazos" 
                         className="flex items-center gap-3 p-2 rounded-xl hover:bg-rose-500/10 transition-all group/link"
@@ -305,7 +297,6 @@ export default function ProcessosPage() {
                       </Link>
                     </div>
 
-                    {/* Conteúdo Expandido (Detalhes Técnicos) */}
                     {isExpanded && (
                       <div className="rounded-xl border border-white/5 bg-black/40 p-5 animate-in slide-in-from-top-2 duration-300 space-y-6">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
@@ -337,7 +328,6 @@ export default function ProcessosPage() {
                       </div>
                     )}
 
-                    {/* Camada 3: Rodapé de Sistema */}
                     <div className="flex items-center justify-between pt-2">
                       <div className="flex items-center gap-4">
                         {p.driveFolderId ? (
@@ -356,7 +346,7 @@ export default function ProcessosPage() {
                         )}
                       </div>
                       <div className="flex flex-col items-end">
-                        <span className="text-[9px] text-muted-foreground font-black uppercase tracking-widest">Protocolado em: {format(p.createdAt.toDate(), 'dd/MM/yyyy')}</span>
+                        <span className="text-[9px] text-muted-foreground font-black uppercase tracking-widest">Protocolado em: {p.createdAt ? format(p.createdAt.toDate(), 'dd/MM/yyyy') : '---'}</span>
                         <span className="text-[8px] text-slate-600 font-mono">UID: {p.id.substring(0, 8)}</span>
                       </div>
                     </div>
