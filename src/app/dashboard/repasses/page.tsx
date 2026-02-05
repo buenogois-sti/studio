@@ -27,7 +27,8 @@ import {
   Receipt,
   Edit,
   Trash2,
-  Plus
+  Plus,
+  Info
 } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, where, getDocs, FieldValue, Timestamp, doc, deleteDoc, orderBy, limit } from 'firebase/firestore';
@@ -224,7 +225,7 @@ function ManageCreditsDialog({
             <div className="p-6">
               {isLoading ? (
                 <div className="space-y-4">
-                  {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-16 w-full bg-white/5" />)}
+                  {[...Array(3)].map((_, i) => <Skeleton className="h-16 w-full bg-white/5" />)}
                 </div>
               ) : filteredCredits.length > 0 ? (
                 <div className="space-y-3">
@@ -653,7 +654,7 @@ function RepassePaymentDialog({
                           <Badge variant="outline" className={cn(
                             "text-[8px] font-black uppercase px-1.5 h-4 border-none",
                             c.type === 'REEMBOLSO' ? "bg-blue-500/20 text-blue-400" : 
-                            c.type === 'SALARIO' ? "bg-purple-500/20 text-purple-400" : 
+                            c.type === 'SALARIO' ? "bg-purple-500/10 text-purple-400" : 
                             "bg-emerald-500/20 text-emerald-400"
                           )}>
                             {c.type === 'REEMBOLSO' ? 'Ressarcimento' : c.type === 'SALARIO' ? 'Pro-labore' : 'Participação'}
