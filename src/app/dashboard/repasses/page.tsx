@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -18,7 +19,11 @@ import {
   TrendingUp,
   AlertCircle,
   Zap,
-  ShieldCheck
+  ShieldCheck,
+  X,
+  ChevronDown,
+  LayoutList,
+  FileCheck
 } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, where, getDocs, FieldValue, Timestamp, doc, deleteDoc, orderBy, limit } from 'firebase/firestore';
@@ -53,6 +58,7 @@ import {
 } from '@/components/ui/table';
 import { format, startOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { Separator } from '@/components/ui/separator';
 
 const roleLabels: Record<string, string> = {
   lawyer: 'Advogado',
@@ -61,6 +67,152 @@ const roleLabels: Record<string, string> = {
   provider: 'Prestador / Fornecedor',
   partner: 'Sócio',
 };
+
+// Componente de Comprovante de Pagamento (Voucher)
+function StaffVoucherDialog({ 
+  staff, 
+  credits, 
+  totalValue, 
+  paymentDate,
+  open, 
+  onOpenChange 
+}: { 
+  staff: Staff | null; 
+  credits: any[]; 
+  totalValue: number; 
+  paymentDate?: Date;
+  open: boolean; 
+  onOpenChange: (open: boolean) => void 
+}) {
+  const [isDetailed, setIsDetailed] = React.useState(false);
+  if (!staff) return null;
+
+  const handlePrint = () => { window.print(); };
+  const todayFormatted = format(paymentDate || new Date(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
+  const formattedTotal = totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-4xl bg-white text-slate-900 p-0 overflow-hidden border-none shadow-none print:max-w-full">
+        <ScrollArea className="max-h-[90vh] print:max-h-full">
+          <div className="p-10 space-y-8 bg-white print:p-0" id="staff-voucher-print-area">
+            {/* Header Timbrado */}
+            <div className="flex justify-between items-center border-b-2 border-slate-900 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="bg-slate-900 p-1.5 rounded-lg print:bg-transparent">
+                  <img src="/logo.png" alt="Logo" className="h-10 w-auto print:brightness-0" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-black uppercase tracking-tighter text-slate-900 leading-none">Bueno Gois Advogados</h2>
+                  <p className="text-[8px] text-slate-500 uppercase font-bold tracking-widest mt-1">Gestão de Capital Humano e Parcerias</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-xl font-black text-slate-900 leading-none font-headline uppercase">Comprovante de Repasse</div>
+                <div className="text-[8px] font-bold text-slate-500 mt-1 uppercase">ID: {Math.random().toString(36).substring(7).toUpperCase()}</div>
+              </div>
+            </div>
+
+            {/* Texto do Recibo */}
+            <div className="py-6 space-y-6 text-sm leading-relaxed text-justify">
+              <p>
+                Declaramos para os devidos fins que o escritório <strong className="text-slate-900">Bueno Gois Advogados e Associados</strong> efetuou o pagamento da importância líquida de <strong className="text-lg font-black underline">{formattedTotal}</strong> ao colaborador(a) <strong className="text-slate-900">{staff.firstName} {staff.lastName}</strong>, portador(a) do CPF/CNPJ <strong className="text-slate-900">{staff.oabNumber ? `OAB ${staff.oabNumber}` : '---'}</strong>.
+              </p>
+
+              {isDetailed ? (
+                <div className="space-y-3 animate-in fade-in">
+                  <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500 border-b pb-1">Detalhamento da Liquidação (Extrato)</h4>
+                  <table className="w-full text-[11px] border border-slate-200">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        <th className="px-3 py-2 text-left font-black uppercase">Natureza</th>
+                        <th className="px-3 py-2 text-left font-black uppercase">Descrição</th>
+                        <th className="px-3 py-2 text-right font-black uppercase">Valor</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {credits.map((c, i) => (
+                        <tr key={i}>
+                          <td className="px-3 py-2 font-bold text-slate-600">{c.type}</td>
+                          <td className="px-3 py-2 text-slate-500">{c.description}</td>
+                          <td className="px-3 py-2 text-right font-mono">{c.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot className="bg-slate-50 border-t-2 border-slate-200">
+                      <tr>
+                        <td colSpan={2} className="px-3 py-2 text-right font-black uppercase">Total Liquidado</td>
+                        <td className="px-3 py-2 text-right font-black text-slate-900">{formattedTotal}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              ) : (
+                <div className="p-6 rounded-2xl bg-slate-50 border border-slate-100 italic text-slate-600 text-center">
+                  "O valor acima refere-se à quitação de honorários advocatícios, pro-labore e/ou reembolsos de despesas processuais acumulados até a presente data."
+                </div>
+              )}
+            </div>
+
+            {/* Dados Bancários de Destino */}
+            <div className="grid grid-cols-2 gap-8 text-[10px] bg-slate-50 p-4 rounded-xl border border-slate-100">
+              <div>
+                <p className="font-black uppercase text-slate-400 mb-1">Destino do Crédito</p>
+                <p className="font-bold text-slate-900">{staff.bankInfo?.bankName || 'Dados não informados'}</p>
+                <p className="text-slate-600">Ag: {staff.bankInfo?.agency} | Cc: {staff.bankInfo?.account}</p>
+              </div>
+              <div>
+                <p className="font-black uppercase text-slate-400 mb-1">Chave PIX</p>
+                <p className="font-bold text-slate-900">{staff.bankInfo?.pixKey || '---'}</p>
+              </div>
+            </div>
+
+            {/* Assinaturas */}
+            <div className="pt-12 flex flex-col items-center gap-12">
+              <p className="text-sm font-bold text-slate-900">São Bernardo do Campo, {todayFormatted}</p>
+              
+              <div className="grid grid-cols-2 gap-12 w-full max-w-2xl">
+                <div className="text-center">
+                  <div className="w-full border-t border-slate-900 mb-1" />
+                  <p className="text-[9px] font-black uppercase tracking-widest text-slate-900">Bueno Gois Advogados</p>
+                  <p className="text-[8px] text-slate-500 uppercase font-bold">Emitente / Financeiro</p>
+                </div>
+                <div className="text-center">
+                  <div className="w-full border-t border-slate-900 mb-1" />
+                  <p className="text-[9px] font-black uppercase tracking-widest text-slate-900">{staff.firstName} {staff.lastName}</p>
+                  <p className="text-[8px] text-slate-500 uppercase font-bold">Assinatura do Recebedor</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </ScrollArea>
+
+        <DialogFooter className="p-6 bg-slate-50 border-t print:hidden flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className={cn("h-9 px-4 text-[10px] font-black uppercase gap-2 transition-all", isDetailed && "bg-slate-900 text-white border-slate-900")}
+              onClick={() => setIsDetailed(!isDetailed)}
+            >
+              {isDetailed ? <FileCheck className="h-3.5 w-3.5" /> : <LayoutList className="h-3.5 w-3.5" />}
+              {isDetailed ? 'Ver Modo Simples' : 'Ver Modo Detalhado'}
+            </Button>
+          </div>
+          <div className="flex gap-3">
+            <DialogClose asChild><Button variant="ghost" className="font-bold text-slate-500">Fechar</Button></DialogClose>
+            <Button 
+              onClick={handlePrint} 
+              className="gap-2 bg-slate-900 hover:bg-slate-800 text-white h-10 px-8 font-black uppercase text-[11px] border-b-4 border-primary rounded-lg"
+            >
+              <Printer className="h-4 w-4" /> Imprimir Comprovante
+            </Button>
+          </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 function RepassePaymentDialog({ 
   staff, 
@@ -73,7 +225,7 @@ function RepassePaymentDialog({
   credits: any[]; 
   open: boolean; 
   onOpenChange: (open: boolean) => void;
-  onPaid: () => void;
+  onPaid: (total: number, creditsPaid: any[]) => void;
 }) {
   const [isProcessing, setIsProcessing] = React.useState(false);
   const { toast } = useToast();
@@ -86,7 +238,7 @@ function RepassePaymentDialog({
     try {
       await processRepasse(staff.id, credits.map(c => c.id), totalValue);
       toast({ title: 'Repasse Concluído!', description: `Valor de ${totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} pago.` });
-      onPaid();
+      onPaid(totalValue, credits);
       onOpenChange(false);
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Erro no repasse', description: e.message });
@@ -162,7 +314,7 @@ function RepassePaymentDialog({
   );
 }
 
-function PayoutList({ filterRole, onRefresh }: { filterRole?: string; onRefresh?: () => void }) {
+function PayoutList({ filterRole, onRefresh, onPaid }: { filterRole?: string; onRefresh?: () => void; onPaid: (total: number, credits: any[], staff: Staff) => void }) {
   const { firestore } = useFirebase();
   const [selectedStaff, setSelectedStaff] = React.useState<Staff | null>(null);
   const [staffCredits, setStaffCredits] = React.useState<any[]>([]);
@@ -228,7 +380,7 @@ function PayoutList({ filterRole, onRefresh }: { filterRole?: string; onRefresh?
                 <TableRow key={i}><TableCell colSpan={4}><Skeleton className="h-10 w-full bg-white/5" /></TableCell></TableRow>
               ))
             ) : filteredStaff.map(member => (
-              <TableRow key={member.id} className="border-white/5 hover:bg-white/5">
+              <TableRow key={member.id} className="border-white/5 hover:bg-white/5 transition-colors">
                 <TableCell>
                   <div className="flex items-center gap-3">
                     <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
@@ -266,8 +418,9 @@ function PayoutList({ filterRole, onRefresh }: { filterRole?: string; onRefresh?
         credits={staffCredits} 
         open={isRepasseOpen} 
         onOpenChange={setIsRepasseOpen}
-        onPaid={() => {
+        onPaid={(total, credits) => {
           setIsRepasseOpen(false);
+          if (selectedStaff) onPaid(total, credits, selectedStaff);
           onRefresh?.();
         }}
       />
@@ -292,7 +445,7 @@ function RepasseValue({ staffId }: { staffId: string }) {
   return <span className={cn("text-sm font-black", val > 0 ? "text-emerald-400" : "text-slate-500")}>{val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>;
 }
 
-function PaymentHistory() {
+function PaymentHistory({ onShowVoucher }: { onPaid: () => void; onShowVoucher: (t: FinancialTitle) => void }) {
   const { firestore } = useFirebase();
   const historyQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'financial_titles'), where('origin', '==', 'HONORARIOS_PAGOS'), orderBy('paymentDate', 'desc'), limit(50)) : null), [firestore]);
   const { data: history, isLoading } = useCollection<FinancialTitle>(historyQuery);
@@ -316,12 +469,17 @@ function PaymentHistory() {
               <TableCell className="text-xs text-slate-400">
                 {t.paymentDate && format(t.paymentDate.toDate(), 'dd/MM/yyyy')}
               </TableCell>
-              <TableCell className="font-bold text-white">{t.description}</TableCell>
+              <TableCell>
+                <div className="flex flex-col">
+                  <span className="font-bold text-white">{t.description}</span>
+                  <span className="text-[9px] text-muted-foreground uppercase font-black">Ref ID: {t.id.substring(0, 8)}</span>
+                </div>
+              </TableCell>
               <TableCell className="text-right font-black text-emerald-400">
                 {t.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
               </TableCell>
               <TableCell className="text-right">
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-white/50" onClick={() => window.print()}>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-white/50" onClick={() => onShowVoucher(t)}>
                   <Printer className="h-4 w-4" />
                 </Button>
               </TableCell>
@@ -344,6 +502,14 @@ export default function RepassesPage() {
   const [isLaunching, setIsLaunching] = React.useState(false);
   const [stats, setStats] = React.useState({ totalPending: 0, totalPaidMonth: 0, staffCount: 0, totalRetained: 0 });
   const [refreshKey, setRefreshKey] = React.useState(0);
+
+  // Estados para o Comprovante (Voucher)
+  const [isVoucherOpen, setIsVoucherOpen] = React.useState(false);
+  const [voucherData, setVoucherData] = React.useState<{ staff: Staff | null, credits: any[], total: number, date?: Date }>({
+    staff: null,
+    credits: [],
+    total: 0
+  });
 
   const loadStats = React.useCallback(async () => {
     if (!firestore) return;
@@ -394,6 +560,34 @@ export default function RepassesPage() {
       toast({ variant: 'destructive', title: 'Erro na folha', description: e.message });
     } finally {
       setIsLaunching(false);
+    }
+  };
+
+  const handleRepassePaid = (total: number, credits: any[], staff: Staff) => {
+    setVoucherData({ staff, credits, total, date: new Date() });
+    setIsVoucherOpen(true);
+    setRefreshKey(k => k + 1);
+  };
+
+  const handleShowVoucherFromHistory = async (title: FinancialTitle) => {
+    if (!firestore || !title.paidToStaffId) return;
+    
+    try {
+      // 1. Buscar dados do profissional
+      const staffDoc = await getDocs(query(collection(firestore, 'staff'), where('id', '==', title.paidToStaffId)));
+      const staff = staffDoc.docs[0]?.exists() ? { id: staffDoc.docs[0].id, ...staffDoc.docs[0].data() } as Staff : null;
+      
+      // 2. Buscar créditos vinculados a este pagamento (se existirem metadados)
+      // Como a relação crédito <-> título é complexa, no histórico mostramos o modo Simples com o valor do título.
+      setVoucherData({
+        staff,
+        credits: [{ description: title.description, value: title.value, type: 'HONORARIOS' }],
+        total: title.value,
+        date: title.paymentDate ? (title.paymentDate as any).toDate() : new Date()
+      });
+      setIsVoucherOpen(true);
+    } catch (e) {
+      toast({ variant: 'destructive', title: 'Erro ao carregar comprovante' });
     }
   };
 
@@ -457,21 +651,30 @@ export default function RepassesPage() {
         </TabsList>
 
         <TabsContent value="lawyers" className="mt-6">
-          <PayoutList filterRole="lawyer" onRefresh={() => setRefreshKey(k => k + 1)} />
+          <PayoutList filterRole="lawyer" onRefresh={() => setRefreshKey(k => k + 1)} onPaid={handleRepassePaid} />
         </TabsContent>
 
         <TabsContent value="staff" className="mt-6">
-          <PayoutList filterRole="employee" onRefresh={() => setRefreshKey(k => k + 1)} />
+          <PayoutList filterRole="employee" onRefresh={() => setRefreshKey(k => k + 1)} onPaid={handleRepassePaid} />
         </TabsContent>
 
         <TabsContent value="providers" className="mt-6">
-          <PayoutList filterRole="provider" onRefresh={() => setRefreshKey(k => k + 1)} />
+          <PayoutList filterRole="provider" onRefresh={() => setRefreshKey(k => k + 1)} onPaid={handleRepassePaid} />
         </TabsContent>
 
         <TabsContent value="history" className="mt-6">
-          <PaymentHistory />
+          <PaymentHistory onPaid={() => setRefreshKey(k => k + 1)} onShowVoucher={handleShowVoucherFromHistory} />
         </TabsContent>
       </Tabs>
+
+      <StaffVoucherDialog 
+        staff={voucherData.staff} 
+        credits={voucherData.credits} 
+        totalValue={voucherData.total}
+        paymentDate={voucherData.date}
+        open={isVoucherOpen}
+        onOpenChange={setIsVoucherOpen}
+      />
     </div>
   );
 }

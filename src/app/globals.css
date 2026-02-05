@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -148,7 +149,8 @@
 
   /* Container for the printable content */
   #receipt-print-area, 
-  #honorarios-print-area {
+  #honorarios-print-area,
+  #staff-voucher-print-area {
     width: 100% !important;
     height: auto !important;
     margin: 0 !important;
