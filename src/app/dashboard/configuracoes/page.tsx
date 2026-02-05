@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -20,6 +21,10 @@ import {
   Edit,
   Trash2,
   FolderTree,
+  ShieldCheck,
+  Headset,
+  ExternalLink,
+  Zap
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -507,6 +512,85 @@ function FinancialTab() {
   );
 }
 
+function LicenseTab() {
+    return (
+        <div className="space-y-6">
+            <Card className="border-primary/20 bg-primary/5">
+                <CardHeader>
+                    <div className="flex items-center gap-2 text-primary">
+                        <ShieldCheck className="h-5 w-5" />
+                        <CardTitle className="text-white">Licenciamento do Sistema</CardTitle>
+                    </div>
+                    <CardDescription>Informações sobre o contrato de uso e manutenção do LexFlow.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="p-4 rounded-xl bg-background border border-border/50">
+                            <p className="text-[10px] font-black uppercase text-muted-foreground mb-1">Plano Atual</p>
+                            <p className="text-lg font-bold text-white">Premium Jurídico</p>
+                        </div>
+                        <div className="p-4 rounded-xl bg-background border border-border/50">
+                            <p className="text-[10px] font-black uppercase text-muted-foreground mb-1">Status da Assinatura</p>
+                            <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30">ATIVO</Badge>
+                        </div>
+                        <div className="p-4 rounded-xl bg-background border border-border/50">
+                            <p className="text-[10px] font-black uppercase text-muted-foreground mb-1">Próxima Renovação</p>
+                            <p className="text-lg font-bold text-white">Mensal (Dia 05)</p>
+                        </div>
+                    </div>
+
+                    <div className="space-y-4">
+                        <h4 className="text-xs font-black uppercase tracking-widest text-primary flex items-center gap-2">
+                            <Zap className="h-3 w-3" /> Recursos Habilitados
+                        </h4>
+                        <div className="grid grid-cols-2 gap-2">
+                            {[
+                                'Integração Google Drive',
+                                'Google Agenda & Tasks Sync',
+                                'Análise Estratégica via IA',
+                                'Relatórios de BI Ilimitados',
+                                'Backup Automático Semanal',
+                                'Suporte Técnico Prioritário'
+                            ].map((feature, i) => (
+                                <div key={i} className="flex items-center gap-2 text-xs text-slate-300">
+                                    <ShieldCheck className="h-3 w-3 text-emerald-500" />
+                                    {feature}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <div className="flex items-center gap-2">
+                        <Headset className="h-5 w-5 text-blue-400" />
+                        <CardTitle>Suporte e Manutenção</CardTitle>
+                    </div>
+                    <CardDescription>Central de atendimento técnico para o escritório.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between p-4 rounded-xl border bg-muted/30">
+                        <div className="space-y-1">
+                            <p className="text-sm font-bold">Suporte Via WhatsApp</p>
+                            <p className="text-xs text-muted-foreground">Fale diretamente com o desenvolvedor responsável.</p>
+                        </div>
+                        <Button variant="outline" size="sm" asChild>
+                            <a href="https://wa.me/5511980590128" target="_blank" className="gap-2">
+                                <ExternalLink className="h-3.5 w-3.5" /> Abrir Chat
+                            </a>
+                        </Button>
+                    </div>
+                    <div className="p-4 rounded-xl border bg-blue-500/5 text-blue-400 text-xs italic leading-relaxed">
+                        A manutenção mensal inclui atualizações de segurança, correções de bugs, monitoramento de cotas de IA e ajustes finos nas integrações com o Google Workspace.
+                    </div>
+                </CardContent>
+            </Card>
+        </div>
+    );
+}
+
 
 export default function ConfiguracoesPage() {
   return (
@@ -518,15 +602,16 @@ export default function ConfiguracoesPage() {
       </div>
 
       <Tabs defaultValue="integracoes" className="w-full">
-        <TabsList className="grid w-full grid-cols-4 md:grid-cols-8 mb-6">
+        <TabsList className="grid w-full grid-cols-4 md:grid-cols-9 mb-6">
           <TabsTrigger value="geral">Geral</TabsTrigger>
           <TabsTrigger value="integracoes">Integrações</TabsTrigger>
           <TabsTrigger value="kit-cliente">Kit Cliente</TabsTrigger>
-          <TabsTrigger value="modelos-acervo">Modelos Acervo</TabsTrigger>
+          <TabsTrigger value="modelos-acervo">Modelos</TabsTrigger>
           <TabsTrigger value="financeiro">Financeiro</TabsTrigger>
           <TabsTrigger value="usuarios">Usuários</TabsTrigger>
           <TabsTrigger value="aparencia">Aparência</TabsTrigger>
           <TabsTrigger value="backup">Backup</TabsTrigger>
+          <TabsTrigger value="licenca">Licença</TabsTrigger>
         </TabsList>
 
         <TabsContent value="geral">
@@ -585,6 +670,10 @@ export default function ConfiguracoesPage() {
 
         <TabsContent value="backup">
           <BackupManager />
+        </TabsContent>
+
+        <TabsContent value="licenca">
+          <LicenseTab />
         </TabsContent>
       </Tabs>
     </div>
