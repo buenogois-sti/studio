@@ -1,4 +1,5 @@
 
+'use server';
 'use client';
 import * as React from 'react';
 import {
@@ -25,7 +26,9 @@ import {
   Handshake,
   User,
   ExternalLink,
-  Info
+  Info,
+  Building,
+  Users
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
