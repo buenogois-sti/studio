@@ -42,8 +42,8 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { Badge } from '../ui/badge';
-import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, limit, where } from 'firebase/firestore';
+import { useFirebase, useCollection, useMemoFirebase, useDoc } from '@/firebase';
+import { collection, query, orderBy, limit, where, doc } from 'firebase/firestore';
 import { Skeleton } from '../ui/skeleton';
 
 interface StaffDetailsSheetProps {
@@ -73,7 +73,7 @@ export function StaffDetailsSheet({ staff, processes, open, onOpenChange }: Staf
   const { firestore } = useFirebase();
   const { toast } = useToast();
 
-  // Hooks de dados no topo
+  // 1. Hooks de dados (Sempre no topo)
   const creditsQuery = useMemoFirebase(
     () => (firestore && staff?.id ? query(collection(firestore, `staff/${staff.id}/credits`), orderBy('date', 'desc')) : null),
     [firestore, staff?.id, open]
@@ -92,6 +92,7 @@ export function StaffDetailsSheet({ staff, processes, open, onOpenChange }: Staf
   );
   const { data: logs, isLoading: isLoadingLogs } = useCollection<Log>(logsQuery);
 
+  // 2. Memos para cálculos
   const financialSummary = React.useMemo(() => {
     if (!credits) return { paid: 0, available: 0, retained: 0 };
     return credits.reduce((acc, c) => {
@@ -230,7 +231,7 @@ export function StaffDetailsSheet({ staff, processes, open, onOpenChange }: Staf
           </div>
 
           <ScrollArea className="flex-1">
-            <div className="p-6">
+            <div className="p-6 pb-20">
               <TabsContent value="profile" className="m-0 space-y-8 animate-in fade-in duration-300">
                 <div className="grid grid-cols-2 gap-4">
                     <div className="p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/10 flex flex-col items-center text-center">
@@ -329,7 +330,6 @@ export function StaffDetailsSheet({ staff, processes, open, onOpenChange }: Staf
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      {/* Mostrar Reembolsos não processados como créditos ainda */}
                       {reimbursements?.filter(r => r.status === 'SOLICITADO').map(r => (
                         <div key={r.id} className="flex items-center justify-between p-4 rounded-xl bg-blue-500/5 border border-blue-500/20">
                           <div className="flex-1 min-w-0">
@@ -346,7 +346,6 @@ export function StaffDetailsSheet({ staff, processes, open, onOpenChange }: Staf
                         </div>
                       ))}
 
-                      {/* Mostrar Créditos (Honorários e Reembolsos Aprovados/Pagos) */}
                       {credits?.map(credit => (
                         <div key={credit.id} className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5 group hover:bg-white/10 transition-all">
                           <div className="flex-1 min-w-0">
@@ -404,7 +403,7 @@ export function StaffDetailsSheet({ staff, processes, open, onOpenChange }: Staf
                           <div className="flex items-center justify-between mb-1">
                             <span className="text-[9px] font-black uppercase text-primary tracking-widest">{log.action || 'ATIVIDADE'}</span>
                             <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                              <Clock className="h-3 w-3" /> {format(log.timestamp.toDate(), "dd/MM/yy HH:mm")}
+                              <Clock className="h-3 w-3" /> {log.timestamp ? format(log.timestamp.toDate(), "dd/MM/yy HH:mm") : 'Agora'}
                             </span>
                           </div>
                           <p className="text-sm text-slate-300 leading-relaxed">{log.description}</p>
@@ -412,14 +411,17 @@ export function StaffDetailsSheet({ staff, processes, open, onOpenChange }: Staf
                       </div>
                     ))
                   ) : (
-                    <div className="py-20 text-center opacity-30 italic text-sm">Sem histórico de atividades recente.</div>
+                    <div className="py-20 text-center opacity-30 flex flex-col items-center">
+                      <History className="h-12 w-12 mb-4 text-slate-500" />
+                      <p className="text-sm italic font-medium">Sem histórico de atividades recente.</p>
+                    </div>
                   )}
                 </div>
               </TabsContent>
             </div>
           </ScrollArea>
 
-          <div className="p-6 border-t border-white/5 bg-white/5 shrink-0 flex items-center justify-between text-[10px] text-muted-foreground">
+          <div className="p-6 border-t border-white/5 bg-white/5 shrink-0 flex items-center justify-between text-[10px] text-muted-foreground mt-auto">
             <div className="flex items-center gap-2 font-bold uppercase tracking-tighter">
                 <Calendar className="h-3 w-3 text-primary" />
                 <span>Colaborador desde {formatDate(staff.createdAt)}</span>
