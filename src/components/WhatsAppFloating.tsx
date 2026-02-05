@@ -116,7 +116,11 @@ export const WhatsAppFloating = React.memo(function WhatsAppFloating({
                   <h3 className="font-semibold text-white text-sm">{userName}</h3>
                   <p className="text-xs text-white/70">
                     Online
-                        <span className="flex gap-1">
+                    <span className="ml-2 inline-flex items-center gap-1">
+                      <span className="h-1.5 w-1.5 rounded-full bg-white/70" />
+                      <span className="h-1.5 w-1.5 rounded-full bg-white/70" />
+                      <span className="h-1.5 w-1.5 rounded-full bg-white/70" />
+                    </span>
                   </p>
                 </div>
               </div>
@@ -184,9 +188,8 @@ export const WhatsAppFloating = React.memo(function WhatsAppFloating({
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                     </svg>
                   </div>
-                  </button>
-                </div>
-              )}
+                </button>
+              </div>
             </div>
 
             {/* Footer - Powered by WhatsApp */}
