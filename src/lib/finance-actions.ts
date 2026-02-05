@@ -1,4 +1,3 @@
-
 'use server';
 import { firestoreAdmin } from '@/firebase/admin';
 import type { FinancialTitle, Process, FinancialEvent, Staff } from './types';
@@ -76,6 +75,7 @@ export async function createFinancialEventAndTitles(data: CreateEventData) {
     batch.set(titleRef, newTitle);
   }
 
+  // REGRA DE NEGÓCIO DE REPASSE (HONORÁRIOS SOBRE HONORÁRIOS)
   if (leadLawyerId) {
     const lawyerDoc = await firestoreAdmin.collection('staff').doc(leadLawyerId).get();
     if (lawyerDoc.exists) {
@@ -85,17 +85,25 @@ export async function createFinancialEventAndTitles(data: CreateEventData) {
       if (rem) {
         let lawyerValue = 0;
         
+        // O escritório cobra 30% do cliente (padrão Bueno Gois)
+        const officeFeeTotal = totalValue * 0.3;
+
         if ((rem.type === 'SUCUMBENCIA' || rem.type === 'QUOTA_LITIS') && rem.lawyerPercentage) {
-          lawyerValue = totalValue * (rem.lawyerPercentage / 100);
+          // O advogado recebe X% dos 30% do escritório
+          lawyerValue = officeFeeTotal * (rem.lawyerPercentage / 100);
+        } else if (rem.type === 'FIXO_MENSAL' || rem.type === 'AUDIENCISTA') {
+          // Casos fixos não geram crédito variável por evento de processo automaticamente aqui
+          // Mas poderiam ser lançados conforme a necessidade
         }
 
         if (lawyerValue > 0) {
           const creditRef = firestoreAdmin.collection(`staff/${leadLawyerId}/credits`).doc();
           const newCredit: any = {
+            type: 'HONORARIOS',
             processId,
-            description: `Honorários (${rem.type}): ${description}`,
+            description: `Part. Honorários (${rem.type}): ${description}`,
             value: lawyerValue,
-            status: 'RETIDO',
+            status: 'RETIDO', // Fica retido até o título ser pago
             date: new Date(),
             financialEventId: eventRef.id
           };
@@ -141,17 +149,21 @@ export async function updateFinancialTitleStatus(titleId: string, status: 'PAGO'
     try {
         const titleRef = firestoreAdmin.collection('financial_titles').doc(titleId);
         const titleDoc = await titleRef.get();
+        if (!titleDoc.exists) throw new Error('Título não encontrado.');
+        
         const titleData = titleDoc.data() as FinancialTitle;
 
         const updateData: any = { status };
         if (status === 'PAGO') {
             updateData.paymentDate = FieldValue.serverTimestamp();
             
+            // Se o título está vinculado a um evento financeiro, libera os créditos dos advogados
             if (titleData.financialEventId) {
                 const staffSnapshot = await firestoreAdmin.collection('staff').get();
                 for (const staffDoc of staffSnapshot.docs) {
                     const creditsQuery = await staffDoc.ref.collection('credits')
                         .where('financialEventId', '==', titleData.financialEventId)
+                        .where('status', '==', 'RETIDO')
                         .get();
                     
                     for (const creditDoc of creditsQuery.docs) {
@@ -193,7 +205,7 @@ export async function processRepasse(staffId: string, creditIds: string[], total
   // 2. Lançar despesa no financeiro
   const titleRef = firestoreAdmin.collection('financial_titles').doc();
   const newTitle: Omit<FinancialTitle, 'id'> = {
-    description: `Repasse de Honorários: ${staffData.firstName} ${staffData.lastName}`,
+    description: `Repasse Consolidado: ${staffData.firstName} ${staffData.lastName}`,
     type: 'DESPESA',
     origin: 'HONORARIOS_PAGOS',
     value: totalValue,
@@ -207,13 +219,13 @@ export async function processRepasse(staffId: string, creditIds: string[], total
   try {
     await batch.commit();
     
-    // Notificar o advogado
+    // Notificar o profissional
     await createNotification({
-      userId: staffId, // Se o staffId for o mesmo do User UID
-      title: "Honorários Recebidos",
-      description: `O escritório processou um repasse de ${totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} para você.`,
+      userId: staffId,
+      title: "Repasse Recebido",
+      description: `O escritório processou um pagamento de ${totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} para você.`,
       type: 'finance',
-      href: '/dashboard/financeiro'
+      href: '/dashboard/reembolsos'
     });
 
     return { success: true };

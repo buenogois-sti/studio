@@ -2,7 +2,7 @@
 
 import { firestoreAdmin } from '@/firebase/admin';
 import type { Reimbursement, ReimbursementStatus } from './types';
-import { Timestamp } from 'firebase-admin/firestore';
+import { Timestamp, FieldValue } from 'firebase-admin/firestore';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/options';
 import { createNotification } from './notification-actions';
@@ -60,25 +60,44 @@ export async function updateReimbursementStatus(id: string, status: Reimbursemen
   if (!firestoreAdmin) throw new Error('Servidor indisponível.');
   
   const session = await getServerSession(authOptions);
-  if (!session || session.user.role !== 'admin') {
-    throw new Error('Apenas administradores podem alterar o status.');
+  if (!session || !['admin', 'financial'].includes(session.user.role || '')) {
+    throw new Error('Apenas administradores ou financeiro podem alterar o status.');
   }
 
   try {
     const ref = firestoreAdmin.collection('reimbursements').doc(id);
     const doc = await ref.get();
-    const data = doc.data();
+    const data = doc.data() as Reimbursement;
 
-    await ref.update({
+    if (!doc.exists) throw new Error('Solicitação não encontrada.');
+
+    const batch = firestoreAdmin.batch();
+    
+    batch.update(ref, {
       status,
       notes: notes || '',
       updatedAt: Timestamp.now(),
     });
 
+    // Se aprovado, integra com o módulo de Repasses (Staff Credits)
+    if (status === 'APROVADO' && data.userId) {
+      const creditRef = firestoreAdmin.collection(`staff/${data.userId}/credits`).doc();
+      batch.set(creditRef, {
+        type: 'REEMBOLSO',
+        description: `REEMBOLSO APROVADO: ${data.description}`,
+        value: data.value,
+        status: 'DISPONIVEL', // Reembolsos aprovados já entram como disponíveis
+        date: Timestamp.now(),
+        reimbursementId: id
+      });
+    }
+
+    await batch.commit();
+
     // Notificar o solicitante
     if (data?.userId) {
       const statusLabels = {
-        APROVADO: "✅ Aprovado",
+        APROVADO: "✅ Aprovado (Disponível p/ Repasse)",
         NEGADO: "❌ Negado",
         REEMBOLSADO: "💰 Pago"
       };
@@ -94,6 +113,7 @@ export async function updateReimbursementStatus(id: string, status: Reimbursemen
 
     return { success: true };
   } catch (error: any) {
+    console.error('Error updating reimbursement status:', error);
     throw new Error(error.message);
   }
 }

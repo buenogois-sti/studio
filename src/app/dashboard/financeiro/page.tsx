@@ -1,4 +1,3 @@
-
 'use client';
 import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -21,7 +20,9 @@ import {
   Printer,
   Wallet,
   CheckCircle2,
-  Scale
+  Scale,
+  FileText,
+  DollarSign
 } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, Timestamp, query, orderBy, deleteDoc, doc, getDocs, where } from 'firebase/firestore';
@@ -478,7 +479,7 @@ function RepassePaymentDialog({
         <DialogHeader>
           <DialogTitle className="text-white flex items-center gap-2 font-headline text-xl">
             <Wallet className="h-6 w-6 text-emerald-400" />
-            Processar Repasse de Honorários
+            Processar Repasse Consolidado
           </DialogTitle>
           <DialogDescription className="text-slate-400">
             Confirmando o pagamento para <span className="text-white font-bold">{staff.firstName} {staff.lastName}</span>.
@@ -492,14 +493,21 @@ function RepassePaymentDialog({
           </div>
 
           <div className="space-y-3">
-            <h4 className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Extrato de Créditos ({credits.length})</h4>
+            <h4 className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Extrato de Créditos e Reembolsos ({credits.length})</h4>
             <ScrollArea className="h-[200px] border border-white/5 rounded-xl p-2 bg-black/40">
               <div className="space-y-2">
                 {credits.map(c => (
                   <div key={c.id} className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/5 hover:border-emerald-500/30 transition-all">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-bold text-slate-200 truncate">{c.description}</p>
-                      <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-tighter">{c.processId ? `Vínculo: Processo Ativo` : 'Vínculo: Honorário Avulso'}</p>
+                    <div className="min-w-0 flex-1 flex items-center gap-3">
+                      <div className="h-8 w-8 rounded-full bg-white/5 flex items-center justify-center shrink-0">
+                        {c.type === 'REEMBOLSO' ? <FileText className="h-4 w-4 text-blue-400" /> : <DollarSign className="h-4 w-4 text-emerald-400" />}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-slate-200 truncate">{c.description}</p>
+                        <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-tighter">
+                          {c.type === 'REEMBOLSO' ? 'Natureza: Ressarcimento de Despesa' : 'Natureza: Participação em Honorários'}
+                        </p>
+                      </div>
                     </div>
                     <span className="text-sm font-black text-emerald-400 ml-4 tabular-nums">{c.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
                   </div>
@@ -510,7 +518,7 @@ function RepassePaymentDialog({
 
           <div className="flex items-start gap-3 p-4 rounded-xl bg-blue-500/5 border border-blue-500/20 text-[11px] text-blue-400 italic leading-relaxed">
             <AlertCircle className="h-4 w-4 shrink-0" />
-            <p>Esta operação é irreversível. Ao confirmar, o sistema registrará uma saída de caixa e dará quitação automática aos honorários deste profissional no histórico interno.</p>
+            <p>Esta operação é irreversível. Ao confirmar, o sistema registrará uma saída de caixa e dará quitação automática aos honorários e reembolsos deste profissional.</p>
           </div>
         </div>
 
@@ -547,7 +555,7 @@ function RepassesTab() {
     const credits = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     
     if (credits.length === 0) {
-      alert("Este profissional não possui créditos disponíveis para saque no momento.");
+      alert("Este profissional não possui créditos ou reembolsos disponíveis para saque no momento.");
       return;
     }
 
@@ -564,7 +572,7 @@ function RepassesTab() {
             <TableRow className="border-white/5">
               <TableHead className="text-muted-foreground">Profissional</TableHead>
               <TableHead className="text-muted-foreground">Perfil</TableHead>
-              <TableHead className="text-right text-muted-foreground">Disponível para Repasse</TableHead>
+              <TableHead className="text-right text-muted-foreground">Total Disponível (Honorários + Reembolsos)</TableHead>
               <TableHead className="text-right text-muted-foreground">Ação</TableHead>
             </TableRow>
           </TableHeader>
