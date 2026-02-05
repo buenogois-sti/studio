@@ -73,7 +73,7 @@ export function StaffDetailsSheet({ staff, processes, open, onOpenChange }: Staf
   const { firestore } = useFirebase();
   const { toast } = useToast();
 
-  // 1. Hooks de dados (Sempre no topo)
+  // Hooks de dados - Sempre no topo para evitar erro #310
   const creditsQuery = useMemoFirebase(
     () => (firestore && staff?.id ? query(collection(firestore, `staff/${staff.id}/credits`), orderBy('date', 'desc')) : null),
     [firestore, staff?.id, open]
@@ -92,7 +92,6 @@ export function StaffDetailsSheet({ staff, processes, open, onOpenChange }: Staf
   );
   const { data: logs, isLoading: isLoadingLogs } = useCollection<Log>(logsQuery);
 
-  // 2. Memos para cálculos
   const financialSummary = React.useMemo(() => {
     if (!credits) return { paid: 0, available: 0, retained: 0 };
     return credits.reduce((acc, c) => {

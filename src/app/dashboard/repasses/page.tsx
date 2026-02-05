@@ -416,14 +416,12 @@ export default function RepassesPage() {
   const { firestore } = useFirebase();
   const { toast } = useToast();
   
-  // 1. Estados
   const [isLaunching, setIsLaunching] = React.useState(false);
   const [stats, setStats] = React.useState({ totalPending: 0, totalPaidMonth: 0, staffCount: 0, totalRetained: 0 });
   const [refreshKey, setRefreshKey] = React.useState(0);
   const [isVoucherOpen, setIsVoucherOpen] = React.useState(false);
   const [voucherData, setVoucherData] = React.useState<{ staff: Staff | null, credits: any[], total: number, date?: Date }>({ staff: null, credits: [], total: 0 });
 
-  // 2. Efeito de carregamento de estatísticas
   const loadStats = React.useCallback(async () => {
     if (!firestore) return;
     try {
@@ -446,7 +444,6 @@ export default function RepassesPage() {
 
   React.useEffect(() => { loadStats(); }, [loadStats, refreshKey]);
 
-  // 3. Handlers
   const handleLaunchPayroll = async () => {
     if (!confirm('Deseja processar a folha de pagamento fixa de todos os colaboradores ativos?')) return;
     setIsLaunching(true);

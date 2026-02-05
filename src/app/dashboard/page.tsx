@@ -11,7 +11,8 @@ import {
   AlertCircle,
   CheckCircle2,
   Loader2,
-  BrainCircuit
+  BrainCircuit,
+  Users
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import {
@@ -143,6 +144,10 @@ export default function Dashboard() {
   const processesQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'processes'), limit(100)) : null), [firestore]);
   const { data: processesData, isLoading: isLoadingProcesses } = useCollection<Process>(processesQuery);
 
+  // OTIMIZAÇÃO: Clientes
+  const clientsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'clients'), limit(100)) : null), [firestore]);
+  const { data: clientsData, isLoading: isLoadingClients } = useCollection<Client>(clientsQuery);
+
   // OTIMIZAÇÃO: Audiências limitadas às próximas 10
   const hearingsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'hearings'), where('date', '>=', Timestamp.now()), orderBy('date', 'asc'), limit(10)) : null), [firestore]);
   const { data: hearingsData, isLoading: isLoadingHearings } = useCollection<Hearing>(hearingsQuery);
@@ -154,10 +159,10 @@ export default function Dashboard() {
   );
   const { data: logsData, isLoading: isLoadingLogs } = useCollection<Log>(logsQuery);
 
-  const isLoading = status === 'loading' || isLoadingTitles || isLoadingProcesses || isLoadingHearings || isLoadingLogs;
+  const isLoading = status === 'loading' || isLoadingTitles || isLoadingProcesses || isLoadingHearings || isLoadingLogs || isLoadingClients;
 
   const dashboardStats = React.useMemo(() => {
-    if (!titlesData || !processesData || !hearingsData) return { totalRevenue: 0, pendingReceivables: 0, totalOverdue: 0, activeProcessesCount: 0, upcomingHearingsCount: 0 };
+    if (!titlesData || !processesData || !hearingsData || !clientsData) return { totalRevenue: 0, pendingReceivables: 0, totalOverdue: 0, activeProcessesCount: 0, upcomingHearingsCount: 0, totalClients: 0 };
     
     const now = new Date();
     const revenue = titlesData
@@ -174,9 +179,10 @@ export default function Dashboard() {
 
     const activeProcesses = processesData.filter(p => p.status === 'Ativo').length;
     const upcomingHearings = hearingsData.length;
+    const totalClients = clientsData.length;
 
-    return { totalRevenue: revenue, pendingReceivables: pending, totalOverdue: overdue, activeProcessesCount: activeProcesses, upcomingHearingsCount: upcomingHearings };
-  }, [titlesData, processesData, hearingsData]);
+    return { totalRevenue: revenue, pendingReceivables: pending, totalOverdue: overdue, activeProcessesCount: activeProcesses, upcomingHearingsCount: upcomingHearings, totalClients };
+  }, [titlesData, processesData, hearingsData, clientsData]);
 
   const chartData = React.useMemo(() => {
     const monthLabels: {key: string, name: string}[] = [];
@@ -238,13 +244,20 @@ export default function Dashboard() {
         </Badge>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard 
           title="Faturamento Bruto" 
           value={dashboardStats.totalRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
           icon={DollarSign}
           href="/dashboard/financeiro"
           description="Recebido este mês"
+        />
+        <StatCard 
+          title="Total de Clientes" 
+          value={dashboardStats.totalClients}
+          icon={Users}
+          href="/dashboard/clientes"
+          description="Base de contatos"
         />
         <StatCard 
           title="Fila de Processos" 

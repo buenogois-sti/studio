@@ -70,13 +70,13 @@ const navItems = [
     href: '/dashboard/clientes',
     label: 'Clientes',
     icon: Users,
-    roles: ['admin', 'lawyer', 'assistant'],
+    roles: ['admin', 'lawyer', 'assistant', 'financial'],
   },
   {
     href: '/dashboard/processos',
     label: 'Processos',
     icon: FolderKanban,
-    roles: ['admin', 'lawyer', 'assistant'],
+    roles: ['admin', 'lawyer', 'assistant', 'financial'],
   },
   {
     href: '/dashboard/prazos',
