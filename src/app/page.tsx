@@ -88,12 +88,29 @@ function useScrollPosition() {
   const [scrollPosition, setScrollPosition] = useState(0);
 
   useEffect(() => {
+    let rafId: number;
+    let lastScrollY = 0;
+
     const handleScroll = () => {
-      setScrollPosition(window.scrollY);
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+      }
+      
+      rafId = requestAnimationFrame(() => {
+        const currentScrollY = window.scrollY;
+        // Only update if difference is significant (reduces re-renders)
+        if (Math.abs(currentScrollY - lastScrollY) > 10) {
+          setScrollPosition(currentScrollY);
+          lastScrollY = currentScrollY;
+        }
+      });
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      if (rafId) cancelAnimationFrame(rafId);
+    };
   }, []);
 
   return scrollPosition;
@@ -117,55 +134,56 @@ function useIntersectionObserver(options = {}) {
   return [setRef, isIntersecting] as const;
 }
 
-// Animated Components
-function ParallaxLayer({ children, speed = 1, className = '' }: { children: React.ReactNode; speed?: number; className?: string }) {
+// Animated Components - Optimized with React.memo
+const ParallaxLayer = React.memo(({ children, speed = 1, className = '' }: { children: React.ReactNode; speed?: number; className?: string }) => {
   const scrollY = useScrollPosition();
-  const transform = `translateY(${scrollY * speed}px)`;
+  const transform = React.useMemo(() => `translateY(${Math.round(scrollY * speed * 10) / 10}px)`, [scrollY, speed]);
 
   return (
-    <div className={className} style={{ transform, willChange: 'transform' }}>
+    <div className={className} style={{ transform }}>
       {children}
     </div>
   );
-}
+});
+ParallaxLayer.displayName = 'ParallaxLayer';
 
-function AnimatedSection({ children, className = '', delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) {
+const AnimatedSection = React.memo(({ children, className = '', delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) => {
   const [ref, isIntersecting] = useIntersectionObserver();
 
   return (
     <div
       ref={ref as any}
-      className={`transition-all duration-1000 ease-out ${
-        isIntersecting ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-20'
+      className={`transition-all duration-700 ease-out ${
+        isIntersecting ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
       } ${className}`}
       style={{ transitionDelay: `${delay}ms` }}
     >
       {children}
     </div>
   );
-}
+});
+AnimatedSection.displayName = 'AnimatedSection';
 
-function FloatingParticles() {
-  const [particles, setParticles] = useState<any[]>([]);
-
-  useEffect(() => {
-    const newParticles = Array.from({ length: 20 }, (_, i) => ({
+// Optimized - Reduced particles for better performance
+const FloatingParticles = React.memo(() => {
+  // Static particles - no state updates
+  const particles = React.useMemo(() => 
+    Array.from({ length: 8 }, (_, i) => ({
       id: i,
-      size: Math.random() * 4 + 2,
+      size: Math.random() * 3 + 2,
       x: Math.random() * 100,
       y: Math.random() * 100,
-      duration: Math.random() * 20 + 10,
-      delay: Math.random() * 5,
-    }));
-    setParticles(newParticles);
-  }, []);
+      duration: Math.random() * 15 + 10,
+      delay: i * 0.5,
+    })), []
+  );
 
   return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+    <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-40">
       {particles.map((particle) => (
         <div
           key={particle.id}
-          className="absolute rounded-full bg-primary/20"
+          className="absolute rounded-full bg-primary/30 will-change-transform"
           style={{
             width: `${particle.size}px`,
             height: `${particle.size}px`,
@@ -178,25 +196,22 @@ function FloatingParticles() {
       ))}
       <style jsx>{`
         @keyframes float {
-          0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.5; }
-          25% { transform: translate(20px, -20px) scale(1.1); opacity: 0.8; }
-          50% { transform: translate(-20px, 20px) scale(0.9); opacity: 0.6; }
-          75% { transform: translate(20px, 10px) scale(1.05); opacity: 0.7; }
+          0%, 100% { transform: translate(0, 0); opacity: 0.4; }
+          50% { transform: translate(-15px, 15px); opacity: 0.6; }
         }
       `}</style>
     </div>
   );
-}
+});
+FloatingParticles.displayName = 'FloatingParticles';
 
-function AnimatedGradientBg() {
-  return (
-    <div className="absolute inset-0 overflow-hidden">
-      <div className="absolute -top-1/2 -left-1/2 w-full h-full bg-gradient-to-br from-primary/20 via-transparent to-transparent rounded-full blur-3xl animate-pulse" />
-      <div className="absolute top-1/4 right-0 w-96 h-96 bg-gradient-to-bl from-primary/10 via-transparent to-transparent rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }} />
-      <div className="absolute bottom-0 left-1/3 w-80 h-80 bg-gradient-to-tr from-primary/10 via-transparent to-transparent rounded-full blur-3xl animate-pulse" style={{ animationDelay: '4s' }} />
-    </div>
-  );
-}
+const AnimatedGradientBg = React.memo(() => (
+  <div className="absolute inset-0 overflow-hidden pointer-events-none">
+    <div className="absolute -top-1/2 -left-1/2 w-full h-full bg-gradient-to-br from-primary/10 via-transparent to-transparent rounded-full blur-3xl opacity-50" />
+    <div className="absolute top-1/4 right-0 w-96 h-96 bg-gradient-to-bl from-primary/5 via-transparent to-transparent rounded-full blur-2xl opacity-60" />
+  </div>
+));
+AnimatedGradientBg.displayName = 'AnimatedGradientBg';
 
 export default function LandingPage() {
   const scrollY = useScrollPosition();

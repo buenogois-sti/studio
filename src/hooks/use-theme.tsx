@@ -13,24 +13,20 @@ interface ThemeContextType {
 const ThemeContext = React.createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [mounted, setMounted] = React.useState(false);
-
   React.useEffect(() => {
-    setMounted(true);
     // Remove dark class if it exists
     document.documentElement.classList.remove('dark');
     localStorage.removeItem('theme');
   }, []);
 
-  const toggleTheme = () => {};
-  const setTheme = () => {};
-
-  if (!mounted) {
-    return <>{children}</>;
-  }
+  const value = React.useMemo(() => ({
+    theme: 'light' as Theme,
+    toggleTheme: () => {},
+    setTheme: () => {},
+  }), []);
 
   return (
-    <ThemeContext.Provider value={{ theme: 'light', toggleTheme, setTheme }}>
+    <ThemeContext.Provider value={value}>
       {children}
     </ThemeContext.Provider>
   );
