@@ -30,18 +30,20 @@ import {
   History,
   Activity,
   CheckCircle2,
-  Clock
+  Clock,
+  Receipt,
+  Coins
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import type { Staff, Process, StaffCredit, Log } from '@/lib/types';
+import type { Staff, Process, StaffCredit, Log, Reimbursement } from '@/lib/types';
 import { useToast } from '@/components/ui/use-toast';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { Badge } from '../ui/badge';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, limit } from 'firebase/firestore';
+import { collection, query, orderBy, limit, where } from 'firebase/firestore';
 import { Skeleton } from '../ui/skeleton';
 
 interface StaffDetailsSheetProps {
@@ -71,12 +73,18 @@ export function StaffDetailsSheet({ staff, processes, open, onOpenChange }: Staf
   const { firestore } = useFirebase();
   const { toast } = useToast();
 
-  // Hooks declarados no topo absoluto para evitar erro 310
+  // Hooks de dados no topo
   const creditsQuery = useMemoFirebase(
     () => (firestore && staff?.id ? query(collection(firestore, `staff/${staff.id}/credits`), orderBy('date', 'desc')) : null),
     [firestore, staff?.id, open]
   );
   const { data: credits, isLoading: isLoadingCredits } = useCollection<StaffCredit>(creditsQuery);
+
+  const reimbursementsQuery = useMemoFirebase(
+    () => (firestore && staff?.id ? query(collection(firestore, 'reimbursements'), where('userId', '==', staff.id), orderBy('requestDate', 'desc')) : null),
+    [firestore, staff?.id, open]
+  );
+  const { data: reimbursements, isLoading: isLoadingReimbursements } = useCollection<Reimbursement>(reimbursementsQuery);
 
   const logsQuery = useMemoFirebase(
     () => (firestore && staff?.id ? query(collection(firestore, `users/${staff.id}/logs`), orderBy('timestamp', 'desc'), limit(50)) : null),
@@ -96,7 +104,7 @@ export function StaffDetailsSheet({ staff, processes, open, onOpenChange }: Staf
 
   const staffProcesses = React.useMemo(() => {
     if (!staff) return [];
-    return processes.filter(p => staff.id && p.responsibleStaffIds?.includes(staff.id));
+    return processes.filter(p => staff.id && (p.leadLawyerId === staff.id || p.responsibleStaffIds?.includes(staff.id)));
   }, [staff, processes]);
 
   const activeCount = React.useMemo(() => staffProcesses.filter(p => p.status === 'Ativo').length, [staffProcesses]);
@@ -217,7 +225,7 @@ export function StaffDetailsSheet({ staff, processes, open, onOpenChange }: Staf
             <TabsList className="bg-transparent gap-6 h-12 p-0">
               <TabsTrigger value="profile" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent text-slate-400 data-[state=active]:text-white font-bold h-full px-0">Ficha do Membro</TabsTrigger>
               <TabsTrigger value="financial" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent text-slate-400 data-[state=active]:text-white font-bold h-full px-0">Histórico Financeiro</TabsTrigger>
-              <TabsTrigger value="activity" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent text-slate-400 data-[state=active]:text-white font-bold h-full px-0">Relatório de Atividades</TabsTrigger>
+              <TabsTrigger value="activity" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent text-slate-400 data-[state=active]:text-white font-bold h-full px-0">Monitor de Atividade</TabsTrigger>
             </TabsList>
           </div>
 
@@ -243,11 +251,11 @@ export function StaffDetailsSheet({ staff, processes, open, onOpenChange }: Staf
                           <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
                               <DollarSign className="h-4 w-4 text-primary" />
                           </div>
-                          <h3 className="font-black text-xs uppercase tracking-widest text-muted-foreground">Regra de Negócio / Pagamento</h3>
+                          <h3 className="font-black text-xs uppercase tracking-widest text-muted-foreground">Regra de Negócio</h3>
                       </div>
                       <div className="p-6 rounded-2xl bg-primary/5 border-2 border-primary/20 space-y-4">
                           <div className="flex items-center justify-between">
-                              <span className="text-xs font-bold text-white uppercase tracking-tighter">Modalidade Base:</span>
+                              <span className="text-xs font-bold text-white uppercase tracking-tighter">Modalidade:</span>
                               <Badge className="bg-primary text-primary-foreground font-black">{remunerationLabels[staff.remuneration.type]}</Badge>
                           </div>
                           <Separator className="bg-primary/10" />
@@ -264,35 +272,11 @@ export function StaffDetailsSheet({ staff, processes, open, onOpenChange }: Staf
                                       </div>
                                   </>
                               )}
-                              {staff.remuneration.type === 'QUOTA_LITIS' && (
-                                  <div className="col-span-2">
-                                      <p className="text-[10px] uppercase font-black text-muted-foreground">Participação no Êxito</p>
-                                      <p className="text-lg font-black text-primary">{staff.remuneration.lawyerPercentage}% <span className="text-xs font-normal text-muted-foreground">após recebimento do cliente</span></p>
-                                  </div>
-                              )}
                               {staff.remuneration.type === 'FIXO_MENSAL' && (
                                   <div className="col-span-2">
                                       <p className="text-[10px] uppercase font-black text-muted-foreground">Valor Mensal Fixo</p>
                                       <p className="text-lg font-black text-white">{staff.remuneration.fixedMonthlyValue?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
                                   </div>
-                              )}
-                              {staff.remuneration.type === 'AUDIENCISTA' && (
-                                  <div className="col-span-2">
-                                      <p className="text-[10px] uppercase font-black text-muted-foreground">Pagamento por Audiência</p>
-                                      <p className="text-lg font-black text-white">{staff.remuneration.valuePerHearing?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
-                                  </div>
-                              )}
-                              {staff.remuneration.type === 'PRODUCAO' && (
-                                  <>
-                                      <div>
-                                          <p className="text-[10px] uppercase font-black text-muted-foreground">Valor p/ Peça</p>
-                                          <p className="text-sm font-black text-white">{staff.remuneration.activityPrices?.drafting?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
-                                      </div>
-                                      <div>
-                                          <p className="text-[10px] uppercase font-black text-muted-foreground">Valor p/ Diligência</p>
-                                          <p className="text-sm font-black text-white">{staff.remuneration.activityPrices?.diligence?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
-                                      </div>
-                                  </>
                               )}
                           </div>
                       </div>
@@ -315,20 +299,6 @@ export function StaffDetailsSheet({ staff, processes, open, onOpenChange }: Staf
                       <InfoRow icon={Phone} label="Telefone" value={staff.phone} actionType="phone" />
                   </div>
                 </section>
-
-                <section>
-                  <div className="flex items-center gap-2 mb-4">
-                      <div className="h-8 w-8 rounded-lg bg-purple-500/10 flex items-center justify-center">
-                          <CreditCard className="h-4 w-4 text-purple-500" />
-                      </div>
-                      <h3 className="font-black text-xs uppercase tracking-widest text-muted-foreground">Dados Financeiros</h3>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 bg-white/5 p-6 rounded-2xl border border-white/10">
-                      <InfoRow icon={CreditCard} label="Banco" value={staff.bankInfo?.bankName} actionType="copy" />
-                      <InfoRow icon={CreditCard} label="Agência / Conta" value={staff.bankInfo?.agency ? `${staff.bankInfo.agency} / ${staff.bankInfo.account || ''}` : undefined} actionType="copy" />
-                      <InfoRow icon={Smartphone} label="Chave PIX" value={staff.bankInfo?.pixKey} actionType="copy" className="col-span-full" />
-                  </div>
-                </section>
               </TabsContent>
 
               <TabsContent value="financial" className="m-0 space-y-8 animate-in fade-in duration-300">
@@ -347,19 +317,37 @@ export function StaffDetailsSheet({ staff, processes, open, onOpenChange }: Staf
                   </div>
                 </div>
 
-                <div className="space-y-4">
+                <div className="space-y-6">
                   <div className="flex items-center gap-2">
                     <History className="h-4 w-4 text-primary" />
-                    <h3 className="font-black text-xs uppercase tracking-widest text-muted-foreground">Extrato Completo</h3>
+                    <h3 className="font-black text-xs uppercase tracking-widest text-muted-foreground">Extrato Consolidado</h3>
                   </div>
                   
-                  {isLoadingCredits ? (
+                  {isLoadingCredits || isLoadingReimbursements ? (
                     <div className="space-y-3">
                       {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-xl bg-white/5" />)}
                     </div>
-                  ) : credits && credits.length > 0 ? (
-                    <div className="space-y-2">
-                      {credits.map(credit => (
+                  ) : (
+                    <div className="space-y-3">
+                      {/* Mostrar Reembolsos não processados como créditos ainda */}
+                      {reimbursements?.filter(r => r.status === 'SOLICITADO').map(r => (
+                        <div key={r.id} className="flex items-center justify-between p-4 rounded-xl bg-blue-500/5 border border-blue-500/20">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <Badge variant="outline" className="text-[8px] font-black uppercase px-1.5 h-4 border-none bg-blue-500/20 text-blue-400">AGUARDANDO</Badge>
+                              <span className="text-[10px] text-muted-foreground font-bold">{format(r.requestDate.toDate(), 'dd/MM/yyyy')}</span>
+                            </div>
+                            <p className="text-sm font-bold text-slate-200 truncate">{r.description}</p>
+                          </div>
+                          <div className="text-right ml-4">
+                            <p className="text-sm font-black text-white tabular-nums">{r.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                            <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-tighter flex items-center gap-1 justify-end"><Receipt className="h-2.5 w-2.5" /> REEMBOLSO</p>
+                          </div>
+                        </div>
+                      ))}
+
+                      {/* Mostrar Créditos (Honorários e Reembolsos Aprovados/Pagos) */}
+                      {credits?.map(credit => (
                         <div key={credit.id} className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5 group hover:bg-white/10 transition-all">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
@@ -376,13 +364,18 @@ export function StaffDetailsSheet({ staff, processes, open, onOpenChange }: Staf
                           </div>
                           <div className="text-right ml-4">
                             <p className="text-sm font-black text-white tabular-nums">{credit.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
-                            <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-tighter">{credit.type}</p>
+                            <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-tighter flex items-center gap-1 justify-end">
+                              {credit.type === 'REEMBOLSO' ? <Receipt className="h-2.5 w-2.5" /> : <Coins className="h-2.5 w-2.5" />}
+                              {credit.type}
+                            </p>
                           </div>
                         </div>
                       ))}
+
+                      {(!credits || credits.length === 0) && (!reimbursements || reimbursements.length === 0) && (
+                        <div className="py-20 text-center opacity-30 italic text-sm">Nenhum lançamento financeiro registrado.</div>
+                      )}
                     </div>
-                  ) : (
-                    <div className="py-20 text-center opacity-30 italic text-sm">Nenhum lançamento financeiro registrado.</div>
                   )}
                 </div>
               </TabsContent>
@@ -391,9 +384,9 @@ export function StaffDetailsSheet({ staff, processes, open, onOpenChange }: Staf
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Activity className="h-4 w-4 text-primary" />
-                    <h3 className="font-black text-xs uppercase tracking-widest text-muted-foreground">Monitor de Produtividade</h3>
+                    <h3 className="font-black text-xs uppercase tracking-widest text-muted-foreground">Monitor de Atividade</h3>
                   </div>
-                  <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20">{logs?.length || 0} Eventos Recentes</Badge>
+                  <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20">{logs?.length || 0} Eventos</Badge>
                 </div>
 
                 <div className="relative space-y-6 before:absolute before:inset-0 before:ml-5 before:-translate-x-px before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-border/20 before:to-transparent">
@@ -419,7 +412,7 @@ export function StaffDetailsSheet({ staff, processes, open, onOpenChange }: Staf
                       </div>
                     ))
                   ) : (
-                    <div className="py-20 text-center opacity-30 italic text-sm">Sem histórico de atividades registrado no sistema.</div>
+                    <div className="py-20 text-center opacity-30 italic text-sm">Sem histórico de atividades recente.</div>
                   )}
                 </div>
               </TabsContent>
