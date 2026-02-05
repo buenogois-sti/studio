@@ -29,7 +29,7 @@ import {
 } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, Timestamp, query, orderBy, deleteDoc, doc, getDocs, where } from 'firebase/firestore';
-import type { FinancialTitle, Staff, Client } from '@/lib/types';
+import type { FinancialTitle, Staff, Client, Process } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -226,52 +226,117 @@ function NewTitleDialog({ onCreated }: { onCreated: () => void }) {
 
 function ReceiptDialog({ 
   title, 
-  client, 
+  client,
+  process,
   open, 
   onOpenChange 
 }: { 
   title: FinancialTitle | null; 
   client?: Client; 
+  process?: Process;
   open: boolean; 
   onOpenChange: (open: boolean) => void 
 }) {
   if (!title) return null;
 
   const handlePrint = () => { window.print(); };
-  const formattedValue = title.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  
+  // Cálculo de Repasse (Upgrade solicitado)
+  // Geralmente honorários são 30% em causas trabalhistas
+  const totalValue = title.value;
+  const feePercent = 30; 
+  const feeValue = totalValue * (feePercent / 100);
+  const netValue = totalValue - feeValue;
+
+  const formattedTotal = totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const formattedFee = feeValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const formattedNet = netValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  
+  const opposingParty = process?.opposingParties?.[0]?.name || "Parte Executada";
   const today = format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl bg-white text-slate-900 p-0 overflow-hidden">
-        <div className="p-8 space-y-8 print:p-0">
-          <div className="flex justify-between items-start border-b pb-6">
+      <DialogContent className="sm:max-w-2xl bg-white text-slate-900 p-0 overflow-hidden border-none shadow-2xl">
+        <div className="p-8 space-y-6 print:p-0">
+          {/* Header Bueno Gois */}
+          <div className="flex justify-between items-start border-b-2 border-slate-900 pb-6">
             <div className="space-y-1">
-              <h2 className="text-xl font-bold uppercase tracking-tighter">Bueno Gois Advogados</h2>
-              <p className="text-[10px] text-slate-500 uppercase font-medium">CNPJ: 00.000.000/0001-00</p>
-              <p className="text-[10px] text-slate-500">Rua Marechal Deodoro, 1594 - SBC/SP</p>
+              <h2 className="text-xl font-bold uppercase tracking-tighter text-slate-900">Bueno Gois Advogados</h2>
+              <p className="text-[10px] text-slate-600 uppercase font-bold">CNPJ: 00.000.000/0001-00 | OAB/SP 000.000</p>
+              <p className="text-[10px] text-slate-600">Rua Marechal Deodoro, 1594 - SBC/SP</p>
             </div>
             <div className="text-right">
-              <div className="text-2xl font-black text-slate-900">RECIBO</div>
-              <div className="text-sm font-bold text-slate-500">Nº {title.id.substring(0, 8).toUpperCase()}</div>
+              <div className="text-2xl font-black text-slate-900 leading-none">RECIBO DE REPASSE</div>
+              <div className="text-[10px] font-bold text-slate-500 uppercase mt-1">Controle: {title.id.substring(0, 8).toUpperCase()}</div>
             </div>
           </div>
-          <div className="py-10 space-y-6 text-lg leading-relaxed">
-            <p>Recebemos de <strong className="border-b-2 border-slate-900 pb-0.5">{client ? `${client.firstName} ${client.lastName}` : 'Cliente não identificado'}</strong>, inscrito no CPF/CNPJ <strong className="border-b-2 border-slate-900 pb-0.5">{client?.document || 'N/A'}</strong>, a importância de <strong className="text-2xl font-black">{formattedValue}</strong>.</p>
-            <p>Referente a: <span className="italic text-slate-700">{title.description}</span></p>
+
+          {/* Corpo do Recibo */}
+          <div className="py-4 space-y-6 text-base leading-relaxed text-justify">
+            <p>
+              Declaramos para os devidos fins que o escritório <strong>Bueno Gois Advogados e Associados</strong> recebeu de <strong>{opposingParty}</strong> a importância bruta de <strong>{formattedTotal}</strong>, referente ao pagamento de <i>{title.description}</i> no âmbito do processo judicial nº <strong>{process?.processNumber || 'N/A'}</strong>.
+            </p>
+            
+            <p>
+              Pelo presente instrumento, o escritório efetua o repasse de valores ao cliente <strong>{client ? `${client.firstName} ${client.lastName}` : 'N/A'}</strong>, inscrito no CPF/CNPJ <strong>{client?.document || 'N/A'}</strong>, procedendo com a dedução da verba honorária advocatícia contratual, conforme demonstrativo discriminado abaixo:
+            </p>
           </div>
-          <div className="pt-12 flex flex-col items-center gap-12">
-            <p className="text-sm font-medium">São Bernardo do Campo, {today}</p>
-            <div className="flex flex-col items-center w-full max-w-xs pt-4">
-              <div className="w-full border-t border-slate-900 mb-2" />
-              <p className="text-xs font-bold uppercase tracking-widest">Bueno Gois Advogados e Associados</p>
-              <p className="text-[10px] text-slate-500">Representante Legal</p>
+
+          {/* Demonstrativo Financeiro (Upgrade solicitado) */}
+          <div className="bg-slate-50 border-2 border-slate-200 rounded-xl overflow-hidden my-6">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-100 border-b border-slate-200">
+                <tr>
+                  <th className="px-4 py-3 text-left font-bold uppercase text-[10px] tracking-widest text-slate-600">Discriminação das Verbas</th>
+                  <th className="px-4 py-3 text-right font-bold uppercase text-[10px] tracking-widest text-slate-600">Valor (R$)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200">
+                <tr>
+                  <td className="px-4 py-3 font-medium">Valor Bruto Recebido do Réu</td>
+                  <td className="px-4 py-3 text-right font-bold">{formattedTotal}</td>
+                </tr>
+                <tr className="text-rose-600 bg-rose-50/30">
+                  <td className="px-4 py-3 font-medium">(-) Honorários Advocatícios Contratuais ({feePercent}%)</td>
+                  <td className="px-4 py-3 text-right font-bold italic">({formattedFee})</td>
+                </tr>
+                <tr className="bg-emerald-50 font-black text-emerald-900 border-t-2 border-emerald-200">
+                  <td className="px-4 py-3 uppercase tracking-tighter">Valor Líquido a Repassar ao Cliente</td>
+                  <td className="px-4 py-3 text-right text-lg">{formattedNet}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* Quitação e Data */}
+          <div className="text-sm text-center italic text-slate-600 py-4">
+            "O cliente declara ter conferido os valores acima e dá plena, rasa e geral quitação para nada mais reclamar quanto ao objeto deste pagamento."
+          </div>
+
+          <div className="pt-8 flex flex-col items-center gap-12">
+            <p className="text-sm font-bold">São Bernardo do Campo, {today}</p>
+            
+            <div className="grid grid-cols-2 gap-12 w-full max-w-lg pt-4">
+              <div className="flex flex-col items-center text-center">
+                <div className="w-full border-t border-slate-900 mb-2" />
+                <p className="text-[9px] font-black uppercase tracking-widest">Bueno Gois Advogados</p>
+                <p className="text-[8px] text-slate-500">Representante Legal</p>
+              </div>
+              <div className="flex flex-col items-center text-center">
+                <div className="w-full border-t border-slate-900 mb-2" />
+                <p className="text-[9px] font-black uppercase tracking-widest">{client ? `${client.firstName} ${client.lastName}` : 'Beneficiário'}</p>
+                <p className="text-[8px] text-slate-500">Cliente / Beneficiário</p>
+              </div>
             </div>
           </div>
         </div>
-        <DialogFooter className="p-4 bg-slate-50 border-t print:hidden">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Fechar</Button>
-          <Button onClick={handlePrint} className="gap-2"><Printer className="h-4 w-4" /> Imprimir Recibo</Button>
+
+        <DialogFooter className="p-4 bg-slate-100 border-t print:hidden">
+          <Button variant="outline" onClick={() => onOpenChange(false)} className="text-slate-600 border-slate-300">Fechar Janela</Button>
+          <Button onClick={handlePrint} className="gap-2 bg-slate-900 text-white hover:bg-slate-800">
+            <Printer className="h-4 w-4" /> Imprimir Documento
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -371,19 +436,107 @@ function RepassePaymentDialog({
   );
 }
 
-// TODO: Implementar repasses quando a estrutura de créditos for definida
 function RepassesTab() {
+  const { firestore } = useFirebase();
+  const [selectedStaff, setSelectedStaff] = React.useState<Staff | null>(null);
+  const [staffCredits, setStaffCredits] = React.useState<any[]>([]);
+  const [isRepasseOpen, setIsRepasseOpen] = React.useState(false);
+
+  const staffQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'staff') : null), [firestore]);
+  const { data: staffData, isLoading: isLoadingStaff } = useCollection<Staff>(staffQuery);
+
+  const handleOpenRepasse = async (member: Staff) => {
+    if (!firestore) return;
+    const creditsRef = collection(firestore, `staff/${member.id}/credits`);
+    const q = query(creditsRef, where('status', '==', 'DISPONIVEL'));
+    const snapshot = await getDocs(q);
+    const credits = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    
+    if (credits.length === 0) {
+      alert("Este profissional não possui créditos disponíveis para saque no momento.");
+      return;
+    }
+
+    setStaffCredits(credits);
+    setSelectedStaff(member);
+    setIsRepasseOpen(true);
+  };
+
   return (
-    <Card className="bg-[#0f172a] border-white/5 p-12 text-center flex flex-col items-center gap-4">
-      <div className="h-16 w-16 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-400">
-        <AlertCircle className="h-8 w-8" />
-      </div>
-      <div className="space-y-2">
-        <h3 className="text-xl font-bold text-white">Módulo de Reparesses</h3>
-        <p className="text-muted-foreground max-w-sm">Este módulo está sendo desenvolvido. Em breve você poderá gerenciar os pagamentos e reparesses para os profissionais da equipe.</p>
-      </div>
-    </Card>
+    <>
+      <Card className="bg-[#0f172a] border-white/5 overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow className="border-white/5">
+              <TableHead className="text-muted-foreground">Profissional</TableHead>
+              <TableHead className="text-muted-foreground">Perfil</TableHead>
+              <TableHead className="text-right text-muted-foreground">Disponível para Repasse</TableHead>
+              <TableHead className="text-right text-muted-foreground">Ação</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoadingStaff ? (
+              Array.from({ length: 3 }).map((_, i) => (
+                <TableRow key={i}><TableCell colSpan={4}><Skeleton className="h-10 w-full" /></TableCell></TableRow>
+              ))
+            ) : staffData?.map(member => (
+              <TableRow key={member.id} className="border-white/5 hover:bg-white/5">
+                <TableCell>
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
+                      {member.firstName.charAt(0)}{member.lastName.charAt(0)}
+                    </div>
+                    <span className="font-bold text-white">{member.firstName} {member.lastName}</span>
+                  </div>
+                </TableCell>
+                <TableCell><Badge variant="outline" className="text-[10px] uppercase">{member.role}</Badge></TableCell>
+                <TableCell className="text-right">
+                  <div className="flex flex-col items-end">
+                    <RepasseValue staffId={member.id} />
+                  </div>
+                </TableCell>
+                <TableCell className="text-right">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-8 text-[10px] font-black uppercase text-primary hover:bg-primary/10"
+                    onClick={() => handleOpenRepasse(member)}
+                  >
+                    Pagar Agora
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </Card>
+
+      <RepassePaymentDialog 
+        staff={selectedStaff} 
+        credits={staffCredits} 
+        open={isRepasseOpen} 
+        onOpenChange={setIsRepasseOpen}
+        onPaid={() => setIsRepasseOpen(false)}
+      />
+    </>
   );
+}
+
+function RepasseValue({ staffId }: { staffId: string }) {
+  const { firestore } = useFirebase();
+  const [val, setVal] = React.useState(0);
+
+  React.useEffect(() => {
+    if (!firestore) return;
+    const creditsRef = collection(firestore, `staff/${staffId}/credits`);
+    const q = query(creditsRef, where('status', '==', 'DISPONIVEL'));
+    getDocs(q).then(snap => {
+      const total = snap.docs.reduce((sum, d) => sum + (d.data().value || 0), 0);
+      setVal(total);
+    });
+  }, [firestore, staffId]);
+
+  return <span className={cn("text-sm font-black", val > 0 ? "text-emerald-400" : "text-slate-500")}>{val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>;
 }
 
 export default function FinanceiroPage() {
@@ -399,6 +552,10 @@ export default function FinanceiroPage() {
   const clientsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'clients') : null), [firestore]);
   const { data: clientsData } = useCollection<Client>(clientsQuery);
   const clientsMap = React.useMemo(() => new Map(clientsData?.map(c => [c.id, c])), [clientsData]);
+
+  const processesQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'processes') : null), [firestore]);
+  const { data: processesData } = useCollection<Process>(processesQuery);
+  const processesMap = React.useMemo(() => new Map(processesData?.map(p => [p.id, p])), [processesData]);
   
   const stats = React.useMemo(() => {
     if (!titlesData) return { totalReceitas: 0, totalDespesas: 0, pendenteReceita: 0, pendenteDespesa: 0 };
@@ -613,6 +770,7 @@ export default function FinanceiroPage() {
       <ReceiptDialog 
         title={receiptTitle} 
         client={receiptTitle?.clientId ? clientsMap.get(receiptTitle.clientId) : undefined} 
+        process={receiptTitle?.processId ? processesMap.get(receiptTitle.processId) : undefined}
         open={!!receiptTitle} 
         onOpenChange={(open) => !open && setReceiptTitle(null)} 
       />
