@@ -1,3 +1,4 @@
+
 'use client';
 import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -23,10 +24,13 @@ import {
   Scale,
   FileText,
   DollarSign,
-  BarChart3
+  BarChart3,
+  Search,
+  FolderKanban,
+  X
 } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, Timestamp, query, orderBy, deleteDoc, doc, getDocs, where } from 'firebase/firestore';
+import { collection, Timestamp, query, orderBy, deleteDoc, doc, getDocs, where, limit } from 'firebase/firestore';
 import type { FinancialTitle, Staff, Client, Process } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -62,6 +66,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import Link from 'next/link';
+import { searchProcesses } from '@/lib/process-actions';
 
 const titleFormSchema = z.object({
   description: z.string().min(3, 'Descrição obrigatória'),
@@ -85,11 +90,16 @@ const titleFormSchema = z.object({
   value: z.coerce.number().positive('Valor deve ser positivo'),
   dueDate: z.string().min(1, 'Data de vencimento obrigatória'),
   status: z.enum(['PENDENTE', 'PAGO']).default('PENDENTE'),
+  processId: z.string().optional(),
 });
 
 function NewTitleDialog({ onCreated }: { onCreated: () => void }) {
   const [open, setOpen] = React.useState(false);
   const [isSaving, setIsSaving] = React.useState(false);
+  const [processSearch, setProcessSearch] = React.useState('');
+  const [processResults, setProcessResults] = React.useState<Process[]>([]);
+  const [isSearchingProcess, setIsSearchingProcess] = React.useState(false);
+  const [selectedProcess, setSelectedProcess] = React.useState<Process | null>(null);
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof titleFormSchema>>({
@@ -99,8 +109,29 @@ function NewTitleDialog({ onCreated }: { onCreated: () => void }) {
       status: 'PENDENTE',
       value: 0,
       dueDate: format(new Date(), 'yyyy-MM-dd'),
+      processId: '',
     }
   });
+
+  // Busca de processos com debounce
+  React.useEffect(() => {
+    if (processSearch.length < 2) {
+      setProcessResults([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setIsSearchingProcess(true);
+      try {
+        const results = await searchProcesses(processSearch);
+        setProcessResults(results);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setIsSearchingProcess(false);
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [processSearch]);
 
   const handleValueChange = (e: React.ChangeEvent<HTMLInputElement>, onChange: (val: number) => void) => {
     const rawValue = e.target.value.replace(/\D/g, '');
@@ -121,9 +152,12 @@ function NewTitleDialog({ onCreated }: { onCreated: () => void }) {
       await createFinancialTitle({
         ...values,
         dueDate: new Date(values.dueDate),
+        processId: selectedProcess?.id || undefined,
       });
       toast({ title: 'Lançamento realizado!' });
       form.reset();
+      setSelectedProcess(null);
+      setProcessSearch('');
       onCreated();
       setOpen(false);
     } catch (error: any) {
@@ -134,14 +168,21 @@ function NewTitleDialog({ onCreated }: { onCreated: () => void }) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(o) => {
+      setOpen(o);
+      if (!o) {
+        setSelectedProcess(null);
+        setProcessSearch('');
+        form.reset();
+      }
+    }}>
       <DialogTrigger asChild>
         <Button className="gap-2 bg-primary text-primary-foreground">
           <PlusCircle className="h-4 w-4" />
           Novo Lançamento
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md bg-card border-border">
+      <DialogContent className="sm:max-w-md bg-card border-border max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-white">Novo Título Financeiro</DialogTitle>
           <DialogDescription className="text-slate-400">Lançamento manual de entrada ou saída.</DialogDescription>
@@ -186,6 +227,59 @@ function NewTitleDialog({ onCreated }: { onCreated: () => void }) {
                 )}
               />
             </div>
+
+            {/* Vínculo com Processo */}
+            <div className="space-y-2">
+              <FormLabel className="text-white">Vincular a um Processo (Opcional)</FormLabel>
+              {selectedProcess ? (
+                <div className="flex items-center justify-between p-3 rounded-lg border-2 border-primary/30 bg-primary/5">
+                  <div className="flex items-center gap-2 overflow-hidden">
+                    <FolderKanban className="h-4 w-4 text-primary shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-white truncate">{selectedProcess.name}</p>
+                      <p className="text-[10px] text-muted-foreground font-mono">{selectedProcess.processNumber}</p>
+                    </div>
+                  </div>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-white" onClick={() => setSelectedProcess(null)}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input 
+                    className="bg-background border-border pl-9 h-11" 
+                    placeholder="Pesquisar processo..." 
+                    value={processSearch}
+                    onChange={(e) => setProcessSearch(e.target.value)}
+                  />
+                  {isSearchingProcess && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-primary" />}
+                  
+                  {processResults.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-[#0f172a] border border-border rounded-lg shadow-2xl z-50 overflow-hidden">
+                      <ScrollArea className="max-h-[200px]">
+                        {processResults.map(p => (
+                          <button
+                            key={p.id}
+                            type="button"
+                            className="w-full text-left p-3 hover:bg-white/5 transition-colors border-b border-white/5 last:border-0"
+                            onClick={() => {
+                              setSelectedProcess(p);
+                              setProcessResults([]);
+                              setProcessSearch('');
+                            }}
+                          >
+                            <p className="text-xs font-bold text-white truncate">{p.name}</p>
+                            <p className="text-[9px] text-muted-foreground font-mono">{p.processNumber}</p>
+                          </button>
+                        ))}
+                      </ScrollArea>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
             <FormField
               control={form.control}
               name="description"
@@ -553,7 +647,14 @@ export default function FinanceiroPage() {
                       <TableCell>
                         <div className="flex flex-col">
                           <span className="font-medium text-white">{t.description}</span>
-                          <span className="text-[10px] text-muted-foreground uppercase">{t.origin}</span>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <Badge variant="outline" className="text-[8px] font-bold uppercase py-0 px-1 h-3.5 border-white/10 text-muted-foreground">{t.origin}</Badge>
+                            {t.processId && (
+                              <div className="flex items-center gap-1 text-[9px] text-primary/80 font-bold uppercase">
+                                <FolderKanban className="h-2.5 w-2.5" /> {processesMap.get(t.processId)?.name}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell className={cn("text-slate-400 text-xs", isOverdue && "text-rose-500 font-bold")}>
