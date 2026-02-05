@@ -19,7 +19,8 @@ import {
   Gavel,
   History,
   Search,
-  CalendarDays
+  CalendarDays,
+  Info
 } from 'lucide-react';
 import { 
   format, 
@@ -40,9 +41,9 @@ import { ptBR } from 'date-fns/locale';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
-import { collection } from 'firebase/firestore';
-import type { Hearing, Process, HearingStatus } from '@/lib/types';
+import { useFirebase, useCollection, useMemoFirebase, useDoc } from '@/firebase';
+import { collection, query, where, doc } from 'firebase/firestore';
+import type { Hearing, Process, HearingStatus, UserProfile } from '@/lib/types';
 import { useToast } from '@/components/ui/use-toast';
 import { updateHearingStatus, syncHearings } from '@/lib/hearing-actions';
 import { cn } from '@/lib/utils';
@@ -55,6 +56,7 @@ import {
 import { H1 } from '@/components/ui/typography';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const statusConfig: Record<HearingStatus, { label: string; icon: any; color: string }> = {
     PENDENTE: { label: 'Pendente', icon: Clock3, color: 'text-blue-500 bg-blue-500/10' },
@@ -64,7 +66,7 @@ const statusConfig: Record<HearingStatus, { label: string; icon: any; color: str
 };
 
 export default function AudienciasPage() {
-  const { firestore, isUserLoading } = useFirebase();
+  const { firestore, isUserLoading, user } = useFirebase();
   const [refreshKey, setRefreshKey] = React.useState(0);
   const [isSyncing, setIsSyncing] = React.useState(false);
   const [viewMode, setViewMode] = React.useState<'list' | 'calendar' | 'history'>('list');
@@ -72,8 +74,24 @@ export default function AudienciasPage() {
   const [selectedDay, setSelectedDay] = React.useState<Date | null>(new Date());
   const { toast } = useToast();
 
-  const hearingsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'hearings') : null, [firestore, refreshKey]);
-  const { data: hearingsData, isLoading: isLoadingHearings } = useCollection<Hearing>(hearingsQuery);
+  const userProfileRef = useMemoFirebase(
+    () => (firestore && user?.uid ? doc(firestore, 'users', user.uid) : null),
+    [firestore, user?.uid]
+  );
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
+
+  const hearingsQuery = useMemoFirebase(() => {
+    if (!firestore || !userProfile) return null;
+    const base = collection(firestore, 'hearings');
+    
+    // Regra: Advogado vê as dele. Admin/Secretaria vê de todos.
+    if (userProfile.role === 'lawyer') {
+      return query(base, where('lawyerId', '==', userProfile.id));
+    }
+    return base;
+  }, [firestore, userProfile, refreshKey]);
+
+  const { data: hearingsData, isLoading: isLoadingHearings, error: hearingsError } = useCollection<Hearing>(hearingsQuery);
 
   const processesQuery = useMemoFirebase(() => firestore ? collection(firestore, 'processes') : null, [firestore]);
   const { data: processesData } = useCollection<Process>(processesQuery);
@@ -111,7 +129,6 @@ export default function AudienciasPage() {
         .sort((a, b) => b.date.seconds - a.date.seconds);
   }, [hearingsData]);
 
-  // Lógica do Calendário Mensal
   const monthDays = React.useMemo(() => {
     const start = startOfWeek(startOfMonth(currentDate));
     const end = endOfWeek(endOfMonth(currentDate));
@@ -123,14 +140,34 @@ export default function AudienciasPage() {
     return hearingsData.filter(h => isSameDay(h.date.toDate(), selectedDay));
   }, [hearingsData, selectedDay]);
 
-  const isLoading = isUserLoading || isLoadingHearings;
+  const isLoading = isUserLoading || isProfileLoading || isLoadingHearings;
+
+  if (hearingsError) {
+    return (
+      <div className="p-6">
+        <Alert variant="destructive" className="bg-rose-500/10 border-rose-500/20 text-rose-400">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Erro de Consulta</AlertTitle>
+          <AlertDescription className="text-xs mt-2 space-y-4">
+            <p>Não foi possível carregar a agenda. Se você for um advogado, o Firebase exige um índice para filtrar por responsável.</p>
+            <div className="bg-black/20 p-4 rounded-lg space-y-2 border border-white/10">
+              <p className="font-bold text-white uppercase tracking-tighter text-[10px]">Ação Necessária (Admin):</p>
+              <p className="text-slate-300 text-xs">Crie um índice para a coleção <strong>hearings</strong> com o campo <strong>lawyerId</strong>.</p>
+            </div>
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-8 pb-10">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
                 <H1 className="text-white">Agenda de Audiências</H1>
-                <p className="text-sm text-muted-foreground">Gestão integrada de compromissos judiciais.</p>
+                <p className="text-sm text-muted-foreground">
+                  {userProfile?.role === 'lawyer' ? 'Seus compromissos judiciais agendados.' : 'Visão global de pauta do escritório.'}
+                </p>
             </div>
             <div className="flex items-center gap-2">
                 <Button 

@@ -69,6 +69,10 @@ export async function createHearing(data: {
 
   const { processId, hearingDate, location, responsibleParty, status, type, notes } = data;
   const session = await getServerSession(authOptions);
+  
+  if (!session?.user?.id) {
+    throw new Error('Não autenticado.');
+  }
 
   try {
     const processDoc = await firestoreAdmin.collection('processes').doc(processId).get();
@@ -90,6 +94,7 @@ export async function createHearing(data: {
 
     const hearingRef = await firestoreAdmin.collection('hearings').add({
       processId,
+      lawyerId: session.user.id, // Vincula ao ID do advogado que criou/agendou
       date: new Date(hearingDate),
       location: summarizeAddress(location),
       responsibleParty,
@@ -135,14 +140,12 @@ export async function createHearing(data: {
       if (createdEvent.data.id) {
         await hearingRef.update({ googleCalendarEventId: createdEvent.data.id });
         
-        if (session?.user?.id) {
-            await createNotification({
-                userId: session.user.id,
-                title: "Audiência Agendada",
-                description: `Audiência de ${clientInfo.name} sincronizada com Google Agenda.`,
-                href: `/dashboard/audiencias`,
-            });
-        }
+        await createNotification({
+            userId: session.user.id,
+            title: "Audiência Agendada",
+            description: `Audiência de ${clientInfo.name} sincronizada com Google Agenda.`,
+            href: `/dashboard/audiencias`,
+        });
       }
     } catch (calendarError: any) {
       console.error("Calendar sync failed:", calendarError.message);

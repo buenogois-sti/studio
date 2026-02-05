@@ -19,12 +19,13 @@ import {
   Edit,
   ArrowRight,
   CalendarDays,
-  RotateCcw
+  RotateCcw,
+  Info
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, Timestamp } from 'firebase/firestore';
-import type { LegalDeadline, Process, LegalDeadlineStatus } from '@/lib/types';
+import { useFirebase, useCollection, useMemoFirebase, useDoc } from '@/firebase';
+import { collection, query, orderBy, Timestamp, where, doc } from 'firebase/firestore';
+import type { LegalDeadline, Process, LegalDeadlineStatus, UserProfile } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -47,9 +48,10 @@ import {
 import { DeadlineDetailsSheet } from '@/components/process/DeadlineDetailsSheet';
 import { LegalDeadlineDialog } from '@/components/process/LegalDeadlineDialog';
 import { Progress } from '@/components/ui/progress';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function PrazosPage() {
-  const { firestore, isUserLoading } = useFirebase();
+  const { firestore, isUserLoading, user } = useFirebase();
   const { toast } = useToast();
   const router = useRouter();
   const [searchTerm, setSearchTerm] = React.useState('');
@@ -61,14 +63,30 @@ export default function PrazosPage() {
   const [editingDeadline, setEditingDeadline] = React.useState<LegalDeadline | null>(null);
   const [isEditOpen, setIsEditOpen] = React.useState(false);
 
-  const deadlinesQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'deadlines'), orderBy('endDate', 'asc')) : null, [firestore]);
-  const { data: deadlinesData, isLoading: isLoadingDeadlines } = useCollection<LegalDeadline>(deadlinesQuery);
+  const userProfileRef = useMemoFirebase(
+    () => (firestore && user?.uid ? doc(firestore, 'users', user.uid) : null),
+    [firestore, user?.uid]
+  );
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
+
+  const deadlinesQuery = useMemoFirebase(() => {
+    if (!firestore || !userProfile) return null;
+    const base = collection(firestore, 'deadlines');
+    
+    // Regra: Advogado vê os dele. Admin/Secretaria vê de todos.
+    if (userProfile.role === 'lawyer') {
+      return query(base, where('authorId', '==', userProfile.id), orderBy('endDate', 'asc'));
+    }
+    return query(base, orderBy('endDate', 'asc'));
+  }, [firestore, userProfile]);
+
+  const { data: deadlinesData, isLoading: isLoadingDeadlines, error: deadlinesError } = useCollection<LegalDeadline>(deadlinesQuery);
 
   const processesQuery = useMemoFirebase(() => firestore ? collection(firestore, 'processes') : null, [firestore]);
   const { data: processesData } = useCollection<Process>(processesQuery);
   const processesMap = React.useMemo(() => new Map(processesData?.map(p => [p.id, p])), [processesData]);
 
-  const isLoading = isUserLoading || isLoadingDeadlines;
+  const isLoading = isUserLoading || isProfileLoading || isLoadingDeadlines;
 
   const filteredDeadlines = React.useMemo(() => {
     if (!deadlinesData) return [];
@@ -128,6 +146,30 @@ export default function PrazosPage() {
     }
   };
 
+  if (deadlinesError) {
+    return (
+      <div className="p-6">
+        <Alert variant="destructive" className="bg-rose-500/10 border-rose-500/20 text-rose-400">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Índice Composto Necessário</AlertTitle>
+          <AlertDescription className="text-xs mt-2 space-y-4">
+            <p>Para visualizar sua agenda de prazos filtrada, o Firebase exige a criação de um índice manual.</p>
+            <div className="bg-black/20 p-4 rounded-lg space-y-2 border border-white/10">
+              <p className="font-bold text-white uppercase tracking-tighter text-[10px]">Instruções para Admin:</p>
+              <ol className="list-decimal list-inside space-y-1 text-slate-300">
+                <li>Acesse o Console do Firebase e vá em Índices.</li>
+                <li>ID da Coleção: <strong>deadlines</strong></li>
+                <li>Campo 1: <strong>authorId</strong> (Ascendente)</li>
+                <li>Campo 2: <strong>endDate</strong> (Ascendente)</li>
+                <li>Escopo: <strong>Coleção</strong></li>
+              </ol>
+            </div>
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -136,7 +178,9 @@ export default function PrazosPage() {
             <Timer className="h-8 w-8 text-primary" />
             Agenda de Prazos
           </h1>
-          <p className="text-sm text-muted-foreground">Controle fatal integrado ao Google Workspace.</p>
+          <p className="text-sm text-muted-foreground">
+            {userProfile?.role === 'lawyer' ? 'Seus compromissos processuais fatais.' : 'Controle global de obrigações do escritório.'}
+          </p>
         </div>
         <div className="relative w-full max-w-sm">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />

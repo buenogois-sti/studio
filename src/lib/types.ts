@@ -118,6 +118,7 @@ export type HearingType = 'CONCILIACAO' | 'INSTRUCAO' | 'UNA' | 'JULGAMENTO' | '
 export type Hearing = {
   id: string;
   processId: string;
+  lawyerId?: string; // ID do advogado responsável pela audiência
   date: Timestamp;
   location: string;
   responsibleParty: string;
