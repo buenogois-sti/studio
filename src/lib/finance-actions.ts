@@ -293,3 +293,58 @@ export async function launchPayroll() {
   
   return { success: true, count };
 }
+
+export async function deleteStaffCredit(staffId: string, creditId: string) {
+  if (!firestoreAdmin) throw new Error("Servidor indisponível.");
+  const session = await getServerSession(authOptions);
+  if (!session || !['admin', 'financial'].includes(session.user.role || '')) {
+    throw new Error("Não autorizado.");
+  }
+
+  try {
+    await firestoreAdmin.collection(`staff/${staffId}/credits`).doc(creditId).delete();
+    return { success: true };
+  } catch (error: any) {
+    throw new Error(error.message);
+  }
+}
+
+export async function updateStaffCredit(staffId: string, creditId: string, data: { description: string; value: number }) {
+  if (!firestoreAdmin) throw new Error("Servidor indisponível.");
+  const session = await getServerSession(authOptions);
+  if (!session || !['admin', 'financial'].includes(session.user.role || '')) {
+    throw new Error("Não autorizado.");
+  }
+
+  try {
+    await firestoreAdmin.collection(`staff/${staffId}/credits`).doc(creditId).update({
+      description: data.description,
+      value: data.value,
+      updatedAt: FieldValue.serverTimestamp()
+    });
+    return { success: true };
+  } catch (error: any) {
+    throw new Error(error.message);
+  }
+}
+
+export async function addManualStaffCredit(staffId: string, data: { description: string; value: number; type: StaffCredit['type'] }) {
+  if (!firestoreAdmin) throw new Error("Servidor indisponível.");
+  const session = await getServerSession(authOptions);
+  if (!session || !['admin', 'financial'].includes(session.user.role || '')) {
+    throw new Error("Não autorizado.");
+  }
+
+  try {
+    await firestoreAdmin.collection(`staff/${staffId}/credits`).add({
+      ...data,
+      status: 'DISPONIVEL',
+      date: FieldValue.serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
+      authorName: session.user.name
+    });
+    return { success: true };
+  } catch (error: any) {
+    throw new Error(error.message);
+  }
+}

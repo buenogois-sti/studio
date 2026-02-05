@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -25,7 +24,10 @@ import {
   LayoutList,
   FileCheck,
   Coins,
-  Receipt
+  Receipt,
+  Edit,
+  Trash2,
+  Plus
 } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, where, getDocs, FieldValue, Timestamp, doc, deleteDoc, orderBy, limit } from 'firebase/firestore';
@@ -40,7 +42,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
 import { H1 } from '@/components/ui/typography';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { processRepasse, launchPayroll } from '@/lib/finance-actions';
+import { processRepasse, launchPayroll, deleteStaffCredit, updateStaffCredit, addManualStaffCredit } from '@/lib/finance-actions';
 import {
   Dialog,
   DialogContent,
@@ -49,6 +51,7 @@ import {
   DialogDescription,
   DialogFooter,
   DialogClose,
+  DialogTrigger,
 } from '@/components/ui/dialog';
 import {
   Table,
@@ -58,9 +61,21 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { format, startOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Separator } from '@/components/ui/separator';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 
 const roleLabels: Record<string, string> = {
   lawyer: 'Advogado',
@@ -70,7 +85,347 @@ const roleLabels: Record<string, string> = {
   partner: 'Sócio',
 };
 
-// Componente de Comprovante de Pagamento (Voucher)
+// --- Form Schemas ---
+const creditEditSchema = z.object({
+  description: z.string().min(3, 'Descrição obrigatória'),
+  value: z.coerce.number().positive('Valor deve ser positivo'),
+});
+
+const manualCreditSchema = z.object({
+  description: z.string().min(3, 'Descrição obrigatória'),
+  value: z.coerce.number().positive('Valor deve ser positivo'),
+  type: z.enum(['HONORARIOS', 'REEMBOLSO', 'SALARIO', 'PRODUCAO']),
+});
+
+// --- Components ---
+
+function ManageCreditsDialog({ 
+  staff, 
+  open, 
+  onOpenChange,
+  onUpdate 
+}: { 
+  staff: Staff | null; 
+  open: boolean; 
+  onOpenChange: (open: boolean) => void;
+  onUpdate: () => void;
+}) {
+  const { firestore } = useFirebase();
+  const { toast } = useToast();
+  const [filter, setFilter] = React.useState<'ALL' | 'DISPONIVEL' | 'RETIDO'>('ALL');
+  const [isProcessing, setIsProcessing] = React.useState<string | null>(null);
+  const [isAdding, setIsAdding] = React.useState(false);
+  const [editingCredit, setEditingCredit] = React.useState<any | null>(null);
+
+  // Queries
+  const creditsQuery = useMemoFirebase(() => {
+    if (!firestore || !staff) return null;
+    const base = collection(firestore, `staff/${staff.id}/credits`);
+    return query(base, orderBy('date', 'desc'));
+  }, [firestore, staff, open]);
+
+  const { data: credits, isLoading } = useCollection<any>(creditsQuery);
+
+  const filteredCredits = React.useMemo(() => {
+    if (!credits) return [];
+    if (filter === 'ALL') return credits.filter(c => c.status !== 'PAGO');
+    return credits.filter(c => c.status === filter);
+  }, [credits, filter]);
+
+  const handleDelete = async (id: string) => {
+    if (!staff || !confirm("Deseja realmente excluir este lançamento?")) return;
+    setIsProcessing(id);
+    try {
+      await deleteStaffCredit(staff.id, id);
+      toast({ title: 'Lançamento excluído' });
+      onUpdate();
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Erro', description: e.message });
+    } finally {
+      setIsProcessing(null);
+    }
+  };
+
+  const handleEditSubmit = async (values: any) => {
+    if (!staff || !editingCredit) return;
+    setIsProcessing(editingCredit.id);
+    try {
+      await updateStaffCredit(staff.id, editingCredit.id, values);
+      toast({ title: 'Lançamento atualizado' });
+      setEditingCredit(null);
+      onUpdate();
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Erro', description: e.message });
+    } finally {
+      setIsProcessing(null);
+    }
+  };
+
+  const handleManualAdd = async (values: any) => {
+    if (!staff) return;
+    setIsProcessing('adding');
+    try {
+      await addManualStaffCredit(staff.id, values);
+      toast({ title: 'Crédito manual adicionado' });
+      setIsAdding(false);
+      onUpdate();
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Erro', description: e.message });
+    } finally {
+      setIsProcessing(null);
+    }
+  };
+
+  if (!staff) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-4xl bg-[#020617] border-white/10 p-0 overflow-hidden h-[85vh] flex flex-col">
+        <DialogHeader className="p-6 border-b border-white/5 bg-white/5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-black text-lg">
+                {staff.firstName.charAt(0)}{staff.lastName.charAt(0)}
+              </div>
+              <div>
+                <DialogTitle className="text-xl font-black text-white">{staff.firstName} {staff.lastName}</DialogTitle>
+                <DialogDescription className="text-slate-400">Auditoria e gestão de lançamentos pendentes</DialogDescription>
+              </div>
+            </div>
+            <Button size="sm" onClick={() => setIsAdding(true)} className="gap-2">
+              <Plus className="h-4 w-4" /> Novo Lançamento
+            </Button>
+          </div>
+        </DialogHeader>
+
+        <div className="flex-1 overflow-hidden flex flex-col">
+          <div className="p-4 bg-black/20 flex items-center gap-2">
+            <Button 
+              variant={filter === 'ALL' ? 'default' : 'ghost'} 
+              size="sm" 
+              onClick={() => setFilter('ALL')}
+              className="text-[10px] uppercase font-black h-8"
+            >Todos Pendentes</Button>
+            <Button 
+              variant={filter === 'DISPONIVEL' ? 'default' : 'ghost'} 
+              size="sm" 
+              onClick={() => setFilter('DISPONIVEL')}
+              className="text-[10px] uppercase font-black h-8 text-emerald-400"
+            >Disponíveis</Button>
+            <Button 
+              variant={filter === 'RETIDO' ? 'default' : 'ghost'} 
+              size="sm" 
+              onClick={() => setFilter('RETIDO')}
+              className="text-[10px] uppercase font-black h-8 text-blue-400"
+            >Retidos</Button>
+          </div>
+
+          <ScrollArea className="flex-1">
+            <div className="p-6">
+              {isLoading ? (
+                <div className="space-y-4">
+                  {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-16 w-full bg-white/5" />)}
+                </div>
+              ) : filteredCredits.length > 0 ? (
+                <div className="space-y-3">
+                  {filteredCredits.map(c => (
+                    <div key={c.id} className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5 group hover:border-white/20 transition-all">
+                      <div className="flex-1 min-w-0 mr-4">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Badge variant="outline" className={cn(
+                            "text-[8px] font-black uppercase px-1.5 h-4 border-none",
+                            c.status === 'DISPONIVEL' ? "bg-emerald-500/20 text-emerald-400" : "bg-blue-500/20 text-blue-400"
+                          )}>
+                            {c.status}
+                          </Badge>
+                          <span className="text-[10px] text-muted-foreground font-medium">
+                            {c.date ? format(c.date.toDate(), 'dd/MM/yyyy') : 'N/A'}
+                          </span>
+                        </div>
+                        <p className="text-sm font-bold text-white truncate">{c.description}</p>
+                        <p className="text-[10px] text-slate-500 uppercase font-bold">{c.type}</p>
+                      </div>
+                      <div className="flex items-center gap-6">
+                        <span className="text-sm font-black text-white tabular-nums">
+                          {c.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        </span>
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 text-blue-400"
+                            onClick={() => setEditingCredit(c)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 text-rose-500"
+                            onClick={() => handleDelete(c.id)}
+                            disabled={isProcessing === c.id}
+                          >
+                            {isProcessing === c.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-20 opacity-30">
+                  <FileText className="h-12 w-12 mx-auto mb-2" />
+                  <p className="text-sm font-bold uppercase">Nenhum lançamento encontrado</p>
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+        </div>
+
+        <DialogFooter className="p-6 border-t border-white/5 bg-black/20">
+          <DialogClose asChild><Button variant="ghost">Fechar Painel</Button></DialogClose>
+        </DialogFooter>
+      </DialogContent>
+
+      {/* Internal Dialog for Editing */}
+      <Dialog open={!!editingCredit} onOpenChange={(o) => !o && setEditingCredit(null)}>
+        <DialogContent className="bg-card border-border sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Editar Lançamento</DialogTitle>
+            <DialogDescription>Ajuste os dados do crédito para o profissional.</DialogDescription>
+          </DialogHeader>
+          <EditCreditForm 
+            initialData={editingCredit} 
+            onSubmit={handleEditSubmit} 
+            isSaving={isProcessing === editingCredit?.id} 
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Internal Dialog for Manual Add */}
+      <Dialog open={isAdding} onOpenChange={setIsAdding}>
+        <DialogContent className="bg-card border-border sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Novo Crédito Manual</DialogTitle>
+            <DialogDescription>Lançar bônus, reembolso ou ajuste manual.</DialogDescription>
+          </DialogHeader>
+          <ManualCreditForm 
+            onSubmit={handleManualAdd} 
+            isSaving={isProcessing === 'adding'} 
+          />
+        </DialogContent>
+      </Dialog>
+    </Dialog>
+  );
+}
+
+function EditCreditForm({ initialData, onSubmit, isSaving }: { initialData: any; onSubmit: (vals: any) => void; isSaving: boolean }) {
+  const form = useForm({
+    resolver: zodResolver(creditEditSchema),
+    defaultValues: {
+      description: initialData?.description || '',
+      value: initialData?.value || 0,
+    }
+  });
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <FormField
+          control={form.control}
+          name="description"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Descrição</FormLabel>
+              <FormControl><Input {...field} /></FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="value"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Valor (R$)</FormLabel>
+              <FormControl><Input type="number" step="0.01" {...field} /></FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <Button type="submit" className="w-full" disabled={isSaving}>
+          {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+          Salvar Alterações
+        </Button>
+      </form>
+    </Form>
+  );
+}
+
+function ManualCreditForm({ onSubmit, isSaving }: { onSubmit: (vals: any) => void; isSaving: boolean }) {
+  const form = useForm({
+    resolver: zodResolver(manualCreditSchema),
+    defaultValues: {
+      description: '',
+      value: 0,
+      type: 'PRODUCAO' as any,
+    }
+  });
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <FormField
+          control={form.control}
+          name="type"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Natureza</FormLabel>
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                <SelectContent>
+                  <SelectItem value="HONORARIOS">Honorários / Participação</SelectItem>
+                  <SelectItem value="SALARIO">Salário / Pro-labore</SelectItem>
+                  <SelectItem value="REEMBOLSO">Reembolso de Despesas</SelectItem>
+                  <SelectItem value="PRODUCAO">Pró-labore por Ato</SelectItem>
+                </SelectContent>
+              </Select>
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="description"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Descrição do Lançamento</FormLabel>
+              <FormControl><Input placeholder="Ex: Bônus por meta alcançada" {...field} /></FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="value"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Valor (R$)</FormLabel>
+              <FormControl><Input type="number" step="0.01" {...field} /></FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <Button type="submit" className="w-full" disabled={isSaving}>
+          {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+          Confirmar Lançamento
+        </Button>
+      </form>
+    </Form>
+  );
+}
+
+// --- Voucher & Payment Logic ---
+
 function StaffVoucherDialog({ 
   staff, 
   credits, 
@@ -359,6 +714,7 @@ function PayoutList({ filterRole, onRefresh, onPaid }: { filterRole?: string; on
   const [selectedStaff, setSelectedStaff] = React.useState<Staff | null>(null);
   const [staffCredits, setStaffCredits] = React.useState<any[]>([]);
   const [isRepasseOpen, setIsRepasseOpen] = React.useState(false);
+  const [isManageOpen, setIsManageOpen] = React.useState(false);
   const [searchTerm, setSearchTerm] = React.useState('');
 
   const staffQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'staff') : null), [firestore]);
@@ -390,6 +746,11 @@ function PayoutList({ filterRole, onRefresh, onPaid }: { filterRole?: string; on
     setStaffCredits(credits);
     setSelectedStaff(member);
     setIsRepasseOpen(true);
+  };
+
+  const handleOpenManage = (member: Staff) => {
+    setSelectedStaff(member);
+    setIsManageOpen(true);
   };
 
   return (
@@ -438,14 +799,24 @@ function PayoutList({ filterRole, onRefresh, onPaid }: { filterRole?: string; on
                   <RepasseValue staffId={member.id} />
                 </TableCell>
                 <TableCell className="text-right">
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="h-8 text-[10px] font-black uppercase text-emerald-400 hover:bg-emerald-500/10"
-                    onClick={() => handleOpenRepasse(member)}
-                  >
-                    Quitar Saldo
-                  </Button>
+                  <div className="flex justify-end gap-2">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-8 text-[10px] font-black uppercase text-blue-400 hover:bg-blue-500/10"
+                      onClick={() => handleOpenManage(member)}
+                    >
+                      Gerenciar
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-8 text-[10px] font-black uppercase text-emerald-400 hover:bg-emerald-500/10"
+                      onClick={() => handleOpenRepasse(member)}
+                    >
+                      Quitar Saldo
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
@@ -463,6 +834,13 @@ function PayoutList({ filterRole, onRefresh, onPaid }: { filterRole?: string; on
           if (selectedStaff) onPaid(total, credits, selectedStaff);
           onRefresh?.();
         }}
+      />
+
+      <ManageCreditsDialog 
+        staff={selectedStaff}
+        open={isManageOpen}
+        onOpenChange={setIsManageOpen}
+        onUpdate={() => onRefresh?.()}
       />
     </div>
   );
@@ -671,7 +1049,7 @@ export default function RepassesPage() {
         <Card className="bg-white/5 border-white/10">
           <CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-slate-400">Total Equipe</CardTitle></CardHeader>
           <CardContent className="p-4 pt-0"><p className="text-2xl font-black text-white">{stats.staffCount} Profissionais</p></CardContent>
-        </Card>
+        </div>
       </div>
 
       <Tabs defaultValue="lawyers" className="w-full">
@@ -717,21 +1095,4 @@ export default function RepassesPage() {
       />
     </div>
   );
-}
-
-function RepasseValue({ staffId }: { staffId: string }) {
-  const { firestore } = useFirebase();
-  const [val, setVal] = React.useState(0);
-
-  React.useEffect(() => {
-    if (!firestore) return;
-    const creditsRef = collection(firestore, `staff/${staffId}/credits`);
-    const q = query(creditsRef, where('status', '==', 'DISPONIVEL'));
-    getDocs(q).then(snap => {
-      const total = snap.docs.reduce((sum, d) => sum + (d.data().value || 0), 0);
-      setVal(total);
-    });
-  }, [firestore, staffId]);
-
-  return <span className={cn("text-sm font-black", val > 0 ? "text-emerald-400" : "text-slate-500")}>{val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>;
 }
