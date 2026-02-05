@@ -107,7 +107,7 @@ export default function AudienciasPage() {
   const historyHearings = React.useMemo(() => {
     if (!hearingsData) return [];
     return hearingsData
-        .filter(h => h.status === 'REALIZADA')
+        .filter(h => h.status !== 'PENDENTE')
         .sort((a, b) => b.date.seconds - a.date.seconds);
   }, [hearingsData]);
 
@@ -207,7 +207,7 @@ export default function AudienciasPage() {
                 <Card className="bg-[#0f172a] border-border/50 overflow-hidden">
                     <div className="divide-y divide-border/30">
                         {weekDays.map(day => {
-                            const daily = hearingsData?.filter(h => isSameDay(h.date.toDate(), day) && h.status !== 'REALIZADA') || [];
+                            const daily = hearingsData?.filter(h => isSameDay(h.date.toDate(), day) && h.status === 'PENDENTE') || [];
                             if (daily.length === 0) return null;
 
                             return (
@@ -386,18 +386,40 @@ export default function AudienciasPage() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-border/20">
-                          {historyHearings.map(h => (
-                              <tr key={h.id} className="hover:bg-white/5 transition-colors">
-                                  <td className="px-6 py-4 text-white font-bold whitespace-nowrap">{format(h.date.toDate(), 'dd/MM/yyyy HH:mm')}</td>
-                                  <td className="px-6 py-4 text-slate-300 truncate max-w-[200px]">{processesMap.get(h.processId)?.name}</td>
-                                  <td className="px-6 py-4"><Badge variant="outline" className="text-[10px] bg-white/5">{h.type}</Badge></td>
-                                  <td className="px-6 py-4 text-muted-foreground text-xs truncate max-w-[200px]">{h.location}</td>
-                                  <td className="px-6 py-4 text-right"><Badge variant="outline" className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-[9px] font-black uppercase">REALIZADA</Badge></td>
-                              </tr>
-                          ))}
+                          {historyHearings.map(h => {
+                              const config = statusConfig[h.status];
+                              const StatusIcon = config.icon;
+                              return (
+                                <tr key={h.id} className="hover:bg-white/5 transition-colors">
+                                    <td className="px-6 py-4 text-white font-bold whitespace-nowrap">
+                                      {format(h.date.toDate(), 'dd/MM/yyyy HH:mm')}
+                                    </td>
+                                    <td className="px-6 py-4 text-slate-300 truncate max-w-[250px]">
+                                      {processesMap.get(h.processId)?.name || 'Processo não encontrado'}
+                                    </td>
+                                    <td className="px-6 py-4">
+                                      <Badge variant="outline" className="text-[10px] font-black uppercase bg-white/5 border-white/10">
+                                        {h.type}
+                                      </Badge>
+                                    </td>
+                                    <td className="px-6 py-4 text-muted-foreground text-xs truncate max-w-[200px]">
+                                      {h.location}
+                                    </td>
+                                    <td className="px-6 py-4 text-right">
+                                      <Badge variant="outline" className={cn("gap-1.5 h-7 px-3 text-[9px] font-black uppercase tracking-widest", config.color)}>
+                                          <StatusIcon className="h-3 w-3" />
+                                          {config.label}
+                                      </Badge>
+                                    </td>
+                                </tr>
+                              );
+                          })}
                           {historyHearings.length === 0 && (
                             <tr>
-                              <td colSpan={5} className="px-6 py-20 text-center text-muted-foreground italic">Nenhuma audiência realizada no histórico.</td>
+                              <td colSpan={5} className="px-6 py-32 text-center text-muted-foreground italic bg-black/10">
+                                <History className="h-10 w-10 mx-auto mb-4 opacity-20" />
+                                <p className="font-bold uppercase tracking-widest text-[10px]">Nenhuma audiência no histórico operacional</p>
+                              </td>
                             </tr>
                           )}
                         </tbody>

@@ -129,30 +129,15 @@ function PaymentHistory({ onShowVoucher }: { onShowVoucher: (t: FinancialTitle) 
 
   if (error) {
     const errorMsg = error instanceof Error ? error.message : "Erro desconhecido";
-    const isIndexError = errorMsg.toLowerCase().includes('index');
     return (
       <Card className="bg-rose-500/5 border-rose-500/20 p-12 text-center flex flex-col items-center gap-4">
         <AlertTriangle className="h-12 w-12 text-rose-500" />
         <div className="space-y-2">
           <h3 className="text-xl font-bold text-white">Falha ao Carregar Histórico</h3>
           <p className="text-sm text-slate-400 max-w-sm">
-            {isIndexError 
-              ? "O Firestore exige um índice composto para esta consulta. Verifique o console do navegador (F12) para o link de criação."
-              : `Ocorreu um erro no servidor: ${errorMsg}`}
+            {`Ocorreu um erro no servidor: ${errorMsg}`}
           </p>
         </div>
-        {isIndexError && (
-          <div className="p-4 bg-black/40 rounded-xl border border-white/5 text-left space-y-3">
-            <p className="text-[10px] font-black uppercase text-rose-400 tracking-widest">Instruções de Resolução:</p>
-            <ol className="text-[10px] text-slate-300 space-y-1.5 list-decimal pl-4 leading-relaxed">
-              <li>Pressione <strong>F12</strong> no teclado para abrir o console.</li>
-              <li>Procure pela mensagem de erro do Firebase.</li>
-              <li>Clique no link azul que começa com <strong>console.firebase.google.com</strong>.</li>
-              <li>Na página do Firebase Console, clique no botão <strong>"Criar Índice"</strong>.</li>
-              <li>Aguarde o status ficar "Ativo" e atualize esta página.</li>
-            </ol>
-          </div>
-        )}
       </Card>
     );
   }
@@ -276,46 +261,6 @@ function ManageCreditsDialog({ staff, open, onOpenChange, onUpdate }: { staff: S
       </DialogContent>
       <Dialog open={!!editingCredit} onOpenChange={(o) => !o && setEditingCredit(null)}><DialogContent className="bg-card border-border sm:max-w-md"><DialogHeader><DialogTitle>Editar Lançamento</DialogTitle><DialogDescription>Ajuste os dados do crédito.</DialogDescription></DialogHeader><EditCreditForm initialData={editingCredit} onSubmit={handleEditSubmit} isSaving={isProcessing === editingCredit?.id} /></DialogContent></Dialog>
       <Dialog open={isAdding} onOpenChange={setIsAdding}><DialogContent className="bg-card border-border sm:max-w-md"><DialogHeader><DialogTitle>Novo Crédito Manual</DialogTitle><DialogDescription>Lançar bônus ou ajuste.</DialogDescription></DialogHeader><ManualCreditForm onSubmit={handleManualAdd} isSaving={isProcessing === 'adding'} /></DialogContent></Dialog>
-    </Dialog>
-  );
-}
-
-function StaffVoucherDialog({ staff, credits, totalValue, paymentDate, open, onOpenChange }: { staff: Staff | null; credits: any[]; totalValue: number; paymentDate?: Date; open: boolean; onOpenChange: (open: boolean) => void; }) {
-  const [isDetailed, setIsDetailed] = React.useState(false);
-  if (!staff) return null;
-  const handlePrint = () => { window.print(); };
-  const todayFormatted = format(paymentDate || new Date(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
-  const formattedTotal = totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-4xl bg-white text-slate-900 p-0 overflow-hidden border-none shadow-none print:max-w-full">
-        <ScrollArea className="max-h-[90vh] print:max-h-full">
-          <div className="p-10 space-y-8 bg-white print:p-0" id="staff-voucher-print-area">
-            <div className="flex justify-between items-center border-b-2 border-slate-900 pb-4">
-              <div className="flex items-center gap-3"><div className="bg-slate-900 p-1.5 rounded-lg print:bg-transparent"><img src="/logo.png" alt="Logo" className="h-10 w-auto print:brightness-0" /></div><div><h2 className="text-lg font-black uppercase tracking-tighter text-slate-900 leading-none">Bueno Gois Advogados</h2><p className="text-[8px] text-slate-500 uppercase font-bold tracking-widest mt-1">Gestão de Capital Humano e Parcerias</p></div></div>
-              <div className="text-right"><div className="text-xl font-black text-slate-900 leading-none font-headline uppercase">Comprovante de Repasse</div><div className="text-[8px] font-bold text-slate-500 mt-1 uppercase">ID: {Math.random().toString(36).substring(7).toUpperCase()}</div></div>
-            </div>
-            <div className="py-6 space-y-6 text-sm leading-relaxed text-justify">
-              <p>Declaramos para os devidos fins que o escritório <strong className="text-slate-900">Bueno Gois Advogados e Associados</strong> efetuou o pagamento da importância líquida de <strong className="text-lg font-black underline">{formattedTotal}</strong> ao colaborador(a) <strong className="text-slate-900">{staff.firstName} {staff.lastName}</strong>, portador(a) do CPF/CNPJ <strong className="text-slate-900">{staff.oabNumber ? `OAB ${staff.oabNumber}` : '---'}</strong>.</p>
-              {isDetailed ? (
-                <div className="space-y-3 animate-in fade-in"><h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500 border-b pb-1">Detalhamento da Liquidação (Extrato)</h4><table className="w-full text-[11px] border border-slate-200"><thead className="bg-slate-50"><tr><th className="px-3 py-2 text-left font-black uppercase">Natureza</th><th className="px-3 py-2 text-left font-black uppercase">Descrição</th><th className="px-3 py-2 text-right font-black uppercase">Valor</th></tr></thead><tbody className="divide-y divide-slate-100">{credits.map((c, i) => (<tr key={i}><td className="px-3 py-2 font-bold text-slate-600">{c.type}</td><td className="px-3 py-2 text-slate-500">{c.description}</td><td className="px-3 py-2 text-right font-mono">{c.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td></tr>))}</tbody><tfoot className="bg-slate-50 border-t-2 border-slate-200"><tr><td colSpan={2} className="px-3 py-2 text-right font-black uppercase">Total Liquidado</td><td className="px-3 py-2 text-right font-black text-slate-900">{formattedTotal}</td></tr></tfoot></table></div>
-              ) : (
-                <div className="p-6 rounded-2xl bg-slate-50 border border-slate-100 italic text-slate-600 text-center">"O valor acima refere-se à quitação de honorários advocatícios, pro-labore e/ou reembolsos de despesas processuais acumulados até a presente data."</div>
-              )}
-            </div>
-            <div className="grid grid-cols-2 gap-8 text-[10px] bg-slate-50 p-4 rounded-xl border border-slate-100">
-              <div><p className="font-black uppercase text-slate-400 mb-1">Destino do Crédito</p><p className="font-bold text-slate-900">{staff.bankInfo?.bankName || 'Dados não informados'}</p><p className="text-slate-600">Ag: {staff.bankInfo?.agency} | Cc: {staff.bankInfo?.account}</p></div>
-              <div><p className="font-black uppercase text-slate-400 mb-1">Chave PIX</p><p className="font-bold text-slate-900">{staff.bankInfo?.pixKey || '---'}</p></div>
-            </div>
-            <div className="pt-12 flex flex-col items-center gap-12">
-              <p className="text-sm font-bold text-slate-900">São Bernardo do Campo, {todayFormatted}</p>
-              <div className="grid grid-cols-2 gap-12 w-full max-w-2xl"><div className="text-center"><div className="w-full border-t border-slate-900 mb-1" /><p className="text-[9px] font-black uppercase tracking-widest text-slate-900">Bueno Gois Advogados</p><p className="text-[8px] text-slate-500 uppercase font-bold">Emitente / Financeiro</p></div><div className="text-center"><div className="w-full border-t border-slate-900 mb-1" /><p className="text-[9px] font-black uppercase tracking-widest text-slate-900">{staff.firstName} {staff.lastName}</p><p className="text-[8px] text-slate-500 uppercase font-bold">Assinatura do Recebedor</p></div></div>
-            </div>
-          </div>
-        </ScrollArea>
-        <DialogFooter className="p-6 bg-slate-50 border-t print:hidden flex items-center justify-between"><Button variant="outline" size="sm" className={cn("h-10 px-4 text-[10px] font-black uppercase gap-2", isDetailed ? "bg-slate-900 text-white border-slate-900" : "bg-white text-slate-600")} onClick={() => setIsDetailed(!isDetailed)}>{isDetailed ? <FileCheck className="h-4 w-4" /> : <LayoutList className="h-4 w-4" />}{isDetailed ? 'Ver Modo Simples' : 'Ver Modo Detalhado'}</Button><div className="flex gap-3"><DialogClose asChild><Button variant="ghost" className="font-bold text-slate-500 h-10 px-6">Fechar</Button></DialogClose><Button onClick={handlePrint} className="gap-2 bg-slate-900 hover:bg-slate-800 text-white h-10 px-8 font-black uppercase text-[11px] border-b-4 border-primary rounded-lg transition-all active:translate-y-1 active:border-b-0"><Printer className="h-4 w-4" /> Imprimir Comprovante</Button></div></DialogFooter>
-      </DialogContent>
     </Dialog>
   );
 }

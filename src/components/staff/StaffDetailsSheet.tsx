@@ -73,7 +73,6 @@ export function StaffDetailsSheet({ staff, processes, open, onOpenChange }: Staf
   const { firestore } = useFirebase();
   const { toast } = useToast();
 
-  // Hooks de dados - Sempre no topo para evitar erro #310
   const creditsQuery = useMemoFirebase(
     () => (firestore && staff?.id ? query(collection(firestore, `staff/${staff.id}/credits`), orderBy('date', 'desc')) : null),
     [firestore, staff?.id, open]
@@ -329,11 +328,16 @@ export function StaffDetailsSheet({ staff, processes, open, onOpenChange }: Staf
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      {reimbursements?.filter(r => r.status === 'SOLICITADO').map(r => (
+                      {reimbursements?.map(r => (
                         <div key={r.id} className="flex items-center justify-between p-4 rounded-xl bg-blue-500/5 border border-blue-500/20">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
-                              <Badge variant="outline" className="text-[8px] font-black uppercase px-1.5 h-4 border-none bg-blue-500/20 text-blue-400">AGUARDANDO</Badge>
+                              <Badge variant="outline" className={cn(
+                                "text-[8px] font-black uppercase px-1.5 h-4 border-none",
+                                r.status === 'SOLICITADO' ? "bg-blue-500/20 text-blue-400" :
+                                r.status === 'APROVADO' ? "bg-amber-500/20 text-amber-400" :
+                                r.status === 'REEMBOLSADO' ? "bg-emerald-500/20 text-emerald-400" : "bg-rose-500/20 text-rose-400"
+                              )}>{r.status}</Badge>
                               <span className="text-[10px] text-muted-foreground font-bold">{format(r.requestDate.toDate(), 'dd/MM/yyyy')}</span>
                             </div>
                             <p className="text-sm font-bold text-slate-200 truncate">{r.description}</p>
@@ -371,7 +375,7 @@ export function StaffDetailsSheet({ staff, processes, open, onOpenChange }: Staf
                       ))}
 
                       {(!credits || credits.length === 0) && (!reimbursements || reimbursements.length === 0) && (
-                        <div className="py-20 text-center opacity-30 italic text-sm">Nenhum lançamento financeiro registrado.</div>
+                        <div className="py-20 text-center opacity-30 italic text-sm text-slate-400">Nenhum lançamento financeiro registrado.</div>
                       )}
                     </div>
                   )}
