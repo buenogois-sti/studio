@@ -27,14 +27,24 @@ import {
   GraduationCap,
   MessageSquare,
   DollarSign,
-  PieChart
+  PieChart,
+  History,
+  Activity,
+  CheckCircle2,
+  Clock,
+  ArrowUpRight
 } from 'lucide-react';
-import type { Staff, Process } from '@/lib/types';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import type { Staff, Process, StaffCredit, Log } from '@/lib/types';
 import { useToast } from '@/components/ui/use-toast';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { Badge } from '../ui/badge';
+import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
+import { collection, query, orderBy, limit } from 'firebase/firestore';
+import { Skeleton } from '../ui/skeleton';
 
 interface StaffDetailsSheetProps {
   staff: Staff | null;
@@ -60,12 +70,36 @@ const remunerationLabels: Record<string, string> = {
 };
 
 export function StaffDetailsSheet({ staff, processes, open, onOpenChange }: StaffDetailsSheetProps) {
+  const { firestore } = useFirebase();
   const { toast } = useToast();
+
+  // Queries para Histórico e Atividades
+  const creditsQuery = useMemoFirebase(
+    () => (firestore && staff?.id ? query(collection(firestore, `staff/${staff.id}/credits`), orderBy('date', 'desc')) : null),
+    [firestore, staff?.id, open]
+  );
+  const { data: credits, isLoading: isLoadingCredits } = useCollection<StaffCredit>(creditsQuery);
+
+  const logsQuery = useMemoFirebase(
+    () => (firestore && staff?.id ? query(collection(firestore, `users/${staff.id}/logs`), orderBy('timestamp', 'desc'), limit(50)) : null),
+    [firestore, staff?.id, open]
+  );
+  const { data: logs, isLoading: isLoadingLogs } = useCollection<Log>(logsQuery);
 
   if (!staff) return null;
 
   const staffProcesses = processes.filter(p => staff.id && p.responsibleStaffIds?.includes(staff.id));
   const activeCount = staffProcesses.filter(p => p.status === 'Ativo').length;
+
+  const financialSummary = React.useMemo(() => {
+    if (!credits) return { paid: 0, available: 0, retained: 0 };
+    return credits.reduce((acc, c) => {
+      if (c.status === 'PAGO') acc.paid += c.value;
+      else if (c.status === 'DISPONIVEL') acc.available += c.value;
+      else if (c.status === 'RETIDO') acc.retained += c.value;
+      return acc;
+    }, { paid: 0, available: 0, retained: 0 });
+  }, [credits]);
 
   const formatDate = (date: any) => {
     if (!date) return 'N/A';
@@ -167,9 +201,9 @@ export function StaffDetailsSheet({ staff, processes, open, onOpenChange }: Staf
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="sm:max-w-3xl w-full overflow-y-auto bg-[#020617] border-border">
-        <SheetHeader>
-          <div className="flex items-center justify-between gap-4 mb-2">
+      <SheetContent className="sm:max-w-3xl w-full flex flex-col p-0 bg-[#020617] border-border overflow-hidden">
+        <SheetHeader className="p-6 border-b border-white/5 bg-white/5 shrink-0">
+          <div className="flex items-center justify-between gap-4">
             <div className="flex flex-col text-left">
                 <div className="flex items-center gap-2 mb-1">
                     <Badge variant="outline" className="text-[10px] font-black uppercase bg-primary/10 text-primary border-primary/20">
@@ -178,7 +212,7 @@ export function StaffDetailsSheet({ staff, processes, open, onOpenChange }: Staf
                 </div>
                 <SheetTitle className="text-2xl font-headline font-bold text-white">{staff.firstName} {staff.lastName}</SheetTitle>
             </div>
-            <div className="flex gap-2 shrink-0">
+            <div className="flex gap-2">
                 <Button variant="outline" size="icon" onClick={() => window.print()} title="Imprimir">
                     <Printer className="h-4 w-4" />
                 </Button>
@@ -186,137 +220,229 @@ export function StaffDetailsSheet({ staff, processes, open, onOpenChange }: Staf
           </div>
         </SheetHeader>
 
-        <div className="space-y-8 mt-8">
-          {/* Carga de Trabalho */}
-          <div className="grid grid-cols-2 gap-4">
-              <div className="p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/10 flex flex-col items-center text-center">
-                  <Briefcase className="h-5 w-5 text-emerald-600 mb-2" />
-                  <span className="text-2xl font-black text-emerald-700">{activeCount}</span>
-                  <span className="text-[10px] font-black uppercase text-emerald-600">Processos Ativos</span>
-              </div>
-              <div className="p-4 rounded-2xl bg-blue-500/5 border border-blue-500/10 flex flex-col items-center text-center">
-                  <GraduationCap className="h-5 w-5 text-blue-600 mb-2" />
-                  <span className="text-2xl font-black text-blue-700">{staffProcesses.length}</span>
-                  <span className="text-[10px] font-black uppercase text-blue-600">Total Carteira</span>
-              </div>
+        <Tabs defaultValue="profile" className="flex-1 flex flex-col min-h-0">
+          <div className="px-6 bg-white/5 border-b border-white/5 shrink-0">
+            <TabsList className="bg-transparent gap-6 h-12 p-0">
+              <TabsTrigger value="profile" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent text-slate-400 data-[state=active]:text-white font-bold h-full px-0">Ficha do Membro</TabsTrigger>
+              <TabsTrigger value="financial" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent text-slate-400 data-[state=active]:text-white font-bold h-full px-0">Histórico Financeiro</TabsTrigger>
+              <TabsTrigger value="activity" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent text-slate-400 data-[state=active]:text-white font-bold h-full px-0">Relatório de Atividades</TabsTrigger>
+            </TabsList>
           </div>
 
-          {/* REGRA DE REMUNERAÇÃO (Destaque) */}
-          {(staff.role === 'lawyer' || staff.role === 'partner' || staff.role === 'provider') && staff.remuneration && (
-              <section className="space-y-4">
-                <div className="flex items-center gap-2 mb-4">
-                    <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                        <DollarSign className="h-4 w-4 text-primary" />
+          <ScrollArea className="flex-1">
+            <div className="p-6">
+              {/* ABA: PERFIL */}
+              <TabsContent value="profile" className="m-0 space-y-8 animate-in fade-in duration-300">
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/10 flex flex-col items-center text-center">
+                        <Briefcase className="h-5 w-5 text-emerald-600 mb-2" />
+                        <span className="text-2xl font-black text-emerald-700">{activeCount}</span>
+                        <span className="text-[10px] font-black uppercase text-emerald-600">Processos Ativos</span>
                     </div>
-                    <h3 className="font-black text-xs uppercase tracking-widest text-muted-foreground">Regra de Negócio / Pagamento</h3>
-                </div>
-                <div className="p-6 rounded-2xl bg-primary/5 border-2 border-primary/20 space-y-4">
-                    <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-white uppercase tracking-tighter">Modalidade Base:</span>
-                        <Badge className="bg-primary text-primary-foreground font-black">{remunerationLabels[staff.remuneration.type]}</Badge>
-                    </div>
-                    <Separator className="bg-primary/10" />
-                    <div className="grid grid-cols-2 gap-4">
-                        {staff.remuneration.type === 'SUCUMBENCIA' && (
-                            <>
-                                <div>
-                                    <p className="text-[10px] uppercase font-black text-muted-foreground">Cota Escritório</p>
-                                    <p className="text-lg font-black text-white">{staff.remuneration.officePercentage}%</p>
-                                </div>
-                                <div>
-                                    <p className="text-[10px] uppercase font-black text-muted-foreground">Cota Advogado</p>
-                                    <p className="text-lg font-black text-primary">{staff.remuneration.lawyerPercentage}%</p>
-                                </div>
-                            </>
-                        )}
-                        {staff.remuneration.type === 'QUOTA_LITIS' && (
-                            <div className="col-span-2">
-                                <p className="text-[10px] uppercase font-black text-muted-foreground">Participação no Êxito</p>
-                                <p className="text-lg font-black text-primary">{staff.remuneration.lawyerPercentage}% <span className="text-xs font-normal text-muted-foreground">após recebimento do cliente</span></p>
-                            </div>
-                        )}
-                        {staff.remuneration.type === 'FIXO_MENSAL' && (
-                            <div className="col-span-2">
-                                <p className="text-[10px] uppercase font-black text-muted-foreground">Valor Mensal Fixo</p>
-                                <p className="text-lg font-black text-white">{staff.remuneration.fixedMonthlyValue?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
-                            </div>
-                        )}
-                        {staff.remuneration.type === 'AUDIENCISTA' && (
-                            <div className="col-span-2">
-                                <p className="text-[10px] uppercase font-black text-muted-foreground">Pagamento por Audiência</p>
-                                <p className="text-lg font-black text-white">{staff.remuneration.valuePerHearing?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
-                            </div>
-                        )}
-                        {staff.remuneration.type === 'PRODUCAO' && (
-                            <>
-                                <div>
-                                    <p className="text-[10px] uppercase font-black text-muted-foreground">Valor p/ Peça</p>
-                                    <p className="text-sm font-black text-white">{staff.remuneration.activityPrices?.drafting?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
-                                </div>
-                                <div>
-                                    <p className="text-[10px] uppercase font-black text-muted-foreground">Valor p/ Diligência</p>
-                                    <p className="text-sm font-black text-white">{staff.remuneration.activityPrices?.diligence?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
-                                </div>
-                            </>
-                        )}
+                    <div className="p-4 rounded-2xl bg-blue-500/5 border border-blue-500/10 flex flex-col items-center text-center">
+                        <GraduationCap className="h-5 w-5 text-blue-600 mb-2" />
+                        <span className="text-2xl font-black text-blue-700">{staffProcesses.length}</span>
+                        <span className="text-[10px] font-black uppercase text-blue-600">Total Carteira</span>
                     </div>
                 </div>
-              </section>
-          )}
 
-          {/* Sessão: Profissional */}
-          <section>
-            <div className="flex items-center gap-2 mb-4">
-                <div className="h-8 w-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                    <ShieldCheck className="h-4 w-4 text-blue-500" />
+                {(staff.role === 'lawyer' || staff.role === 'partner' || staff.role === 'provider') && staff.remuneration && (
+                    <section className="space-y-4">
+                      <div className="flex items-center gap-2 mb-4">
+                          <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                              <DollarSign className="h-4 w-4 text-primary" />
+                          </div>
+                          <h3 className="font-black text-xs uppercase tracking-widest text-muted-foreground">Regra de Negócio / Pagamento</h3>
+                      </div>
+                      <div className="p-6 rounded-2xl bg-primary/5 border-2 border-primary/20 space-y-4">
+                          <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-white uppercase tracking-tighter">Modalidade Base:</span>
+                              <Badge className="bg-primary text-primary-foreground font-black">{remunerationLabels[staff.remuneration.type]}</Badge>
+                          </div>
+                          <Separator className="bg-primary/10" />
+                          <div className="grid grid-cols-2 gap-4">
+                              {staff.remuneration.type === 'SUCUMBENCIA' && (
+                                  <>
+                                      <div>
+                                          <p className="text-[10px] uppercase font-black text-muted-foreground">Cota Escritório</p>
+                                          <p className="text-lg font-black text-white">{staff.remuneration.officePercentage}%</p>
+                                      </div>
+                                      <div>
+                                          <p className="text-[10px] uppercase font-black text-muted-foreground">Cota Advogado</p>
+                                          <p className="text-lg font-black text-primary">{staff.remuneration.lawyerPercentage}%</p>
+                                      </div>
+                                  </>
+                              )}
+                              {staff.remuneration.type === 'QUOTA_LITIS' && (
+                                  <div className="col-span-2">
+                                      <p className="text-[10px] uppercase font-black text-muted-foreground">Participação no Êxito</p>
+                                      <p className="text-lg font-black text-primary">{staff.remuneration.lawyerPercentage}% <span className="text-xs font-normal text-muted-foreground">após recebimento do cliente</span></p>
+                                  </div>
+                              )}
+                              {staff.remuneration.type === 'FIXO_MENSAL' && (
+                                  <div className="col-span-2">
+                                      <p className="text-[10px] uppercase font-black text-muted-foreground">Valor Mensal Fixo</p>
+                                      <p className="text-lg font-black text-white">{staff.remuneration.fixedMonthlyValue?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                                  </div>
+                              )}
+                              {staff.remuneration.type === 'AUDIENCISTA' && (
+                                  <div className="col-span-2">
+                                      <p className="text-[10px] uppercase font-black text-muted-foreground">Pagamento por Audiência</p>
+                                      <p className="text-lg font-black text-white">{staff.remuneration.valuePerHearing?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                                  </div>
+                              )}
+                              {staff.remuneration.type === 'PRODUCAO' && (
+                                  <>
+                                      <div>
+                                          <p className="text-[10px] uppercase font-black text-muted-foreground">Valor p/ Peça</p>
+                                          <p className="text-sm font-black text-white">{staff.remuneration.activityPrices?.drafting?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                                      </div>
+                                      <div>
+                                          <p className="text-[10px] uppercase font-black text-muted-foreground">Valor p/ Diligência</p>
+                                          <p className="text-sm font-black text-white">{staff.remuneration.activityPrices?.diligence?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                                      </div>
+                                  </>
+                              )}
+                          </div>
+                      </div>
+                    </section>
+                )}
+
+                <section>
+                  <div className="flex items-center gap-2 mb-4">
+                      <div className="h-8 w-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                          <ShieldCheck className="h-4 w-4 text-blue-500" />
+                      </div>
+                      <h3 className="font-black text-xs uppercase tracking-widest text-muted-foreground">Habilitação & Contato</h3>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 bg-white/5 p-6 rounded-2xl border border-white/10">
+                      <InfoRow icon={Hash} label="Nº da OAB" value={staff.oabNumber} actionType="copy" />
+                      <InfoRow icon={AlertCircle} label="Situação OAB" value={staff.oabStatus} />
+                      <Separator className="col-span-full my-2 bg-white/5" />
+                      <InfoRow icon={AtSign} label="E-mail" value={staff.email} actionType="email" className="col-span-full" />
+                      <InfoRow icon={Smartphone} label="WhatsApp" value={staff.whatsapp} actionType="whatsapp" />
+                      <InfoRow icon={Phone} label="Telefone" value={staff.phone} actionType="phone" />
+                  </div>
+                </section>
+
+                <section>
+                  <div className="flex items-center gap-2 mb-4">
+                      <div className="h-8 w-8 rounded-lg bg-purple-500/10 flex items-center justify-center">
+                          <CreditCard className="h-4 w-4 text-purple-500" />
+                      </div>
+                      <h3 className="font-black text-xs uppercase tracking-widest text-muted-foreground">Dados Financeiros</h3>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 bg-white/5 p-6 rounded-2xl border border-white/10">
+                      <InfoRow icon={CreditCard} label="Banco" value={staff.bankInfo?.bankName} actionType="copy" />
+                      <InfoRow icon={CreditCard} label="Agência / Conta" value={staff.bankInfo?.agency ? `${staff.bankInfo.agency} / ${staff.bankInfo.account || ''}` : undefined} actionType="copy" />
+                      <InfoRow icon={Smartphone} label="Chave PIX" value={staff.bankInfo?.pixKey} actionType="copy" className="col-span-full" />
+                  </div>
+                </section>
+              </TabsContent>
+
+              {/* ABA: HISTÓRICO FINANCEIRO */}
+              <TabsContent value="financial" className="m-0 space-y-8 animate-in fade-in duration-300">
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-center">
+                    <p className="text-[9px] font-black uppercase text-emerald-500 tracking-widest mb-1">Total Recebido</p>
+                    <p className="text-lg font-black text-white tabular-nums">{financialSummary.paid.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                  </div>
+                  <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-center">
+                    <p className="text-[9px] font-black uppercase text-amber-500 tracking-widest mb-1">Disponível</p>
+                    <p className="text-lg font-black text-white tabular-nums">{financialSummary.available.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                  </div>
+                  <div className="p-4 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-center">
+                    <p className="text-[9px] font-black uppercase text-blue-500 tracking-widest mb-1">Retido</p>
+                    <p className="text-lg font-black text-white tabular-nums">{financialSummary.retained.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                  </div>
                 </div>
-                <h3 className="font-black text-xs uppercase tracking-widest text-muted-foreground">Habilitação</h3>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 bg-white/5 p-6 rounded-2xl border border-white/10">
-                <InfoRow icon={Hash} label="Nº da OAB" value={staff.oabNumber} actionType="copy" />
-                <InfoRow icon={AlertCircle} label="Situação OAB" value={staff.oabStatus} />
-                <InfoRow icon={AtSign} label="E-mail Corporativo" value={staff.email} actionType="email" className="col-span-1 sm:col-span-2" />
-            </div>
-          </section>
 
-          {/* Sessão: Contato */}
-          <section>
-            <div className="flex items-center gap-2 mb-4">
-                <div className="h-8 w-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-                    <Smartphone className="h-4 w-4 text-emerald-500" />
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <History className="h-4 w-4 text-primary" />
+                    <h3 className="font-black text-xs uppercase tracking-widest text-muted-foreground">Extrato Completo</h3>
+                  </div>
+                  
+                  {isLoadingCredits ? (
+                    <div className="space-y-3">
+                      {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-xl bg-white/5" />)}
+                    </div>
+                  ) : credits && credits.length > 0 ? (
+                    <div className="space-y-2">
+                      {credits.map(credit => (
+                        <div key={credit.id} className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5 group hover:bg-white/10 transition-all">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <Badge variant="outline" className={cn(
+                                "text-[8px] font-black uppercase px-1.5 h-4 border-none",
+                                credit.status === 'PAGO' ? "bg-emerald-500/20 text-emerald-400" :
+                                credit.status === 'DISPONIVEL' ? "bg-amber-500/20 text-amber-400" : "bg-blue-500/20 text-blue-400"
+                              )}>
+                                {credit.status}
+                              </Badge>
+                              <span className="text-[10px] text-muted-foreground font-bold">{format(credit.date.toDate(), 'dd/MM/yyyy')}</span>
+                            </div>
+                            <p className="text-sm font-bold text-slate-200 truncate">{credit.description}</p>
+                          </div>
+                          <div className="text-right ml-4">
+                            <p className="text-sm font-black text-white tabular-nums">{credit.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                            <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-tighter">{credit.type}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="py-20 text-center opacity-30 italic text-sm">Nenhum lançamento financeiro registrado.</div>
+                  )}
                 </div>
-                <h3 className="font-black text-xs uppercase tracking-widest text-muted-foreground">Canais de Contato</h3>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 bg-white/5 p-6 rounded-2xl border border-white/10">
-                <InfoRow icon={Smartphone} label="WhatsApp" value={staff.whatsapp} actionType="whatsapp" />
-                <InfoRow icon={Phone} label="Telefone" value={staff.phone} actionType="phone" />
-                <InfoRow icon={MapPin} label="Endereço" value={staff.address?.street} actionType="copy" className="col-span-1 sm:col-span-2" />
-            </div>
-          </section>
+              </TabsContent>
 
-          {/* Sessão: Financeiro (Repasse) */}
-          <section>
-            <div className="flex items-center gap-2 mb-4">
-                <div className="h-8 w-8 rounded-lg bg-purple-500/10 flex items-center justify-center">
-                    <CreditCard className="h-4 w-4 text-purple-500" />
+              {/* ABA: RELATÓRIO DE ATIVIDADES */}
+              <TabsContent value="activity" className="m-0 space-y-8 animate-in fade-in duration-300">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Activity className="h-4 w-4 text-primary" />
+                    <h3 className="font-black text-xs uppercase tracking-widest text-muted-foreground">Monitor de Produtividade</h3>
+                  </div>
+                  <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20">{logs?.length || 0} Eventos Recentes</Badge>
                 </div>
-                <h3 className="font-black text-xs uppercase tracking-widest text-muted-foreground">Dados p/ Pagamento</h3>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 bg-white/5 p-6 rounded-2xl border border-white/10">
-                <InfoRow icon={CreditCard} label="Banco" value={staff.bankInfo?.bankName} actionType="copy" />
-                <InfoRow icon={CreditCard} label="Agência / Conta" value={staff.bankInfo?.agency ? `${staff.bankInfo.agency} / ${staff.bankInfo.account || ''}` : undefined} actionType="copy" />
-                <InfoRow icon={Smartphone} label="Chave PIX" value={staff.bankInfo?.pixKey} actionType="copy" className="col-span-1 sm:col-span-2" />
-            </div>
-          </section>
 
-          <div className="pt-8 text-[10px] text-muted-foreground flex items-center justify-between border-t border-white/10">
+                <div className="relative space-y-6 before:absolute before:inset-0 before:ml-5 before:-translate-x-px before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-border/20 before:to-transparent">
+                  {isLoadingLogs ? (
+                    <div className="space-y-6 pl-12">
+                      {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-12 w-full rounded-lg bg-white/5" />)}
+                    </div>
+                  ) : logs && logs.length > 0 ? (
+                    logs.map(log => (
+                      <div key={log.id} className="relative flex items-start gap-6 group">
+                        <div className="flex items-center justify-center w-10 h-10 rounded-full bg-[#0f172a] border-2 border-border/50 z-10 shadow-sm group-hover:border-primary transition-colors">
+                          <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                        </div>
+                        <div className="flex-1 p-4 rounded-xl bg-white/5 border border-white/5 hover:border-white/10 transition-all">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-[9px] font-black uppercase text-primary tracking-widest">{log.action || 'ATIVIDADE'}</span>
+                            <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                              <Clock className="h-3 w-3" /> {format(log.timestamp.toDate(), "dd/MM/yy HH:mm")}
+                            </span>
+                          </div>
+                          <p className="text-sm text-slate-300 leading-relaxed">{log.description}</p>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="py-20 text-center opacity-30 italic text-sm">Sem histórico de atividades registrado no sistema.</div>
+                  )}
+                </div>
+              </TabsContent>
+            </div>
+          </ScrollArea>
+
+          <div className="p-6 border-t border-white/5 bg-white/5 shrink-0 flex items-center justify-between text-[10px] text-muted-foreground">
             <div className="flex items-center gap-2 font-bold uppercase tracking-tighter">
-                <Calendar className="h-3 w-3" />
+                <Calendar className="h-3 w-3 text-primary" />
                 <span>Colaborador desde {formatDate(staff.createdAt)}</span>
             </div>
-            <div className="flex items-center gap-1 font-mono">
-                ID: {staff.id}
-            </div>
+            <div className="font-mono opacity-50">ID: {staff.id}</div>
           </div>
         </div>
       </SheetContent>
