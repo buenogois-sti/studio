@@ -25,7 +25,8 @@ import {
   ChevronRight,
   Wallet,
   ShieldCheck,
-  CheckCircle2
+  CheckCircle2,
+  Coins
 } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, Timestamp, query, orderBy, deleteDoc, doc, getDocs, where } from 'firebase/firestore';
@@ -211,7 +212,7 @@ function NewTitleDialog({ onCreated }: { onCreated: () => void }) {
               />
             </div>
             <DialogFooter className="pt-4">
-              <DialogClose asChild><Button variant="ghost" type="button">Cancelar</Button></DialogClose>
+              <DialogClose asChild><Button variant="outline" type="button" className="text-white">Cancelar</Button></DialogClose>
               <Button type="submit" disabled={isSaving}>
                 {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Salvar Lançamento
@@ -241,8 +242,6 @@ function ReceiptDialog({
 
   const handlePrint = () => { window.print(); };
   
-  // Cálculo de Repasse (Upgrade solicitado)
-  // Geralmente honorários são 30% em causas trabalhistas
   const totalValue = title.value;
   const feePercent = 30; 
   const feeValue = totalValue * (feePercent / 100);
@@ -259,7 +258,6 @@ function ReceiptDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl bg-white text-slate-900 p-0 overflow-hidden border-none shadow-2xl">
         <div className="p-8 space-y-6 print:p-0">
-          {/* Header Bueno Gois */}
           <div className="flex justify-between items-start border-b-2 border-slate-900 pb-6">
             <div className="space-y-1">
               <h2 className="text-xl font-bold uppercase tracking-tighter text-slate-900">Bueno Gois Advogados</h2>
@@ -272,7 +270,6 @@ function ReceiptDialog({
             </div>
           </div>
 
-          {/* Corpo do Recibo */}
           <div className="py-4 space-y-6 text-base leading-relaxed text-justify">
             <p>
               Declaramos para os devidos fins que o escritório <strong>Bueno Gois Advogados e Associados</strong> recebeu de <strong>{opposingParty}</strong> a importância bruta de <strong>{formattedTotal}</strong>, referente ao pagamento de <i>{title.description}</i> no âmbito do processo judicial nº <strong>{process?.processNumber || 'N/A'}</strong>.
@@ -283,7 +280,6 @@ function ReceiptDialog({
             </p>
           </div>
 
-          {/* Demonstrativo Financeiro (Upgrade solicitado) */}
           <div className="bg-slate-50 border-2 border-slate-200 rounded-xl overflow-hidden my-6">
             <table className="w-full text-sm">
               <thead className="bg-slate-100 border-b border-slate-200">
@@ -309,7 +305,6 @@ function ReceiptDialog({
             </table>
           </div>
 
-          {/* Quitação e Data */}
           <div className="text-sm text-center italic text-slate-600 py-4">
             "O cliente declara ter conferido os valores acima e dá plena, rasa e geral quitação para nada mais reclamar quanto ao objeto deste pagamento."
           </div>
@@ -558,7 +553,7 @@ export default function FinanceiroPage() {
   const processesMap = React.useMemo(() => new Map(processesData?.map(p => [p.id, p])), [processesData]);
   
   const stats = React.useMemo(() => {
-    if (!titlesData) return { totalReceitas: 0, totalDespesas: 0, pendenteReceita: 0, pendenteDespesa: 0 };
+    if (!titlesData) return { totalReceitas: 0, totalDespesas: 0, pendenteReceita: 0, pendenteDespesa: 0, aRepassar: 0 };
     return titlesData.reduce((acc, t) => {
       const val = t.value || 0;
       if (t.type === 'RECEITA') {
@@ -569,7 +564,7 @@ export default function FinanceiroPage() {
         else acc.pendenteDespesa += val;
       }
       return acc;
-    }, { totalReceitas: 0, totalDespesas: 0, pendenteReceita: 0, pendenteDespesa: 0 });
+    }, { totalReceitas: 0, totalDespesas: 0, pendenteReceita: 0, pendenteDespesa: 0, aRepassar: 0 });
   }, [titlesData]);
 
   const handleUpdateStatus = async (id: string, status: 'PAGO' | 'PENDENTE') => {
