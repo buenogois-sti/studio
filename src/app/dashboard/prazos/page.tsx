@@ -18,7 +18,8 @@ import {
   Eye,
   Edit,
   ArrowRight,
-  CalendarDays
+  CalendarDays,
+  RotateCcw
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
@@ -92,7 +93,7 @@ export default function PrazosPage() {
     setIsProcessing(id);
     try {
       await updateDeadlineStatus(id, status);
-      toast({ title: `Prazo marcado como ${status.toLowerCase()}!` });
+      toast({ title: status === 'PENDENTE' ? 'Prazo Reativado!' : `Prazo marcado como ${status.toLowerCase()}!` });
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Erro', description: error.message });
     } finally {
@@ -261,7 +262,42 @@ export default function PrazosPage() {
                           )}>{d.status}</Badge>
                         </td>
                         <td className="px-6 py-4 text-right">
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground group-hover:text-primary" onClick={() => handleViewDetails(d)}><Eye className="h-4 w-4" /></Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground group-hover:text-white">
+                                {isProcessing === d.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreVertical className="h-4 w-4" />}
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="bg-card border-border w-56">
+                              <DropdownMenuLabel className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Opções do Prazo</DropdownMenuLabel>
+                              <DropdownMenuItem onClick={() => handleViewDetails(d)} className="gap-2 cursor-pointer">
+                                <Eye className="h-4 w-4 text-blue-400" /> <span className="font-bold">Ver Detalhes</span>
+                              </DropdownMenuItem>
+                              
+                              {d.status === 'CUMPRIDO' ? (
+                                <DropdownMenuItem onClick={() => handleUpdateStatus(d.id, 'PENDENTE')} className="gap-2 cursor-pointer text-amber-400">
+                                  <RotateCcw className="h-4 w-4" /> <span className="font-bold">Reativar Prazo</span>
+                                </DropdownMenuItem>
+                              ) : (
+                                <DropdownMenuItem onClick={() => handleUpdateStatus(d.id, 'CUMPRIDO')} className="gap-2 cursor-pointer text-emerald-400">
+                                  <Check className="h-4 w-4" /> <span className="font-bold">Marcar Cumprido</span>
+                                </DropdownMenuItem>
+                              )}
+
+                              <DropdownMenuItem onClick={() => handleEdit(d)} className="gap-2 cursor-pointer">
+                                <Edit className="h-4 w-4 text-primary" /> <span className="font-bold">Editar</span>
+                              </DropdownMenuItem>
+                              
+                              <DropdownMenuItem onClick={() => handleGoToProcess(d.processId)} className="gap-2 cursor-pointer">
+                                <ArrowRight className="h-4 w-4 text-slate-400" /> <span className="font-bold">Ver Processo</span>
+                              </DropdownMenuItem>
+
+                              <DropdownMenuSeparator className="bg-white/10" />
+                              <DropdownMenuItem className="text-rose-500 gap-2 cursor-pointer" onClick={() => handleDelete(d.id)}>
+                                <X className="h-4 w-4" /> <span className="font-bold">Excluir</span>
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </td>
                       </tr>
                     ))}
@@ -392,7 +428,7 @@ function DeadlineCard({
                 onClick={() => onStatusUpdate(deadline.id, 'PENDENTE')}
                 disabled={isProcessing}
               >
-                {isProcessing ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Clock className="h-3 w-3 mr-1" />}
+                {isProcessing ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <RotateCcw className="h-3 w-3 mr-1" />}
                 Reabrir
               </Button>
             ) : (
