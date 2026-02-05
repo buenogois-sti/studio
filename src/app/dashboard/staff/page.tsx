@@ -274,7 +274,13 @@ export default function StaffPage() {
             ) : filteredStaff.length > 0 ? (
             <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6">
                 {filteredStaff.map((member) => {
-                const memberProcesses = processes.filter(p => p.responsibleStaffIds?.includes(member.id));
+                // CORREÇÃO: Busca processos onde o membro é titular (leadLawyerId) ou faz parte da equipe (teamParticipants)
+                const memberProcesses = processes.filter(p => 
+                  p.leadLawyerId === member.id || 
+                  p.teamParticipants?.some(tp => tp.staffId === member.id) ||
+                  p.responsibleStaffIds?.includes(member.id)
+                );
+                
                 const activeCount = memberProcesses.filter(p => p.status === 'Ativo').length;
                 const pendingCount = memberProcesses.filter(p => p.status === 'Pendente').length;
 
