@@ -104,6 +104,7 @@ Cidade/UF: ${client.address?.city || 'Não informado'} - ${client.address?.state
 CEP: ${client.address?.zipCode || 'Não informado'}
 
 DADOS BANCÁRIOS
+Favorecido: ${client.bankInfo?.bankBeneficiary || `${client.firstName} ${client.lastName}`}
 Banco: ${client.bankInfo?.bankName || 'Não informado'}
 Agência: ${client.bankInfo?.agency || 'Não informado'}
 Conta: ${client.bankInfo?.account || 'Não informado'}
@@ -207,7 +208,7 @@ Gerado em: ${format(new Date(), "dd/MM/yyyy HH:mm")}
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="sm:max-w-3xl w-full overflow-y-auto print:p-0 print:shadow-none print:border-none">
+      <SheetContent className="sm:max-w-[800px] w-full overflow-y-auto print:p-0 print:shadow-none print:border-none">
         <div className="print:block hidden mb-8">
             <h1 className="text-2xl font-bold">FICHA DO CLIENTE</h1>
             <p className="text-sm text-muted-foreground">Bueno Gois Advogados e Associados</p>
@@ -315,6 +316,13 @@ Gerado em: ${format(new Date(), "dd/MM/yyyy HH:mm")}
                 <h3 className="font-black text-xs uppercase tracking-widest text-muted-foreground">Dados Financeiros</h3>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 bg-muted/20 p-6 rounded-2xl border border-border/50">
+                <InfoRow 
+                    icon={User} 
+                    label="Favorecido da Conta" 
+                    value={client.bankInfo?.bankBeneficiary || `${client.firstName} ${client.lastName}`} 
+                    actionType="copy"
+                    className="col-span-full"
+                />
                 <InfoRow icon={CreditCard} label="Banco" value={client.bankInfo?.bankName} actionType="copy" />
                 <InfoRow icon={CreditCard} label="Agência / Conta" value={client.bankInfo?.agency ? `${client.bankInfo.agency} / ${client.bankInfo.account || ''}` : undefined} actionType="copy" />
                 <InfoRow icon={Smartphone} label="Chave PIX" value={client.bankInfo?.pixKey} actionType="copy" className="col-span-1 sm:col-span-2" />

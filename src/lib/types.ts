@@ -53,6 +53,7 @@ export type Client = {
     agency?: string;
     account?: string;
     pixKey?: string;
+    bankBeneficiary?: string;
   };
   driveFolderId?: string;
   sheetId?: string;
@@ -256,6 +257,7 @@ export type Staff = {
     agency?: string;
     account?: string;
     pixKey?: string;
+    bankBeneficiary?: string;
   };
   remuneration?: {
     type: RemunerationType;

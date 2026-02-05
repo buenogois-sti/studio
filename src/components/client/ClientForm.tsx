@@ -1,4 +1,3 @@
-
 'use client';
 import * as React from 'react';
 import { z } from 'zod';
@@ -53,6 +52,7 @@ const clientSchema = z.object({
   address_neighborhood: z.string().optional(),
   address_city: z.string().optional(),
   address_state: z.string().optional(),
+  bankBeneficiary: z.string().optional(),
   bankName: z.string().optional(),
   agency: z.string().optional(),
   account: z.string().optional(),
@@ -101,6 +101,7 @@ export function ClientForm({
       address_neighborhood: client?.address?.neighborhood ?? '',
       address_city: client?.address?.city ?? '',
       address_state: client?.address?.state ?? '',
+      bankBeneficiary: client?.bankInfo?.bankBeneficiary ?? '',
       bankName: client?.bankInfo?.bankName ?? '',
       agency: client?.bankInfo?.agency ?? '',
       account: client?.bankInfo?.account ?? '',
@@ -169,6 +170,7 @@ export function ClientForm({
         address_neighborhood: client.address?.neighborhood,
         address_city: client.address?.city,
         address_state: client.address?.state,
+        bankBeneficiary: client.bankInfo?.bankBeneficiary,
         bankName: client.bankInfo?.bankName,
         agency: client.bankInfo?.agency,
         account: client.bankInfo?.account,
@@ -200,6 +202,7 @@ export function ClientForm({
         address_neighborhood: '',
         address_city: '',
         address_state: '',
+        bankBeneficiary: '',
         bankName: '',
         agency: '',
         account: '',
@@ -216,7 +219,7 @@ export function ClientForm({
       const { 
         address_street, address_number, address_complement, address_zipCode, 
         address_neighborhood, address_city, address_state,
-        bankName, agency, account, pixKey,
+        bankBeneficiary, bankName, agency, account, pixKey,
         ...restOfValues
       } = values;
 
@@ -232,6 +235,7 @@ export function ClientForm({
           state: address_state,
         },
         bankInfo: {
+          bankBeneficiary,
           bankName,
           agency,
           account,
@@ -610,6 +614,17 @@ export function ClientForm({
           <section>
               <H2>Dados Bancários</H2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                  <FormField
+                      control={form.control}
+                      name="bankBeneficiary"
+                      render={({ field }) => (
+                          <FormItem className="md:col-span-2">
+                              <FormLabel>Nome do Favorecido</FormLabel>
+                              <FormControl><Input placeholder="Deixe em branco se for o próprio cliente" {...field} /></FormControl>
+                              <FormMessage />
+                          </FormItem>
+                      )}
+                  />
                   <FormField
                       control={form.control}
                       name="bankName"
