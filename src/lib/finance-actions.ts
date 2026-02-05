@@ -155,7 +155,7 @@ export async function updateFinancialTitleStatus(titleId: string, status: 'PAGO'
         if (status === 'PAGO') {
             updateData.paymentDate = FieldValue.serverTimestamp();
             
-            // Se o título está vinculado a um evento financeiro, libera os créditos dos advogados
+            // Se o título está vinculado a um evento financeiro, LIBERA os créditos dos advogados
             if (titleData.financialEventId) {
                 const staffSnapshot = await firestoreAdmin.collection('staff').get();
                 for (const staffDoc of staffSnapshot.docs) {
@@ -166,6 +166,23 @@ export async function updateFinancialTitleStatus(titleId: string, status: 'PAGO'
                     
                     for (const creditDoc of creditsQuery.docs) {
                         await creditDoc.ref.update({ status: 'DISPONIVEL' });
+                    }
+                }
+            }
+        } else if (status === 'PENDENTE') {
+            // LÓGICA DE ESTORNO: Volta créditos de DISPONIVEL para RETIDO
+            updateData.paymentDate = FieldValue.delete();
+
+            if (titleData.financialEventId) {
+                const staffSnapshot = await firestoreAdmin.collection('staff').get();
+                for (const staffDoc of staffSnapshot.docs) {
+                    const creditsQuery = await staffDoc.ref.collection('credits')
+                        .where('financialEventId', '==', titleData.financialEventId)
+                        .where('status', '==', 'DISPONIVEL')
+                        .get();
+                    
+                    for (const creditDoc of creditsQuery.docs) {
+                        await creditDoc.ref.update({ status: 'RETIDO' });
                     }
                 }
             }
