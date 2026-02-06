@@ -147,6 +147,8 @@ export type Hearing = {
   status: HearingStatus;
   type: HearingType;
   notes?: string;
+  resultNotes?: string; // Ata ou resultado pós-audiência
+  hasFollowUp?: boolean; // Se o retorno de audiência foi processado
   googleCalendarEventId?: string;
   createdAt?: Timestamp;
 };

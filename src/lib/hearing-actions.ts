@@ -6,8 +6,10 @@ import { add, formatISO } from 'date-fns';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/options';
 import { createNotification } from './notification-actions';
-import type { HearingStatus, HearingType } from './types';
+import type { HearingStatus, HearingType, TimelineEvent } from './types';
 import { summarizeAddress } from './utils';
+import { v4 as uuidv4 } from 'uuid';
+import { Timestamp, FieldValue } from 'firebase-admin/firestore';
 
 /**
  * Constrói a descrição detalhada para o Google Agenda seguindo o padrão Bueno Gois.
@@ -137,6 +139,13 @@ export async function createHearing(data: {
         description: description,
         start: { dateTime: formatISO(startDateTime), timeZone: 'America/Sao_Paulo' },
         end: { dateTime: formatISO(endDateTime), timeZone: 'America/Sao_Paulo' },
+        reminders: {
+          useDefault: false,
+          overrides: [
+            { method: 'popup', minutes: 1440 },
+            { method: 'popup', minutes: 120 },
+          ],
+        },
       };
 
       const createdEvent = await calendar.events.insert({
@@ -151,6 +160,7 @@ export async function createHearing(data: {
             userId: session.user.id,
             title: "Audiência Agendada",
             description: `Audiência de ${clientInfo.name} sincronizada com Google Agenda.`,
+            type: 'hearing',
             href: `/dashboard/audiencias`,
         });
       }
@@ -165,83 +175,69 @@ export async function createHearing(data: {
   }
 }
 
-export async function syncHearings() {
-  if (!firestoreAdmin) throw new Error('A conexão com o servidor de dados falhou.');
-  
+export async function processHearingReturn(id: string, data: {
+  resultNotes: string;
+  nextStepType?: string;
+  nextStepDeadline?: string;
+}) {
+  if (!firestoreAdmin) throw new Error('Servidor indisponível.');
+  const session = await getServerSession(authOptions);
+  if (!session) throw new Error('Não autenticado.');
+
   try {
-    const hearingsSnapshot = await firestoreAdmin.collection('hearings')
-      .where('status', '==', 'PENDENTE')
-      .get();
-    
-    const { calendar } = await getGoogleApiClientsForUser();
-    let syncedCount = 0;
+    const hearingRef = firestoreAdmin.collection('hearings').doc(id);
+    const hearingDoc = await hearingRef.get();
+    if (!hearingDoc.exists) throw new Error('Audiência não encontrada.');
+    const hearingData = hearingDoc.data();
 
-    for (const doc of hearingsSnapshot.docs) {
-      const hearing = doc.data();
-      if (!hearing.googleCalendarEventId) {
-        const processDoc = await firestoreAdmin.collection('processes').doc(hearing.processId).get();
-        const processData = processDoc.data();
-        const processNumber = processData?.processNumber || 'Não informado';
-        const legalArea = processData?.legalArea || 'Não informada';
+    const processRef = firestoreAdmin.collection('processes').doc(hearingData!.processId);
 
-        let clientInfo = { name: 'Não informado', phone: 'Não informado' };
-        if (processData?.clientId) {
-          const clientDoc = await firestoreAdmin.collection('clients').doc(processData.clientId).get();
-          const clientData = clientDoc.data();
-          if (clientData) {
-            clientInfo = {
-              name: `${clientData.firstName} ${clientData.lastName}`.trim(),
-              phone: clientData.mobile || clientData.phone || 'Não informado'
-            };
+    // 1. Atualizar status da audiência
+    await hearingRef.update({
+      status: 'REALIZADA',
+      resultNotes: data.resultNotes,
+      hasFollowUp: true,
+      updatedAt: Timestamp.now()
+    });
+
+    // 2. Registrar na linha do tempo do processo
+    const timelineEvent: TimelineEvent = {
+      id: uuidv4(),
+      type: 'hearing',
+      description: `AUDIÊNCIA REALIZADA: ${data.resultNotes}`,
+      date: Timestamp.now() as any,
+      authorName: session.user.name || 'Sistema'
+    };
+
+    await processRef.update({
+      timeline: FieldValue.arrayUnion(timelineEvent),
+      updatedAt: FieldValue.serverTimestamp()
+    });
+
+    // 3. Se houver próximo passo, criar um Google Task ou Deadline
+    if (data.nextStepDeadline && data.nextStepType) {
+      // Aqui poderíamos chamar createLegalDeadline, mas para simplificar o "seguimento":
+      try {
+        const { tasks } = await getGoogleApiClientsForUser();
+        const taskDate = new Date(data.nextStepDeadline);
+        taskDate.setUTCHours(0, 0, 0, 0);
+
+        await tasks.tasks.insert({
+          tasklist: '@default',
+          requestBody: {
+            title: `⏭️ SEGUIMENTO: ${data.nextStepType} (Pós-Audiência)`,
+            notes: `Tarefa gerada automaticamente após retorno de audiência.\nAudiência: ${hearingData?.type}\nResultados: ${data.resultNotes}`,
+            due: taskDate.toISOString(),
           }
-        }
-
-        const forumName = hearing.location.split('-')[0]?.trim() || hearing.location.split(',')[0]?.trim() || hearing.location;
-        const summarizedLoc = summarizeAddress(hearing.location);
-
-        const description = buildCalendarDescription({
-          legalArea,
-          processNumber,
-          clientName: clientInfo.name,
-          clientPhone: clientInfo.phone,
-          location: summarizedLoc,
-          courtBranch: hearing.courtBranch,
-          responsibleParty: hearing.responsibleParty,
-          status: hearing.status,
-          notes: hearing.notes,
-          id: doc.id
         });
-
-        const startDateTime = hearing.date.toDate();
-        const endDateTime = add(startDateTime, { hours: 1 });
-
-        const event = {
-          summary: `Audiência [${hearing.type}] | ${clientInfo.name}`,
-          location: forumName,
-          description: description,
-          start: { dateTime: formatISO(startDateTime), timeZone: 'America/Sao_Paulo' },
-          end: { dateTime: formatISO(endDateTime), timeZone: 'America/Sao_Paulo' },
-        };
-
-        try {
-          const createdEvent = await calendar.events.insert({
-            calendarId: 'primary',
-            requestBody: event,
-          });
-
-          if (createdEvent.data.id) {
-            await doc.ref.update({ googleCalendarEventId: createdEvent.data.id, updatedAt: new Date() });
-            syncedCount++;
-          }
-        } catch (e) {
-          console.error(`Failed to sync hearing ${doc.id}:`, e);
-        }
+      } catch (e) {
+        console.warn('Failed to create follow-up task in Google Tasks');
       }
     }
-    return { success: true, syncedCount };
+
+    return { success: true };
   } catch (error: any) {
-    console.error('Error in syncHearings action:', error);
-    throw new Error(error.message || 'Erro na comunicação com o Google Calendar.');
+    throw new Error(error.message);
   }
 }
 
@@ -254,48 +250,18 @@ export async function updateHearingStatus(hearingId: string, status: HearingStat
         if (!hearingDoc.exists) throw new Error('Audiência não encontrada.');
         const hearing = hearingDoc.data();
 
-        // 1. Atualiza Firestore
         await hearingRef.update({ status, updatedAt: new Date() });
 
-        // 2. Atualiza Google Calendar se houver vínculo
         if (hearing?.googleCalendarEventId) {
             try {
                 const { calendar } = await getGoogleApiClientsForUser();
+                const prefix = status === 'REALIZADA' ? '✅ ' : status === 'CANCELADA' ? '❌ ' : '';
                 
-                // Busca dados do processo para reconstruir a descrição
-                const processDoc = await firestoreAdmin.collection('processes').doc(hearing.processId).get();
-                const processData = processDoc.data();
-                
-                let clientInfo = { name: 'Não informado', phone: 'Não informado' };
-                if (processData?.clientId) {
-                    const clientDoc = await firestoreAdmin.collection('clients').doc(processData.clientId).get();
-                    const clientData = clientDoc.data();
-                    if (clientData) {
-                        clientInfo = {
-                            name: `${clientData.firstName} ${clientData.lastName}`.trim(),
-                            phone: clientData.mobile || clientData.phone || 'Não informado'
-                        };
-                    }
-                }
-
-                const newDescription = buildCalendarDescription({
-                    legalArea: processData?.legalArea || 'Não informada',
-                    processNumber: processData?.processNumber || 'Não informado',
-                    clientName: clientInfo.name,
-                    clientPhone: clientInfo.phone,
-                    location: hearing.location,
-                    courtBranch: hearing.courtBranch,
-                    responsibleParty: hearing.responsibleParty,
-                    status: status, // Status atualizado
-                    notes: hearing.notes,
-                    id: hearingId
-                });
-
                 await calendar.events.patch({
                     calendarId: 'primary',
                     eventId: hearing.googleCalendarEventId,
                     requestBody: {
-                        description: newDescription,
+                        summary: `${prefix}Audiência [${hearing.type}] | ID: ${hearingId.substring(0,4)}`,
                     }
                 });
             } catch (calendarError: any) {
@@ -305,8 +271,7 @@ export async function updateHearingStatus(hearingId: string, status: HearingStat
 
         return { success: true };
     } catch (e: any) {
-        console.error('Error updating hearing status:', e);
-        throw new Error(e.message || 'Falha ao atualizar status da audiência.');
+        throw new Error(e.message || 'Falha ao atualizar status.');
     }
 }
 
@@ -331,7 +296,6 @@ export async function deleteHearing(hearingId: string, googleCalendarEventId?: s
     await firestoreAdmin.collection('hearings').doc(hearingId).delete();
     return { success: true };
   } catch (error: any) {
-    console.error('Error deleting hearing:', error);
     throw new Error(error.message || 'Falha ao excluir audiência.');
   }
 }

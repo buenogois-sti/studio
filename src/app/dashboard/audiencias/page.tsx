@@ -18,7 +18,9 @@ import {
   Gavel,
   History,
   CalendarDays,
-  Building
+  Building,
+  ArrowRightCircle,
+  AlertCircle
 } from 'lucide-react';
 import { 
   format, 
@@ -55,6 +57,7 @@ import { H1 } from '@/components/ui/typography';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { HearingReturnDialog } from '@/components/process/HearingReturnDialog';
 
 const statusConfig: Record<HearingStatus, { label: string; icon: any; color: string }> = {
     PENDENTE: { label: 'Pendente', icon: Clock3, color: 'text-blue-500 bg-blue-500/10' },
@@ -70,6 +73,7 @@ export default function AudienciasPage() {
   const [viewMode, setViewMode] = React.useState<'list' | 'calendar' | 'history'>('list');
   const [currentDate, setCurrentDate] = React.useState(new Date());
   const [selectedDay, setSelectedDay] = React.useState<Date | null>(new Date());
+  const [returnHearing, setReturnHearing] = React.useState<Hearing | null>(null);
   const { toast } = useToast();
 
   const userProfileRef = useMemoFirebase(
@@ -82,7 +86,6 @@ export default function AudienciasPage() {
     if (!firestore || !userProfile) return null;
     const base = collection(firestore, 'hearings');
     
-    // Regra: Advogado vê as dele. Admin/Secretaria vê de todos.
     if (userProfile.role === 'lawyer') {
       return query(base, where('lawyerId', '==', userProfile.id));
     }
@@ -93,12 +96,15 @@ export default function AudienciasPage() {
 
   const processesQuery = useMemoFirebase(() => firestore ? collection(firestore, 'processes') : null, [firestore]);
   const { data: processesData } = useCollection<Process>(processesQuery);
-  
   const processesMap = React.useMemo(() => new Map(processesData?.map(p => [p.id, p])), [processesData]);
 
-  const handleUpdateStatus = async (hearingId: string, status: HearingStatus) => {
+  const handleUpdateStatus = async (hearing: Hearing, status: HearingStatus) => {
+      if (status === 'REALIZADA' && !hearing.hasFollowUp) {
+          setReturnHearing(hearing);
+          return;
+      }
       try {
-          await updateHearingStatus(hearingId, status);
+          await updateHearingStatus(hearing.id, status);
           toast({ title: 'Status atualizado!', description: 'A alteração foi sincronizada com sua agenda.' });
           setRefreshKey(prev => prev + 1);
       } catch (e: any) {
@@ -138,6 +144,11 @@ export default function AudienciasPage() {
     return hearingsData.filter(h => isSameDay(h.date.toDate(), selectedDay));
   }, [hearingsData, selectedDay]);
 
+  const pendingReturns = React.useMemo(() => {
+    if (!hearingsData) return [];
+    return hearingsData.filter(h => h.status === 'REALIZADA' && !h.hasFollowUp);
+  }, [hearingsData]);
+
   const isLoading = isUserLoading || isProfileLoading || isLoadingHearings;
 
   if (hearingsError) {
@@ -147,11 +158,7 @@ export default function AudienciasPage() {
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Erro de Consulta</AlertTitle>
           <AlertDescription className="text-xs mt-2 space-y-4">
-            <p>Não foi possível carregar a agenda. Se você for um advogado, o Firebase exige um índice para filtrar por responsável.</p>
-            <div className="bg-black/20 p-4 rounded-lg space-y-2 border border-white/10">
-              <p className="font-bold text-white uppercase tracking-tighter text-[10px]">Ação Necessária (Admin):</p>
-              <p className="text-slate-300 text-xs">Crie um índice para a coleção <strong>hearings</strong> com o campo <strong>lawyerId</strong>.</p>
-            </div>
+            <p>Não foi possível carregar a agenda. Verifique os índices no Console do Firebase.</p>
           </AlertDescription>
         </Alert>
       </div>
@@ -189,6 +196,28 @@ export default function AudienciasPage() {
                 </Button>
             </div>
         </div>
+
+        {pendingReturns.length > 0 && (
+          <Card className="border-amber-500/20 bg-amber-500/5 animate-in slide-in-from-top-4 duration-500">
+            <CardContent className="p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <AlertCircle className="h-5 w-5 text-amber-500" />
+                <div>
+                  <p className="text-sm font-bold text-amber-200">Retornos Pendentes</p>
+                  <p className="text-xs text-amber-400/70">Você tem {pendingReturns.length} audiência(s) realizada(s) aguardando o seguimento jurídico.</p>
+                </div>
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
+                onClick={() => setViewMode('history')}
+              >
+                Ver Histórico
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
         {todayHearings.length > 0 && viewMode !== 'calendar' && (
             <Card className="border-2 border-primary/20 bg-primary/5 shadow-[0_0_30px_rgba(245,208,48,0.05)]">
@@ -237,7 +266,7 @@ export default function AudienciasPage() {
                   <CalendarDays className="h-4 w-4"/> Calendário Mensal
                 </TabsTrigger>
                 <TabsTrigger value="history" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground px-6 h-10 font-bold">
-                  <History className="h-4 w-4"/> Histórico de Atas
+                  <History className="h-4 w-4"/> Histórico & Retornos
                 </TabsTrigger>
             </TabsList>
 
@@ -290,13 +319,13 @@ export default function AudienciasPage() {
                                                                 <Button variant="ghost" size="icon" className="text-white/30 hover:text-white rounded-xl h-10 w-10"><MoreVertical className="h-5 w-5" /></Button>
                                                             </DropdownMenuTrigger>
                                                             <DropdownMenuContent align="end" className="bg-card border-border w-56 p-1">
-                                                                <DropdownMenuItem onClick={() => handleUpdateStatus(h.id, 'REALIZADA')} className="font-bold gap-2">
-                                                                    <CheckCircle2 className="h-4 w-4 text-emerald-500" /> Marcar como Realizada
+                                                                <DropdownMenuItem onClick={() => handleUpdateStatus(h, 'REALIZADA')} className="font-bold gap-2">
+                                                                    <ArrowRightCircle className="h-4 w-4 text-emerald-500" /> Processar Retorno
                                                                 </DropdownMenuItem>
-                                                                <DropdownMenuItem onClick={() => handleUpdateStatus(h.id, 'ADIADA')} className="font-bold gap-2">
+                                                                <DropdownMenuItem onClick={() => handleUpdateStatus(h, 'ADIADA')} className="font-bold gap-2">
                                                                     <Clock3 className="h-4 w-4 text-amber-500" /> Marcar como Adiada
                                                                 </DropdownMenuItem>
-                                                                <DropdownMenuItem className="text-rose-500 font-bold gap-2" onClick={() => handleUpdateStatus(h.id, 'CANCELADA')}>
+                                                                <DropdownMenuItem className="text-rose-500 font-bold gap-2" onClick={() => handleUpdateStatus(h, 'CANCELADA')}>
                                                                     <XCircle className="h-4 w-4" /> Cancelar Audiência
                                                                 </DropdownMenuItem>
                                                             </DropdownMenuContent>
@@ -309,12 +338,6 @@ export default function AudienciasPage() {
                                 </div>
                             )
                         })}
-                        {hearingsData && hearingsData.filter(h => h.status === 'PENDENTE').length === 0 && (
-                            <div className="flex flex-col items-center justify-center py-32 opacity-30">
-                                <CalendarDays className="h-16 w-16 mb-4" />
-                                <p className="font-black uppercase tracking-widest">Sem audiências pendentes nos próximos 7 dias</p>
-                            </div>
-                        )}
                     </div>
                 </Card>
             </TabsContent>
@@ -376,7 +399,6 @@ export default function AudienciasPage() {
                                 h.status === 'CANCELADA' ? "bg-rose-500" : "bg-primary shadow-[0_0_5px_rgba(245,208,48,0.5)]"
                               )} />
                             ))}
-                            {dailyHearings.length > 3 && <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />}
                           </div>
                         </button>
                       )
@@ -423,7 +445,7 @@ export default function AudienciasPage() {
                           ) : (
                             <div className="flex flex-col items-center justify-center py-32 text-center opacity-20">
                               <CalendarIcon className="h-12 w-12 mb-3" />
-                              <p className="text-[10px] font-black uppercase tracking-widest">Sem compromissos para este dia</p>
+                              <p className="text-[10px] font-black uppercase tracking-widest">Sem compromissos</p>
                             </div>
                           )}
                         </div>
@@ -442,57 +464,80 @@ export default function AudienciasPage() {
                           <tr>
                             <th className="px-6 py-5">Data/Hora</th>
                             <th className="px-6 py-5">Processo</th>
-                            <th className="px-6 py-5">Vara / Juízo</th>
-                            <th className="px-6 py-5">Tipo</th>
-                            <th className="px-6 py-5 text-right">Status Final</th>
+                            <th className="px-6 py-5">Status Final</th>
+                            <th className="px-6 py-5">Retorno Jurídico</th>
+                            <th className="px-6 py-5 text-right">Ação</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-white/5">
                           {historyHearings.map(h => {
                               const config = statusConfig[h.status];
                               const StatusIcon = config.icon;
+                              const isPendingReturn = h.status === 'REALIZADA' && !h.hasFollowUp;
+
                               return (
-                                <tr key={h.id} className="hover:bg-white/[0.02] transition-colors group">
+                                <tr key={h.id} className={cn("hover:bg-white/[0.02] transition-colors group", isPendingReturn && "bg-amber-500/[0.03]")}>
                                     <td className="px-6 py-5 text-white font-black whitespace-nowrap">
                                       {format(h.date.toDate(), 'dd/MM/yyyy HH:mm')}
                                     </td>
-                                    <td className="px-6 py-5 text-slate-300 truncate max-w-[250px] font-bold group-hover:text-primary transition-colors">
-                                      {processesMap.get(h.processId)?.name || 'Processo não encontrado'}
-                                    </td>
                                     <td className="px-6 py-5">
-                                      <div className="flex items-center gap-2 text-[10px] text-slate-400 font-medium">
-                                        <Building className="h-3 w-3 text-slate-600" />
-                                        <span className="truncate max-w-[200px]">{h.courtBranch || 'N/A'}</span>
+                                      <div className="flex flex-col">
+                                        <span className="text-slate-300 font-bold group-hover:text-primary transition-colors truncate max-w-[200px]">
+                                          {processesMap.get(h.processId)?.name}
+                                        </span>
+                                        <span className="text-[9px] text-slate-500 uppercase font-black">{h.type}</span>
                                       </div>
                                     </td>
                                     <td className="px-6 py-5">
-                                      <Badge variant="outline" className="text-[10px] font-black uppercase bg-white/5 border-white/10 text-slate-400">
-                                        {h.type}
-                                      </Badge>
-                                    </td>
-                                    <td className="px-6 py-5 text-right">
                                       <Badge variant="outline" className={cn("gap-1.5 h-7 px-3 text-[9px] font-black uppercase tracking-widest", config.color)}>
                                           <StatusIcon className="h-3 w-3" />
                                           {config.label}
                                       </Badge>
                                     </td>
+                                    <td className="px-6 py-5">
+                                      {h.hasFollowUp ? (
+                                        <div className="flex items-center gap-2 text-emerald-500">
+                                          <CheckCircle2 className="h-4 w-4" />
+                                          <span className="text-[10px] font-black uppercase">Processado</span>
+                                        </div>
+                                      ) : h.status === 'REALIZADA' ? (
+                                        <div className="flex items-center gap-2 text-amber-500">
+                                          <AlertCircle className="h-4 w-4" />
+                                          <span className="text-[10px] font-black uppercase animate-pulse">Pendente</span>
+                                        </div>
+                                      ) : (
+                                        <span className="text-slate-600">---</span>
+                                      )}
+                                    </td>
+                                    <td className="px-6 py-5 text-right">
+                                      {isPendingReturn ? (
+                                        <Button 
+                                          size="sm" 
+                                          className="bg-amber-600 hover:bg-amber-500 text-white font-black uppercase text-[9px] h-8 shadow-lg shadow-amber-900/20"
+                                          onClick={() => setReturnHearing(h)}
+                                        >
+                                          Dar Retorno
+                                        </Button>
+                                      ) : (
+                                        <Button variant="ghost" size="icon" className="text-white/20"><MoreVertical className="h-4 w-4" /></Button>
+                                      )}
+                                    </td>
                                 </tr>
                               );
                           })}
-                          {historyHearings.length === 0 && (
-                            <tr>
-                              <td colSpan={5} className="px-6 py-40 text-center text-muted-foreground italic bg-black/10">
-                                <History className="h-16 w-16 mx-auto mb-6 opacity-10" />
-                                <p className="font-black uppercase tracking-[0.3em] text-[10px]">Nenhuma pauta finalizada no histórico</p>
-                              </td>
-                            </tr>
-                          )}
                         </tbody>
                       </table>
                     </div>
                 </Card>
             </TabsContent>
         </Tabs>
+
+        <HearingReturnDialog 
+          hearing={returnHearing} 
+          open={!!returnHearing} 
+          onOpenChange={(o) => !o && setReturnHearing(null)}
+          onSuccess={() => setRefreshKey(k => k + 1)}
+        />
     </div>
   );
 }
