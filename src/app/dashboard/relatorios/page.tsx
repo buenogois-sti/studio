@@ -17,7 +17,10 @@ import {
   AlertTriangle,
   Target,
   Flame,
-  Clock
+  Clock,
+  Activity,
+  XCircle,
+  Sparkles
 } from 'lucide-react';
 import { 
   Bar, 
@@ -47,6 +50,7 @@ import type { Process, Client, FinancialTitle, Staff, LegalDeadline, Hearing, Le
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const COLORS = ['#F5D030', '#3b82f6', '#10b981', '#f43f5e', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316'];
 
@@ -61,7 +65,7 @@ export default function RelatoriosPage() {
   const { data: processesData } = useCollection<Process>(processesQuery);
 
   const titlesQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'financial_titles'), orderBy('dueDate', 'desc')) : null, [firestore]);
-  const { data: titlesData } = useCollection<FinancialTitle>(titlesQuery);
+  const { data: titlesData, error: titlesError } = useCollection<FinancialTitle>(titlesQuery);
 
   const staffQuery = useMemoFirebase(() => firestore ? collection(firestore, 'staff') : null, [firestore]);
   const { data: staffData } = useCollection<Staff>(staffQuery);
@@ -73,7 +77,7 @@ export default function RelatoriosPage() {
   const { data: hearingsData } = useCollection<Hearing>(hearingsQuery);
 
   const leadsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'leads') : null, [firestore]);
-  const { data: leadsData } = useCollection<Lead>(leadsQuery);
+  const { data: leadsData, error: leadsError } = useCollection<Lead>(leadsQuery);
 
   // 1. Processamento de Prazos (Vencidos e Pendentes)
   const deadlineStats = React.useMemo(() => {
@@ -161,6 +165,24 @@ export default function RelatoriosPage() {
   }, [titlesData]);
 
   const isLoading = isUserLoading || !deadlinesData || !leadsData;
+
+  if (titlesError || leadsError) {
+    return (
+      <div className="p-8 space-y-6">
+        <H1 className="text-white">Relatórios</H1>
+        <Alert variant="destructive" className="bg-rose-500/10 border-rose-500/20 text-rose-400">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Erro de Sincronização (Status 400)</AlertTitle>
+          <AlertDescription className="text-xs mt-2 space-y-4">
+            <p>O sistema encontrou uma falha ao tentar cruzar dados filtrados. Isso geralmente ocorre quando o Firebase exige um índice manual.</p>
+            <div className="bg-black/20 p-4 rounded-lg space-y-2 border border-white/10 font-mono text-[10px]">
+              <p>Verifique se os índices de 'financial_titles' e 'leads' estão ativos no Firebase Console.</p>
+            </div>
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -258,14 +280,14 @@ export default function RelatoriosPage() {
         </Card>
 
         {/* Eficácia de Canais de Captação (Marketing Jurídico) */}
-        <Card className="bg-[#0f172a] border-white/5 shadow-2xl">
-          <CardHeader>
+        <Card className="bg-[#0f172a] border-white/5 shadow-2xl flex flex-col items-center justify-center">
+          <CardHeader className="w-full">
             <CardTitle className="text-lg text-white font-black uppercase tracking-tighter flex items-center gap-2">
               <Target className="h-5 w-5 text-emerald-400" /> Origem de Novos Negócios (Leads)
             </CardTitle>
             <CardDescription>Breakdown por tipo de captação para análise de ROI.</CardDescription>
           </CardHeader>
-          <CardContent className="h-[400px] flex items-center justify-center">
+          <CardContent className="h-[400px] w-full flex items-center justify-center">
             {leadCaptureData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -377,25 +399,4 @@ export default function RelatoriosPage() {
       </div>
     </div>
   );
-}
-
-function XCircle(props: any) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <circle cx="12" cy="12" r="10" />
-      <path d="m15 9-6 6" />
-      <path d="m9 9 6 6" />
-    </svg>
-  )
 }

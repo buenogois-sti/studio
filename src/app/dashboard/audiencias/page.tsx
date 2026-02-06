@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -23,7 +24,8 @@ import {
   AlertCircle,
   Users,
   User,
-  Filter
+  Filter,
+  Activity
 } from 'lucide-react';
 import { 
   format, 
@@ -100,6 +102,7 @@ export default function AudienciasPage() {
     // Admins e Assistentes podem ver tudo ou filtrar por advogado
     if (userProfile.role === 'admin' || userProfile.role === 'assistant') {
       if (selectedLawyerFilter !== 'all') {
+        // ESSA QUERY PRECISA DE ÍNDICE COMPOSTO: lawyerId + date
         return query(base, where('lawyerId', '==', selectedLawyerFilter), orderBy('date', 'asc'), limit(150));
       }
       return query(base, orderBy('date', 'asc'), limit(300));
@@ -174,9 +177,13 @@ export default function AudienciasPage() {
       <div className="p-6">
         <Alert variant="destructive" className="bg-rose-500/10 border-rose-500/20 text-rose-400">
           <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Índice Necessário</AlertTitle>
+          <AlertTitle>Índice Necessário (Status 400)</AlertTitle>
           <AlertDescription className="text-xs mt-2 space-y-4">
-            <p>Para visualizar a pauta global, o Firebase exige um índice manual nos campos 'lawyerId' e 'date'.</p>
+            <p>Para visualizar a pauta global filtrada, o Firebase exige a criação de um índice composto manual.</p>
+            <div className="bg-black/20 p-4 rounded-lg space-y-2 border border-white/10 font-mono text-[10px]">
+              <p>Coleção: 'hearings'</p>
+              <p>Campos: 'lawyerId' (ASC) e 'date' (ASC)</p>
+            </div>
           </AlertDescription>
         </Alert>
       </div>
@@ -215,7 +222,7 @@ export default function AudienciasPage() {
                     variant="outline" 
                     size="sm" 
                     className="h-10 border-white/10 text-slate-300 hover:bg-white/5" 
-                    onClick={() => setRefreshKey(k => k + 1)}
+                    onClick={() => setRefreshKey(prev => prev + 1)}
                     disabled={isSyncing}
                 >
                     <RefreshCw className={cn("h-4 w-4 mr-2", (isLoading || isSyncing) && "animate-spin")} />
