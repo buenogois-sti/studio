@@ -1,6 +1,5 @@
 'use client';
 import * as React from 'react';
-import Link from 'next/link';
 import {
   MoreVertical,
   PlusCircle,
@@ -178,23 +177,17 @@ export default function ClientsPage() {
             <p className="text-sm text-muted-foreground">Gestão estratégica de contatos.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <div className="relative w-full max-w-sm">
+            <div className="relative w-full max-sm:w-full max-w-sm">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Pesquisar (Server Search)..." className="pl-8 pr-8 bg-card border-border/50 text-white" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-              {(searchTerm || isSearching) && (
-                <div className="absolute right-2.5 top-2.5 flex items-center gap-2">
-                  {isSearching && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
-                  <button onClick={() => setSearchTerm('')} className="text-white/50"><X className="h-4 w-4" /></button>
-                </div>
-              )}
+              <Input placeholder="Pesquisar..." className="pl-8 pr-8 bg-[#0f172a] border-border/50 text-white h-10" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
             </div>
             <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as any)}>
-              <TabsList className="h-9 bg-card border-border/50">
+              <TabsList className="h-10 bg-[#0f172a] border-border/50">
                 <TabsTrigger value="grid" className="px-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><LayoutGrid className="h-4 w-4" /></TabsTrigger>
                 <TabsTrigger value="table" className="px-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><List className="h-4 w-4" /></TabsTrigger>
               </TabsList>
             </Tabs>
-            <Button size="sm" onClick={handleAddNew} className="bg-primary text-primary-foreground hover:bg-primary/90"><PlusCircle className="mr-2 h-4 w-4" /> Novo</Button>
+            <Button size="sm" onClick={handleAddNew} className="bg-primary text-primary-foreground h-10 px-6 font-bold"><PlusCircle className="mr-2 h-4 w-4" /> Novo</Button>
           </div>
         </div>
 
@@ -225,10 +218,10 @@ export default function ClientsPage() {
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild><Button size="icon" variant="ghost" className="h-8 w-8 text-white/50"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
                               <DropdownMenuContent align="end" className="w-56 bg-card border-border">
-                                  <DropdownMenuItem onClick={() => handleViewDetails(client)}><UserCheck className="mr-2 h-4 w-4 text-primary" /> Ficha Completa</DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleViewDetails(client)} className="font-bold"><UserCheck className="mr-2 h-4 w-4 text-primary" /> Ficha Completa</DropdownMenuItem>
                                   <DropdownMenuItem onClick={() => handleEdit(client)}><Edit className="mr-2 h-4 w-4" /> Editar</DropdownMenuItem>
                                   <DropdownMenuSeparator className="bg-white/10" />
-                                  <DropdownMenuItem className="text-destructive" onClick={() => setClientToDelete(client)}><Trash2 className="mr-2 h-4 w-4" /> Excluir</DropdownMenuItem>
+                                  <DropdownMenuItem className="text-destructive font-bold" onClick={() => setClientToDelete(client)}><Trash2 className="mr-2 h-4 w-4" /> Excluir</DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
                         </div>
@@ -268,7 +261,7 @@ export default function ClientsPage() {
               <Card className="bg-[#0f172a] border-border/50 overflow-hidden">
                 <CardContent className="p-0">
                   <Table>
-                    <TableHeader><TableRow className="border-border/50 hover:bg-transparent"><TableHead className="w-[300px] text-muted-foreground">Cliente</TableHead><TableHead className="text-center text-muted-foreground">Status</TableHead><TableHead className="text-muted-foreground">Documento</TableHead><TableHead className="text-right text-muted-foreground">Ações</TableHead></TableRow></TableHeader>
+                    <TableHeader><TableRow className="border-border/50 hover:bg-transparent"><TableHead className="w-[300px] text-muted-foreground font-black uppercase text-[10px]">Cliente</TableHead><TableHead className="text-center text-muted-foreground font-black uppercase text-[10px]">Status</TableHead><TableHead className="text-muted-foreground font-black uppercase text-[10px]">Documento</TableHead><TableHead className="text-right text-muted-foreground font-black uppercase text-[10px]">Ações</TableHead></TableRow></TableHeader>
                     <TableBody>
                       {paginatedClients.map((client) => (
                         <TableRow key={client.id} className="border-border/30 hover:bg-white/5">

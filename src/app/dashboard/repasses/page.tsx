@@ -104,63 +104,6 @@ function RepasseValue({ staffId }: { staffId: string }) {
   </span>;
 }
 
-function PaymentHistory({ onShowVoucher }: { onShowVoucher: (t: FinancialTitle) => void }) {
-  const { firestore, userError } = useFirebase();
-  const historyQuery = useMemoFirebase(() => (firestore ? query(
-    collection(firestore, 'financial_titles'), 
-    where('origin', '==', 'HONORARIOS_PAGOS'), 
-    orderBy('paymentDate', 'desc'), 
-    limit(50)
-  ) : null), [firestore]);
-  
-  const { data: history, isLoading, error } = useCollection<FinancialTitle>(historyQuery);
-
-  if (userError) {
-    return (
-      <Card className="bg-rose-500/5 border-rose-500/20 p-8 text-center">
-        <AlertTriangle className="h-10 w-10 text-rose-500 mx-auto mb-4" />
-        <h3 className="text-white font-bold mb-2">Erro de Autenticação</h3>
-        <p className="text-xs text-slate-400">Verifique a sincronização com seu projeto Firebase no servidor.</p>
-      </Card>
-    );
-  }
-
-  if (isLoading) return <div className="space-y-4">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-16 w-full bg-white/5 rounded-xl" />)}</div>;
-
-  if (error) {
-    return (
-      <Card className="bg-rose-500/5 border-rose-500/20 p-12 text-center flex flex-col items-center gap-4">
-        <AlertTriangle className="h-12 w-12 text-rose-500" />
-        <div className="space-y-2">
-          <h3 className="text-xl font-bold text-white">Índice Requerido</h3>
-          <p className="text-sm text-slate-400 max-w-sm">
-            Para ver o histórico, o Firebase exige um índice composto para os campos 'origin' e 'paymentDate'.
-          </p>
-        </div>
-      </Card>
-    );
-  }
-
-  return (
-    <Card className="bg-[#0f172a] border-white/5 overflow-hidden">
-      <Table>
-        <TableHeader><TableRow className="border-white/5"><TableHead className="text-muted-foreground">Data Pagamento</TableHead><TableHead className="text-muted-foreground">Descrição</TableHead><TableHead className="text-right text-muted-foreground">Valor Liquidado</TableHead><TableHead className="text-right text-muted-foreground">Ações</TableHead></TableRow></TableHeader>
-        <TableBody>
-          {history?.map(t => (
-            <TableRow key={t.id} className="border-white/5 hover:bg-white/5">
-              <TableCell className="text-xs text-slate-400">{t.paymentDate && format(t.paymentDate.toDate(), 'dd/MM/yyyy')}</TableCell>
-              <TableCell><div className="flex flex-col"><span className="font-bold text-white">{t.description}</span><span className="text-[9px] text-muted-foreground uppercase font-black">Ref ID: {t.id.substring(0, 8)}</span></div></TableCell>
-              <TableCell className="text-right font-black text-emerald-400">{t.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
-              <TableCell className="text-right"><Button variant="ghost" size="icon" className="h-8 w-8 text-white/50" onClick={() => onShowVoucher(t)}><Printer className="h-4 w-4" /></Button></TableCell>
-            </TableRow>
-          ))}
-          {history && history.length === 0 && <TableRow><TableCell colSpan={4} className="h-24 text-center text-muted-foreground italic">Nenhum pagamento registrado no histórico.</TableCell></TableRow>}
-        </TableBody>
-      </Table>
-    </Card>
-  );
-}
-
 function StaffVoucherDialog({ 
   staff, 
   credits, 
@@ -247,143 +190,60 @@ function StaffVoucherDialog({
   );
 }
 
-const creditEditSchema = z.object({
-  description: z.string().min(3, 'Descrição obrigatória'),
-  value: z.coerce.number().positive('Valor deve ser positivo'),
-});
-
-const manualCreditSchema = z.object({
-  description: z.string().min(3, 'Descrição obrigatória'),
-  value: z.coerce.number().positive('Valor deve ser positivo'),
-  type: z.enum(['HONORARIOS', 'REEMBOLSO', 'SALARIO', 'PRODUCAO']),
-});
-
-function EditCreditForm({ initialData, onSubmit, isSaving }: { initialData: any; onSubmit: (vals: any) => void; isSaving: boolean }) {
-  const form = useForm({
-    resolver: zodResolver(creditEditSchema),
-    defaultValues: {
-      description: initialData?.description || '',
-      value: initialData?.value || 0,
-    }
-  });
-
-  return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        <FormField control={form.control} name="description" render={({ field }) => ( <FormItem><FormLabel>Descrição</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )}/>
-        <FormField control={form.control} name="value" render={({ field }) => ( <FormItem><FormLabel>Valor (R$)</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem> )}/>
-        <Button type="submit" className="w-full" disabled={isSaving}>{isSaving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}Salvar Alterações</Button>
-      </form>
-    </Form>
-  );
-}
-
-function ManualCreditForm({ onSubmit, isSaving }: { onSubmit: (vals: any) => void; isSaving: boolean }) {
-  const form = useForm({
-    resolver: zodResolver(manualCreditSchema),
-    defaultValues: { description: '', value: 0, type: 'PRODUCAO' as any }
-  });
-
-  return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        <FormField control={form.control} name="type" render={({ field }) => ( <FormItem><FormLabel>Natureza</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="HONORARIOS">Honorários / Participação</SelectItem><SelectItem value="SALARIO">Salário / Pro-labore</SelectItem><SelectItem value="REEMBOLSO">Reembolso de Despesas</SelectItem><SelectItem value="PRODUCAO">Pró-labore por Ato</SelectItem></SelectContent></Select></FormItem> )}/>
-        <FormField control={form.control} name="description" render={({ field }) => ( <FormItem><FormLabel>Descrição</FormLabel><FormControl><Input placeholder="Ex: Bônus por meta alcançada" {...field} /></FormControl><FormMessage /></FormItem> )}/>
-        <FormField control={form.control} name="value" render={({ field }) => ( <FormItem><FormLabel>Valor (R$)</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem> )}/>
-        <Button type="submit" className="w-full" disabled={isSaving}>{isSaving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}Confirmar Lançamento</Button>
-      </form>
-    </Form>
-  );
-}
-
-function ManageCreditsDialog({ staff, open, onOpenChange, onUpdate }: { staff: Staff | null; open: boolean; onOpenChange: (open: boolean) => void; onUpdate: () => void; }) {
-  const { firestore } = useFirebase();
-  const { toast } = useToast();
-  const [filter, setFilter] = React.useState<'ALL' | 'DISPONIVEL' | 'RETIDO'>('ALL');
-  const [isProcessing, setIsProcessing] = React.useState<string | null>(null);
-  const [isAdding, setIsAdding] = React.useState(false);
-  const [editingCredit, setEditingCredit] = React.useState<any | null>(null);
-
-  const creditsQuery = useMemoFirebase(() => {
-    if (!firestore || !staff) return null;
-    return query(collection(firestore, `staff/${staff.id}/credits`), orderBy('date', 'desc'));
-  }, [firestore, staff?.id, open]);
-
-  const { data: credits, isLoading } = useCollection<any>(creditsQuery);
-
-  const filteredCredits = React.useMemo(() => {
-    if (!credits) return [];
-    if (filter === 'ALL') return credits.filter(c => c.status !== 'PAGO');
-    return credits.filter(c => c.status === filter);
-  }, [credits, filter]);
-
-  const handleDelete = async (id: string) => {
-    if (!staff || !confirm("Deseja realmente excluir este lançamento?")) return;
-    setIsProcessing(id);
-    try { await deleteStaffCredit(staff.id, id); toast({ title: 'Lançamento excluído' }); onUpdate(); } catch (e: any) { toast({ variant: 'destructive', title: 'Erro', description: e.message }); } finally { setIsProcessing(null); }
-  };
-
-  const handleEditSubmit = async (values: any) => {
-    if (!staff || !editingCredit) return;
-    setIsProcessing(editingCredit.id);
-    try { await updateStaffCredit(staff.id, editingCredit.id, values); toast({ title: 'Lançamento atualizado' }); setEditingCredit(null); onUpdate(); } catch (e: any) { toast({ variant: 'destructive', title: 'Erro', description: e.message }); } finally { setIsProcessing(null); }
-  };
-
-  const handleManualAdd = async (values: any) => {
-    if (!staff) return;
-    setIsProcessing('adding');
-    try { await addManualStaffCredit(staff.id, values); toast({ title: 'Crédito manual adicionado' }); setIsAdding(false); onUpdate(); } catch (e: any) { toast({ variant: 'destructive', title: 'Erro', description: e.message }); } finally { setIsProcessing(null); }
-  };
-
-  if (!staff) return null;
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-4xl bg-[#020617] border-white/10 p-0 overflow-hidden h-[85vh] flex flex-col">
-        <DialogHeader className="p-6 border-b border-white/5 bg-white/5"><div className="flex items-center justify-between"><div className="flex items-center gap-4"><div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-black text-lg">{staff.firstName.charAt(0)}{staff.lastName.charAt(0)}</div><div><DialogTitle className="text-xl font-black text-white">{staff.firstName} {staff.lastName}</DialogTitle><DialogDescription className="text-slate-400">Auditoria e gestão de lançamentos pendentes</DialogDescription></div></div><Button size="sm" onClick={() => setIsAdding(true)} className="gap-2"><Plus className="h-4 w-4" /> Novo Lançamento</Button></div></DialogHeader>
-        <div className="flex-1 overflow-hidden flex flex-col"><div className="p-4 bg-black/20 flex items-center gap-2"><Button variant={filter === 'ALL' ? 'default' : 'ghost'} size="sm" onClick={() => setFilter('ALL')} className="text-[10px] uppercase font-black h-8">Todos Pendentes</Button><Button variant={filter === 'DISPONIVEL' ? 'default' : 'ghost'} size="sm" onClick={() => setFilter('DISPONIVEL')} className="text-[10px] uppercase font-black h-8 text-emerald-400">Disponíveis</Button><Button variant={filter === 'RETIDO' ? 'default' : 'ghost'} size="sm" onClick={() => setFilter('RETIDO')} className="text-[10px] uppercase font-black h-8 text-blue-400">Retidos</Button></div><ScrollArea className="flex-1"><div className="p-6">{isLoading ? (<div className="space-y-4">{[...Array(3)].map((_, i) => <Skeleton className="h-16 w-full bg-white/5" />)}</div>) : filteredCredits.length > 0 ? (<div className="space-y-3">{filteredCredits.map(c => (<div key={c.id} className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5 group hover:border-white/20 transition-all"><div className="flex-1 min-w-0 mr-4"><div className="flex items-center gap-2 mb-1"><Badge variant="outline" className={cn("text-[8px] font-black uppercase px-1.5 h-4 border-none", c.status === 'DISPONIVEL' ? "bg-emerald-500/20 text-emerald-400" : "bg-blue-500/20 text-blue-400")}>{c.status}</Badge><span className="text-[10px] text-muted-foreground font-medium">{c.date ? format(c.date.toDate(), 'dd/MM/yyyy') : 'N/A'}</span></div><p className="text-sm font-bold text-white truncate">{c.description}</p><p className="text-[10px] text-slate-500 uppercase font-bold">{c.type}</p></div><div className="flex items-center gap-6"><span className="text-sm font-black text-white tabular-nums">{c.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span><div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"><Button variant="ghost" size="icon" className="h-8 w-8 text-blue-400" onClick={() => setEditingCredit(c)}><Edit className="h-4 w-4" /></Button><Button variant="ghost" size="icon" className="h-8 w-8 text-rose-500" onClick={() => handleDelete(c.id)} disabled={isProcessing === c.id}>{isProcessing === c.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}</Button></div></div></div>))}</div>) : (<div className="text-center py-20 opacity-30"><FileText className="h-12 w-12 mx-auto mb-2" /><p className="text-sm font-bold uppercase">Nenhum lançamento encontrado</p></div>)}</div></ScrollArea></div>
-        <DialogFooter className="p-6 border-t border-white/5 bg-black/20"><DialogClose asChild><Button variant="ghost">Fechar Painel</Button></DialogClose></DialogFooter>
-      </DialogContent>
-      <Dialog open={!!editingCredit} onOpenChange={(o) => !o && setEditingCredit(null)}><DialogContent className="bg-card border-border sm:max-w-md"><DialogHeader><DialogTitle>Editar Lançamento</DialogTitle><DialogDescription>Ajuste os dados do crédito.</DialogDescription></DialogHeader><EditCreditForm initialData={editingCredit} onSubmit={handleEditSubmit} isSaving={isProcessing === editingCredit?.id} /></DialogContent></Dialog>
-      <Dialog open={isAdding} onOpenChange={setIsAdding}><DialogContent className="bg-card border-border sm:max-w-md"><DialogHeader><DialogTitle>Novo Crédito Manual</DialogTitle><DialogDescription>Lançar bônus ou ajuste.</DialogDescription></DialogHeader><ManualCreditForm onSubmit={handleManualAdd} isSaving={isProcessing === 'adding'} /></DialogContent></Dialog>
-    </Dialog>
-  );
-}
-
-function RepassePaymentDialog({ staff, credits, open, onOpenChange, onPaid }: { staff: Staff | null; credits: any[]; open: boolean; onOpenChange: (open: boolean) => void; onPaid: (total: number, creditsPaid: any[]) => void; }) {
-  const [isProcessing, setIsProcessing] = React.useState(false);
-  const { toast } = useToast();
-  const totalValue = React.useMemo(() => credits.reduce((sum, c) => sum + c.value, 0), [credits]);
+function PaymentHistory({ onShowVoucher }: { onShowVoucher: (t: FinancialTitle) => void }) {
+  const { firestore, userError } = useFirebase();
+  const historyQuery = useMemoFirebase(() => (firestore ? query(
+    collection(firestore, 'financial_titles'), 
+    where('origin', '==', 'HONORARIOS_PAGOS'), 
+    orderBy('paymentDate', 'desc'), 
+    limit(50)
+  ) : null), [firestore]);
   
-  const handlePay = async () => {
-    if (!staff) return;
-    setIsProcessing(true);
-    try {
-      await processRepasse(staff.id, credits.map(c => c.id), totalValue);
-      toast({ title: 'Repasse Concluído!', description: `Valor de ${totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} pago.` });
-      onPaid(totalValue, credits);
-      onOpenChange(false);
-    } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Erro no repasse', description: e.message });
-    } finally { setIsProcessing(false); }
-  };
+  const { data: history, isLoading, error } = useCollection<FinancialTitle>(historyQuery);
 
-  if (!staff) return null;
+  if (userError) {
+    return (
+      <Card className="bg-rose-500/5 border-rose-500/20 p-8 text-center">
+        <AlertTriangle className="h-10 w-10 text-rose-500 mx-auto mb-4" />
+        <h3 className="text-white font-bold mb-2">Erro de Autenticação</h3>
+        <p className="text-xs text-slate-400">Verifique a sincronização com seu projeto Firebase no servidor.</p>
+      </Card>
+    );
+  }
+
+  if (isLoading) return <div className="space-y-4">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-16 w-full bg-white/5 rounded-xl" />)}</div>;
+
+  if (error) {
+    return (
+      <Card className="bg-rose-500/5 border-rose-500/20 p-12 text-center flex flex-col items-center gap-4">
+        <AlertTriangle className="h-12 w-12 text-rose-500" />
+        <div className="space-y-2">
+          <h3 className="text-xl font-bold text-white">Índice Requerido</h3>
+          <p className="text-sm text-slate-400 max-w-sm">
+            Para ver o histórico, o Firebase exige um índice composto para os campos 'origin' e 'paymentDate'.
+          </p>
+        </div>
+      </Card>
+    );
+  }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-4xl bg-[#020617] border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.5)] p-0 overflow-hidden">
-        <div className="p-8 space-y-8">
-          <DialogHeader><div className="flex items-center gap-4 mb-2"><div className="h-12 w-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center"><Wallet className="h-6 w-6 text-emerald-400" /></div><div className="text-left"><DialogTitle className="text-2xl font-black text-white font-headline">Processar Liquidação</DialogTitle><DialogDescription className="text-slate-400 mt-1">Confirmando o pagamento para <span className="text-white font-bold">{staff.firstName} {staff.lastName}</span>.</DialogDescription></div></div></DialogHeader>
-          <div className="relative group"><div className="absolute -inset-1 bg-gradient-to-r from-emerald-500/20 to-primary/20 rounded-3xl blur opacity-25 group-hover:opacity-40 transition duration-1000"></div><div className="relative p-10 rounded-3xl bg-white/5 border border-white/10 text-center space-y-2"><p className="text-[10px] font-black uppercase text-emerald-400 tracking-[0.25em] mb-1">Valor Total Líquido a Pagar</p><div className="flex items-center justify-center gap-3"><span className="text-2xl font-bold text-white/40 mt-2">R$</span><span className="text-6xl font-black text-white tracking-tighter tabular-nums">{totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div></div></div>
-          <div className="space-y-4"><div className="flex items-center justify-between"><h4 className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Extrato de Créditos Selecionados ({credits.length})</h4><Badge variant="outline" className="bg-white/5 border-white/10 text-slate-400 text-[9px] h-5 font-mono">REF: {staff.id.substring(0, 8).toUpperCase()}</Badge></div>
-            <ScrollArea className="h-[350px] -mx-2 px-2"><div className="space-y-3">{credits.map(c => (<div key={c.id} className="flex items-center justify-between p-5 rounded-2xl bg-[#0f172a] border border-white/5 hover:border-emerald-500/30 transition-all duration-300 group/item"><div className="min-w-0 flex-1 flex items-center gap-5"><div className={cn("h-12 w-12 rounded-xl flex items-center justify-center shrink-0 shadow-inner", c.type === 'REEMBOLSO' ? "bg-blue-500/10" : c.type === 'SALARIO' ? "bg-purple-500/10" : "bg-emerald-500/10")}>{c.type === 'REEMBOLSO' ? <Receipt className="h-6 w-6 text-blue-400" /> : c.type === 'SALARIO' ? <Briefcase className="h-6 w-6 text-purple-400" /> : <Coins className="h-6 w-6 text-emerald-400" />}</div><div className="min-w-0 flex-1"><p className="text-sm font-bold text-slate-200 truncate leading-tight mb-1">{c.description}</p><div className="flex items-center gap-2"><Badge variant="outline" className={cn("text-[8px] font-black uppercase px-2 h-4.5 border-none", c.type === 'REEMBOLSO' ? "bg-blue-500/20 text-blue-400" : c.type === 'SALARIO' ? "bg-purple-500/10 text-purple-400" : "bg-emerald-500/20 text-emerald-400")}>{c.type === 'REEMBOLSO' ? 'Ressarcimento' : c.type === 'SALARIO' ? 'Pro-labore' : 'Participação'}</Badge>{c.date && <span className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">📅 {format(c.date.toDate(), 'dd/MM/yy')}</span>}</div></div></div><div className="text-right ml-6 shrink-0"><p className="text-lg font-black text-white tabular-nums tracking-tight">{c.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p></div></div>))}</div></ScrollArea>
-          </div>
-          <div className="flex items-start gap-4 p-5 rounded-2xl bg-blue-500/5 border border-blue-500/20 text-[11px] text-blue-400/80 leading-relaxed"><div className="h-6 w-6 rounded-full bg-blue-500/10 flex items-center justify-center shrink-0"><Info className="h-3.5 w-3.5" /></div><p>Esta operação registrará uma saída de caixa oficial no financeiro central do escritório e gerará um aviso de liquidação para o profissional.</p></div>
-        </div>
-        <DialogFooter className="bg-black/20 p-6 border-t border-white/5 gap-3"><DialogClose asChild><Button variant="ghost" className="text-slate-400 hover:text-white font-bold h-14 px-8 text-xs uppercase tracking-widest">Cancelar</Button></DialogClose><Button className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase tracking-widest text-[11px] h-14 shadow-xl shadow-emerald-900/20 group" onClick={handlePay} disabled={isProcessing}>{isProcessing ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <CheckCircle2 className="mr-2 h-5 w-5" />}Confirmar Pagamento e Emitir</Button></DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <Card className="bg-[#0f172a] border-white/5 overflow-hidden">
+      <Table>
+        <TableHeader><TableRow className="border-white/5"><TableHead className="text-muted-foreground">Data Pagamento</TableHead><TableHead className="text-muted-foreground">Descrição</TableHead><TableHead className="text-right text-muted-foreground">Valor Liquidado</TableHead><TableHead className="text-right text-muted-foreground">Ações</TableHead></TableRow></TableHeader>
+        <TableBody>
+          {history?.map(t => (
+            <TableRow key={t.id} className="border-white/5 hover:bg-white/5">
+              <TableCell className="text-xs text-slate-400">{t.paymentDate && format(t.paymentDate.toDate(), 'dd/MM/yyyy')}</TableCell>
+              <TableCell><div className="flex flex-col"><span className="font-bold text-white">{t.description}</span><span className="text-[9px] text-muted-foreground uppercase font-black">Ref ID: {t.id.substring(0, 8)}</span></div></TableCell>
+              <TableCell className="text-right font-black text-emerald-400">{t.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
+              <TableCell className="text-right"><Button variant="ghost" size="icon" className="h-8 w-8 text-white/50" onClick={() => onShowVoucher(t)}><Printer className="h-4 w-4" /></Button></TableCell>
+            </TableRow>
+          ))}
+          {history && history.length === 0 && <TableRow><TableCell colSpan={4} className="h-24 text-center text-muted-foreground italic">Nenhum pagamento registrado no histórico.</TableCell></TableRow>}
+        </TableBody>
+      </Table>
+    </Card>
   );
 }
 
@@ -439,6 +299,95 @@ function PayoutList({ filterRole, onRefresh, onPaid }: { filterRole?: string; on
       <RepassePaymentDialog staff={selectedStaff} credits={staffCredits} open={isRepasseOpen} onOpenChange={setIsRepasseOpen} onPaid={(total, credits) => { setIsRepasseOpen(false); if (selectedStaff) onPaid(total, credits, selectedStaff); onRefresh?.(); }} />
       <ManageCreditsDialog staff={selectedStaff} open={isManageOpen} onOpenChange={setIsManageOpen} onUpdate={() => onRefresh?.()} />
     </div>
+  );
+}
+
+function RepassePaymentDialog({ staff, credits, open, onOpenChange, onPaid }: { staff: Staff | null; credits: any[]; open: boolean; onOpenChange: (open: boolean) => void; onPaid: (total: number, creditsPaid: any[]) => void; }) {
+  const [isProcessing, setIsProcessing] = React.useState(false);
+  const { toast } = useToast();
+  const totalValue = React.useMemo(() => credits.reduce((sum, c) => sum + c.value, 0), [credits]);
+  
+  const handlePay = async () => {
+    if (!staff) return;
+    setIsProcessing(true);
+    try {
+      await processRepasse(staff.id, credits.map(c => c.id), totalValue);
+      toast({ title: 'Repasse Concluído!', description: `Valor de ${totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} pago.` });
+      onPaid(totalValue, credits);
+      onOpenChange(false);
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Erro no repasse', description: e.message });
+    } finally { setIsProcessing(false); }
+  };
+
+  if (!staff) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-4xl bg-[#020617] border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.5)] p-0 overflow-hidden">
+        <div className="p-8 space-y-8">
+          <DialogHeader><div className="flex items-center gap-4 mb-2"><div className="h-12 w-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center"><Wallet className="h-6 w-6 text-emerald-400" /></div><div className="text-left"><DialogTitle className="text-2xl font-black text-white font-headline">Processar Liquidação</DialogTitle><DialogDescription className="text-slate-400 mt-1">Confirmando o pagamento para <span className="text-white font-bold">{staff.firstName} {staff.lastName}</span>.</DialogDescription></div></div></DialogHeader>
+          <div className="relative group"><div className="absolute -inset-1 bg-gradient-to-r from-emerald-500/20 to-primary/20 rounded-3xl blur opacity-25 group-hover:opacity-40 transition duration-1000"></div><div className="relative p-10 rounded-3xl bg-white/5 border border-white/10 text-center space-y-2"><p className="text-[10px] font-black uppercase text-emerald-400 tracking-[0.25em] mb-1">Valor Total Líquido a Pagar</p><div className="flex items-center justify-center gap-3"><span className="text-2xl font-bold text-white/40 mt-2">R$</span><span className="text-6xl font-black text-white tracking-tighter tabular-nums">{totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div></div></div>
+          <div className="space-y-4"><div className="flex items-center justify-between"><h4 className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Extrato de Créditos Selecionados ({credits.length})</h4><Badge variant="outline" className="bg-white/5 border-white/10 text-slate-400 text-[9px] h-5 font-mono">REF: {staff.id.substring(0, 8).toUpperCase()}</Badge></div>
+            <ScrollArea className="h-[350px] -mx-2 px-2"><div className="space-y-3">{credits.map(c => (<div key={c.id} className="flex items-center justify-between p-5 rounded-2xl bg-[#0f172a] border border-white/5 hover:border-emerald-500/30 transition-all duration-300 group/item"><div className="min-w-0 flex-1 flex items-center gap-5"><div className={cn("h-12 w-12 rounded-xl flex items-center justify-center shrink-0 shadow-inner", c.type === 'REEMBOLSO' ? "bg-blue-500/10" : c.type === 'SALARIO' ? "bg-purple-500/10" : "bg-emerald-500/10")}>{c.type === 'REEMBOLSO' ? <Receipt className="h-6 w-6 text-blue-400" /> : c.type === 'SALARIO' ? <Briefcase className="h-6 w-6 text-purple-400" /> : <Coins className="h-6 w-6 text-emerald-400" />}</div><div className="min-w-0 flex-1"><p className="text-sm font-bold text-slate-200 truncate leading-tight mb-1">{c.description}</p><div className="flex items-center gap-2"><Badge variant="outline" className={cn("text-[8px] font-black uppercase px-2 h-4.5 border-none", c.type === 'REEMBOLSO' ? "bg-blue-500/20 text-blue-400" : c.type === 'SALARIO' ? "bg-purple-500/10 text-purple-400" : "bg-emerald-500/20 text-emerald-400")}>{c.type === 'REEMBOLSO' ? 'Ressarcimento' : c.type === 'SALARIO' ? 'Pro-labore' : 'Participação'}</Badge>{c.date && <span className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">📅 {format(c.date.toDate(), 'dd/MM/yy')}</span>}</div></div></div><div className="text-right ml-6 shrink-0"><p className="text-lg font-black text-white tabular-nums tracking-tight">{c.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p></div></div>))}</div></ScrollArea>
+          </div>
+          <div className="flex items-start gap-4 p-5 rounded-2xl bg-blue-500/5 border border-blue-500/20 text-[11px] text-blue-400/80 leading-relaxed"><div className="h-6 w-6 rounded-full bg-blue-500/10 flex items-center justify-center shrink-0"><Info className="h-3.5 w-3.5" /></div><p>Esta operação registrará uma saída de caixa oficial no financeiro central do escritório e gerará um aviso de liquidação para o profissional.</p></div>
+        </div>
+        <DialogFooter className="bg-black/20 p-6 border-t border-white/5 gap-3"><DialogClose asChild><Button variant="ghost" className="text-slate-400 hover:text-white font-bold h-14 px-8 text-xs uppercase tracking-widest">Cancelar</Button></DialogClose><Button className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase tracking-widest text-[11px] h-14 shadow-xl shadow-emerald-900/20 group" onClick={handlePay} disabled={isProcessing}>{isProcessing ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <CheckCircle2 className="mr-2 h-5 w-5" />}Confirmar Pagamento e Emitir</Button></DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ManageCreditsDialog({ staff, open, onOpenChange, onUpdate }: { staff: Staff | null; open: boolean; onOpenChange: (open: boolean) => void; onUpdate: () => void; }) {
+  const { firestore } = useFirebase();
+  const { toast } = useToast();
+  const [filter, setFilter] = React.useState<'ALL' | 'DISPONIVEL' | 'RETIDO'>('ALL');
+  const [isProcessing, setIsProcessing] = React.useState<string | null>(null);
+  const [isAdding, setIsAdding] = React.useState(false);
+  const [editingCredit, setEditingCredit] = React.useState<any | null>(null);
+
+  const creditsQuery = useMemoFirebase(() => {
+    if (!firestore || !staff) return null;
+    return query(collection(firestore, `staff/${staff.id}/credits`), orderBy('date', 'desc'));
+  }, [firestore, staff?.id, open]);
+
+  const { data: credits, isLoading } = useCollection<any>(creditsQuery);
+
+  const filteredCredits = React.useMemo(() => {
+    if (!credits) return [];
+    if (filter === 'ALL') return credits.filter(c => c.status !== 'PAGO');
+    return credits.filter(c => c.status === filter);
+  }, [credits, filter]);
+
+  const handleDelete = async (id: string) => {
+    if (!staff || !confirm("Deseja realmente excluir este lançamento?")) return;
+    setIsProcessing(id);
+    try { await deleteStaffCredit(staff.id, id); toast({ title: 'Lançamento excluído' }); onUpdate(); } catch (e: any) { toast({ variant: 'destructive', title: 'Erro', description: e.message }); } finally { setIsProcessing(null); }
+  };
+
+  const handleEditSubmit = async (values: any) => {
+    if (!staff || !editingCredit) return;
+    setIsProcessing(editingCredit.id);
+    try { await updateStaffCredit(staff.id, editingCredit.id, values); toast({ title: 'Lançamento atualizado' }); setEditingCredit(null); onUpdate(); } catch (e: any) { toast({ variant: 'destructive', title: 'Erro', description: e.message }); } finally { setIsProcessing(null); }
+  };
+
+  const handleManualAdd = async (values: any) => {
+    if (!staff) return;
+    setIsProcessing('adding');
+    try { await addManualStaffCredit(staff.id, values); toast({ title: 'Crédito manual adicionado' }); setIsAdding(false); onUpdate(); } catch (e: any) { toast({ variant: 'destructive', title: 'Erro', description: e.message }); } finally { setIsProcessing(null); }
+  };
+
+  if (!staff) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-4xl bg-[#020617] border-white/10 p-0 overflow-hidden h-[85vh] flex flex-col">
+        <DialogHeader className="p-6 border-b border-white/5 bg-white/5"><div className="flex items-center justify-between"><div className="flex items-center gap-4"><div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-black text-lg">{staff.firstName.charAt(0)}{staff.lastName.charAt(0)}</div><div><DialogTitle className="text-xl font-black text-white">{staff.firstName} {staff.lastName}</DialogTitle><DialogDescription className="text-slate-400">Auditoria e gestão de lançamentos pendentes</DialogDescription></div></div><Button size="sm" onClick={() => setIsAdding(true)} className="gap-2"><Plus className="h-4 w-4" /> Novo Lançamento</Button></div></DialogHeader>
+        <div className="flex-1 overflow-hidden flex flex-col"><div className="p-4 bg-black/20 flex items-center gap-2"><Button variant={filter === 'ALL' ? 'default' : 'ghost'} size="sm" onClick={() => setFilter('ALL')} className="text-[10px] uppercase font-black h-8">Todos Pendentes</Button><Button variant={filter === 'DISPONIVEL' ? 'default' : 'ghost'} size="sm" onClick={() => setFilter('DISPONIVEL')} className="text-[10px] uppercase font-black h-8 text-emerald-400">Disponíveis</Button><Button variant={filter === 'RETIDO' ? 'default' : 'ghost'} size="sm" onClick={() => setFilter('RETIDO')} className="text-[10px] uppercase font-black h-8 text-blue-400">Retidos</Button></div><ScrollArea className="flex-1"><div className="p-6">{isLoading ? (<div className="space-y-4">{[...Array(3)].map((_, i) => <Skeleton className="h-16 w-full bg-white/5" />)}</div>) : filteredCredits.length > 0 ? (<div className="space-y-3">{filteredCredits.map(c => (<div key={c.id} className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5 group hover:border-white/20 transition-all"><div className="flex-1 min-w-0 mr-4"><div className="flex items-center gap-2 mb-1"><Badge variant="outline" className={cn("text-[8px] font-black uppercase px-1.5 h-4 border-none", c.status === 'DISPONIVEL' ? "bg-emerald-500/20 text-emerald-400" : "bg-blue-500/20 text-blue-400")}>{c.status}</Badge><span className="text-[10px] text-muted-foreground font-medium">{c.date ? format(c.date.toDate(), 'dd/MM/yyyy') : 'N/A'}</span></div><p className="text-sm font-bold text-white truncate">{c.description}</p><p className="text-[10px] text-slate-500 uppercase font-bold">{c.type}</p></div><div className="flex items-center gap-6"><span className="text-sm font-black text-white tabular-nums">{c.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span><div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"><Button variant="ghost" size="icon" className="h-8 w-8 text-blue-400" onClick={() => setEditingCredit(c)}><Edit className="h-4 w-4" /></Button><Button variant="ghost" size="icon" className="h-8 w-8 text-rose-500" onClick={() => handleDelete(c.id)} disabled={isProcessing === c.id}>{isProcessing === c.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}</Button></div></div></div>))}</div>) : (<div className="text-center py-20 opacity-30"><FileText className="h-12 w-12 mx-auto mb-2" /><p className="text-sm font-bold uppercase">Nenhum lançamento encontrado</p></div>)}</div></ScrollArea></div>
+        <DialogFooter className="p-6 border-t border-white/5 bg-black/20"><DialogClose asChild><Button variant="ghost">Fechar Painel</Button></DialogClose></DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -518,10 +467,10 @@ export default function RepassesPage() {
 
       <Tabs defaultValue="lawyers" className="w-full">
         <TabsList className="grid w-full grid-cols-4 bg-[#0f172a] border border-white/5 p-1 h-12">
-          <TabsTrigger value="lawyers" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Briefcase className="h-4 w-4" /> Honorários</TabsTrigger>
-          <TabsTrigger value="staff" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Users className="h-4 w-4" /> Administrativo</TabsTrigger>
-          <TabsTrigger value="providers" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><ShieldCheck className="h-4 w-4" /> Fornecedores</TabsTrigger>
-          <TabsTrigger value="history" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><History className="h-4 w-4" /> Histórico</TabsTrigger>
+          <TabsTrigger value="lawyers" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold"><Briefcase className="h-4 w-4" /> Honorários</TabsTrigger>
+          <TabsTrigger value="staff" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold"><Users className="h-4 w-4" /> Administrativo</TabsTrigger>
+          <TabsTrigger value="providers" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold"><ShieldCheck className="h-4 w-4" /> Fornecedores</TabsTrigger>
+          <TabsTrigger value="history" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold"><History className="h-4 w-4" /> Histórico</TabsTrigger>
         </TabsList>
         <TabsContent value="lawyers" className="mt-6"><PayoutList filterRole="lawyer" onRefresh={() => setRefreshKey(k => k + 1)} onPaid={handleRepassePaid} /></TabsContent>
         <TabsContent value="staff" className="mt-6"><PayoutList filterRole="employee" onRefresh={() => setRefreshKey(k => k + 1)} onPaid={handleRepassePaid} /></TabsContent>
