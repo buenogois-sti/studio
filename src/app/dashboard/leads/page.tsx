@@ -17,7 +17,8 @@ import {
   Briefcase,
   AlertCircle,
   Scale,
-  ArrowRight
+  ArrowRight,
+  X
 } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy, doc, deleteDoc } from 'firebase/firestore';
@@ -62,6 +63,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Textarea } from '@/components/ui/textarea';
 import { createLead, updateLeadStatus, convertLeadToProcess } from '@/lib/lead-actions';
 import { ClientSearchInput } from '@/components/process/ClientSearchInput';
+import { ClientCreationModal } from '@/components/process/ClientCreationModal';
 
 const leadFormSchema = z.object({
   clientId: z.string().min(1, 'Selecione um cliente.'),
@@ -84,6 +86,7 @@ export default function LeadsPage() {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = React.useState('');
   const [isNewLeadOpen, setIsNewLeadOpen] = React.useState(false);
+  const [isClientModalOpen, setIsClientModalOpen] = React.useState(false);
   const [isProcessing, setIsProcessing] = React.useState<string | null>(null);
 
   const leadsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'leads'), orderBy('createdAt', 'desc')) : null), [firestore]);
@@ -101,6 +104,8 @@ export default function LeadsPage() {
   const form = useForm<z.infer<typeof leadFormSchema>>({
     resolver: zodResolver(leadFormSchema),
     defaultValues: {
+      clientId: '',
+      lawyerId: '',
       title: '',
       legalArea: 'Trabalhista',
       description: '',
@@ -201,7 +206,6 @@ export default function LeadsPage() {
               )}>
                 <CardContent className="p-6">
                   <div className="flex flex-col lg:flex-row gap-6">
-                    {/* Status e Info Principal */}
                     <div className="flex-1 space-y-4">
                       <div className="flex items-center gap-3">
                         <Badge variant="outline" className={cn("gap-1.5 h-6 text-[9px] font-black uppercase tracking-widest", status.color)}>
@@ -227,7 +231,6 @@ export default function LeadsPage() {
                       )}
                     </div>
 
-                    {/* Advogado e Timeline */}
                     <div className="lg:w-72 space-y-4 pt-4 lg:pt-0 lg:border-l lg:border-white/5 lg:pl-6">
                       <div className="space-y-1">
                         <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Elaboração por:</p>
@@ -244,7 +247,6 @@ export default function LeadsPage() {
                       </div>
                     </div>
 
-                    {/* Ações */}
                     <div className="flex items-center gap-3 lg:ml-auto">
                       {lead.status !== 'CONVERTIDO' && (
                         <>
@@ -301,7 +303,6 @@ export default function LeadsPage() {
         )}
       </div>
 
-      {/* Dialog Novo Lead */}
       <Dialog open={isNewLeadOpen} onOpenChange={setIsNewLeadOpen}>
         <DialogContent className="sm:max-w-2xl bg-[#020617] border-white/10 text-white">
           <DialogHeader>
@@ -321,6 +322,7 @@ export default function LeadsPage() {
                         <ClientSearchInput 
                           selectedClientId={field.value} 
                           onSelect={c => field.onChange(c.id)} 
+                          onCreateNew={() => setIsClientModalOpen(true)}
                         />
                       </FormControl>
                       <FormMessage />
@@ -413,6 +415,15 @@ export default function LeadsPage() {
           </Form>
         </DialogContent>
       </Dialog>
+
+      <ClientCreationModal 
+        open={isClientModalOpen}
+        onOpenChange={setIsClientModalOpen}
+        onClientCreated={(client) => {
+          form.setValue('clientId', client.id);
+          setIsClientModalOpen(false);
+        }}
+      />
     </div>
   );
 }

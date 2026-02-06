@@ -44,6 +44,22 @@ function serializeClient(doc: firestore.DocumentSnapshot): Client | null {
     };
 }
 
+export async function createClient(data: Partial<Client>): Promise<{ success: boolean; id?: string; error?: string }> {
+    if (!firestoreAdmin) throw new Error("A conexão com o servidor de dados falhou.");
+    try {
+        const docRef = await firestoreAdmin.collection('clients').add({
+            ...data,
+            status: data.status || 'active',
+            createdAt: firestore.FieldValue.serverTimestamp(),
+            updatedAt: firestore.FieldValue.serverTimestamp(),
+        });
+        return { success: true, id: docRef.id };
+    } catch (error: any) {
+        console.error("[createClient] Error:", error);
+        return { success: false, error: error.message };
+    }
+}
+
 export async function searchClients(query: string): Promise<Client[]> {
     if (!query || query.length < 2) return [];
     
