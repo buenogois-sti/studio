@@ -189,7 +189,7 @@ function StaffVoucherDialog({
                   <img src="/logo.png" alt="Logo" className="h-10 w-auto print:brightness-0" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-black uppercase tracking-tighter">Bueno Gois Advogados</h2>
+                  <h2 className="text-lg font-black uppercase tracking-tighter text-slate-900">Bueno Gois Advogados</h2>
                   <p className="text-[8px] text-slate-500 uppercase font-bold tracking-widest">Recibo de Liquidação de Honorários/Salário</p>
                 </div>
               </div>
@@ -239,8 +239,8 @@ function StaffVoucherDialog({
           </div>
         </ScrollArea>
         <DialogFooter className="p-6 bg-slate-50 border-t print:hidden flex justify-end gap-3">
-          <DialogClose asChild><Button variant="ghost">Fechar</Button></DialogClose>
-          <Button onClick={() => window.print()} className="gap-2 bg-slate-900 text-white"><Printer className="h-4 w-4" /> Imprimir Comprovante</Button>
+          <DialogClose asChild><Button variant="ghost" className="text-slate-600 font-bold">Fechar</Button></DialogClose>
+          <Button onClick={() => window.print()} className="gap-2 bg-slate-900 text-white font-bold"><Printer className="h-4 w-4" /> Imprimir Comprovante</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

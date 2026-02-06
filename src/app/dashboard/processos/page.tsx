@@ -131,7 +131,7 @@ export default function ProcessosPage() {
     });
   }, [processesData, searchTerm, clientIdFilter]);
 
-  const totalPages = Math.ceil(filteredProcesses.length / ITEMS_PER_PAGE);
+  const totalPages = Math.max(1, Math.ceil(filteredProcesses.length / ITEMS_PER_PAGE));
   const paginatedProcesses = React.useMemo(() => {
     return filteredProcesses.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
   }, [filteredProcesses, currentPage]);

@@ -336,231 +336,14 @@ function NewTitleDialog({ onCreated }: { onCreated: () => void }) {
   );
 }
 
-function ReceiptDialog({ 
-  title, 
-  client,
-  process,
-  open, 
-  onOpenChange 
-}: { 
-  title: FinancialTitle | null; 
-  client?: Client; 
-  process?: Process;
-  open: boolean; 
-  onOpenChange: (open: boolean) => void 
-}) {
-  if (!title) return null;
-
-  const handlePrint = () => { window.print(); };
-  
-  const totalValue = title.value;
-  const feePercent = 30; 
-  const feeValue = totalValue * (feePercent / 100);
-  const netValue = totalValue - feeValue;
-
-  const formattedTotal = totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-  const formattedFee = feeValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-  const formattedNet = netValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-  
-  const opposingParty = process?.opposingParties?.[0]?.name || "Parte Executada";
-  const today = format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-4xl bg-white text-slate-900 p-0 overflow-hidden border-none shadow-none print:shadow-none print:max-w-full">
-        <ScrollArea className="max-h-[90vh] print:max-h-full">
-          <div className="p-10 space-y-6 bg-white print:p-0" id="receipt-print-area">
-            <div className="flex justify-between items-center border-b-2 border-slate-900 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="bg-slate-900 p-1.5 rounded-lg print:bg-transparent">
-                  <img src="/logo.png" alt="Bueno Gois" className="h-10 w-auto print:brightness-0" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-black uppercase tracking-tighter text-slate-900">Bueno Gois Advogados</h2>
-                  <p className="text-[8px] text-slate-500 uppercase font-bold">Bueno Gois Advogados e Associados</p>
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="text-xl font-black text-slate-900 leading-none font-headline">RECIBO DE REPASSE</div>
-                <p className="text-[8px] text-slate-500 font-bold mt-1 uppercase tracking-widest">Controle: {title.id.substring(0, 8).toUpperCase()}</p>
-              </div>
-            </div>
-
-            <div className="space-y-4 text-sm leading-relaxed text-justify text-slate-800">
-              <p>
-                Declaramos para os devidos fins que o escritório <strong className="text-slate-900">Bueno Gois Advogados e Associados</strong>, recebeu de <strong className="text-slate-900">{opposingParty}</strong> a importância bruta de <strong>{formattedTotal}</strong>, referente ao pagamento de <i>{title.description}</i> nos autos do processo nº <strong className="text-slate-900">{process?.processNumber || 'N/A'}</strong>.
-              </p>
-              
-              <p>
-                Pelo presente instrumento, o escritório efetua neste ato o repasse de valores ao cliente <strong className="text-slate-900">{client ? `${client.firstName} ${client.lastName}` : 'N/A'}</strong>, portador do CPF/CNPJ <strong className="text-slate-900">{client?.document || 'N/A'}</strong>, procedendo com a regular dedução da verba honorária contratual, conforme demonstrativo abaixo:
-              </p>
-            </div>
-
-            <div className="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden print:bg-white">
-              <table className="w-full text-xs">
-                <thead className="bg-slate-100 border-b border-slate-200 print:bg-slate-50">
-                  <tr>
-                    <th className="px-4 py-2 text-left font-black uppercase text-[9px] tracking-widest text-slate-500">Discriminação</th>
-                    <th className="px-4 py-2 text-right font-black uppercase text-[9px] tracking-widest text-slate-500">Valor (R$)</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200">
-                  <tr>
-                    <td className="px-4 py-2.5 text-slate-700">Valor Bruto Recebido (Proveniente da Parte Reclamada)</td>
-                    <td className="px-4 py-2.5 text-right font-bold text-slate-900">{formattedTotal}</td>
-                  </tr>
-                  <tr className="text-rose-600 bg-rose-50/10 print:bg-white">
-                    <td className="px-4 py-2.5 font-medium italic">Honorários Advocatícios Contratuais ({feePercent}%)</td>
-                    <td className="px-4 py-2.5 text-right font-bold">({formattedFee})</td>
-                  </tr>
-                  <tr className="bg-emerald-50 font-black text-emerald-900 border-t-2 border-emerald-200 print:bg-white">
-                    <td className="px-4 py-3 uppercase tracking-tighter text-sm">Valor Líquido de Repasse ao Cliente</td>
-                    <td className="px-4 py-3 text-right text-lg">{formattedNet}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            <p className="text-[10px] text-center italic text-slate-500 py-2 border-y border-slate-100 px-8">
-              "O beneficiário declara ter conferido os valores e dá plena quitação ao escritório quanto ao objeto deste pagamento, servindo este como prova de recebimento."
-            </p>
-
-            <div className="pt-4 flex flex-col items-center gap-10">
-              <p className="text-sm font-bold text-slate-900">São Bernardo do Campo, {today}</p>
-              
-              <div className="grid grid-cols-2 gap-12 w-full max-w-2xl">
-                <div className="text-center">
-                  <div className="w-full border-t border-slate-900 mb-1" />
-                  <p className="text-[9px] font-black uppercase tracking-widest text-slate-900">Bueno Gois Advogados</p>
-                  <p className="text-[8px] text-slate-500 uppercase font-bold">Representante Legal</p>
-                </div>
-                <div className="text-center">
-                  <div className="w-full border-t border-slate-900 mb-1" />
-                  <p className="text-[9px] font-black uppercase tracking-widest text-slate-900">{client ? `${client.firstName} ${client.lastName}` : 'Beneficiário'}</p>
-                  <p className="text-[8px] text-slate-500 uppercase font-bold">Assinatura do Cliente</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </ScrollArea>
-
-        <DialogFooter className="p-6 bg-slate-50 border-t print:hidden flex items-center justify-between">
-          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">LexFlow Bueno Gois</p>
-          <div className="flex gap-3">
-            <DialogClose asChild>
-              <Button variant="ghost" size="sm" className="h-10 text-slate-600 font-bold hover:bg-slate-200">
-                Fechar
-              </Button>
-            </DialogClose>
-            <Button 
-              onClick={handlePrint} 
-              size="sm" 
-              className="gap-2 bg-slate-900 hover:bg-slate-800 text-white h-10 px-8 font-black uppercase text-[11px] tracking-wider border-b-4 border-primary rounded-lg transition-all active:translate-y-1 active:border-b-0"
-            >
-              <Printer className="h-4 w-4" /> Imprimir Recibo
-            </Button>
-          </div>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function HonorariosReceiptDialog({ 
-  title, 
-  client,
-  open, 
-  onOpenChange 
-}: { 
-  title: FinancialTitle | null; 
-  client?: Client; 
-  open: boolean; 
-  onOpenChange: (open: boolean) => void 
-}) {
-  if (!title) return null;
-
-  const handlePrint = () => { window.print(); };
-  
-  const feePercent = 30; 
-  const feeValue = title.value * (feePercent / 100);
-  const formattedFee = feeValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-  const today = format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-4xl bg-white text-slate-900 p-0 overflow-hidden border-none shadow-none print:shadow-none print:max-w-full">
-        <div className="p-10 space-y-8 bg-white print:p-0" id="honorarios-print-area">
-          <div className="flex justify-between items-center border-b-2 border-slate-900 pb-4">
-            <div className="flex items-center gap-3">
-              <div className="bg-slate-900 p-1.5 rounded-lg print:bg-transparent">
-                <img src="/logo.png" alt="Logo" className="h-10 w-auto print:brightness-0" />
-              </div>
-              <div>
-                <h2 className="text-lg font-black uppercase tracking-tighter text-slate-900">Bueno Gois Advogados</h2>
-                <p className="text-[8px] text-slate-500 uppercase font-bold tracking-widest">OAB/SP 000.000 | CONTABILIDADE</p>
-              </div>
-            </div>
-            <div className="text-right">
-              <div className="text-xl font-black text-slate-900 leading-none font-headline">HONORÁRIOS</div>
-              <div className="text-[8px] font-bold text-slate-500 mt-1 uppercase">ID: {title.id.substring(0, 8).toUpperCase()}</div>
-            </div>
-          </div>
-
-          <div className="py-6 space-y-4 text-sm leading-relaxed text-justify border-l-4 border-primary/20 pl-6 bg-slate-50/50 rounded-r-2xl print:bg-white print:border-l-2 print:border-slate-300">
-            <p>
-              Confirmamos o recebimento de <strong className="text-slate-900 font-black">{formattedFee}</strong> do cliente <strong>{client ? `${client.firstName} ${client.lastName}` : 'N/A'}</strong>, referente aos honorários contratuais de êxito ({feePercent}%) incidentes sobre a verba:
-            </p>
-            <p className="italic text-slate-600 bg-white p-3 rounded-lg border border-slate-200 print:bg-slate-50">
-              "{title.description}"
-            </p>
-            <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest">
-              Natureza: Honorários Advocatícios de Êxito / Quota Litis.
-            </p>
-          </div>
-
-          <div className="pt-10 flex flex-col items-center gap-12">
-            <p className="text-sm font-bold">São Bernardo do Campo, {today}</p>
-            <div className="w-full max-w-sm text-center">
-              <div className="w-full border-t border-slate-900 mb-1" />
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-900">Bueno Gois Advogados e Associados</p>
-              <p className="text-[8px] text-slate-500 font-bold uppercase">Prestador de Serviços Jurídicos</p>
-            </div>
-          </div>
-        </div>
-
-        <DialogFooter className="p-6 bg-slate-50 border-t print:hidden flex justify-end gap-3">
-          <DialogClose asChild>
-            <Button variant="ghost" size="sm" className="h-10 text-slate-600 font-bold hover:bg-slate-200">
-              Fechar
-            </Button>
-          </DialogClose>
-          <Button 
-            onClick={handlePrint} 
-            size="sm" 
-            className="gap-2 bg-slate-900 hover:bg-slate-800 text-white h-10 px-8 font-black uppercase text-[11px] tracking-wider border-b-4 border-primary rounded-lg transition-all active:translate-y-1 active:border-b-0"
-          >
-            <Printer className="h-4 w-4" /> Imprimir Honorários
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 export default function FinanceiroPage() {
   const { firestore, isUserLoading } = useFirebase();
   const [refreshKey, setRefreshKey] = React.useState(0);
   const [isProcessing, setIsProcessing] = React.useState<string | null>(null);
-  const [receiptTitle, setReceiptTitle] = React.useState<FinancialTitle | null>(null);
-  const [honorariosTitle, setHonorariosTitle] = React.useState<FinancialTitle | null>(null);
   const { toast } = useToast();
 
   const titlesQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'financial_titles'), orderBy('dueDate', 'asc')) : null), [firestore, refreshKey]);
   const { data: titlesData, isLoading: isLoadingTitles } = useCollection<FinancialTitle>(titlesQuery);
-
-  const clientsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'clients') : null), [firestore]);
-  const { data: clientsData } = useCollection<Client>(clientsQuery);
-  const clientsMap = React.useMemo(() => new Map(clientsData?.map(c => [c.id, c])), [clientsData]);
 
   const processesQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'processes') : null), [firestore]);
   const { data: processesData } = useCollection<Process>(processesQuery);
@@ -598,148 +381,9 @@ export default function FinanceiroPage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Tem certeza que deseja excluir este lançamento?')) return;
-    try {
-      await deleteDoc(doc(firestore!, 'financial_titles', id));
-      toast({ title: 'Lançamento removido.' });
-      setRefreshKey(k => k + 1);
-    } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Erro', description: e.message });
-    }
-  };
-
   const formatCurrency = (val: number) => val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
   const isLoading = isUserLoading || isLoadingTitles;
-
-  const TitleTable = ({ data, type }: { data: FinancialTitle[], type: 'RECEITA' | 'DESPESA' }) => {
-    const groupedData = React.useMemo(() => {
-      const groups: { monthLabel: string; titles: FinancialTitle[] }[] = [];
-      data.forEach(t => {
-        const date = t.dueDate instanceof Timestamp ? t.dueDate.toDate() : new Date(t.dueDate);
-        const label = format(date, 'MMMM yyyy', { locale: ptBR });
-        let group = groups.find(g => g.monthLabel === label);
-        if (!group) {
-          group = { monthLabel: label, titles: [] };
-          groups.push(group);
-        }
-        group.titles.push(t);
-      });
-      return groups;
-    }, [data]);
-
-    return (
-      <div className="space-y-8">
-        {groupedData.map((group) => (
-          <Card key={group.monthLabel} className="bg-[#0f172a] border-white/5 overflow-hidden">
-            <CardHeader className="bg-white/5 py-3 border-b border-white/5">
-              <CardTitle className="text-xs font-black uppercase text-primary tracking-widest flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
-                {group.monthLabel}
-              </CardTitle>
-            </CardHeader>
-            <Table>
-              <TableHeader className="sr-only md:not-sr-only">
-                <TableRow className="border-white/5 hover:bg-transparent">
-                  <TableHead className="text-muted-foreground">Descrição</TableHead>
-                  <TableHead className="text-muted-foreground">Vencimento</TableHead>
-                  <TableHead className="text-center text-muted-foreground">Status</TableHead>
-                  <TableHead className="text-right text-muted-foreground">Valor Bruto</TableHead>
-                  <TableHead className="text-right text-muted-foreground">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {group.titles.map(t => {
-                  const dueDate = t.dueDate instanceof Timestamp ? t.dueDate.toDate() : new Date(t.dueDate);
-                  const isOverdue = t.status === 'PENDENTE' && isBefore(dueDate, new Date());
-                  
-                  return (
-                    <TableRow key={t.id} className="border-white/5 hover:bg-white/5 transition-colors">
-                      <TableCell>
-                        <div className="flex flex-col">
-                          <span className="font-medium text-white">{t.description}</span>
-                          <div className="flex items-center gap-2 mt-0.5">
-                            <Badge variant="outline" className="text-[8px] font-bold uppercase py-0 px-1.5 h-4 border-white/10 text-muted-foreground">{t.origin}</Badge>
-                            {t.processId && (
-                              <div className="flex items-center gap-1 text-[9px] text-primary/80 font-bold uppercase">
-                                <FolderKanban className="h-3 w-3" /> {processesMap.get(t.processId)?.name}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className={cn("text-slate-400 text-xs", isOverdue && "text-rose-500 font-bold")}>
-                        <div className="flex items-center gap-1.5">
-                          <Calendar className="h-3 w-3" />
-                          {format(dueDate, 'dd/MM/yyyy')}
-                          {isOverdue && <Badge variant="outline" className="h-4 text-[8px] border-rose-500/50 text-rose-500 bg-rose-50/5">VENCIDO</Badge>}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Badge className={cn(
-                          "text-[9px] font-black uppercase tracking-widest px-2 h-5",
-                          t.status === 'PAGO' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 'bg-amber-500/20 text-amber-400 border-amber-500/30'
-                        )} variant="outline">
-                          {t.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className={cn("text-right font-bold tabular-nums", type === 'RECEITA' ? 'text-emerald-400' : 'text-rose-400')}>
-                        {formatCurrency(t.value)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-white/50">
-                              {isProcessing === t.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreVertical className="h-4 w-4" />}
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="bg-card border-border w-64">
-                            <DropdownMenuLabel className="text-white text-[10px] font-black uppercase">Gerenciar Título</DropdownMenuLabel>
-                            {t.status === 'PENDENTE' ? (
-                              <DropdownMenuItem onClick={() => handleUpdateStatus(t.id, 'PAGO')}>
-                                <Check className="mr-2 h-4 w-4 text-emerald-500" /> Marcar como Pago
-                              </DropdownMenuItem>
-                            ) : (
-                              <DropdownMenuItem onClick={() => handleUpdateStatus(t.id, 'PENDENTE')}>
-                                <RefreshCw className="mr-2 h-4 w-4 text-amber-500" /> Estornar Pagamento
-                              </DropdownMenuItem>
-                            )}
-                            
-                            {type === 'RECEITA' && t.status === 'PAGO' && (
-                              <>
-                                <DropdownMenuSeparator className="bg-white/10" />
-                                <DropdownMenuItem onClick={() => setReceiptTitle(t)}>
-                                  <Users className="mr-2 h-4 w-4 text-blue-400" /> Recibo de Repasse (Cliente)
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => setHonorariosTitle(t)}>
-                                  <Scale className="mr-2 h-4 w-4 text-primary" /> Recibo de Honorários (Escritório)
-                                </DropdownMenuItem>
-                              </>
-                            )}
-
-                            <DropdownMenuSeparator className="bg-white/10" />
-                            <DropdownMenuItem className="text-rose-500" onClick={() => handleDelete(t.id)}>
-                              <Trash2 className="mr-2 h-4 w-4" /> Excluir Registro
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </Card>
-        ))}
-        {data.length === 0 && (
-          <Card className="bg-[#0f172a] border-white/5 p-12 text-center text-muted-foreground italic">
-            Nenhum título encontrado nesta categoria.
-          </Card>
-        )}
-      </div>
-    );
-  }
 
   return (
     <div className="flex flex-col gap-6 p-1">
@@ -791,47 +435,107 @@ export default function FinanceiroPage() {
         </TabsList>
 
         <TabsContent value="receitas" className="flex-1 mt-4">
-          {isLoading ? <Skeleton className="h-64 w-full bg-white/5" /> : (
-            <TitleTable data={titlesData?.filter(t => t.type === 'RECEITA') || []} type="RECEITA" />
-          )}
+          <Card className="bg-[#0f172a] border-white/5 overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-white/5">
+                  <TableHead className="text-muted-foreground">Descrição</TableHead>
+                  <TableHead className="text-muted-foreground">Vencimento</TableHead>
+                  <TableHead className="text-center text-muted-foreground">Status</TableHead>
+                  <TableHead className="text-right text-muted-foreground">Valor</TableHead>
+                  <TableHead className="text-right text-muted-foreground">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  Array.from({ length: 3 }).map((_, i) => (
+                    <TableRow key={i}><TableCell colSpan={5}><Skeleton className="h-8 w-full bg-white/5" /></TableCell></TableRow>
+                  ))
+                ) : (titlesData?.filter(t => t.type === 'RECEITA').map(t => (
+                  <TableRow key={t.id} className="border-white/5">
+                    <TableCell>
+                      <div className="flex flex-col">
+                        <span className="font-medium text-white">{t.description}</span>
+                        {t.processId && <span className="text-[9px] text-primary font-bold uppercase">{processesMap.get(t.processId)?.name}</span>}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-xs text-slate-400">{format(t.dueDate instanceof Timestamp ? t.dueDate.toDate() : new Date(t.dueDate), 'dd/MM/yyyy')}</TableCell>
+                    <TableCell className="text-center">
+                      <Badge className={cn("text-[9px] uppercase", t.status === 'PAGO' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400')} variant="outline">{t.status}</Badge>
+                    </TableCell>
+                    <TableCell className="text-right font-bold text-emerald-400">{formatCurrency(t.value)}</TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="bg-card border-border">
+                          {t.status === 'PENDENTE' ? (
+                            <DropdownMenuItem onClick={() => handleUpdateStatus(t.id, 'PAGO')}><Check className="mr-2 h-4 w-4" /> Marcar Pago</DropdownMenuItem>
+                          ) : (
+                            <DropdownMenuItem onClick={() => handleUpdateStatus(t.id, 'PENDENTE')}><RefreshCw className="mr-2 h-4 w-4" /> Estornar</DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                )))}
+              </TableBody>
+            </Table>
+          </Card>
         </TabsContent>
 
         <TabsContent value="despesas" className="flex-1 mt-4">
-          {isLoading ? <Skeleton className="h-64 w-full bg-white/5" /> : (
-            <TitleTable data={titlesData?.filter(t => t.type === 'DESPESA') || []} type="DESPESA" />
-          )}
+          <Card className="bg-[#0f172a] border-white/5 overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-white/5">
+                  <TableHead className="text-muted-foreground">Descrição</TableHead>
+                  <TableHead className="text-muted-foreground">Vencimento</TableHead>
+                  <TableHead className="text-center text-muted-foreground">Status</TableHead>
+                  <TableHead className="text-right text-muted-foreground">Valor</TableHead>
+                  <TableHead className="text-right text-muted-foreground">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  Array.from({ length: 3 }).map((_, i) => (
+                    <TableRow key={i}><TableCell colSpan={5}><Skeleton className="h-8 w-full bg-white/5" /></TableCell></TableRow>
+                  ))
+                ) : (titlesData?.filter(t => t.type === 'DESPESA').map(t => (
+                  <TableRow key={t.id} className="border-white/5">
+                    <TableCell className="font-medium text-white">{t.description}</TableCell>
+                    <TableCell className="text-xs text-slate-400">{format(t.dueDate instanceof Timestamp ? t.dueDate.toDate() : new Date(t.dueDate), 'dd/MM/yyyy')}</TableCell>
+                    <TableCell className="text-center">
+                      <Badge className={cn("text-[9px] uppercase", t.status === 'PAGO' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400')} variant="outline">{t.status}</Badge>
+                    </TableCell>
+                    <TableCell className="text-right font-bold text-rose-400">{formatCurrency(t.value)}</TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="bg-card border-border">
+                          {t.status === 'PENDENTE' ? (
+                            <DropdownMenuItem onClick={() => handleUpdateStatus(t.id, 'PAGO')}><Check className="mr-2 h-4 w-4" /> Marcar Pago</DropdownMenuItem>
+                          ) : (
+                            <DropdownMenuItem onClick={() => handleUpdateStatus(t.id, 'PENDENTE')}><RefreshCw className="mr-2 h-4 w-4" /> Estornar</DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                )))}
+              </TableBody>
+            </Table>
+          </Card>
         </TabsContent>
 
         <TabsContent value="relatorios" className="flex-1 mt-4">
-          <Card className="bg-[#0f172a] border-white/5 p-12 text-center flex flex-col items-center gap-4">
-            <div className="h-16 w-16 rounded-full bg-purple-500/10 flex items-center justify-center text-purple-400">
-              <ArrowUpRight className="h-8 w-8" />
-            </div>
-            <div className="space-y-2">
-              <h3 className="text-xl font-bold text-white">Relatórios Gerenciais</h3>
-              <p className="text-muted-foreground max-w-sm">Acesse a página consolidada de BI para visualizar gráficos de crescimento, lucratividade e performance da equipe.</p>
-            </div>
-            <Button variant="outline" className="border-purple-500/30 text-purple-400 hover:bg-purple-500/10" asChild>
-              <Link href="/dashboard/relatorios">Ver Painel de BI</Link>
-            </Button>
+          <Card className="bg-[#0f172a] border-white/5 p-12 text-center">
+            <BarChart3 className="h-12 w-12 text-primary mx-auto mb-4" />
+            <h3 className="text-lg font-bold text-white mb-2">Relatórios Gerenciais</h3>
+            <p className="text-muted-foreground mb-6">Acesse a página de BI para análise completa.</p>
+            <Button variant="outline" className="border-primary/20 text-primary" asChild><Link href="/dashboard/relatorios">Ver Painel BI</Link></Button>
           </Card>
         </TabsContent>
       </Tabs>
-
-      <ReceiptDialog 
-        title={receiptTitle} 
-        client={receiptTitle?.clientId ? clientsMap.get(receiptTitle.clientId) : undefined} 
-        process={receiptTitle?.processId ? processesMap.get(receiptTitle.processId) : undefined}
-        open={!!receiptTitle} 
-        onOpenChange={(open) => !open && setReceiptTitle(null)} 
-      />
-
-      <HonorariosReceiptDialog 
-        title={honorariosTitle}
-        client={honorariosTitle?.clientId ? clientsMap.get(honorariosTitle.clientId) : undefined}
-        open={!!honorariosTitle}
-        onOpenChange={(open) => !open && setHonorariosTitle(null)}
-      />
     </div>
   );
 }

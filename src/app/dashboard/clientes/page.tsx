@@ -135,7 +135,7 @@ export default function ClientsPage() {
     return result;
   }, [clients, searchResults, statusFilter]);
 
-  const totalPages = Math.ceil(filteredClients.length / ITEMS_PER_PAGE);
+  const totalPages = Math.max(1, Math.ceil(filteredClients.length / ITEMS_PER_PAGE));
   const paginatedClients = React.useMemo(() => {
     return filteredClients.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
   }, [filteredClients, currentPage]);
@@ -251,7 +251,7 @@ export default function ClientsPage() {
                           <span className="text-[9px] text-muted-foreground font-bold uppercase">Cadastrado em {typeof client.createdAt === 'string' ? new Date(client.createdAt).toLocaleDateString() : client.createdAt.toDate().toLocaleDateString()}</span>
                           
                           {client.driveFolderId ? (
-                            <a href={`https://drive.google.com/drive/folders/${client.driveFolderId}`} target="_blank" className="text-emerald-400 font-bold text-[9px] uppercase flex items-center gap-1 hover:bg-emerald-500/10 px-2 py-1 rounded-md transition-all">
+                            <a href={`https://drive.google.com/drive/folders/${client.driveFolderId}`} target="_blank" className="text-emerald-400 font-bold text-[9px] uppercase flex items-center gap-1 hover:bg-emerald-500/10 px-2.5 py-1 rounded-md transition-all">
                               <CheckCircle2 className="h-3 w-3" /> Drive OK
                             </a>
                           ) : (
