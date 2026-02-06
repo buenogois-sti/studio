@@ -17,7 +17,8 @@ import {
   CheckCircle2,
   Info,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  FolderKanban
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 

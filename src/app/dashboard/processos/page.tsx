@@ -162,7 +162,7 @@ export default function ProcessosPage() {
           <p className="text-sm text-muted-foreground">Gestão jurídica estratégica e acompanhamento em tempo real.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="relative w-full max-w-sm">
+          <div className="relative w-full max-sm:w-full max-w-sm">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input placeholder="Pesquisar por CNPJ ou Título..." className="pl-8 pr-8 bg-[#0f172a] border-border/50 text-white h-10" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
           </div>
