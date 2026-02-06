@@ -29,7 +29,9 @@ import {
   FolderKanban,
   X,
   Receipt,
-  Download
+  Download,
+  Calculator,
+  Info
 } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, Timestamp, query, orderBy, deleteDoc, doc, getDocs, where, limit } from 'firebase/firestore';
@@ -66,6 +68,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
 import Link from 'next/link';
 import { searchProcesses } from '@/lib/process-actions';
 
@@ -107,75 +110,217 @@ function ClientReceiptDialog({
   open: boolean; 
   onOpenChange: (open: boolean) => void 
 }) {
+  const [receiptMode, setReceiptMode] = React.useState<'REPASSE' | 'HONORARIOS'>('REPASSE');
+  const [feePercentage, setFeePercentage] = React.useState(30);
+
+  React.useEffect(() => {
+    if (title?.origin === 'HONORARIOS_CONTRATUAIS' || title?.origin === 'SUCUMBENCIA') {
+      setReceiptMode('HONORARIOS');
+    } else {
+      setReceiptMode('REPASSE');
+    }
+  }, [title]);
+
   if (!title || !client) return null;
 
   const paymentDate = title.paymentDate ? (title.paymentDate as any).toDate() : new Date();
+  const grossValue = title.value;
+  const feeValue = (grossValue * feePercentage) / 100;
+  const netValue = grossValue - feeValue;
+
+  const formatCurrency = (val: number) => val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-4xl bg-white text-slate-900 p-0 overflow-hidden border-none shadow-none print:shadow-none">
-        <ScrollArea className="max-h-[90vh] print:max-h-full">
-          <div className="p-10 space-y-8 bg-white" id="receipt-print-area">
-            <div className="flex justify-between items-center border-b-2 border-slate-900 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="bg-slate-900 p-1.5 rounded-lg">
-                  <img src="/logo.png" alt="Bueno Gois" className="h-10 w-auto print:brightness-0" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-black uppercase tracking-tighter text-slate-900 leading-none">Bueno Gois Advogados</h2>
-                  <p className="text-[8px] text-slate-500 uppercase font-bold tracking-widest mt-1">Assessoria e Consultoria Jurídica</p>
-                </div>
+      <DialogContent className="sm:max-w-5xl bg-slate-50 text-slate-900 p-0 overflow-hidden border-none shadow-2xl">
+        <div className="flex flex-col lg:flex-row h-[90vh]">
+          {/* Sidebar de Configuração do Recibo */}
+          <div className="w-full lg:w-80 bg-slate-900 p-6 text-white shrink-0 print:hidden overflow-y-auto">
+            <div className="space-y-8">
+              <div className="space-y-2">
+                <h3 className="text-xs font-black uppercase tracking-widest text-primary flex items-center gap-2">
+                  <Calculator className="h-4 w-4" /> Configurações do Recibo
+                </h3>
+                <p className="text-[10px] text-slate-400">Ajuste os valores para o cálculo da liquidação.</p>
               </div>
-              <div className="text-right">
-                <div className="text-xl font-black text-slate-900 leading-none font-headline tracking-widest">RECIBO</div>
-                <div className="text-[10px] font-bold text-slate-500 mt-1 uppercase tracking-tighter">Nº {title.id.substring(0, 8).toUpperCase()}</div>
-              </div>
-            </div>
 
-            <div className="bg-slate-50 border-2 border-slate-200 p-6 rounded-2xl flex justify-between items-center">
-              <span className="text-sm font-bold uppercase text-slate-500">Valor Recebido</span>
-              <span className="text-3xl font-black text-slate-900">
-                {title.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-              </span>
-            </div>
-
-            <div className="space-y-6 text-sm leading-relaxed text-justify text-slate-800">
-              <p>
-                Recebemos de <strong className="text-slate-900 uppercase">{client.firstName} {client.lastName}</strong>, 
-                inscrito sob o documento <strong className="text-slate-900">{client.document}</strong>, a importância acima mencionada 
-                referente a <strong className="text-slate-900">{title.description}</strong>.
-              </p>
-              
-              {process && (
-                <div className="p-4 bg-slate-100 rounded-lg border border-slate-200">
-                  <p className="text-[10px] font-black uppercase text-slate-500 mb-1">Vínculo Processual</p>
-                  <p className="font-bold text-slate-900">{process.name}</p>
-                  <p className="text-xs text-slate-600 font-mono">CNPJ: {process.processNumber || 'N/A'}</p>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase text-slate-500">Modelo de Recibo</label>
+                  <Select value={receiptMode} onValueChange={(v: any) => setReceiptMode(v)}>
+                    <SelectTrigger className="bg-white/5 border-white/10 text-white h-10">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="REPASSE">Repasse (Com Desconto)</SelectItem>
+                      <SelectItem value="HONORARIOS">Apenas Honorários</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-              )}
 
-              <p>
-                Pelo que firmamos o presente recibo para que produza seus efeitos legais, dando plena, 
-                geral e irrevogável quitação do valor ora recebido.
-              </p>
-            </div>
+                {receiptMode === 'REPASSE' && (
+                  <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold uppercase text-slate-500">Honorários Contratuais (%)</label>
+                      <div className="relative">
+                        <Input 
+                          type="number" 
+                          value={feePercentage} 
+                          onChange={(e) => setFeePercentage(Number(e.target.value))}
+                          className="bg-white/5 border-white/10 text-white pl-10"
+                        />
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-primary font-bold">%</span>
+                      </div>
+                    </div>
 
-            <div className="pt-12 flex flex-col items-center gap-12">
-              <p className="text-sm font-bold text-slate-900">São Bernardo do Campo, {format(paymentDate, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}</p>
-              <div className="w-full max-w-sm text-center">
-                <div className="w-full border-t border-slate-900 mb-1" />
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-900">Bueno Gois Advogados e Associados</p>
-                <p className="text-[8px] text-slate-500 uppercase font-bold">Setor Financeiro / Dr. Alan Bueno de Gois</p>
+                    <div className="p-4 rounded-xl bg-primary/5 border border-primary/20 space-y-3">
+                      <div className="flex justify-between text-[10px] font-bold">
+                        <span className="text-slate-400">BRUTO:</span>
+                        <span className="text-white">{formatCurrency(grossValue)}</span>
+                      </div>
+                      <div className="flex justify-between text-[10px] font-bold">
+                        <span className="text-rose-400">DESC. ({feePercentage}%):</span>
+                        <span className="text-rose-400">-{formatCurrency(feeValue)}</span>
+                      </div>
+                      <Separator className="bg-primary/20" />
+                      <div className="flex justify-between text-xs font-black">
+                        <span className="text-primary">LÍQUIDO:</span>
+                        <span className="text-primary">{formatCurrency(netValue)}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="pt-8 space-y-4">
+                <Button onClick={() => window.print()} className="w-full bg-primary text-primary-foreground font-black uppercase tracking-widest text-[11px] h-12 shadow-xl shadow-primary/20">
+                  <Printer className="h-4 w-4 mr-2" /> Imprimir Recibo
+                </Button>
+                <DialogClose asChild>
+                  <Button variant="ghost" className="w-full text-slate-400 hover:text-white text-[10px] font-bold uppercase">Fechar</Button>
+                </DialogClose>
               </div>
             </div>
           </div>
-        </ScrollArea>
-        <DialogFooter className="p-6 bg-slate-50 border-t print:hidden flex justify-end gap-3">
-          <DialogClose asChild><Button variant="ghost" className="text-slate-600 font-bold">Fechar</Button></DialogClose>
-          <Button onClick={() => window.print()} className="gap-2 bg-slate-900 text-white font-bold">
-            <Printer className="h-4 w-4" /> Imprimir Recibo
-          </Button>
-        </DialogFooter>
+
+          {/* Área do Documento */}
+          <ScrollArea className="flex-1 bg-white">
+            <div className="p-12 min-h-full flex flex-col" id="receipt-print-area">
+              {/* Header do Documento */}
+              <div className="flex justify-between items-start border-b-2 border-slate-900 pb-6 mb-8">
+                <div className="flex items-center gap-4">
+                  <div className="bg-slate-900 p-2 rounded-xl print:bg-transparent">
+                    <img src="/logo.png" alt="Bueno Gois" className="h-12 w-auto print:brightness-0" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-black uppercase tracking-tighter text-slate-900 leading-none">Bueno Gois Advogados</h2>
+                    <p className="text-[10px] text-slate-500 uppercase font-bold tracking-[0.2em] mt-1.5">Assessoria e Consultoria Jurídica</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-2xl font-black text-slate-900 leading-none font-headline tracking-widest">RECIBO</div>
+                  <div className="text-[10px] font-bold text-slate-500 mt-2 uppercase tracking-tighter">ID OPERAÇÃO: {title.id.substring(0, 8).toUpperCase()}</div>
+                </div>
+              </div>
+
+              {/* Corpo do Recibo */}
+              <div className="flex-1 space-y-10">
+                <div className="bg-slate-100 border-2 border-slate-200 p-8 rounded-3xl flex justify-between items-center">
+                  <span className="text-sm font-black uppercase text-slate-500 tracking-widest">
+                    {receiptMode === 'REPASSE' ? 'Valor Líquido da Liquidação' : 'Valor Total Recebido'}
+                  </span>
+                  <span className="text-4xl font-black text-slate-900">
+                    {formatCurrency(receiptMode === 'REPASSE' ? netValue : grossValue)}
+                  </span>
+                </div>
+
+                <div className="space-y-8 text-base leading-relaxed text-justify text-slate-800">
+                  <p>
+                    Recebemos de <strong className="text-slate-900 uppercase">Bueno Gois Advogados e Associados</strong>, 
+                    inscrito sob o CNPJ <strong className="text-slate-900">12.345.678/0001-90</strong>, a importância supramencionada 
+                    em favor de <strong className="text-slate-900 uppercase">{client.firstName} {client.lastName}</strong>, 
+                    portador(a) do documento <strong className="text-slate-900">{client.document}</strong>.
+                  </p>
+
+                  {receiptMode === 'REPASSE' ? (
+                    <div className="space-y-6">
+                      <p>Referente à liquidação de valores no processo abaixo identificado, com a devida prestação de contas e desconto de honorários contratuais:</p>
+                      
+                      <div className="grid grid-cols-1 gap-4">
+                        <div className="p-6 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
+                          <div className="flex justify-between items-center mb-4">
+                            <span className="text-[10px] font-black uppercase text-slate-500">Detalhamento da Liquidação</span>
+                            <Badge variant="outline" className="border-slate-300 text-slate-600 text-[9px] font-black">EXTRATO</Badge>
+                          </div>
+                          <div className="space-y-2">
+                            <div className="flex justify-between text-sm">
+                              <span>(+) Valor Bruto Recebido (Acordo/Sentença)</span>
+                              <span className="font-bold">{formatCurrency(grossValue)}</span>
+                            </div>
+                            <div className="flex justify-between text-sm text-rose-600">
+                              <span>(-) Honorários Advocatícios Contratuais ({feePercentage}%)</span>
+                              <span className="font-bold">-{formatCurrency(feeValue)}</span>
+                            </div>
+                            <Separator className="my-2" />
+                            <div className="flex justify-between text-lg font-black text-slate-900">
+                              <span>(=) VALOR LÍQUIDO DISPONIBILIZADO</span>
+                              <span>{formatCurrency(netValue)}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <p>
+                      Referente ao pagamento de <strong>Honorários Advocatícios</strong> por serviços prestados no acompanhamento 
+                      do processo identificado abaixo, dando plena e total quitação pelo valor ora recebido.
+                    </p>
+                  )}
+                  
+                  {process && (
+                    <div className="p-6 bg-slate-900 text-white rounded-2xl flex items-center justify-between">
+                      <div className="space-y-1">
+                        <p className="text-[9px] font-black uppercase text-primary tracking-widest">Vínculo Processual</p>
+                        <p className="font-bold text-base">{process.name}</p>
+                        <p className="text-[10px] text-slate-400 font-mono">AUTOS Nº {process.processNumber || 'N/A'}</p>
+                      </div>
+                      <Scale className="h-10 w-10 text-white/10 shrink-0" />
+                    </div>
+                  )}
+
+                  <p className="text-sm italic text-slate-500 border-l-4 border-slate-200 pl-4">
+                    Pelo que firmo o presente recibo para que produza seus efeitos legais, dando plena, 
+                    geral e irrevogável quitação do valor recebido nesta data.
+                  </p>
+                </div>
+
+                {/* Assinatura */}
+                <div className="pt-16 flex flex-col items-center gap-12">
+                  <p className="text-sm font-bold text-slate-900">São Bernardo do Campo, {format(paymentDate, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}</p>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-20 w-full pt-10">
+                    <div className="text-center space-y-2">
+                      <div className="w-full border-t border-slate-900" />
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-900">Bueno Gois Advogados</p>
+                      <p className="text-[8px] text-slate-500 uppercase font-bold">Emitente / Outorgado</p>
+                    </div>
+                    <div className="text-center space-y-2">
+                      <div className="w-full border-t border-slate-900" />
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-900">{client.firstName} {client.lastName}</p>
+                      <p className="text-[8px] text-slate-500 uppercase font-bold">Recebedor / Outorgante</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Rodapé do Documento */}
+              <div className="mt-20 pt-6 border-t border-slate-100 text-center space-y-1">
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Bueno Gois Advogados e Associados - OAB/SP 00.000</p>
+                <p className="text-[8px] text-slate-400">Rua Marechal Deodoro, 1594 - Sala 2, São Bernardo do Campo / SP - (11) 98059-0128</p>
+              </div>
+            </div>
+          </ScrollArea>
+        </div>
       </DialogContent>
     </Dialog>
   );
@@ -431,6 +576,7 @@ export default function FinanceiroPage() {
   const [isProcessing, setIsProcessing] = React.useState<string | null>(null);
   const [selectedReceiptTitle, setSelectedReceiptTitle] = React.useState<FinancialTitle | null>(null);
   const [isReceiptOpen, setIsReceiptOpen] = React.useState(false);
+  const [searchTerm, setSearchTerm] = React.useState('');
   const { toast } = useToast();
 
   const titlesQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'financial_titles'), orderBy('dueDate', 'asc')) : null), [firestore, refreshKey]);
@@ -476,6 +622,16 @@ export default function FinanceiroPage() {
     }
   };
 
+  const filteredTitles = React.useMemo(() => {
+    if (!titlesData) return [];
+    if (!searchTerm.trim()) return titlesData;
+    const q = searchTerm.toLowerCase();
+    return titlesData.filter(t => 
+      t.description.toLowerCase().includes(q) ||
+      processesMap.get(t.processId || '')?.name.toLowerCase().includes(q)
+    );
+  }, [titlesData, searchTerm, processesMap]);
+
   const formatCurrency = (val: number) => val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
   const isLoading = isUserLoading || isLoadingTitles;
@@ -487,7 +643,16 @@ export default function FinanceiroPage() {
           <H1 className="text-white">Financeiro</H1>
           <p className="text-sm text-muted-foreground">Controle estratégico de faturamento e despesas operacionais.</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          <div className="relative w-full max-sm:w-full max-w-sm print:hidden">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input 
+              placeholder="Pesquisar lançamentos..." 
+              className="pl-8 bg-[#0f172a] border-border/50 text-white h-10" 
+              value={searchTerm} 
+              onChange={e => setSearchTerm(e.target.value)} 
+            />
+          </div>
           <Button variant="outline" className="border-primary/20 text-primary" asChild>
             <Link href="/dashboard/repasses">
               <Wallet className="mr-2 h-4 w-4" /> Ir para Repasses & Folha
@@ -533,12 +698,12 @@ export default function FinanceiroPage() {
           <Card className="bg-[#0f172a] border-white/5 overflow-hidden">
             <Table>
               <TableHeader>
-                <TableRow className="border-white/5">
-                  <TableHead className="text-muted-foreground">Descrição</TableHead>
-                  <TableHead className="text-muted-foreground">Vencimento</TableHead>
-                  <TableHead className="text-center text-muted-foreground">Status</TableHead>
-                  <TableHead className="text-right text-muted-foreground">Valor</TableHead>
-                  <TableHead className="text-right text-muted-foreground">Ações</TableHead>
+                <TableRow className="border-white/5 hover:bg-transparent">
+                  <TableHead className="text-muted-foreground font-black uppercase text-[10px]">Descrição</TableHead>
+                  <TableHead className="text-muted-foreground font-black uppercase text-[10px]">Vencimento</TableHead>
+                  <TableHead className="text-center text-muted-foreground font-black uppercase text-[10px]">Status</TableHead>
+                  <TableHead className="text-right text-muted-foreground font-black uppercase text-[10px]">Valor</TableHead>
+                  <TableHead className="text-right text-muted-foreground font-black uppercase text-[10px] px-6">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -546,46 +711,80 @@ export default function FinanceiroPage() {
                   Array.from({ length: 3 }).map((_, i) => (
                     <TableRow key={i}><TableCell colSpan={5}><Skeleton className="h-8 w-full bg-white/5" /></TableCell></TableRow>
                   ))
-                ) : (titlesData?.filter(t => t.type === 'RECEITA').map(t => (
-                  <TableRow key={t.id} className="border-white/5">
+                ) : (filteredTitles.filter(t => t.type === 'RECEITA').map(t => (
+                  <TableRow key={t.id} className="border-white/5 hover:bg-white/5 transition-colors">
                     <TableCell>
                       <div className="flex flex-col">
-                        <span className="font-medium text-white">{t.description}</span>
-                        {t.processId && <span className="text-[9px] text-primary font-bold uppercase">{processesMap.get(t.processId)?.name}</span>}
+                        <span className="font-bold text-white text-sm">{t.description}</span>
+                        {t.processId && (
+                          <div className="flex items-center gap-1.5 mt-1">
+                            <FolderKanban className="h-3 w-3 text-primary" />
+                            <span className="text-[9px] text-primary font-black uppercase tracking-tighter">{processesMap.get(t.processId)?.name}</span>
+                          </div>
+                        )}
                       </div>
                     </TableCell>
-                    <TableCell className="text-xs text-slate-400">{format(t.dueDate instanceof Timestamp ? t.dueDate.toDate() : new Date(t.dueDate), 'dd/MM/yyyy')}</TableCell>
-                    <TableCell className="text-center">
-                      <Badge className={cn("text-[9px] uppercase", t.status === 'PAGO' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400')} variant="outline">{t.status}</Badge>
+                    <TableCell className="text-xs text-slate-400 font-medium">
+                      {format(t.dueDate instanceof Timestamp ? t.dueDate.toDate() : new Date(t.dueDate), 'dd/MM/yyyy')}
                     </TableCell>
-                    <TableCell className="text-right font-bold text-emerald-400">{formatCurrency(t.value)}</TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-center">
+                      <Badge variant="outline" className={cn("text-[9px] font-black uppercase px-2 h-6", t.status === 'PAGO' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border-amber-500/20')}>
+                        {t.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right font-black text-emerald-400 text-sm tabular-nums">
+                      {formatCurrency(t.value)}
+                    </TableCell>
+                    <TableCell className="text-right px-6">
                       <div className="flex justify-end gap-2">
                         {t.status === 'PAGO' && (
                           <Button 
                             variant="ghost" 
                             size="icon" 
-                            className="h-8 w-8 text-primary"
+                            className="h-8 w-8 text-primary hover:bg-primary/10 transition-all rounded-full"
                             onClick={() => { setSelectedReceiptTitle(t); setIsReceiptOpen(true); }}
-                            title="Ver Recibo"
+                            title="Emitir Recibo Profissional"
                           >
                             <Receipt className="h-4 w-4" />
                           </Button>
                         )}
                         <DropdownMenu>
-                          <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="bg-card border-border">
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-white/30 hover:text-white rounded-full">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="bg-card border-border shadow-2xl">
+                            <DropdownMenuLabel className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Gestão Financeira</DropdownMenuLabel>
                             {t.status === 'PENDENTE' ? (
-                              <DropdownMenuItem onClick={() => handleUpdateStatus(t.id, 'PAGO')}><Check className="mr-2 h-4 w-4" /> Marcar Pago</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleUpdateStatus(t.id, 'PAGO')} className="gap-2 cursor-pointer focus:bg-emerald-500/10">
+                                <Check className="mr-2 h-4 w-4 text-emerald-500" /> <span className="font-bold">Marcar como Pago</span>
+                              </DropdownMenuItem>
                             ) : (
-                              <DropdownMenuItem onClick={() => handleUpdateStatus(t.id, 'PENDENTE')}><RefreshCw className="mr-2 h-4 w-4" /> Estornar</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleUpdateStatus(t.id, 'PENDENTE')} className="gap-2 cursor-pointer focus:bg-amber-500/10">
+                                <RefreshCw className="mr-2 h-4 w-4 text-amber-500" /> <span className="font-bold text-amber-500">Estornar Lançamento</span>
+                              </DropdownMenuItem>
                             )}
+                            <DropdownMenuSeparator className="bg-white/5" />
+                            <DropdownMenuItem className="text-rose-500 focus:bg-rose-500/10 font-bold">
+                              <Trash2 className="h-4 w-4 mr-2" /> Excluir Registro
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
                     </TableCell>
                   </TableRow>
                 )))}
+                {filteredTitles.filter(t => t.type === 'RECEITA').length === 0 && !isLoading && (
+                  <TableRow>
+                    <TableCell colSpan={5} className="h-32 text-center text-muted-foreground italic">
+                      <div className="flex flex-col items-center gap-2 opacity-30">
+                        <Calculator className="h-10 w-10" />
+                        <p className="text-[10px] font-black uppercase tracking-widest">Nenhuma receita encontrada</p>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </Card>
@@ -595,12 +794,12 @@ export default function FinanceiroPage() {
           <Card className="bg-[#0f172a] border-white/5 overflow-hidden">
             <Table>
               <TableHeader>
-                <TableRow className="border-white/5">
-                  <TableHead className="text-muted-foreground">Descrição</TableHead>
-                  <TableHead className="text-muted-foreground">Vencimento</TableHead>
-                  <TableHead className="text-center text-muted-foreground">Status</TableHead>
-                  <TableHead className="text-right text-muted-foreground">Valor</TableHead>
-                  <TableHead className="text-right text-muted-foreground">Ações</TableHead>
+                <TableRow className="border-white/5 hover:bg-transparent">
+                  <TableHead className="text-muted-foreground font-black uppercase text-[10px]">Descrição</TableHead>
+                  <TableHead className="text-muted-foreground font-black uppercase text-[10px]">Vencimento</TableHead>
+                  <TableHead className="text-center text-muted-foreground font-black uppercase text-[10px]">Status</TableHead>
+                  <TableHead className="text-right text-muted-foreground font-black uppercase text-[10px]">Valor</TableHead>
+                  <TableHead className="text-right text-muted-foreground font-black uppercase text-[10px] px-6">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -608,22 +807,37 @@ export default function FinanceiroPage() {
                   Array.from({ length: 3 }).map((_, i) => (
                     <TableRow key={i}><TableCell colSpan={5}><Skeleton className="h-8 w-full bg-white/5" /></TableCell></TableRow>
                   ))
-                ) : (titlesData?.filter(t => t.type === 'DESPESA').map(t => (
-                  <TableRow key={t.id} className="border-white/5">
-                    <TableCell className="font-medium text-white">{t.description}</TableCell>
-                    <TableCell className="text-xs text-slate-400">{format(t.dueDate instanceof Timestamp ? t.dueDate.toDate() : new Date(t.dueDate), 'dd/MM/yyyy')}</TableCell>
-                    <TableCell className="text-center">
-                      <Badge className={cn("text-[9px] uppercase", t.status === 'PAGO' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400')} variant="outline">{t.status}</Badge>
+                ) : (filteredTitles.filter(t => t.type === 'DESPESA').map(t => (
+                  <TableRow key={t.id} className="border-white/5 hover:bg-white/5 transition-colors">
+                    <TableCell className="font-bold text-white text-sm">{t.description}</TableCell>
+                    <TableCell className="text-xs text-slate-400 font-medium">
+                      {format(t.dueDate instanceof Timestamp ? t.dueDate.toDate() : new Date(t.dueDate), 'dd/MM/yyyy')}
                     </TableCell>
-                    <TableCell className="text-right font-bold text-rose-400">{formatCurrency(t.value)}</TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-center">
+                      <Badge variant="outline" className={cn("text-[9px] font-black uppercase px-2 h-6", t.status === 'PAGO' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border-amber-500/20')}>
+                        {t.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right font-black text-rose-400 text-sm tabular-nums">
+                      {formatCurrency(t.value)}
+                    </TableCell>
+                    <TableCell className="text-right px-6">
                       <DropdownMenu>
-                        <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-white/30 hover:text-white rounded-full">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="bg-card border-border">
+                          <DropdownMenuLabel className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Saída de Caixa</DropdownMenuLabel>
                           {t.status === 'PENDENTE' ? (
-                            <DropdownMenuItem onClick={() => handleUpdateStatus(t.id, 'PAGO')}><Check className="mr-2 h-4 w-4" /> Marcar Pago</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleUpdateStatus(t.id, 'PAGO')} className="gap-2 cursor-pointer focus:bg-emerald-500/10">
+                              <Check className="mr-2 h-4 w-4 text-emerald-500" /> <span className="font-bold">Confirmar Pagamento</span>
+                            </DropdownMenuItem>
                           ) : (
-                            <DropdownMenuItem onClick={() => handleUpdateStatus(t.id, 'PENDENTE')}><RefreshCw className="mr-2 h-4 w-4" /> Estornar</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleUpdateStatus(t.id, 'PENDENTE')} className="gap-2 cursor-pointer focus:bg-amber-500/10">
+                              <RefreshCw className="mr-2 h-4 w-4 text-amber-500" /> <span className="font-bold text-amber-500">Estornar Saída</span>
+                            </DropdownMenuItem>
                           )}
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -636,11 +850,13 @@ export default function FinanceiroPage() {
         </TabsContent>
 
         <TabsContent value="relatorios" className="flex-1 mt-4">
-          <Card className="bg-[#0f172a] border-white/5 p-12 text-center">
+          <Card className="bg-[#0f172a] border-white/5 p-12 text-center rounded-3xl border-2 border-dashed border-white/10 opacity-60">
             <BarChart3 className="h-12 w-12 text-primary mx-auto mb-4" />
-            <h3 className="text-lg font-bold text-white mb-2">Relatórios Gerenciais</h3>
-            <p className="text-muted-foreground mb-6">Acesse a página de BI para análise completa.</p>
-            <Button variant="outline" className="border-primary/20 text-primary" asChild><Link href="/dashboard/relatorios">Ver Painel BI</Link></Button>
+            <h3 className="text-lg font-black text-white uppercase tracking-tighter mb-2">Relatórios Gerenciais de Elite</h3>
+            <p className="text-muted-foreground text-xs font-medium mb-6 max-w-sm mx-auto">Acesse a página de BI para análise completa de faturamento, lucro líquido e produtividade da equipe.</p>
+            <Button variant="outline" className="border-primary/20 text-primary hover:bg-primary/10 font-bold px-8 h-11" asChild>
+              <Link href="/dashboard/relatorios">Acessar Painel BI <ArrowUpRight className="ml-2 h-4 w-4" /></Link>
+            </Button>
           </Card>
         </TabsContent>
       </Tabs>
