@@ -41,13 +41,12 @@ service cloud.firestore {
     }
 
     match /reimbursements/{reimbursementId} {
-      // Regra de Listagem: Admin/Financial veem tudo, User vê apenas os seus
-      allow list: if isAuthenticated();
-      
-      // Regra de Documento Único
-      allow get: if isAuthenticated() && (
+      // Regra de Leitura: Admin/Financial veem tudo, User vê apenas os seus documentos
+      // Firestore impõe que a query tenha o filtro where('userId', '==', request.auth.uid)
+      allow read: if isAuthenticated() && (
         isOneOfRoles(['admin', 'financial']) || 
-        (resource.data.userId == request.auth.uid)
+        (resource.data.userId == request.auth.uid) ||
+        (request.resource.data.userId == request.auth.uid)
       );
       
       allow create: if isAuthenticated();
