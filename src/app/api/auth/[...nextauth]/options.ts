@@ -82,7 +82,11 @@ export const authOptions: NextAuthOptions = {
         }),
     ],
     secret: nextAuthSecret,
-    session: { strategy: 'jwt' },
+    session: {
+        strategy: 'jwt',
+        maxAge: 60 * 60 * 24,
+        updateAge: 60 * 60 * 24,
+    },
     callbacks: {
         async signIn({ user }) {
             return !!(user.email && user.id);

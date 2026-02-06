@@ -26,7 +26,8 @@ import {
   ShieldCheck,
   AlertCircle,
   MessageSquare,
-  Building
+  Building,
+  Sparkles
 } from 'lucide-react';
 import type { Client } from '@/lib/types';
 import { useToast } from '@/components/ui/use-toast';

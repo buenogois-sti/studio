@@ -31,6 +31,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { LocationSearch } from '@/components/shared/LocationSearch';
 import { ClientSearchInput } from './ClientSearchInput';
 import { ClientCreationModal } from './ClientCreationModal';

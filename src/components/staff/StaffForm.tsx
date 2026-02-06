@@ -188,7 +188,7 @@ export function StaffForm({
     onChange(numericValue);
   };
 
-  const formatCurrencyValue = (value: number) => {
+  const formatCurrencyValue = (value?: number) => {
     return new Intl.NumberFormat('pt-BR', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,

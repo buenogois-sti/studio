@@ -238,6 +238,7 @@ export function ClientForm({
         const newClient: Client = {
             id: docRef.id,
             ...clientData,
+          lastName: clientData.lastName || '',
             createdAt: Timestamp.now(),
             avatar: ''
         };
