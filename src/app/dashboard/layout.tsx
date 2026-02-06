@@ -69,7 +69,7 @@ const navItems = [
   },
   {
     href: '/dashboard/leads',
-    label: 'Lides',
+    label: 'Leads',
     icon: Zap,
     roles: ['admin', 'lawyer', 'assistant'],
   },
@@ -149,7 +149,7 @@ const navItems = [
 
 const BreadcrumbMap: { [key: string]: string } = {
   '/dashboard': 'Dashboard',
-  '/dashboard/leads': 'Lides (Triagem)',
+  '/dashboard/leads': 'Leads (Triagem)',
   '/dashboard/clientes': 'Clientes',
   '/dashboard/processos': 'Processos',
   '/dashboard/prazos': 'Prazos Judiciais',

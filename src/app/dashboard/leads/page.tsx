@@ -26,6 +26,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -110,7 +111,7 @@ export default function LeadsPage() {
     setIsProcessing('creating');
     try {
       await createLead(values);
-      toast({ title: 'Lide Criada!', description: 'O advogado foi notificado para iniciar a elaboração.' });
+      toast({ title: 'Lead Criado!', description: 'O advogado foi notificado para iniciar a elaboração.' });
       form.reset();
       setIsNewLeadOpen(false);
     } catch (e: any) {
@@ -133,10 +134,10 @@ export default function LeadsPage() {
   };
 
   const handleConvert = async (id: string) => {
-    if (!confirm('Deseja converter esta lide em um processo oficial? Isso moverá os dados para o módulo contencioso.')) return;
+    if (!confirm('Deseja converter este lead em um processo oficial? Isso moverá os dados para o módulo contencioso.')) return;
     setIsProcessing(id);
     try {
-      const res = await convertLeadToProcess(id);
+      await convertLeadToProcess(id);
       toast({ title: 'Conversão Concluída!', description: 'O processo já está disponível na lista ativa.' });
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Erro na conversão', description: e.message });
@@ -163,7 +164,7 @@ export default function LeadsPage() {
         <div>
           <h1 className="text-3xl font-black tracking-tight font-headline flex items-center gap-3 text-white">
             <Zap className="h-8 w-8 text-primary" />
-            Módulo de Lides
+            Módulo de Leads
           </h1>
           <p className="text-sm text-muted-foreground">Triagem, elaboração de teses e conversão para o contencioso.</p>
         </div>
@@ -171,14 +172,14 @@ export default function LeadsPage() {
           <div className="relative w-64">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input 
-              placeholder="Pesquisar lides..." 
+              placeholder="Pesquisar leads..." 
               className="pl-8 bg-[#0f172a] border-white/10 text-white" 
               value={searchTerm} 
               onChange={e => setSearchTerm(e.target.value)} 
             />
           </div>
           <Button onClick={() => setIsNewLeadOpen(true)} className="bg-primary text-primary-foreground font-black">
-            <PlusCircle className="mr-2 h-4 w-4" /> Nova Lide
+            <PlusCircle className="mr-2 h-4 w-4" /> Novo Lead
           </Button>
         </div>
       </div>
@@ -276,7 +277,7 @@ export default function LeadsPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-56 bg-card border-border shadow-2xl">
-                          <DropdownMenuLabel className="text-[10px] font-black uppercase text-muted-foreground px-2 py-1.5 tracking-widest">Opções da Lide</DropdownMenuLabel>
+                          <DropdownMenuLabel className="text-[10px] font-black uppercase text-muted-foreground px-2 py-1.5 tracking-widest">Opções do Lead</DropdownMenuLabel>
                           <DropdownMenuItem onClick={() => handleUpdateStatus(lead.id, 'EM_ELABORACAO')} className="gap-2 cursor-pointer">
                             <FileEdit className="h-4 w-4 text-amber-400" /> <span className="font-bold">Marcar em Elaboração</span>
                           </DropdownMenuItem>
@@ -295,16 +296,16 @@ export default function LeadsPage() {
         ) : (
           <div className="text-center py-32 bg-[#0f172a] rounded-3xl border-2 border-dashed border-white/5 opacity-40">
             <Zap className="h-12 w-12 mx-auto mb-4 text-slate-600" />
-            <p className="font-bold text-white uppercase tracking-widest text-[10px]">Nenhuma lide na fila de triagem</p>
+            <p className="font-bold text-white uppercase tracking-widest text-[10px]">Nenhum lead na fila de triagem</p>
           </div>
         )}
       </div>
 
-      {/* Dialog Nova Lide */}
+      {/* Dialog Novo Lead */}
       <Dialog open={isNewLeadOpen} onOpenChange={setIsNewLeadOpen}>
         <DialogContent className="sm:max-w-2xl bg-[#020617] border-white/10 text-white">
           <DialogHeader>
-            <DialogTitle className="text-2xl font-black font-headline">Nova Lide Pré-Processual</DialogTitle>
+            <DialogTitle className="text-2xl font-black font-headline">Novo Lead Pré-Processual</DialogTitle>
             <DialogDescription className="text-slate-400">Designe um advogado para elaborar a estratégia inicial do caso.</DialogDescription>
           </DialogHeader>
           <Form {...form}>
@@ -405,7 +406,7 @@ export default function LeadsPage() {
                 <DialogClose asChild><Button variant="ghost" className="text-slate-400">Cancelar</Button></DialogClose>
                 <Button type="submit" className="bg-primary text-primary-foreground font-black uppercase tracking-widest text-[11px] h-12" disabled={isProcessing === 'creating'}>
                   {isProcessing === 'creating' ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Zap className="h-4 w-4 mr-2" />}
-                  Gerar Lide e Notificar
+                  Gerar Lead e Notificar
                 </Button>
               </DialogFooter>
             </form>

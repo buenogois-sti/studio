@@ -34,7 +34,7 @@ export async function createLead(data: {
     if (data.lawyerId) {
       await createNotification({
         userId: data.lawyerId,
-        title: "Nova Lide Designada",
+        title: "Novo Lead Designado",
         description: `Você foi encarregado de elaborar a ação: ${data.title}.`,
         type: 'info',
         href: '/dashboard/leads'
@@ -70,17 +70,17 @@ export async function convertLeadToProcess(leadId: string) {
   try {
     const leadRef = firestoreAdmin.collection('leads').doc(leadId);
     const leadDoc = await leadRef.get();
-    if (!leadDoc.exists) throw new Error('Lide não encontrada.');
+    if (!leadDoc.exists) throw new Error('Lead não encontrado.');
     
     const leadData = leadDoc.data() as Lead;
-    if (leadData.status === 'CONVERTIDO') throw new Error('Esta lide já foi convertida em processo.');
+    if (leadData.status === 'CONVERTIDO') throw new Error('Este lead já foi convertido em processo.');
 
     const processRef = firestoreAdmin.collection('processes').doc();
     
     const timelineEvent: TimelineEvent = {
       id: uuidv4(),
       type: 'system',
-      description: `PROCESSO CRIADO: Convertido a partir da Lide #${leadId.substring(0, 6)}. Elaboração concluída por Dr(a). ${leadData.lawyerId}.`,
+      description: `PROCESSO CRIADO: Convertido a partir do Lead #${leadId.substring(0, 6)}. Elaboração concluída por Dr(a). ${leadData.lawyerId}.`,
       date: Timestamp.now() as any,
       authorName: session.user.name || 'Sistema'
     };
