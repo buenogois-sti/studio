@@ -239,7 +239,7 @@ export type OABStatus = 'Ativa' | 'Suspensa' | 'Inativa' | 'Pendente';
 export type RemunerationType = 'SUCUMBENCIA' | 'PRODUCAO' | 'QUOTA_LITIS' | 'FIXO_MENSAL' | 'AUDIENCISTA';
 
 export type StaffCreditStatus = 'RETIDO' | 'DISPONIVEL' | 'PAGO';
-export type StaffCreditType = 'HONORARIOS' | 'REEMBOLSO' | 'SALARIO' | 'PRODUCAO';
+export type StaffCreditType = 'HONORARIOS' | 'REEMBOLSO' | 'SALARIO' | 'PRODUCAO' | 'BONUS' | 'DEBITO';
 
 export type StaffCredit = {
   id: string;
@@ -253,6 +253,8 @@ export type StaffCredit = {
   reimbursementId?: string;
   paymentDate?: Timestamp;
   paidBy?: string;
+  authorName?: string;
+  monthKey?: string;
 };
 
 export type Staff = {
