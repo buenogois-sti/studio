@@ -19,7 +19,7 @@ import type { Client } from '@/lib/types';
 const clientCreationSchema = z.object({
   firstName: z.string().min(2, 'Nome é obrigatório'),
   lastName: z.string().min(2, 'Sobrenome é obrigatório'),
-  document: z.string().min(11, 'CPF/CNPJ inválido'),
+  document: z.string().optional().or(z.literal('')),
   email: z.string().email('Email inválido').optional().or(z.literal('')),
   phone: z.string().optional().or(z.literal('')),
   legalArea: z.string().optional(),
@@ -66,10 +66,13 @@ export function ClientCreationModal({ open, onOpenChange, onClientCreated }: Cli
   const onSubmit = async (data: ClientCreationFormData) => {
     setIsLoading(true);
     try {
+      const cleanDoc = data.document?.replace(/\D/g, '') || '';
+      const clientType = cleanDoc.length > 11 ? 'Pessoa Jurídica' : 'Pessoa Física';
+
       const result = await createClient({
         ...data,
         status: 'active',
-        clientType: data.document.length > 14 ? 'Pessoa Jurídica' : 'Pessoa Física',
+        clientType: clientType,
       });
 
       if (result.success && result.id) {
@@ -77,7 +80,7 @@ export function ClientCreationModal({ open, onOpenChange, onClientCreated }: Cli
           id: result.id,
           firstName: data.firstName,
           lastName: data.lastName,
-          document: data.document,
+          document: data.document || '',
           email: data.email || '',
           phone: data.phone || '',
           legalArea: data.legalArea || '',
@@ -201,10 +204,10 @@ export function ClientCreationModal({ open, onOpenChange, onClientCreated }: Cli
                 name="document"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-[10px] font-black uppercase text-slate-500">CPF / CNPJ *</FormLabel>
+                    <FormLabel className="text-[10px] font-black uppercase text-slate-500">CPF / CNPJ</FormLabel>
                     <FormControl>
                       <Input 
-                        placeholder="000.000.000-00" 
+                        placeholder="000.000.000-00 (Opcional)" 
                         {...field}
                         onChange={(e) => {
                           const formatted = formatCPFCNPJ(e.target.value);
