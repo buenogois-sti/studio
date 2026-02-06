@@ -13,6 +13,8 @@ export async function createReimbursement(data: {
   requestDate: string;
   userId?: string;
   userName?: string;
+  processId?: string;
+  processName?: string;
 }) {
   if (!firestoreAdmin) throw new Error('Servidor indisponível.');
   
@@ -30,6 +32,8 @@ export async function createReimbursement(data: {
       description: data.description,
       value: data.value,
       status: 'SOLICITADO' as ReimbursementStatus,
+      processId: data.processId || null,
+      processName: data.processName || null,
       requestDate: Timestamp.fromDate(new Date(data.requestDate)),
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),

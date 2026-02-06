@@ -18,7 +18,9 @@ import {
   Trash2,
   AlertTriangle,
   AlertCircle,
-  Info
+  Info,
+  Gavel,
+  FolderKanban
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { z } from 'zod';
@@ -31,7 +33,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useFirebase, useCollection, useMemoFirebase, useDoc } from '@/firebase';
 import { collection, query, where, orderBy, doc, Timestamp } from 'firebase/firestore';
-import type { Reimbursement, ReimbursementStatus, UserProfile } from '@/lib/types';
+import type { Reimbursement, ReimbursementStatus, UserProfile, Process } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose, DialogTrigger } from '@/components/ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -44,12 +46,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { searchProcesses } from '@/lib/process-actions';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const reimbursementFormSchema = z.object({
   description: z.string().min(3, 'A descrição deve ter pelo menos 3 caracteres.'),
   value: z.coerce.number().positive('O valor deve ser positivo.'),
   requestDate: z.string().min(1, 'A data é obrigatória.'),
   userId: z.string().optional(),
+  processId: z.string().optional(),
 });
 
 const statusConfig: Record<ReimbursementStatus, { label: string; color: string; icon: any }> = {
@@ -75,6 +80,11 @@ function NewReimbursementDialog({
   const [isSaving, setIsSaving] = React.useState(false);
   const { toast } = useToast();
 
+  const [processSearch, setProcessSearch] = React.useState('');
+  const [processResults, setProcessResults] = React.useState<Process[]>([]);
+  const [isSearchingProcess, setIsSearchingProcess] = React.useState(false);
+  const [selectedProcess, setSelectedProcess] = React.useState<Process | null>(null);
+
   const usersQuery = useMemoFirebase(() => (firestore && canManage ? collection(firestore, 'users') : null), [firestore, canManage]);
   const { data: users } = useCollection<UserProfile>(usersQuery);
 
@@ -85,8 +95,28 @@ function NewReimbursementDialog({
       value: 0,
       requestDate: format(new Date(), 'yyyy-MM-dd'),
       userId: currentUserId || undefined,
+      processId: '',
     }
   });
+
+  React.useEffect(() => {
+    if (processSearch.length < 2) {
+      setProcessResults([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setIsSearchingProcess(true);
+      try {
+        const results = await searchProcesses(processSearch);
+        setProcessResults(results);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setIsSearchingProcess(false);
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [processSearch]);
 
   const handleValueChange = (e: React.ChangeEvent<HTMLInputElement>, onChange: (val: number) => void) => {
     const rawValue = e.target.value.replace(/\D/g, '');
@@ -117,10 +147,14 @@ function NewReimbursementDialog({
         ...values,
         userId: values.userId || currentUserId || '',
         userName,
+        processId: selectedProcess?.id,
+        processName: selectedProcess?.name,
       });
 
       toast({ title: 'Pedido Enviado!', description: 'Solicitação registrada com sucesso.' });
       form.reset();
+      setSelectedProcess(null);
+      setProcessSearch('');
       onCreated();
       setOpen(false);
     } catch (error: any) {
@@ -131,27 +165,26 @@ function NewReimbursementDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(o) => {
+      setOpen(o);
+      if (!o) {
+        form.reset();
+        setSelectedProcess(null);
+        setProcessSearch('');
+      }
+    }}>
       <DialogTrigger asChild>
         <Button className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90 font-bold">
           <PlusCircle className="h-4 w-4" />
           Solicitar Reembolso
         </Button>
       </DialogTrigger>
-      <DialogContent className="bg-[#0f172a] border-white/10 sm:max-w-lg text-white">
+      <DialogContent className="bg-[#0f172a] border-white/10 sm:max-w-lg text-white max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-white">Nova Solicitação</DialogTitle>
           <DialogDescription className="text-slate-400">Preencha os detalhes da despesa para reembolso.</DialogDescription>
         </DialogHeader>
         
-        <Alert className="bg-amber-500/10 border-amber-500/30 text-amber-200">
-          <AlertCircle className="h-4 w-4 text-amber-400" />
-          <AlertTitle className="text-xs font-black uppercase tracking-widest text-amber-400">Aviso Importante</AlertTitle>
-          <AlertDescription className="text-[11px] leading-relaxed">
-            O comprovante original de pagamento deve ser enviado obrigatoriamente ao e-mail do financeiro após a conclusão desta solicitação. <strong>Pedidos sem comprovante enviado não serão aprovados.</strong>
-          </AlertDescription>
-        </Alert>
-
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-2">
             {canManage && (
@@ -174,6 +207,58 @@ function NewReimbursementDialog({
                 )}
               />
             )}
+
+            <div className="space-y-2">
+              <FormLabel className="text-white">Vincular a um Processo (Opcional)</FormLabel>
+              {selectedProcess ? (
+                <div className="flex items-center justify-between p-3 rounded-lg border-2 border-primary/30 bg-primary/5">
+                  <div className="flex items-center gap-2 overflow-hidden">
+                    <FolderKanban className="h-4 w-4 text-primary shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-white truncate">{selectedProcess.name}</p>
+                      <p className="text-[10px] text-muted-foreground font-mono">{selectedProcess.processNumber}</p>
+                    </div>
+                  </div>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-white" onClick={() => setSelectedProcess(null)}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input 
+                    className="bg-black/40 border-white/10 pl-9" 
+                    placeholder="Pesquisar processo..." 
+                    value={processSearch}
+                    onChange={(e) => setProcessSearch(e.target.value)}
+                  />
+                  {isSearchingProcess && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-primary" />}
+                  
+                  {processResults.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-[#0f172a] border border-white/10 rounded-lg shadow-2xl z-50 overflow-hidden">
+                      <ScrollArea className="max-h-[200px]">
+                        {processResults.map(p => (
+                          <button
+                            key={p.id}
+                            type="button"
+                            className="w-full text-left p-3 hover:bg-white/5 transition-colors border-b border-white/5 last:border-0"
+                            onClick={() => {
+                              setSelectedProcess(p);
+                              setProcessResults([]);
+                              setProcessSearch('');
+                            }}
+                          >
+                            <p className="text-xs font-bold text-white truncate">{p.name}</p>
+                            <p className="text-[9px] text-muted-foreground font-mono">{p.processNumber}</p>
+                          </button>
+                        ))}
+                      </ScrollArea>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
             <FormField
               control={form.control}
               name="description"
@@ -283,7 +368,8 @@ export default function ReembolsosPage() {
     const q = searchTerm.toLowerCase();
     return allData.filter(r => 
       r.userName.toLowerCase().includes(q) || 
-      r.description.toLowerCase().includes(q)
+      r.description.toLowerCase().includes(q) ||
+      r.processName?.toLowerCase().includes(q)
     );
   }, [allData, searchTerm]);
 
@@ -518,7 +604,15 @@ function ReimbursementTable({
                 <TableCell>
                   <div className="flex flex-col">
                     <span className="font-bold text-sm text-white">{r.description}</span>
-                    <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                    {r.processName && (
+                      <div className="flex items-center gap-1.5 mt-1 text-primary">
+                        <Gavel className="h-3 w-3" />
+                        <span className="text-[10px] font-black uppercase tracking-tighter truncate max-w-[200px]">
+                          {r.processName}
+                        </span>
+                      </div>
+                    )}
+                    <span className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
                       <History className="h-3 w-3" /> Criado em {r.createdAt && typeof r.createdAt !== 'string' ? format(r.createdAt.toDate(), "dd/MM/yy") : 'Recente'}
                     </span>
                   </div>

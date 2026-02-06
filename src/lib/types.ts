@@ -219,6 +219,8 @@ export type Reimbursement = {
   value: number;
   requestDate: Timestamp;
   status: ReimbursementStatus;
+  processId?: string;
+  processName?: string;
   notes?: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
