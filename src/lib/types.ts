@@ -84,6 +84,22 @@ export type TeamParticipant = {
   percentage: number;
 };
 
+export type LeadStatus = 'NOVO' | 'EM_ELABORACAO' | 'PRONTO' | 'CONVERTIDO' | 'REPROVADO';
+
+export type Lead = {
+  id: string;
+  clientId: string;
+  clientName?: string;
+  lawyerId: string; // Advogado responsável por elaborar a ação
+  title: string;
+  legalArea: string;
+  status: LeadStatus;
+  description?: string;
+  driveFolderId?: string;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+};
+
 export type Process = {
   id: string;
   clientId: string;

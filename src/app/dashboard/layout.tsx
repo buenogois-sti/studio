@@ -46,7 +46,8 @@ import {
   Archive,
   Receipt,
   Timer,
-  Wallet
+  Wallet,
+  Zap
 } from 'lucide-react';
 import type { UserProfile } from '@/lib/types';
 import {
@@ -65,6 +66,12 @@ const navItems = [
     label: 'Dashboard',
     icon: Home,
     roles: ['admin', 'lawyer', 'financial', 'assistant'],
+  },
+  {
+    href: '/dashboard/leads',
+    label: 'Lides',
+    icon: Zap,
+    roles: ['admin', 'lawyer', 'assistant'],
   },
   {
     href: '/dashboard/clientes',
@@ -142,6 +149,7 @@ const navItems = [
 
 const BreadcrumbMap: { [key: string]: string } = {
   '/dashboard': 'Dashboard',
+  '/dashboard/leads': 'Lides (Triagem)',
   '/dashboard/clientes': 'Clientes',
   '/dashboard/processos': 'Processos',
   '/dashboard/prazos': 'Prazos Judiciais',
