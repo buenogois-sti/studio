@@ -27,7 +27,8 @@ import {
   FilePlus2,
   ChevronLeft,
   ChevronRight,
-  Handshake
+  Handshake,
+  FolderKanban
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
@@ -145,7 +146,7 @@ export default function ProcessosPage() {
       await syncProcessToDrive(process.id);
       toast({ title: 'Sincronização Concluída!' });
     } catch (error: any) {
-      toast({ variant: 'destructive', title: 'Erro', description: error.message });
+      toast({ variant: 'destructive', title: 'Erro na Sincronização', description: error.message });
     } finally {
       setIsSyncing(null);
     }

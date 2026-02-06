@@ -743,7 +743,7 @@ export default function FinanceiroPage() {
 
   return (
     <div className="flex flex-col gap-6 p-1">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-white/5">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-2 border-b border-white/5">
         <div>
           <H1 className="text-white">Financeiro</H1>
           <p className="text-sm text-muted-foreground">Controle estratégico de faturamento e despesas operacionais.</p>
