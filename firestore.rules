@@ -42,7 +42,6 @@ service cloud.firestore {
 
     match /reimbursements/{reimbursementId} {
       // Regra de Leitura: Admin/Financial veem tudo, User vê apenas os seus documentos
-      // Firestore impõe que a query tenha o filtro where('userId', '==', request.auth.uid)
       allow read: if isAuthenticated() && (
         isOneOfRoles(['admin', 'financial']) || 
         (resource.data.userId == request.auth.uid) ||
@@ -64,6 +63,12 @@ service cloud.firestore {
     }
 
     match /processes/{processId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isOneOfRoles(['admin', 'lawyer', 'assistant']);
+      allow delete: if isAdmin();
+    }
+
+    match /leads/{leadId} {
       allow read: if isAuthenticated();
       allow create, update: if isOneOfRoles(['admin', 'lawyer', 'assistant']);
       allow delete: if isAdmin();

@@ -119,7 +119,7 @@ const navItems = [
     href: '/dashboard/relatorios',
     label: 'Relatórios',
     icon: BarChart,
-    roles: ['admin', 'financial'],
+    roles: ['admin', 'financial', 'lawyer'],
   },
   {
     href: '/dashboard/acervo',
