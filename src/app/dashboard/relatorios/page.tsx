@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -10,6 +11,13 @@ import {
   Download, 
   Calendar,
   PieChart as PieChartIcon,
+  Timer,
+  Gavel,
+  Zap,
+  AlertTriangle,
+  Target,
+  Flame,
+  Clock
 } from 'lucide-react';
 import { 
   Bar, 
@@ -22,509 +30,372 @@ import {
   Legend, 
   AreaChart,
   Area,
-  LineChart,
-  Line,
   PieChart,
   Pie,
-  Cell
+  Cell,
+  Cell as RechartsCell
 } from 'recharts';
-import { format, subMonths, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
+import { format, subMonths, startOfMonth, endOfMonth, isWithinInterval, isBefore, startOfDay, isToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { H1 } from '@/components/ui/typography';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, Timestamp, query, orderBy } from 'firebase/firestore';
-import type { Process, Client, FinancialTitle, Staff } from '@/lib/types';
+import { collection, Timestamp, query, orderBy, where } from 'firebase/firestore';
+import type { Process, Client, FinancialTitle, Staff, LegalDeadline, Hearing, Lead } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
-interface FinancialStat {
-  month: string;
-  key: string;
-  receita: number;
-  despesa: number;
-  lucro: number;
-}
-
-interface GrowthStat {
-  month: string;
-  key: string;
-  clientes: number;
-  processos: number;
-}
-
-interface ProductivityStat {
-  nome: string;
-  processos: number;
-  receita: number;
-  media: number;
-}
-
-const COLORS = ['#10b981', '#ef4444', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4'];
+const COLORS = ['#F5D030', '#3b82f6', '#10b981', '#f43f5e', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316'];
 
 export default function RelatoriosPage() {
   const { firestore, isUserLoading } = useFirebase();
 
+  // Queries
   const clientsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'clients') : null, [firestore]);
-  const { data: clientsData, isLoading: isLoadingClients } = useCollection<Client>(clientsQuery);
+  const { data: clientsData } = useCollection<Client>(clientsQuery);
 
   const processesQuery = useMemoFirebase(() => firestore ? collection(firestore, 'processes') : null, [firestore]);
-  const { data: processesData, isLoading: isLoadingProcesses } = useCollection<Process>(processesQuery);
+  const { data: processesData } = useCollection<Process>(processesQuery);
 
-  const titlesQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'financial_titles'), orderBy('paymentDate', 'desc')) : null, [firestore]);
-  const { data: titlesData, isLoading: isLoadingTitles } = useCollection<FinancialTitle>(titlesQuery);
+  const titlesQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'financial_titles'), orderBy('dueDate', 'desc')) : null, [firestore]);
+  const { data: titlesData } = useCollection<FinancialTitle>(titlesQuery);
 
   const staffQuery = useMemoFirebase(() => firestore ? collection(firestore, 'staff') : null, [firestore]);
-  const { data: staffData, isLoading: isLoadingStaff } = useCollection<Staff>(staffQuery);
+  const { data: staffData } = useCollection<Staff>(staffQuery);
 
-  // Dados de fluxo de caixa (últimos 6 meses)
-  const financialData = React.useMemo((): FinancialStat[] => {
-    if (!titlesData) return [];
-    const months: FinancialStat[] = [];
-    const now = new Date();
-    
-    for (let i = 5; i >= 0; i--) {
-      const d = subMonths(now, i);
-      const monthStart = startOfMonth(d);
-      const monthEnd = endOfMonth(d);
-      
-      months.push({ 
-        month: format(d, 'MMM/yy', { locale: ptBR }), 
-        key: format(d, 'yyyy-MM'), 
-        receita: 0, 
-        despesa: 0,
-        lucro: 0
-      });
-      
-      titlesData.forEach(t => {
-        if (t.status === 'PAGO' && t.paymentDate) {
-          const date = t.paymentDate instanceof Timestamp ? t.paymentDate.toDate() : new Date(t.paymentDate as any);
-          if (isWithinInterval(date, { start: monthStart, end: monthEnd })) {
-            if (t.type === 'RECEITA') months[months.length - 1].receita += t.value;
-            else months[months.length - 1].despesa += t.value;
-          }
-        }
-      });
-      
-      months[months.length - 1].lucro = months[months.length - 1].receita - months[months.length - 1].despesa;
-    }
-    
-    return months;
-  }, [titlesData]);
+  const deadlinesQuery = useMemoFirebase(() => firestore ? collection(firestore, 'deadlines') : null, [firestore]);
+  const { data: deadlinesData } = useCollection<LegalDeadline>(deadlinesQuery);
 
-  // Dados de crescimento (clientes e processos)
-  const growthData = React.useMemo((): GrowthStat[] => {
-    if (!clientsData || !processesData) return [];
-    const months: GrowthStat[] = [];
-    const now = new Date();
+  const hearingsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'hearings') : null, [firestore]);
+  const { data: hearingsData } = useCollection<Hearing>(hearingsQuery);
+
+  const leadsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'leads') : null, [firestore]);
+  const { data: leadsData } = useCollection<Lead>(leadsQuery);
+
+  // 1. Processamento de Prazos (Vencidos e Pendentes)
+  const deadlineStats = React.useMemo(() => {
+    if (!deadlinesData) return { pending: 0, overdue: 0, today: 0 };
+    const now = startOfDay(new Date());
     
-    for (let i = 5; i >= 0; i--) {
-      const d = subMonths(now, i);
-      months.push({ 
-        month: format(d, 'MMM', { locale: ptBR }), 
-        key: format(d, 'yyyy-MM'), 
-        clientes: 0, 
-        processos: 0 
-      });
-    }
-    
-    clientsData.forEach(c => {
-      const date = typeof c.createdAt === 'string' ? new Date(c.createdAt) : (c.createdAt as any).toDate?.() || new Date();
-      const monthKey = format(date, 'yyyy-MM');
-      const month = months.find(m => m.key === monthKey);
-      if (month) month.clientes++;
+    return deadlinesData.reduce((acc, d) => {
+      if (d.status === 'PENDENTE') {
+        const endDate = d.endDate.toDate();
+        if (isToday(endDate)) acc.today++;
+        else if (isBefore(endDate, now)) acc.overdue++;
+        else acc.pending++;
+      }
+      return acc;
+    }, { pending: 0, overdue: 0, today: 0 });
+  }, [deadlinesData]);
+
+  // 2. Leads por Tipo de Captação
+  const leadCaptureData = React.useMemo(() => {
+    if (!leadsData) return [];
+    const counts: Record<string, number> = {};
+    leadsData.forEach(l => {
+      const source = l.captureSource || 'Não Informado';
+      counts[source] = (counts[source] || 0) + 1;
     });
-    
-    processesData.forEach(p => {
-      const date = p.createdAt instanceof Timestamp ? p.createdAt.toDate() : new Date(p.createdAt as any);
-      const monthKey = format(date, 'yyyy-MM');
-      const month = months.find(m => m.key === monthKey);
-      if (month) month.processos++;
-    });
-    
-    return months;
-  }, [clientsData, processesData]);
+    return Object.entries(counts).map(([name, value]) => ({ name, value }));
+  }, [leadsData]);
 
-  // Dados de produtividade por advogado
-  const productivityData = React.useMemo((): ProductivityStat[] => {
-    if (!staffData || !processesData || !titlesData) return [];
+  // 3. Leads Pendentes ("Carrinho Abandonado")
+  const pendingLeadsCount = React.useMemo(() => {
+    if (!leadsData) return 0;
+    return leadsData.filter(l => l.status === 'NOVO' || l.status === 'EM_ELABORACAO').length;
+  }, [leadsData]);
+
+  // 4. Performance por Advogado (Comparative)
+  const lawyerPerformanceData = React.useMemo(() => {
+    if (!staffData || !processesData || !deadlinesData || !hearingsData) return [];
     
-    return (staffData || [])
-      .filter(s => s.role === 'lawyer')
-      .map(staff => {
-        const processos = processesData?.filter(p => p.leadLawyerId === staff.id).length || 0;
-        const receita = titlesData
-          ?.filter(t => t.type === 'RECEITA' && t.processId && 
-            processesData?.find(p => p.id === t.processId && p.leadLawyerId === staff.id))
-          .reduce((sum, t) => sum + t.value, 0) || 0;
+    return staffData
+      .filter(s => s.role === 'lawyer' || s.role === 'partner')
+      .map(lawyer => {
+        const processes = processesData.filter(p => p.leadLawyerId === lawyer.id).length;
+        const pendingDeadlines = deadlinesData.filter(d => d.authorId === lawyer.id && d.status === 'PENDENTE').length;
+        const upcomingHearings = hearingsData.filter(h => h.lawyerId === lawyer.id && h.status === 'PENDENTE').length;
         
         return {
-          nome: `${staff.firstName.charAt(0)}${staff.lastName}`,
-          processos,
-          receita,
-          media: processos > 0 ? receita / processos : 0
+          nome: `${lawyer.firstName} ${lawyer.lastName.charAt(0)}.`,
+          demandas: processes,
+          prazos: pendingDeadlines,
+          audiencias: upcomingHearings,
         };
       })
-      .filter(d => d.processos > 0)
-      .sort((a, b) => b.receita - a.receita);
-  }, [staffData, processesData, titlesData]);
+      .filter(d => d.demandas > 0 || d.prazos > 0 || d.audiencias > 0)
+      .sort((a, b) => b.demandas - a.demandas);
+  }, [staffData, processesData, deadlinesData, hearingsData]);
 
-  // Dados de custos por centro de custo
-  const costCenterData = React.useMemo(() => {
+  // 5. Histórico Financeiro (Fluxo de Caixa)
+  const financialData = React.useMemo(() => {
     if (!titlesData) return [];
-    const centers: Record<string, number> = {};
-    
-    titlesData
-      .filter(t => t.type === 'DESPESA' && t.status === 'PAGO')
-      .forEach(t => {
-        const center = t.costCenter || 'Outros';
-        centers[center] = (centers[center] || 0) + t.value;
+    const months = [];
+    const now = new Date();
+    for (let i = 5; i >= 0; i--) {
+      const d = subMonths(now, i);
+      const key = format(d, 'yyyy-MM');
+      months.push({ 
+        month: format(d, 'MMM/yy', { locale: ptBR }), 
+        key, 
+        receita: 0, 
+        despesa: 0 
       });
+    }
     
-    return Object.entries(centers)
-      .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => b.value - a.value);
+    titlesData.forEach(t => {
+      if (t.status === 'PAGO' && t.paymentDate) {
+        const date = t.paymentDate instanceof Timestamp ? t.paymentDate.toDate() : new Date(t.paymentDate as any);
+        const monthKey = format(date, 'yyyy-MM');
+        const m = months.find(m => m.key === monthKey);
+        if (m) {
+          if (t.type === 'RECEITA') m.receita += t.value;
+          else m.despesa += t.value;
+        }
+      }
+    });
+    return months;
   }, [titlesData]);
 
-  const isLoading = isUserLoading || isLoadingClients || isLoadingProcesses || isLoadingTitles || isLoadingStaff;
+  const isLoading = isUserLoading || !deadlinesData || !leadsData;
 
   if (isLoading) {
     return (
-      <div className="space-y-8 p-6">
-        <Skeleton className="h-10 w-64" />
-        <div className="grid grid-cols-4 gap-4">
-          <Skeleton className="h-32" />
-          <Skeleton className="h-32" />
-          <Skeleton className="h-32" />
-          <Skeleton className="h-32" />
+      <div className="p-8 space-y-8">
+        <Skeleton className="h-10 w-64 bg-white/5" />
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-24 w-full bg-white/5" />)}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Skeleton className="h-[400px] w-full bg-white/5" />
+          <Skeleton className="h-[400px] w-full bg-white/5" />
         </div>
       </div>
     );
   }
 
-  // Cálculo de KPIs
-  const totalReceita = financialData.reduce((sum, m) => sum + m.receita, 0);
-  const totalDespesa = financialData.reduce((sum, m) => sum + m.despesa, 0);
-  const totalLucro = totalReceita - totalDespesa;
-  const margemLucro = totalReceita > 0 ? (totalLucro / totalReceita) * 100 : 0;
-
   return (
-    <div className="flex flex-col gap-8 pb-12 p-6">
+    <div className="flex flex-col gap-8 pb-12">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <H1>Relatórios Gerenciais</H1>
-          <p className="text-sm text-slate-400 mt-1">Análise financeira e operacional dos últimos 6 meses</p>
+          <H1 className="text-white text-3xl font-black">Inteligência Operacional</H1>
+          <p className="text-sm text-slate-400 mt-1">Análise estratégica de demandas, prazos e performance da banca.</p>
         </div>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={() => window.print()}
-          className="gap-2"
-        >
-          <Download className="h-4 w-4" />
-          Exportar
+        <Button variant="outline" size="sm" onClick={() => window.print()} className="bg-[#0f172a] border-white/10 text-white font-bold h-10">
+          <Download className="mr-2 h-4 w-4" /> Exportar Relatório Geral
         </Button>
       </div>
 
-      {/* KPIs */}
+      {/* KPI Operacionais */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border-emerald-500/20">
-          <CardContent className="pt-6">
-            <div className="flex items-end justify-between">
-              <div>
-                <p className="text-sm text-slate-400 mb-2">Total de Receitas</p>
-                <p className="text-2xl font-bold text-emerald-400">
-                  R$ {(totalReceita / 1000).toFixed(1)}k
-                </p>
-              </div>
-              <DollarSign className="h-8 w-8 text-emerald-500/40" />
-            </div>
+        <Card className="bg-[#0f172a] border-rose-500/20 border-2 relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:scale-110 transition-transform"><Timer className="h-12 w-12 text-rose-500" /></div>
+          <CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-rose-400 tracking-widest">Prazos Vencidos</CardTitle></CardHeader>
+          <CardContent className="p-4 pt-0">
+            <p className="text-3xl font-black text-rose-500 tabular-nums">{deadlineStats.overdue}</p>
+            <p className="text-[10px] text-rose-400/60 font-bold uppercase mt-1">Atenção Crítica</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-red-500/10 to-red-500/5 border-red-500/20">
-          <CardContent className="pt-6">
-            <div className="flex items-end justify-between">
-              <div>
-                <p className="text-sm text-slate-400 mb-2">Total de Despesas</p>
-                <p className="text-2xl font-bold text-red-400">
-                  R$ {(totalDespesa / 1000).toFixed(1)}k
-                </p>
-              </div>
-              <DollarSign className="h-8 w-8 text-red-500/40" />
-            </div>
+        <Card className="bg-[#0f172a] border-amber-500/20 border-2 relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:scale-110 transition-transform"><Flame className="h-12 w-12 text-amber-500" /></div>
+          <CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-amber-400 tracking-widest">Leads Pendentes</CardTitle></CardHeader>
+          <CardContent className="p-4 pt-0">
+            <p className="text-3xl font-black text-amber-500 tabular-nums">{pendingLeadsCount}</p>
+            <p className="text-[10px] text-amber-400/60 font-bold uppercase mt-1">Potencial não convertido</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-blue-500/10 to-blue-500/5 border-blue-500/20">
-          <CardContent className="pt-6">
-            <div className="flex items-end justify-between">
-              <div>
-                <p className="text-sm text-slate-400 mb-2">Lucro Líquido</p>
-                <p className={`text-2xl font-bold ${totalLucro >= 0 ? 'text-blue-400' : 'text-red-400'}`}>
-                  R$ {(totalLucro / 1000).toFixed(1)}k
-                </p>
-              </div>
-              <TrendingUp className="h-8 w-8 text-blue-500/40" />
-            </div>
+        <Card className="bg-[#0f172a] border-primary/20 border-2 relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:scale-110 transition-transform"><Gavel className="h-12 w-12 text-primary" /></div>
+          <CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-primary tracking-widest">Prazos de Hoje</CardTitle></CardHeader>
+          <CardContent className="p-4 pt-0">
+            <p className="text-3xl font-black text-primary tabular-nums">{deadlineStats.today}</p>
+            <p className="text-[10px] text-primary/60 font-bold uppercase mt-1">Vencimento fatal hoje</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-amber-500/10 to-amber-500/5 border-amber-500/20">
-          <CardContent className="pt-6">
-            <div className="flex items-end justify-between">
-              <div>
-                <p className="text-sm text-slate-400 mb-2">Margem de Lucro</p>
-                <p className="text-2xl font-bold text-amber-400">
-                  {margemLucro.toFixed(1)}%
-                </p>
-              </div>
-              <BarChartIcon className="h-8 w-8 text-amber-500/40" />
-            </div>
+        <Card className="bg-[#0f172a] border-blue-500/20 border-2 relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:scale-110 transition-transform"><Zap className="h-12 w-12 text-blue-500" /></div>
+          <CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-blue-400 tracking-widest">Novos Leads (Mês)</CardTitle></CardHeader>
+          <CardContent className="p-4 pt-0">
+            <p className="text-3xl font-black text-blue-400 tabular-nums">{leadsData?.length || 0}</p>
+            <p className="text-[10px] text-blue-400/60 font-bold uppercase mt-1">Entrada de novos casos</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Gráficos Principais */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Fluxo de Caixa Mensal */}
-        <Card className="border-emerald-500/20 bg-gradient-to-br from-slate-900/30 to-slate-950/30 backdrop-blur-sm">
+        {/* Performance Comparativa por Advogado */}
+        <Card className="bg-[#0f172a] border-white/5 shadow-2xl">
           <CardHeader>
-            <CardTitle className="text-emerald-400 flex items-center gap-2">
-              <BarChartIcon className="h-5 w-5" />
-              Fluxo de Caixa Mensal
+            <CardTitle className="text-lg text-white font-black uppercase tracking-tighter flex items-center gap-2">
+              <Users className="h-5 w-5 text-primary" /> Distribuição de Carga por Advogado
             </CardTitle>
-            <CardDescription>Receitas vs Despesas</CardDescription>
+            <CardDescription>Comparativo de processos, prazos e audiências sob responsabilidade.</CardDescription>
           </CardHeader>
-          <CardContent className="h-[350px]">
+          <CardContent className="h-[400px]">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={financialData} margin={{ top: 20, right: 30, left: 0, bottom: 20 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" />
-                <XAxis 
-                  dataKey="month" 
-                  stroke="#94a3b8"
-                  style={{ fontSize: '12px' }}
-                />
-                <YAxis 
-                  stroke="#94a3b8"
-                  style={{ fontSize: '12px' }}
-                  tickFormatter={(value) => `R$${(value / 1000).toFixed(0)}k`}
-                />
+              <BarChart data={lawyerPerformanceData} margin={{ top: 20, right: 30, left: 0, bottom: 20 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#ffffff10" />
+                <XAxis dataKey="nome" stroke="#94a3b8" fontSize={10} fontVariant="bold" axisLine={false} tickLine={false} />
+                <YAxis stroke="#94a3b8" fontSize={10} axisLine={false} tickLine={false} />
                 <Tooltip 
-                  contentStyle={{
-                    backgroundColor: '#0f172a',
-                    border: '1px solid #334155',
-                    borderRadius: '8px'
-                  }}
-                  formatter={(value: any) => [`R$ ${(value / 1000).toFixed(1)}k`, '']}
-                  labelStyle={{ color: '#cbd5e1' }}
+                  contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #ffffff10', borderRadius: '8px' }}
+                  labelStyle={{ color: '#fff', fontWeight: 'bold', marginBottom: '4px' }}
                 />
-                <Legend 
-                  wrapperStyle={{ paddingTop: '20px' }}
-                  iconType="square"
-                />
-                <Bar dataKey="receita" name="Receitas" fill="#10b981" radius={[8, 8, 0, 0]} />
-                <Bar dataKey="despesa" name="Despesas" fill="#ef4444" radius={[8, 8, 0, 0]} />
+                <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px', fontSize: '10px', textTransform: 'uppercase', fontWeight: 'bold' }} />
+                <Bar dataKey="demandas" name="Processos" fill="#F5D030" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="prazos" name="Prazos" fill="#f43f5e" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="audiencias" name="Audiências" fill="#3b82f6" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
 
-        {/* Lucro Mensal */}
-        <Card className="border-blue-500/20 bg-gradient-to-br from-slate-900/30 to-slate-950/30 backdrop-blur-sm">
+        {/* Eficácia de Canais de Captação (Marketing Jurídico) */}
+        <Card className="bg-[#0f172a] border-white/5 shadow-2xl">
           <CardHeader>
-            <CardTitle className="text-blue-400 flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" />
-              Lucro Líquido Mensal
+            <CardTitle className="text-lg text-white font-black uppercase tracking-tighter flex items-center gap-2">
+              <Target className="h-5 w-5 text-emerald-400" /> Origem de Novos Negócios (Leads)
             </CardTitle>
-            <CardDescription>Tendência de lucratividade</CardDescription>
+            <CardDescription>Breakdown por tipo de captação para análise de ROI.</CardDescription>
           </CardHeader>
-          <CardContent className="h-[350px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={financialData} margin={{ top: 20, right: 30, left: 0, bottom: 20 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" />
-                <XAxis 
-                  dataKey="month" 
-                  stroke="#94a3b8"
-                  style={{ fontSize: '12px' }}
-                />
-                <YAxis 
-                  stroke="#94a3b8"
-                  style={{ fontSize: '12px' }}
-                  tickFormatter={(value) => `R$${(value / 1000).toFixed(0)}k`}
-                />
-                <Tooltip 
-                  contentStyle={{
-                    backgroundColor: '#0f172a',
-                    border: '1px solid #334155',
-                    borderRadius: '8px'
-                  }}
-                  formatter={(value: any) => `R$ ${(value / 1000).toFixed(1)}k`}
-                  labelStyle={{ color: '#cbd5e1' }}
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="lucro" 
-                  stroke="#3b82f6" 
-                  strokeWidth={3}
-                  dot={{ fill: '#3b82f6', r: 5 }}
-                  activeDot={{ r: 7 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Segunda Linha de Gráficos */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Crescimento */}
-        <Card className="border-cyan-500/20 bg-gradient-to-br from-slate-900/30 to-slate-950/30 backdrop-blur-sm">
-          <CardHeader>
-            <CardTitle className="text-cyan-400 flex items-center gap-2">
-              <FolderKanban className="h-5 w-5" />
-              Crescimento da Operação
-            </CardTitle>
-            <CardDescription>Novos clientes e processos</CardDescription>
-          </CardHeader>
-          <CardContent className="h-[350px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={growthData} margin={{ top: 20, right: 30, left: 0, bottom: 20 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" />
-                <XAxis 
-                  dataKey="month" 
-                  stroke="#94a3b8"
-                  style={{ fontSize: '12px' }}
-                />
-                <YAxis 
-                  stroke="#94a3b8"
-                  style={{ fontSize: '12px' }}
-                />
-                <Tooltip 
-                  contentStyle={{
-                    backgroundColor: '#0f172a',
-                    border: '1px solid #334155',
-                    borderRadius: '8px'
-                  }}
-                  labelStyle={{ color: '#cbd5e1' }}
-                />
-                <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                <Area 
-                  type="monotone" 
-                  dataKey="processos" 
-                  name="Processos"
-                  stroke="#f59e0b" 
-                  fill="#f59e0b20"
-                  isAnimationActive={true}
-                />
-                <Area 
-                  type="monotone" 
-                  dataKey="clientes" 
-                  name="Clientes"
-                  stroke="#06b6d4" 
-                  fill="#06b6d420"
-                  isAnimationActive={true}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* Custos por Centro */}
-        <Card className="border-purple-500/20 bg-gradient-to-br from-slate-900/30 to-slate-950/30 backdrop-blur-sm">
-          <CardHeader>
-            <CardTitle className="text-purple-400 flex items-center gap-2">
-              <DollarSign className="h-5 w-5" />
-              Custos por Centro
-            </CardTitle>
-            <CardDescription>Distribuição de despesas</CardDescription>
-          </CardHeader>
-          <CardContent className="h-[350px]">
-            {costCenterData.length > 0 ? (
+          <CardContent className="h-[400px] flex items-center justify-center">
+            {leadCaptureData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <PieChart margin={{ top: 20, right: 20, left: 20, bottom: 20 }}>
+                <PieChart>
                   <Pie
-                    data={costCenterData}
+                    data={leadCaptureData}
                     cx="50%"
                     cy="50%"
-                    labelLine={false}
-                    label={({ name, value }) => `${name}: R$${(value / 1000).toFixed(0)}k`}
-                    outerRadius={100}
-                    fill="#8884d8"
+                    innerRadius={80}
+                    outerRadius={120}
+                    paddingAngle={5}
                     dataKey="value"
                   >
-                    {costCenterData.map((_, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    {leadCaptureData.map((_, index) => (
+                      <RechartsCell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
                   <Tooltip 
-                    contentStyle={{
-                      backgroundColor: '#0f172a',
-                      border: '1px solid #334155',
-                      borderRadius: '8px'
-                    }}
-                    formatter={(value: any) => `R$ ${(value / 1000).toFixed(1)}k`}
-                    labelStyle={{ color: '#cbd5e1' }}
+                    contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #ffffff10', borderRadius: '8px' }}
                   />
+                  <Legend verticalAlign="bottom" align="center" layout="horizontal" iconType="circle" wrapperStyle={{ fontSize: '10px', textTransform: 'uppercase' }} />
                 </PieChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-full flex items-center justify-center text-slate-400">
-                Sem dados de despesas
+              <div className="flex flex-col items-center opacity-30">
+                <Target className="h-12 w-12 mb-4" />
+                <p className="text-xs font-bold uppercase">Sem dados de captação</p>
               </div>
             )}
           </CardContent>
         </Card>
       </div>
 
-      {/* Produtividade por Advogado */}
-      {productivityData.length > 0 && (
-        <Card className="border-pink-500/20 bg-gradient-to-br from-slate-900/30 to-slate-950/30 backdrop-blur-sm">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Fluxo de Caixa (Últimos 6 meses) */}
+        <Card className="lg:col-span-2 bg-[#0f172a] border-white/5 shadow-2xl">
           <CardHeader>
-            <CardTitle className="text-pink-400 flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Produtividade da Equipe
+            <CardTitle className="text-lg text-white font-black uppercase tracking-tighter flex items-center gap-2">
+              <DollarSign className="h-5 w-5 text-emerald-400" /> Evolução Financeira Real
             </CardTitle>
-            <CardDescription>Processos e receita por advogado</CardDescription>
+            <CardDescription>Fluxo de entradas vs saídas operacionais consolidadas.</CardDescription>
           </CardHeader>
-          <CardContent className="h-[350px]">
+          <CardContent className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart 
-                data={productivityData.slice(0, 8)} 
-                margin={{ top: 20, right: 30, left: 0, bottom: 60 }}
-                layout="vertical"
-              >
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" />
-                <XAxis 
-                  type="number"
-                  stroke="#94a3b8"
-                  style={{ fontSize: '12px' }}
-                  tickFormatter={(value) => `R$${(value / 1000).toFixed(0)}k`}
-                />
-                <YAxis 
-                  type="category"
-                  dataKey="nome" 
-                  stroke="#94a3b8"
-                  style={{ fontSize: '12px' }}
-                />
+              <AreaChart data={financialData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="colorRec" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#ffffff05" />
+                <XAxis dataKey="month" stroke="#475569" fontSize={10} axisLine={false} tickLine={false} />
+                <YAxis stroke="#475569" fontSize={10} axisLine={false} tickLine={false} tickFormatter={(val) => `R$${val/1000}k`} />
                 <Tooltip 
-                  contentStyle={{
-                    backgroundColor: '#0f172a',
-                    border: '1px solid #334155',
-                    borderRadius: '8px'
-                  }}
-                  formatter={(value: any) => [`R$ ${(value / 1000).toFixed(1)}k`, 'Receita']}
-                  labelStyle={{ color: '#cbd5e1' }}
+                  contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #ffffff10', borderRadius: '8px' }}
+                  formatter={(val: number) => val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                 />
-                <Bar dataKey="receita" fill="#ec4899" radius={[0, 8, 8, 0]} />
-              </BarChart>
+                <Area type="monotone" dataKey="receita" name="Entradas" stroke="#10b981" fillOpacity={1} fill="url(#colorRec)" strokeWidth={3} />
+                <Area type="monotone" dataKey="despesa" name="Saídas" stroke="#ef4444" fill="transparent" strokeWidth={2} strokeDasharray="5 5" />
+              </AreaChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
-      )}
+
+        {/* Resumo de Conversão */}
+        <Card className="bg-[#0f172a] border-white/5 shadow-2xl flex flex-col">
+          <CardHeader>
+            <CardTitle className="text-lg text-white font-black uppercase tracking-tighter flex items-center gap-2">
+              <Activity className="h-5 w-5 text-blue-400" /> Saúde do Funil
+            </CardTitle>
+            <CardDescription>Métricas de conversão e retenção.</CardDescription>
+          </CardHeader>
+          <CardContent className="flex-1 flex flex-col justify-between py-6">
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="h-8 w-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-500"><CheckCircle2 className="h-4 w-4" /></div>
+                  <span className="text-xs font-bold text-slate-300 uppercase">Leads Convertidos</span>
+                </div>
+                <span className="text-lg font-black text-white">{leadsData?.filter(l => l.status === 'CONVERTIDO').length || 0}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="h-8 w-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-500"><FolderKanban className="h-4 w-4" /></div>
+                  <span className="text-xs font-bold text-slate-300 uppercase">Total Clientes Ativos</span>
+                </div>
+                <span className="text-lg font-black text-white">{clientsData?.filter(c => c.status === 'active').length || 0}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="h-8 w-8 rounded-lg bg-rose-500/10 flex items-center justify-center text-rose-500"><XCircle className="h-4 w-4" /></div>
+                  <span className="text-xs font-bold text-slate-300 uppercase">Leads Reprovados</span>
+                </div>
+                <span className="text-lg font-black text-white">{leadsData?.filter(l => l.status === 'REPROVADO').length || 0}</span>
+              </div>
+            </div>
+
+            <div className="mt-8 p-4 rounded-2xl bg-primary/5 border border-primary/20">
+              <div className="flex items-center gap-2 mb-2">
+                <Sparkles className="h-4 w-4 text-primary" />
+                <span className="text-[10px] font-black text-primary uppercase tracking-widest">Taxa de Conversão</span>
+              </div>
+              <p className="text-2xl font-black text-white">
+                {leadsData?.length ? ((leadsData.filter(l => l.status === 'CONVERTIDO').length / leadsData.length) * 100).toFixed(1) : 0}%
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
+}
+
+function XCircle(props: any) {
+  return (
+    <svg
+      {...props}
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="12" cy="12" r="10" />
+      <path d="m15 9-6 6" />
+      <path d="m9 9 6 6" />
+    </svg>
+  )
 }
