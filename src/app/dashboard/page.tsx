@@ -129,32 +129,33 @@ export default function Dashboard() {
   const { firestore } = useFirebase();
   const { data: session, status } = useSession();
 
-  // OTIMIZAÇÃO: Consulta financeira limitada ao mês atual para os cards de topo
+  // OTIMIZAÇÃO: Consulta financeira estritamente limitada e sem listener em tempo real para stats históricos se não necessário
   const titlesQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     const startOfCurrentMonth = Timestamp.fromDate(startOfMonth(new Date()));
     return query(
       collection(firestore, 'financial_titles'),
-      where('dueDate', '>=', startOfCurrentMonth)
+      where('dueDate', '>=', startOfCurrentMonth),
+      limit(100)
     );
   }, [firestore]);
   const { data: titlesData, isLoading: isLoadingTitles } = useCollection<FinancialTitle>(titlesQuery);
 
-  // OTIMIZAÇÃO: Processos limitados para gráfico e contagem (apenas ativos para estatísticas rápidas)
-  const processesQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'processes'), limit(100)) : null), [firestore]);
+  // OTIMIZAÇÃO: Limitar busca de processos para o gráfico (últimos 100)
+  const processesQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'processes'), orderBy('createdAt', 'desc'), limit(100)) : null), [firestore]);
   const { data: processesData, isLoading: isLoadingProcesses } = useCollection<Process>(processesQuery);
 
-  // OTIMIZAÇÃO: Clientes
-  const clientsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'clients'), limit(100)) : null), [firestore]);
+  // OTIMIZAÇÃO: Clientes limitados
+  const clientsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'clients'), limit(50)) : null), [firestore]);
   const { data: clientsData, isLoading: isLoadingClients } = useCollection<Client>(clientsQuery);
 
-  // OTIMIZAÇÃO: Audiências limitadas às próximas 10
-  const hearingsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'hearings'), where('date', '>=', Timestamp.now()), orderBy('date', 'asc'), limit(10)) : null), [firestore]);
+  // OTIMIZAÇÃO: Audiências limitadas às próximas 5 mais urgentes
+  const hearingsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'hearings'), where('date', '>=', Timestamp.now()), orderBy('date', 'asc'), limit(5)) : null), [firestore]);
   const { data: hearingsData, isLoading: isLoadingHearings } = useCollection<Hearing>(hearingsQuery);
 
-  // OTIMIZAÇÃO: Logs limitados aos 5 mais recentes
+  // OTIMIZAÇÃO: Logs limitados aos 3 mais recentes
   const logsQuery = useMemoFirebase(
-    () => (firestore && session?.user?.id ? query(collection(firestore, `users/${session.user.id}/logs`), orderBy('timestamp', 'desc'), limit(5)) : null), 
+    () => (firestore && session?.user?.id ? query(collection(firestore, `users/${session.user.id}/logs`), orderBy('timestamp', 'desc'), limit(3)) : null), 
     [firestore, session?.user?.id]
   );
   const { data: logsData, isLoading: isLoadingLogs } = useCollection<Log>(logsQuery);
@@ -162,7 +163,7 @@ export default function Dashboard() {
   const isLoading = status === 'loading' || isLoadingTitles || isLoadingProcesses || isLoadingHearings || isLoadingLogs || isLoadingClients;
 
   const dashboardStats = React.useMemo(() => {
-    if (!titlesData || !processesData || !hearingsData || !clientsData) return { totalRevenue: 0, pendingReceivables: 0, totalOverdue: 0, activeProcessesCount: 0, upcomingHearingsCount: 0, totalClients: 0 };
+    if (!titlesData || !processesData || !hearingsData) return { totalRevenue: 0, pendingReceivables: 0, totalOverdue: 0, activeProcessesCount: 0, upcomingHearingsCount: 0, totalClients: 0 };
     
     const now = new Date();
     const revenue = titlesData
@@ -179,7 +180,7 @@ export default function Dashboard() {
 
     const activeProcesses = processesData.filter(p => p.status === 'Ativo').length;
     const upcomingHearings = hearingsData.length;
-    const totalClients = clientsData.length;
+    const totalClients = clientsData?.length || 0;
 
     return { totalRevenue: revenue, pendingReceivables: pending, totalOverdue: overdue, activeProcessesCount: activeProcesses, upcomingHearingsCount: upcomingHearings, totalClients };
   }, [titlesData, processesData, hearingsData, clientsData]);
@@ -236,7 +237,7 @@ export default function Dashboard() {
             Olá, {session?.user?.name?.split(' ')[0]}
             </h1>
             <p className="text-muted-foreground font-medium mt-1">
-            Aqui está a pulsação estratégica do seu escritório hoje.
+            Pulsação operacional e insights estratégicos.
             </p>
         </div>
         <Badge variant="outline" className="h-8 px-3 border-emerald-500/20 bg-emerald-500/5 text-emerald-600 font-bold">
@@ -250,28 +251,28 @@ export default function Dashboard() {
           value={dashboardStats.totalRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
           icon={DollarSign}
           href="/dashboard/financeiro"
-          description="Recebido este mês"
+          description="Recebido (Mês)"
         />
         <StatCard 
-          title="Total de Clientes" 
+          title="Clientes Recentes" 
           value={dashboardStats.totalClients}
           icon={Users}
           href="/dashboard/clientes"
-          description="Base de contatos"
+          description="Contatos na base"
         />
         <StatCard 
-          title="Fila de Processos" 
+          title="Processos Ativos" 
           value={dashboardStats.activeProcessesCount}
           icon={FolderKanban}
           href="/dashboard/processos"
-          description="Total de casos ativos"
+          description="Em andamento"
         />
         <StatCard 
-          title="Agenda Jurídica" 
+          title="Pauta Urgente" 
           value={dashboardStats.upcomingHearingsCount}
           icon={Calendar}
           href="/dashboard/audiencias"
-          description="Próximas audiências"
+          description="Audiências próximas"
         />
       </div>
 
@@ -283,13 +284,13 @@ export default function Dashboard() {
                 isLoading={isLoading} 
             />
             
-            <Card className="bg-[#0f172a] border-border/50">
+            <Card className="bg-[#0f172a] border-border/50 shadow-none">
                 <CardHeader>
-                    <CardTitle className="font-headline text-xl text-white">Crescimento de Carteira</CardTitle>
-                    <CardDescription>Novos processos protocolados nos últimos 6 meses.</CardDescription>
+                    <CardTitle className="font-headline text-xl text-white">Curva de Crescimento</CardTitle>
+                    <CardDescription>Novos processos nos últimos meses.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <ChartContainer config={{ newCases: { label: 'Novos Casos', color: '#F5D030' } }} className="h-[300px] w-full">
+                    <ChartContainer config={{ newCases: { label: 'Novos Casos', color: '#F5D030' } }} className="h-[250px] w-full">
                         <ResponsiveContainer>
                             <BarChart data={chartData}>
                                 <XAxis dataKey="month" stroke="#475569" fontSize={12} axisLine={false} tickLine={false} />
@@ -304,11 +305,11 @@ export default function Dashboard() {
         </div>
 
         <div className="space-y-6">
-            <Card className="h-full bg-[#0f172a] border-border/50">
+            <Card className="h-full bg-[#0f172a] border-border/50 shadow-none">
                 <CardHeader className="border-b border-white/5">
-                    <CardTitle className="font-headline text-xl flex items-center gap-2 text-white">
+                    <CardTitle className="font-headline text-xl flex items-center gap-2 text-white uppercase tracking-tighter">
                         <Calendar className="h-5 w-5 text-primary" />
-                        Agenda Próxima
+                        Pauta Imediata
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-6">
@@ -319,18 +320,18 @@ export default function Dashboard() {
                     ) : (
                         <div className="space-y-6 text-slate-300">
                             {hearingsData?.map(h => (
-                                <div key={h.id} className="flex items-start gap-4 p-2 rounded-lg hover:bg-white/5 transition-colors">
-                                    <div className="flex flex-col items-center justify-center p-2 bg-black/20 rounded-xl w-12 h-12 border border-white/5 shrink-0">
+                                <div key={h.id} className="flex items-start gap-4 p-3 rounded-xl hover:bg-white/5 transition-colors border border-transparent hover:border-white/5">
+                                    <div className="flex flex-col items-center justify-center p-2 bg-black/40 rounded-xl w-12 h-12 border border-white/5 shrink-0">
                                         <span className="text-[10px] font-black uppercase text-primary leading-none">{format(h.date.toDate(), 'MMM', { locale: ptBR })}</span>
                                         <span className="text-lg font-black text-white leading-none">{format(h.date.toDate(), 'dd')}</span>
                                     </div>
                                     <div className="min-w-0">
-                                        <p className="font-bold text-sm truncate text-white">Audiência de {h.type}</p>
-                                        <p className="text-[10px] text-muted-foreground uppercase">{h.location}</p>
+                                        <p className="font-bold text-sm truncate text-white">Audiência {h.type}</p>
+                                        <p className="text-[10px] text-muted-foreground uppercase flex items-center gap-1"><Users className="h-2.5 w-2.5" /> Dr(a). {h.lawyerName}</p>
                                     </div>
                                 </div>
                             ))}
-                            {hearingsData?.length === 0 && <p className="text-xs italic text-muted-foreground text-center">Sem compromissos agendados.</p>}
+                            {hearingsData?.length === 0 && <p className="text-xs italic text-muted-foreground text-center py-10 opacity-30">Sem compromissos agendados.</p>}
                         </div>
                     )}
                 </CardContent>

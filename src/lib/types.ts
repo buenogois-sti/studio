@@ -35,8 +35,8 @@ export type Client = {
   rg?: string;
   ctps?: string;
   pis?: string;
-  stateRegistration?: string; // Inscrição Estadual
-  municipalRegistration?: string; // Inscrição Municipal
+  stateRegistration?: string;
+  municipalRegistration?: string;
   phone?: string;
   mobile?: string;
   emergencyContact?: string;
@@ -69,8 +69,8 @@ export type TimelineEvent = {
   description: string;
   date: Timestamp;
   authorName: string;
-  endDate?: Timestamp; // Para prazos
-  isBusinessDays?: boolean; // Se o prazo é contado em dias úteis
+  endDate?: Timestamp;
+  isBusinessDays?: boolean;
 };
 
 export type OpposingParty = {
@@ -91,7 +91,7 @@ export type Lead = {
   id: string;
   clientId: string;
   clientName?: string;
-  lawyerId: string; // Advogado responsável por elaborar a ação
+  lawyerId: string;
   title: string;
   legalArea: string;
   status: LeadStatus;
@@ -108,7 +108,7 @@ export type Lead = {
 export type Process = {
   id: string;
   clientId: string;
-  clientName?: string; // Nome do cliente (opcional, pode ser derivado de clientId)
+  clientName?: string;
   clientRole?: 'Polo Ativo' | 'Polo Passivo';
   secondaryClientIds?: string[];
   name: string;
@@ -122,7 +122,7 @@ export type Process = {
   description?: string;
   status: 'Ativo' | 'Arquivado' | 'Pendente';
   legalArea: string;
-  responsibleStaffIds?: string[]; // Legacy compatibility
+  responsibleStaffIds?: string[];
   teamParticipants?: TeamParticipant[];
   leadLawyerId?: string;
   defaultLocation?: string;
@@ -139,16 +139,19 @@ export type HearingType = 'CONCILIACAO' | 'INSTRUCAO' | 'UNA' | 'JULGAMENTO' | '
 export type Hearing = {
   id: string;
   processId: string;
-  lawyerId?: string; // ID do advogado responsável pela audiência
+  lawyerId: string;
+  lawyerName?: string;
+  createdById: string;
+  createdByName: string;
   date: Timestamp;
   location: string;
-  courtBranch?: string; // Vara / Câmara
+  courtBranch?: string;
   responsibleParty: string;
   status: HearingStatus;
   type: HearingType;
   notes?: string;
-  resultNotes?: string; // Ata ou resultado pós-audiência
-  hasFollowUp?: boolean; // Se o retorno de audiência foi processado
+  resultNotes?: string;
+  hasFollowUp?: boolean;
   googleCalendarEventId?: string;
   createdAt?: Timestamp;
 };
@@ -188,7 +191,7 @@ export type FinancialTitle = {
   financialEventId?: string;
   processId?: string;
   clientId?: string;
-  costCenter?: string; // Centro de custo para agrupamento em relatórios
+  costCenter?: string;
   description: string;
   type: 'RECEITA' | 'DESPESA';
   origin:

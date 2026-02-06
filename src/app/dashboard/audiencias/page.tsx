@@ -20,7 +20,10 @@ import {
   CalendarDays,
   Building,
   ArrowRightCircle,
-  AlertCircle
+  AlertCircle,
+  Users,
+  User,
+  Filter
 } from 'lucide-react';
 import { 
   format, 
@@ -42,8 +45,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useFirebase, useCollection, useMemoFirebase, useDoc } from '@/firebase';
-import { collection, query, where, doc } from 'firebase/firestore';
-import type { Hearing, Process, HearingStatus, UserProfile } from '@/lib/types';
+import { collection, query, where, doc, limit, orderBy } from 'firebase/firestore';
+import type { Hearing, Process, HearingStatus, UserProfile, Staff } from '@/lib/types';
 import { useToast } from '@/components/ui/use-toast';
 import { updateHearingStatus, syncHearings } from '@/lib/hearing-actions';
 import { cn } from '@/lib/utils';
@@ -58,6 +61,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { HearingReturnDialog } from '@/components/process/HearingReturnDialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const statusConfig: Record<HearingStatus, { label: string; icon: any; color: string }> = {
     PENDENTE: { label: 'Pendente', icon: Clock3, color: 'text-blue-500 bg-blue-500/10' },
@@ -73,6 +77,7 @@ export default function AudienciasPage() {
   const [viewMode, setViewMode] = React.useState<'list' | 'calendar' | 'history'>('list');
   const [currentDate, setCurrentDate] = React.useState(new Date());
   const [selectedDay, setSelectedDay] = React.useState<Date | null>(new Date());
+  const [selectedLawyerFilter, setSelectedLawyerFilter] = React.useState<string>('all');
   const [returnHearing, setReturnHearing] = React.useState<Hearing | null>(null);
   const { toast } = useToast();
 
@@ -82,35 +87,48 @@ export default function AudienciasPage() {
   );
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
 
+  // OTIMIZAÇÃO: Consulta de Staff limitada
+  const staffQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'staff'), limit(50)) : null, [firestore]);
+  const { data: staffData } = useCollection<Staff>(staffQuery);
+  const lawyers = staffData?.filter(s => s.role === 'lawyer' || s.role === 'partner') || [];
+
+  // OTIMIZAÇÃO: Audiências com filtros de servidor e limite
   const hearingsQuery = useMemoFirebase(() => {
     if (!firestore || !userProfile) return null;
     const base = collection(firestore, 'hearings');
     
-    if (userProfile.role === 'lawyer') {
-      return query(base, where('lawyerId', '==', userProfile.id));
+    // Admins e Assistentes podem ver tudo ou filtrar por advogado
+    if (userProfile.role === 'admin' || userProfile.role === 'assistant') {
+      if (selectedLawyerFilter !== 'all') {
+        return query(base, where('lawyerId', '==', selectedLawyerFilter), orderBy('date', 'asc'), limit(150));
+      }
+      return query(base, orderBy('date', 'asc'), limit(300));
     }
-    return base;
-  }, [firestore, userProfile, refreshKey]);
+    
+    // Advogados veem apenas as suas
+    return query(base, where('lawyerId', '==', userProfile.id), orderBy('date', 'asc'), limit(150));
+  }, [firestore, userProfile, selectedLawyerFilter, refreshKey]);
 
   const { data: hearingsData, isLoading: isLoadingHearings, error: hearingsError } = useCollection<Hearing>(hearingsQuery);
 
-  const processesQuery = useMemoFirebase(() => firestore ? collection(firestore, 'processes') : null, [firestore]);
+  // OTIMIZAÇÃO: Processos limitados para o Map
+  const processesQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'processes'), limit(200)) : null, [firestore]);
   const { data: processesData } = useCollection<Process>(processesQuery);
   const processesMap = React.useMemo(() => new Map(processesData?.map(p => [p.id, p])), [processesData]);
 
-  const handleUpdateStatus = async (hearing: Hearing, status: HearingStatus) => {
+  const handleUpdateStatus = React.useCallback(async (hearing: Hearing, status: HearingStatus) => {
       if (status === 'REALIZADA' && !hearing.hasFollowUp) {
           setReturnHearing(hearing);
           return;
       }
       try {
           await updateHearingStatus(hearing.id, status);
-          toast({ title: 'Status atualizado!', description: 'A alteração foi sincronizada com sua agenda.' });
+          toast({ title: 'Status atualizado!', description: 'A alteração foi sincronizada com a pauta.' });
           setRefreshKey(prev => prev + 1);
       } catch (e: any) {
           toast({ variant: 'destructive', title: 'Erro', description: e.message });
       }
-  };
+  }, [toast]);
 
   const todayHearings = React.useMemo(() => {
       if (!hearingsData) return [];
@@ -156,9 +174,9 @@ export default function AudienciasPage() {
       <div className="p-6">
         <Alert variant="destructive" className="bg-rose-500/10 border-rose-500/20 text-rose-400">
           <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Erro de Consulta</AlertTitle>
+          <AlertTitle>Índice Necessário</AlertTitle>
           <AlertDescription className="text-xs mt-2 space-y-4">
-            <p>Não foi possível carregar a agenda. Verifique os índices no Console do Firebase.</p>
+            <p>Para visualizar a pauta global, o Firebase exige um índice manual nos campos 'lawyerId' e 'date'.</p>
           </AlertDescription>
         </Alert>
       </div>
@@ -169,30 +187,39 @@ export default function AudienciasPage() {
     <div className="flex flex-col gap-8 pb-10">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
-                <H1 className="text-white text-3xl font-black">Agenda de Audiências</H1>
+                <H1 className="text-white text-3xl font-black">Pauta de Audiências</H1>
                 <p className="text-sm text-muted-foreground">
-                  {userProfile?.role === 'lawyer' ? 'Seus compromissos judiciais agendados.' : 'Visão global de pauta do escritório.'}
+                  {userProfile?.role === 'lawyer' ? 'Seus compromissos judiciais agendados.' : 'Visão global e distribuição de pauta do escritório.'}
                 </p>
             </div>
-            <div className="flex items-center gap-2">
+            
+            <div className="flex items-center gap-3">
+                {(userProfile?.role === 'admin' || userProfile?.role === 'assistant') && (
+                  <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 animate-in fade-in">
+                    <Filter className="h-3.5 w-3.5 text-primary" />
+                    <Select value={selectedLawyerFilter} onValueChange={setSelectedLawyerFilter}>
+                      <SelectTrigger className="border-none bg-transparent h-7 text-xs font-bold w-[180px] focus:ring-0">
+                        <SelectValue placeholder="Filtrar Advogado..." />
+                      </SelectTrigger>
+                      <SelectContent className="bg-[#0f172a] border-white/10 text-white">
+                        <SelectItem value="all">Todas as Agendas</SelectItem>
+                        {lawyers.map(l => (
+                          <SelectItem key={l.id} value={l.id}>Dr(a). {l.firstName}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
                 <Button 
                     variant="outline" 
                     size="sm" 
-                    className="h-9 border-primary/20 text-primary hover:bg-primary/10" 
-                    onClick={async () => {
-                        setIsSyncing(true);
-                        try {
-                            const res = await syncHearings();
-                            toast({ title: "Sincronização concluída", description: `${res.syncedCount} eventos atualizados.` });
-                            setRefreshKey(k => k + 1);
-                        } catch (e: any) {
-                            toast({ variant: 'destructive', title: 'Erro', description: e.message });
-                        } finally { setIsSyncing(false); }
-                    }}
+                    className="h-10 border-white/10 text-slate-300 hover:bg-white/5" 
+                    onClick={() => setRefreshKey(k => k + 1)}
                     disabled={isSyncing}
                 >
                     <RefreshCw className={cn("h-4 w-4 mr-2", (isLoading || isSyncing) && "animate-spin")} />
-                    {isSyncing ? 'Sincronizando...' : 'Sincronizar Agenda'}
+                    Atualizar Pauta
                 </Button>
             </div>
         </div>
@@ -203,70 +230,32 @@ export default function AudienciasPage() {
               <div className="flex items-center gap-3">
                 <AlertCircle className="h-5 w-5 text-amber-500" />
                 <div>
-                  <p className="text-sm font-bold text-amber-200">Retornos Pendentes</p>
-                  <p className="text-xs text-amber-400/70">Você tem {pendingReturns.length} audiência(s) realizada(s) aguardando o seguimento jurídico.</p>
+                  <p className="text-sm font-bold text-amber-200">Retornos Jurídicos Pendentes</p>
+                  <p className="text-xs text-amber-400/70">Existem {pendingReturns.length} audiência(s) realizada(s) aguardando o seguimento jurídico do caso.</p>
                 </div>
               </div>
               <Button 
                 variant="outline" 
                 size="sm" 
-                className="border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
+                className="border-amber-500/30 text-amber-400 hover:bg-amber-500/10 font-bold"
                 onClick={() => setViewMode('history')}
               >
-                Ver Histórico
+                Processar Retornos
               </Button>
             </CardContent>
           </Card>
         )}
 
-        {todayHearings.length > 0 && viewMode !== 'calendar' && (
-            <Card className="border-2 border-primary/20 bg-primary/5 shadow-[0_0_30px_rgba(245,208,48,0.05)]">
-                <CardHeader className="pb-3 border-b border-white/5">
-                    <div className="flex items-center gap-2 text-primary">
-                        <Gavel className="h-5 w-5" />
-                        <CardTitle className="text-lg text-white font-black uppercase tracking-tight">Foco de Hoje: {todayHearings.length} Audiência(s)</CardTitle>
-                    </div>
-                </CardHeader>
-                <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 pt-4">
-                    {todayHearings.map(h => (
-                        <div key={h.id} className="p-4 rounded-xl bg-[#0f172a] border border-white/5 shadow-sm space-y-3 relative group hover:border-primary/30 transition-all">
-                            <div className="absolute top-2 right-2">
-                                <Badge variant="outline" className={cn("text-[9px] font-bold uppercase", statusConfig[h.status || 'PENDENTE'].color)}>
-                                    {statusConfig[h.status || 'PENDENTE'].label}
-                                </Badge>
-                            </div>
-                            <div className="flex items-center gap-3">
-                                <div className="h-10 w-10 rounded-lg bg-primary/10 flex flex-col items-center justify-center border border-primary/20">
-                                    <span className="text-[10px] font-black leading-none text-white">{format(h.date.toDate(), 'HH:mm')}</span>
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                    <p className="font-bold text-sm truncate text-white">{processesMap.get(h.processId)?.name || 'Processo'}</p>
-                                    <div className="flex items-center gap-1.5 mt-0.5">
-                                        <Badge variant="outline" className="text-[8px] font-black uppercase px-1.5 h-4 border-primary/30 text-primary">{h.type}</Badge>
-                                        <span className="text-[9px] text-slate-400 truncate flex items-center gap-1"><Building className="h-2.5 w-2.5" /> {h.courtBranch}</span>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-2 text-[10px] text-muted-foreground bg-black/20 p-2 rounded-lg border border-white/5">
-                                <MapPin className="h-3 w-3 shrink-0 text-primary" />
-                                <span className="truncate font-medium">{h.location}</span>
-                            </div>
-                        </div>
-                    ))}
-                </CardContent>
-            </Card>
-        )}
-
         <Tabs value={viewMode} onValueChange={v => setViewMode(v as any)} className="w-full">
             <TabsList className="bg-[#0f172a] p-1 border border-white/10 mb-6 h-12">
                 <TabsTrigger value="list" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground px-6 h-10 font-bold">
-                  <ListIcon className="h-4 w-4"/> Próximos 7 Dias
+                  <ListIcon className="h-4 w-4"/> Próximos Compromissos
                 </TabsTrigger>
                 <TabsTrigger value="calendar" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground px-6 h-10 font-bold">
                   <CalendarDays className="h-4 w-4"/> Calendário Mensal
                 </TabsTrigger>
                 <TabsTrigger value="history" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground px-6 h-10 font-bold">
-                  <History className="h-4 w-4"/> Histórico & Retornos
+                  <History className="h-4 w-4"/> Histórico de Atos
                 </TabsTrigger>
             </TabsList>
 
@@ -285,8 +274,8 @@ export default function AudienciasPage() {
                                             <span className="text-2xl font-black text-white">{format(day, 'dd')}</span>
                                         </div>
                                         <div>
-                                            <h3 className="text-lg font-black text-white capitalize">{isToday(day) ? 'Foco Hoje' : format(day, "EEEE", { locale: ptBR })}</h3>
-                                            <p className="text-xs text-slate-400 font-medium">{format(day, "d 'de' MMMM 'de' yyyy", { locale: ptBR })}</p>
+                                            <h3 className="text-lg font-black text-white capitalize">{isToday(day) ? 'Hoje' : format(day, "EEEE", { locale: ptBR })}</h3>
+                                            <p className="text-xs text-slate-400 font-medium">{format(day, "d 'de' MMMM", { locale: ptBR })}</p>
                                         </div>
                                     </div>
                                     <div className="grid gap-4">
@@ -303,11 +292,11 @@ export default function AudienciasPage() {
                                                         <div className="flex flex-wrap items-center gap-2 mb-2">
                                                             <Badge variant="outline" className="text-[9px] font-black uppercase border-primary/30 text-primary px-2">{h.type}</Badge>
                                                             <Badge variant="outline" className="text-[9px] font-black uppercase border-white/10 text-slate-400 flex items-center gap-1">
-                                                                <Building className="h-2.5 w-2.5" /> {h.courtBranch || 'Vara não informada'}
+                                                                <Users className="h-2.5 w-2.5" /> Dr(a). {h.lawyerName || 'Não atribuído'}
                                                             </Badge>
                                                         </div>
                                                         <h4 className="font-black text-lg text-white truncate group-hover:text-primary transition-colors">{p?.name}</h4>
-                                                        <p className="text-[10px] text-slate-500 font-mono mt-1">{h.location}</p>
+                                                        <p className="text-[10px] text-slate-500 font-mono mt-1 flex items-center gap-1.5"><MapPin className="h-3 w-3 text-primary" /> {h.location}</p>
                                                     </div>
                                                     <div className="flex items-center gap-3">
                                                         <Badge variant="outline" className={cn("gap-1.5 h-8 px-4 text-[10px] font-black uppercase tracking-widest", statusConfig[h.status || 'PENDENTE'].color)}>
@@ -318,15 +307,15 @@ export default function AudienciasPage() {
                                                             <DropdownMenuTrigger asChild>
                                                                 <Button variant="ghost" size="icon" className="text-white/30 hover:text-white rounded-xl h-10 w-10"><MoreVertical className="h-5 w-5" /></Button>
                                                             </DropdownMenuTrigger>
-                                                            <DropdownMenuContent align="end" className="bg-card border-border w-56 p-1">
-                                                                <DropdownMenuItem onClick={() => handleUpdateStatus(h, 'REALIZADA')} className="font-bold gap-2">
-                                                                    <ArrowRightCircle className="h-4 w-4 text-emerald-500" /> Processar Retorno
+                                                            <DropdownMenuContent align="end" className="bg-[#0f172a] border-white/10 w-56 p-1">
+                                                                <DropdownMenuItem onClick={() => handleUpdateStatus(h, 'REALIZADA')} className="font-bold gap-2 text-white hover:bg-emerald-500/10">
+                                                                    <ArrowRightCircle className="h-4 w-4 text-emerald-500" /> Marcar Realizada
                                                                 </DropdownMenuItem>
-                                                                <DropdownMenuItem onClick={() => handleUpdateStatus(h, 'ADIADA')} className="font-bold gap-2">
-                                                                    <Clock3 className="h-4 w-4 text-amber-500" /> Marcar como Adiada
+                                                                <DropdownMenuItem onClick={() => handleUpdateStatus(h, 'ADIADA')} className="font-bold gap-2 text-white">
+                                                                    <Clock3 className="h-4 w-4 text-amber-500" /> Adiar Audiência
                                                                 </DropdownMenuItem>
                                                                 <DropdownMenuItem className="text-rose-500 font-bold gap-2" onClick={() => handleUpdateStatus(h, 'CANCELADA')}>
-                                                                    <XCircle className="h-4 w-4" /> Cancelar Audiência
+                                                                    <XCircle className="h-4 w-4" /> Cancelar
                                                                 </DropdownMenuItem>
                                                             </DropdownMenuContent>
                                                         </DropdownMenu>
@@ -414,7 +403,7 @@ export default function AudienciasPage() {
                           {selectedDay ? format(selectedDay, "dd 'de' MMMM", { locale: ptBR }) : 'Selecione um dia'}
                         </CardTitle>
                         <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20 text-[10px] font-black">
-                          {hearingsForSelectedDay.length} Evento(s)
+                          {hearingsForSelectedDay.length} Ato(s)
                         </Badge>
                       </div>
                     </CardHeader>
@@ -423,7 +412,7 @@ export default function AudienciasPage() {
                         <div className="p-4 space-y-4">
                           {hearingsForSelectedDay.length > 0 ? (
                             hearingsForSelectedDay.map(h => (
-                              <div key={h.id} className="p-4 rounded-2xl border border-white/5 bg-black/30 space-y-3 hover:border-primary/20 transition-all">
+                              <div key={h.id} className="p-4 rounded-2xl border border-white/5 bg-black/30 space-y-3 hover:border-primary/20 transition-all group">
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center gap-2">
                                     <Clock className="h-3 w-3 text-primary" />
@@ -435,7 +424,7 @@ export default function AudienciasPage() {
                                 </div>
                                 <div className="space-y-1">
                                     <p className="text-xs font-black text-slate-200 leading-tight truncate">{processesMap.get(h.processId)?.name}</p>
-                                    <p className="text-[9px] text-primary font-bold uppercase flex items-center gap-1.5"><Building className="h-3 w-3" /> {h.courtBranch || 'Vara não informada'}</p>
+                                    <p className="text-[9px] text-primary font-bold uppercase flex items-center gap-1.5"><Users className="h-3 w-3" /> Dr(a). {h.lawyerName}</p>
                                 </div>
                                 <p className="text-[10px] text-slate-500 truncate flex items-center gap-1.5">
                                   <MapPin className="h-3 w-3 text-primary shrink-0" /> {h.location}
@@ -445,7 +434,7 @@ export default function AudienciasPage() {
                           ) : (
                             <div className="flex flex-col items-center justify-center py-32 text-center opacity-20">
                               <CalendarIcon className="h-12 w-12 mb-3" />
-                              <p className="text-[10px] font-black uppercase tracking-widest">Sem compromissos</p>
+                              <p className="text-[10px] font-black uppercase tracking-widest">Sem atos agendados</p>
                             </div>
                           )}
                         </div>
@@ -463,7 +452,7 @@ export default function AudienciasPage() {
                         <thead className="bg-white/5 text-[10px] uppercase font-black tracking-[0.2em] text-slate-500 border-b border-white/5">
                           <tr>
                             <th className="px-6 py-5">Data/Hora</th>
-                            <th className="px-6 py-5">Processo</th>
+                            <th className="px-6 py-5">Processo / Advogado</th>
                             <th className="px-6 py-5">Status Final</th>
                             <th className="px-6 py-5">Retorno Jurídico</th>
                             <th className="px-6 py-5 text-right">Ação</th>
@@ -478,14 +467,17 @@ export default function AudienciasPage() {
                               return (
                                 <tr key={h.id} className={cn("hover:bg-white/[0.02] transition-colors group", isPendingReturn && "bg-amber-500/[0.03]")}>
                                     <td className="px-6 py-5 text-white font-black whitespace-nowrap">
-                                      {format(h.date.toDate(), 'dd/MM/yyyy HH:mm')}
+                                      {format(h.date.toDate(), 'dd/MM/yy HH:mm')}
                                     </td>
                                     <td className="px-6 py-5">
                                       <div className="flex flex-col">
                                         <span className="text-slate-300 font-bold group-hover:text-primary transition-colors truncate max-w-[200px]">
                                           {processesMap.get(h.processId)?.name}
                                         </span>
-                                        <span className="text-[9px] text-slate-500 uppercase font-black">{h.type}</span>
+                                        <div className="flex items-center gap-2 mt-1">
+                                          <span className="text-[9px] text-slate-500 uppercase font-black">{h.type}</span>
+                                          <span className="text-[9px] text-primary/60 font-black uppercase">• {h.lawyerName}</span>
+                                        </div>
                                       </div>
                                     </td>
                                     <td className="px-6 py-5">
