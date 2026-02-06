@@ -660,10 +660,10 @@ export default function FinanceiroPage() {
                         <div className="flex flex-col">
                           <span className="font-medium text-white">{t.description}</span>
                           <div className="flex items-center gap-2 mt-0.5">
-                            <Badge variant="outline" className="text-[8px] font-bold uppercase py-0 px-1 h-3.5 border-white/10 text-muted-foreground">{t.origin}</Badge>
+                            <Badge variant="outline" className="text-[8px] font-bold uppercase py-0 px-1.5 h-4 border-white/10 text-muted-foreground">{t.origin}</Badge>
                             {t.processId && (
                               <div className="flex items-center gap-1 text-[9px] text-primary/80 font-bold uppercase">
-                                <FolderKanban className="h-2.5 w-2.5" /> {processesMap.get(t.processId)?.name}
+                                <FolderKanban className="h-3 w-3" /> {processesMap.get(t.processId)?.name}
                               </div>
                             )}
                           </div>

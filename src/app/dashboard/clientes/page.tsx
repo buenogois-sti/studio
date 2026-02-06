@@ -326,7 +326,7 @@ export default function ClientsPage() {
         ) : (
              <div className="flex flex-1 items-center justify-center rounded-2xl border-2 border-dashed border-border/50 bg-card/50 min-h-[400px]">
                 <div className="flex flex-col items-center gap-4 text-center p-8">
-                    <Search className="h-10 w-10 text-muted-foreground/30" />
+                    <FolderKanban className="h-10 w-10 text-muted-foreground/30" />
                     <h3 className="text-xl font-bold text-white">Nenhum cliente por aqui</h3>
                     <Button onClick={handleAddNew} className="bg-primary text-primary-foreground"><PlusCircle className="mr-2 h-4 w-4" /> Cadastrar Cliente</Button>
                 </div>
