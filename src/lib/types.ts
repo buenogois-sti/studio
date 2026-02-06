@@ -85,6 +85,7 @@ export type TeamParticipant = {
 };
 
 export type LeadStatus = 'NOVO' | 'EM_ELABORACAO' | 'PRONTO' | 'CONVERTIDO' | 'REPROVADO';
+export type LeadPriority = 'BAIXA' | 'MEDIA' | 'ALTA' | 'CRITICA';
 
 export type Lead = {
   id: string;
@@ -94,6 +95,10 @@ export type Lead = {
   title: string;
   legalArea: string;
   status: LeadStatus;
+  priority: LeadPriority;
+  captureSource: string;
+  isUrgent: boolean;
+  prescriptionDate?: Timestamp;
   description?: string;
   driveFolderId?: string;
   createdAt: Timestamp;

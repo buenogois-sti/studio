@@ -1,7 +1,7 @@
 'use server';
 
 import { firestoreAdmin } from '@/firebase/admin';
-import type { Lead, LeadStatus, TimelineEvent } from './types';
+import type { Lead, LeadStatus, LeadPriority, TimelineEvent } from './types';
 import { Timestamp, FieldValue } from 'firebase-admin/firestore';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/options';
@@ -14,6 +14,10 @@ export async function createLead(data: {
   lawyerId: string;
   title: string;
   legalArea: string;
+  priority: LeadPriority;
+  captureSource: string;
+  isUrgent: boolean;
+  prescriptionDate?: string;
   description?: string;
 }) {
   if (!firestoreAdmin) throw new Error('Servidor indisponível.');
@@ -23,7 +27,15 @@ export async function createLead(data: {
   try {
     const leadRef = firestoreAdmin.collection('leads').doc();
     const payload: Omit<Lead, 'id'> = {
-      ...data,
+      clientId: data.clientId,
+      lawyerId: data.lawyerId,
+      title: data.title,
+      legalArea: data.legalArea,
+      priority: data.priority,
+      captureSource: data.captureSource,
+      isUrgent: data.isUrgent,
+      prescriptionDate: data.prescriptionDate ? Timestamp.fromDate(new Date(data.prescriptionDate)) : undefined,
+      description: data.description || '',
       status: 'NOVO' as LeadStatus,
       createdAt: Timestamp.now() as any,
       updatedAt: Timestamp.now() as any,
@@ -36,7 +48,7 @@ export async function createLead(data: {
         userId: data.lawyerId,
         title: "Novo Lead Designado",
         description: `Você foi encarregado de elaborar a ação: ${data.title}.`,
-        type: 'info',
+        type: data.isUrgent ? 'warning' : 'info',
         href: '/dashboard/leads'
       });
     }
@@ -80,7 +92,7 @@ export async function convertLeadToProcess(leadId: string) {
     const timelineEvent: TimelineEvent = {
       id: uuidv4(),
       type: 'system',
-      description: `PROCESSO CRIADO: Convertido a partir do Lead #${leadId.substring(0, 6)}. Elaboração concluída por Dr(a). ${leadData.lawyerId}.`,
+      description: `PROCESSO CRIADO: Convertido a partir do Lead #${leadId.substring(0, 6)}. Elaboração concluída por Dr(a). ${leadData.lawyerId}. Prioridade: ${leadData.priority}.`,
       date: Timestamp.now() as any,
       authorName: session.user.name || 'Sistema'
     };

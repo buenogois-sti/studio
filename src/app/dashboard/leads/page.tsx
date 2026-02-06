@@ -18,11 +18,16 @@ import {
   AlertCircle,
   Scale,
   ArrowRight,
-  X
+  X,
+  Calendar,
+  Flame,
+  Target,
+  ShieldAlert,
+  Info
 } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, doc, deleteDoc } from 'firebase/firestore';
-import type { Lead, Client, Staff, LeadStatus } from '@/lib/types';
+import { collection, query, orderBy, doc, deleteDoc, Timestamp } from 'firebase/firestore';
+import type { Lead, Client, Staff, LeadStatus, LeadPriority } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -30,7 +35,7 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
+import { format, differenceInDays, isBefore, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
   DropdownMenu,
@@ -64,12 +69,18 @@ import { Textarea } from '@/components/ui/textarea';
 import { createLead, updateLeadStatus, convertLeadToProcess } from '@/lib/lead-actions';
 import { ClientSearchInput } from '@/components/process/ClientSearchInput';
 import { ClientCreationModal } from '@/components/process/ClientCreationModal';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 
 const leadFormSchema = z.object({
   clientId: z.string().min(1, 'Selecione um cliente.'),
   lawyerId: z.string().min(1, 'Selecione um advogado responsável.'),
   title: z.string().min(5, 'O título da ação deve ter pelo menos 5 caracteres.'),
   legalArea: z.string().min(1, 'Selecione a área jurídica.'),
+  priority: z.enum(['BAIXA', 'MEDIA', 'ALTA', 'CRITICA']).default('MEDIA'),
+  captureSource: z.string().min(1, 'Selecione a fonte de captação.'),
+  isUrgent: z.boolean().default(false),
+  prescriptionDate: z.string().optional().or(z.literal('')),
   description: z.string().optional(),
 });
 
@@ -80,6 +91,24 @@ const statusConfig: Record<LeadStatus, { label: string; color: string; icon: any
   CONVERTIDO: { label: 'Convertido em Processo', color: 'bg-purple-500/10 text-purple-400 border-purple-500/20', icon: FolderKanban },
   REPROVADO: { label: 'Arquivado/Reprovado', color: 'bg-rose-500/10 text-rose-400 border-rose-500/20', icon: AlertCircle },
 };
+
+const priorityConfig: Record<LeadPriority, { label: string; color: string; icon: any }> = {
+  BAIXA: { label: 'Prioridade Baixa', color: 'text-slate-400 bg-slate-500/10 border-slate-500/20', icon: Info },
+  MEDIA: { label: 'Prioridade Média', color: 'text-blue-400 bg-blue-500/10 border-blue-500/20', icon: Info },
+  ALTA: { label: 'Prioridade Alta', color: 'text-orange-400 bg-orange-500/10 border-orange-500/20', icon: AlertCircle },
+  CRITICA: { label: 'Crítico / Imediato', color: 'text-rose-500 bg-rose-500/10 border-rose-500/20', icon: Flame },
+};
+
+const captureSources = [
+  'Google Ads',
+  'Instagram / Facebook',
+  'Site / Blog',
+  'WhatsApp',
+  'Indicação de Cliente',
+  'Indicação de Parceiro',
+  'Passante / Balcão',
+  'Outro'
+];
 
 export default function LeadsPage() {
   const { firestore, isUserLoading } = useFirebase();
@@ -108,6 +137,10 @@ export default function LeadsPage() {
       lawyerId: '',
       title: '',
       legalArea: 'Trabalhista',
+      priority: 'MEDIA',
+      captureSource: 'WhatsApp',
+      isUrgent: false,
+      prescriptionDate: '',
       description: '',
     }
   });
@@ -171,7 +204,7 @@ export default function LeadsPage() {
             <Zap className="h-8 w-8 text-primary" />
             Módulo de Leads
           </h1>
-          <p className="text-sm text-muted-foreground">Triagem, elaboração de teses e conversão para o contencioso.</p>
+          <p className="text-sm text-muted-foreground">Triagem estratégica, análise de prescrição e conversão de novos casos.</p>
         </div>
         <div className="flex items-center gap-3">
           <div className="relative w-64">
@@ -197,7 +230,13 @@ export default function LeadsPage() {
             const client = clientsMap.get(lead.clientId);
             const lawyer = staffMap.get(lead.lawyerId);
             const status = statusConfig[lead.status];
+            const priority = priorityConfig[lead.priority || 'MEDIA'];
             const StatusIcon = status.icon;
+            const PriorityIcon = priority.icon;
+
+            const isNearPrescription = lead.prescriptionDate && 
+              differenceInDays(lead.prescriptionDate.toDate(), new Date()) < 30 &&
+              !isBefore(lead.prescriptionDate.toDate(), startOfDay(new Date()));
 
             return (
               <Card key={lead.id} className={cn(
@@ -207,12 +246,20 @@ export default function LeadsPage() {
                 <CardContent className="p-6">
                   <div className="flex flex-col lg:flex-row gap-6">
                     <div className="flex-1 space-y-4">
-                      <div className="flex items-center gap-3">
+                      <div className="flex flex-wrap items-center gap-2">
                         <Badge variant="outline" className={cn("gap-1.5 h-6 text-[9px] font-black uppercase tracking-widest", status.color)}>
                           <StatusIcon className="h-3 w-3" /> {status.label}
                         </Badge>
+                        <Badge variant="outline" className={cn("gap-1.5 h-6 text-[9px] font-black uppercase tracking-widest", priority.color)}>
+                          <PriorityIcon className="h-3 w-3" /> {priority.label}
+                        </Badge>
+                        {lead.isUrgent && (
+                          <Badge className="bg-rose-600 text-white font-black text-[9px] uppercase tracking-widest h-6">
+                            <ShieldAlert className="h-3 w-3 mr-1" /> Urgente / Liminar
+                          </Badge>
+                        )}
                         <Badge variant="secondary" className="bg-white/5 text-slate-400 text-[9px] font-black uppercase h-6">
-                          <Scale className="h-3 w-3 mr-1" /> {lead.legalArea}
+                          <Target className="h-3 w-3 mr-1" /> {lead.captureSource}
                         </Badge>
                       </div>
                       
@@ -224,16 +271,26 @@ export default function LeadsPage() {
                         </p>
                       </div>
 
-                      {lead.description && (
-                        <p className="text-xs text-slate-500 italic line-clamp-2 leading-relaxed">
-                          {lead.description}
-                        </p>
-                      )}
+                      <div className="flex flex-wrap gap-4 pt-2">
+                        {lead.prescriptionDate && (
+                          <div className={cn(
+                            "flex items-center gap-2 px-3 py-1.5 rounded-lg border text-[10px] font-black uppercase tracking-widest",
+                            isNearPrescription ? "bg-rose-500/10 border-rose-500/30 text-rose-500 animate-pulse" : "bg-white/5 border-white/10 text-slate-400"
+                          )}>
+                            <Flame className="h-3.5 w-3.5" />
+                            Prescrição: {format(lead.prescriptionDate.toDate(), 'dd/MM/yyyy')}
+                          </div>
+                        )}
+                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                          <Scale className="h-3.5 w-3.5 text-primary" />
+                          Área: {lead.legalArea}
+                        </div>
+                      </div>
                     </div>
 
                     <div className="lg:w-72 space-y-4 pt-4 lg:pt-0 lg:border-l lg:border-white/5 lg:pl-6">
                       <div className="space-y-1">
-                        <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Elaboração por:</p>
+                        <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Responsável pela Tese:</p>
                         <div className="flex items-center gap-2">
                           <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-[10px]">
                             {lawyer?.firstName.charAt(0)}{lawyer?.lastName.charAt(0)}
@@ -242,8 +299,10 @@ export default function LeadsPage() {
                         </div>
                       </div>
                       
-                      <div className="pt-2">
-                        <p className="text-[9px] text-slate-600 font-bold uppercase">Entrada em: {format(lead.createdAt.toDate(), 'dd/MM/yyyy HH:mm')}</p>
+                      <div className="pt-2 space-y-1">
+                        <p className="text-[9px] text-slate-600 font-bold uppercase flex items-center gap-1.5">
+                          <Calendar className="h-3 w-3" /> Criado em {format(lead.createdAt.toDate(), 'dd/MM/yyyy')}
+                        </p>
                       </div>
                     </div>
 
@@ -304,10 +363,10 @@ export default function LeadsPage() {
       </div>
 
       <Dialog open={isNewLeadOpen} onOpenChange={setIsNewLeadOpen}>
-        <DialogContent className="sm:max-w-2xl bg-[#020617] border-white/10 text-white">
+        <DialogContent className="sm:max-w-2xl bg-[#020617] border-white/10 text-white max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-2xl font-black font-headline">Novo Lead Pré-Processual</DialogTitle>
-            <DialogDescription className="text-slate-400">Designe um advogado para elaborar a estratégia inicial do caso.</DialogDescription>
+            <DialogTitle className="text-2xl font-black font-headline">Novo Lead Estratégico</DialogTitle>
+            <DialogDescription className="text-slate-400">Analise os riscos, prazos e prioridade antes de iniciar a ação.</DialogDescription>
           </DialogHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 pt-4">
@@ -317,7 +376,7 @@ export default function LeadsPage() {
                   name="clientId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-[10px] font-black uppercase text-slate-500">Cliente *</FormLabel>
+                      <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Cliente Principal *</FormLabel>
                       <FormControl>
                         <ClientSearchInput 
                           selectedClientId={field.value} 
@@ -334,7 +393,7 @@ export default function LeadsPage() {
                   name="lawyerId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-[10px] font-black uppercase text-slate-500">Advogado p/ Elaboração *</FormLabel>
+                      <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Responsável Tese *</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
                           <SelectTrigger className="h-11 bg-black/40 border-white/10">
@@ -359,20 +418,23 @@ export default function LeadsPage() {
                   name="title"
                   render={({ field }) => (
                     <FormItem className="md:col-span-2">
-                      <FormLabel className="text-[10px] font-black uppercase text-slate-500">Título / Objeto da Ação *</FormLabel>
+                      <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Objeto da Ação / Tese *</FormLabel>
                       <FormControl>
-                        <Input placeholder="Ex: Reclamatória Trabalhista - Horas Extras e Dano Moral" className="h-11 bg-black/40 border-white/10" {...field} />
+                        <Input placeholder="Ex: Reclamatória Trabalhista - Vínculo Empregatício" className="h-11 bg-black/40 border-white/10" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-6">
                 <FormField
                   control={form.control}
-                  name="legalArea"
+                  name="priority"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-[10px] font-black uppercase text-slate-500">Área Jurídica *</FormLabel>
+                      <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Prioridade do Lead *</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
                           <SelectTrigger className="h-11 bg-black/40 border-white/10">
@@ -380,12 +442,66 @@ export default function LeadsPage() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent className="bg-[#0f172a] border-white/10">
-                          <SelectItem value="Trabalhista">Trabalhista</SelectItem>
-                          <SelectItem value="Cível">Cível</SelectItem>
-                          <SelectItem value="Criminal">Criminal</SelectItem>
-                          <SelectItem value="Previdenciário">Previdenciário</SelectItem>
+                          <SelectItem value="BAIXA">🔵 Baixa</SelectItem>
+                          <SelectItem value="MEDIA">🟢 Média</SelectItem>
+                          <SelectItem value="ALTA">🟡 Alta</SelectItem>
+                          <SelectItem value="CRITICA">🔴 Crítica / Imediata</SelectItem>
                         </SelectContent>
                       </Select>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="captureSource"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Fonte de Captação *</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger className="h-11 bg-black/40 border-white/10">
+                            <SelectValue placeholder="Como chegou?" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent className="bg-[#0f172a] border-white/10">
+                          {captureSources.map(source => (
+                            <SelectItem key={source} value={source}>{source}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-6">
+                <FormField
+                  control={form.control}
+                  name="prescriptionDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Data de Prescrição</FormLabel>
+                      <FormControl>
+                        <Input type="date" className="h-11 bg-black/40 border-white/10" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="isUrgent"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border border-white/10 bg-black/20 p-3 space-y-0 h-11 mt-6">
+                      <div className="space-y-0.5">
+                        <Label className="text-[10px] font-black uppercase text-rose-400">Tutela de Urgência?</Label>
+                      </div>
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
                     </FormItem>
                   )}
                 />
@@ -396,17 +512,17 @@ export default function LeadsPage() {
                 name="description"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-[10px] font-black uppercase text-slate-500">Notas de Triagem / Estratégia</FormLabel>
+                    <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Notas de Triagem / Fatos</FormLabel>
                     <FormControl>
-                      <Textarea placeholder="Breve resumo da demanda do cliente..." className="min-h-[100px] bg-black/40 border-white/10" {...field} />
+                      <Textarea placeholder="Breve resumo dos fatos relatados pelo cliente..." className="min-h-[100px] bg-black/40 border-white/10" {...field} />
                     </FormControl>
                   </FormItem>
                 )}
               />
 
-              <DialogFooter className="pt-4">
+              <DialogFooter className="pt-4 gap-3">
                 <DialogClose asChild><Button variant="ghost" className="text-slate-400">Cancelar</Button></DialogClose>
-                <Button type="submit" className="bg-primary text-primary-foreground font-black uppercase tracking-widest text-[11px] h-12" disabled={isProcessing === 'creating'}>
+                <Button type="submit" className="bg-primary text-primary-foreground font-black uppercase tracking-widest text-[11px] h-12 shadow-xl shadow-primary/20" disabled={isProcessing === 'creating'}>
                   {isProcessing === 'creating' ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Zap className="h-4 w-4 mr-2" />}
                   Gerar Lead e Notificar
                 </Button>
