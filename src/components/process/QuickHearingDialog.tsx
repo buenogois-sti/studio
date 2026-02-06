@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { format } from 'date-fns';
-import { Calendar as CalendarIcon, Clock, MapPin, Loader2, Gavel } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, MapPin, Loader2, Gavel, Building } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
@@ -23,6 +23,7 @@ const hearingSchema = z.object({
   date: z.string().min(1, 'A data é obrigatória.'),
   time: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Hora inválida.'),
   location: z.string().min(3, 'O local é obrigatório.'),
+  courtBranch: z.string().optional().or(z.literal('')),
   type: z.enum(['CONCILIACAO', 'INSTRUCAO', 'UNA', 'JULGAMENTO', 'OUTRA']),
   responsibleParty: z.string().min(3, 'O responsável é obrigatório.'),
   notes: z.string().optional(),
@@ -50,6 +51,7 @@ export function QuickHearingDialog({ process, open, onOpenChange, onSuccess }: Q
       time: '09:00',
       type: 'UNA',
       location: '',
+      courtBranch: '',
       responsibleParty: '',
     }
   });
@@ -57,6 +59,7 @@ export function QuickHearingDialog({ process, open, onOpenChange, onSuccess }: Q
   React.useEffect(() => {
     if (process && open) {
       form.setValue('location', process.court || '');
+      form.setValue('courtBranch', process.courtBranch || '');
       if (process.leadLawyerId && staffData) {
         const leader = staffData.find(s => s.id === process.leadLawyerId);
         if (leader) {
@@ -77,6 +80,7 @@ export function QuickHearingDialog({ process, open, onOpenChange, onSuccess }: Q
         processName: process.name,
         hearingDate: hearingDateTime.toISOString(),
         location: values.location,
+        courtBranch: values.courtBranch,
         responsibleParty: values.responsibleParty,
         status: 'PENDENTE',
         type: values.type,
@@ -95,14 +99,14 @@ export function QuickHearingDialog({ process, open, onOpenChange, onSuccess }: Q
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-xl max-w-[95vw] overflow-hidden">
+      <DialogContent className="sm:max-w-xl max-w-[95vw] overflow-hidden bg-card border-border">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Gavel className="h-5 w-5 text-primary" />
+          <DialogTitle className="flex items-center gap-2 text-white font-headline text-xl">
+            <Gavel className="h-6 w-6 text-primary" />
             Marcar Audiência
           </DialogTitle>
-          <DialogDescription className="truncate">
-            Agendamento rápido para o processo: <span className="font-bold text-foreground">{process?.name}</span>
+          <DialogDescription className="text-slate-400">
+            Agendamento rápido para o processo: <span className="font-bold text-white">{process?.name}</span>
           </DialogDescription>
         </DialogHeader>
 
@@ -114,9 +118,9 @@ export function QuickHearingDialog({ process, open, onOpenChange, onSuccess }: Q
                 name="type"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Tipo de Audiência</FormLabel>
+                    <FormLabel className="text-white font-bold">Tipo de Audiência</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
+                      <FormControl><SelectTrigger className="bg-background border-border h-11"><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
                       <SelectContent>
                         <SelectItem value="UNA">Una</SelectItem>
                         <SelectItem value="CONCILIACAO">Conciliação</SelectItem>
@@ -134,8 +138,8 @@ export function QuickHearingDialog({ process, open, onOpenChange, onSuccess }: Q
                 name="date"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Data</FormLabel>
-                    <FormControl><Input type="date" {...field} /></FormControl>
+                    <FormLabel className="text-white font-bold">Data</FormLabel>
+                    <FormControl><Input type="date" className="bg-background border-border h-11" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -148,8 +152,8 @@ export function QuickHearingDialog({ process, open, onOpenChange, onSuccess }: Q
                 name="time"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Horário</FormLabel>
-                    <FormControl><Input type="time" {...field} /></FormControl>
+                    <FormLabel className="text-white font-bold">Horário</FormLabel>
+                    <FormControl><Input type="time" className="bg-background border-border h-11" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -159,8 +163,8 @@ export function QuickHearingDialog({ process, open, onOpenChange, onSuccess }: Q
                 name="responsibleParty"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Advogado Responsável</FormLabel>
-                    <FormControl><Input placeholder="Nome do advogado" {...field} /></FormControl>
+                    <FormLabel className="text-white font-bold">Advogado Responsável</FormLabel>
+                    <FormControl><Input placeholder="Nome do advogado" className="bg-background border-border h-11" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -172,7 +176,7 @@ export function QuickHearingDialog({ process, open, onOpenChange, onSuccess }: Q
               name="location"
               render={({ field }) => (
                 <FormItem className="min-w-0">
-                  <FormLabel>Local / Fórum</FormLabel>
+                  <FormLabel className="text-white font-bold">Fórum / Local</FormLabel>
                   <FormControl>
                     <LocationSearch value={field.value} onSelect={field.onChange} />
                   </FormControl>
@@ -181,9 +185,29 @@ export function QuickHearingDialog({ process, open, onOpenChange, onSuccess }: Q
               )}
             />
 
+            <FormField
+              control={form.control}
+              name="courtBranch"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-white font-bold flex items-center gap-2">
+                    <Building className="h-4 w-4 text-primary" /> Vara / Câmara / Turma
+                  </FormLabel>
+                  <FormControl>
+                    <Input 
+                      placeholder="Ex: 2ª Vara do Trabalho de São Bernardo do Campo" 
+                      className="h-11 bg-background border-border" 
+                      {...field} 
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <DialogFooter className="pt-4 flex-col sm:flex-row gap-2">
-              <DialogClose asChild><Button variant="outline" type="button" className="w-full sm:w-auto">Cancelar</Button></DialogClose>
-              <Button type="submit" disabled={isSaving} className="w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/90">
+              <DialogClose asChild><Button variant="ghost" type="button" className="w-full sm:w-auto text-slate-400">Cancelar</Button></DialogClose>
+              <Button type="submit" disabled={isSaving} className="w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/90 font-black uppercase tracking-widest text-[11px] h-11 px-8">
                 {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CalendarIcon className="h-4 w-4 mr-2" />}
                 Confirmar Agendamento
               </Button>

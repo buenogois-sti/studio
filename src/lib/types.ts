@@ -121,6 +121,7 @@ export type Hearing = {
   lawyerId?: string; // ID do advogado responsável pela audiência
   date: Timestamp;
   location: string;
+  courtBranch?: string; // Vara / Câmara
   responsibleParty: string;
   status: HearingStatus;
   type: HearingType;

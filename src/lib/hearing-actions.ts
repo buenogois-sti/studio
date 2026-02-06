@@ -18,6 +18,7 @@ function buildCalendarDescription(data: {
   clientName: string;
   clientPhone: string;
   location: string;
+  courtBranch?: string;
   responsibleParty: string;
   status: string;
   notes?: string;
@@ -33,11 +34,14 @@ function buildCalendarDescription(data: {
     `🔢 Número do Processo:`,
     `${data.processNumber}`,
     ``,
+    `⚖️ Juízo / Vara:`,
+    `${data.courtBranch || 'Não informado'}`,
+    ``,
     `👤 Cliente:`,
     `${data.clientName} - ${data.clientPhone}`,
     `Link WhatsApp: ${whatsappLink}`,
     ``,
-    `⚖️ Fórum / Local:`,
+    `📍 Local:`,
     `${data.location}`,
     ``,
     `👨‍⚖️ Responsável:`,
@@ -58,6 +62,7 @@ export async function createHearing(data: {
   processName: string;
   hearingDate: string;
   location: string;
+  courtBranch?: string;
   responsibleParty: string;
   status: HearingStatus;
   type: HearingType;
@@ -67,7 +72,7 @@ export async function createHearing(data: {
     throw new Error('A conexão com o servidor de dados falhou.');
   }
 
-  const { processId, hearingDate, location, responsibleParty, status, type, notes } = data;
+  const { processId, hearingDate, location, courtBranch, responsibleParty, status, type, notes } = data;
   const session = await getServerSession(authOptions);
   
   if (!session?.user?.id) {
@@ -94,9 +99,10 @@ export async function createHearing(data: {
 
     const hearingRef = await firestoreAdmin.collection('hearings').add({
       processId,
-      lawyerId: session.user.id, // Vincula ao ID do advogado que criou/agendou
+      lawyerId: session.user.id,
       date: new Date(hearingDate),
       location: summarizeAddress(location),
+      courtBranch: courtBranch || '',
       responsibleParty,
       status: status || 'PENDENTE',
       type: type || 'OUTRA',
@@ -118,6 +124,7 @@ export async function createHearing(data: {
         clientName: clientInfo.name,
         clientPhone: clientInfo.phone,
         location: summarizedLoc,
+        courtBranch: courtBranch,
         responsibleParty,
         status: status || 'PENDENTE',
         notes,
@@ -198,6 +205,7 @@ export async function syncHearings() {
           clientName: clientInfo.name,
           clientPhone: clientInfo.phone,
           location: summarizedLoc,
+          courtBranch: hearing.courtBranch,
           responsibleParty: hearing.responsibleParty,
           status: hearing.status,
           notes: hearing.notes,
@@ -276,6 +284,7 @@ export async function updateHearingStatus(hearingId: string, status: HearingStat
                     clientName: clientInfo.name,
                     clientPhone: clientInfo.phone,
                     location: hearing.location,
+                    courtBranch: hearing.courtBranch,
                     responsibleParty: hearing.responsibleParty,
                     status: status, // Status atualizado
                     notes: hearing.notes,

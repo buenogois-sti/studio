@@ -2,7 +2,6 @@
 
 import * as React from 'react';
 import {
-  PlusCircle,
   Loader2,
   RefreshCw,
   AlertTriangle,
@@ -18,13 +17,11 @@ import {
   ChevronRight,
   Gavel,
   History,
-  Search,
   CalendarDays,
-  Info
+  Building
 } from 'lucide-react';
 import { 
   format, 
-  addDays, 
   isToday, 
   isSameDay, 
   startOfMonth, 
@@ -34,7 +31,8 @@ import {
   eachDayOfInterval, 
   isSameMonth, 
   addMonths, 
-  subMonths 
+  subMonths,
+  addDays
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -164,7 +162,7 @@ export default function AudienciasPage() {
     <div className="flex flex-col gap-8 pb-10">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
-                <H1 className="text-white">Agenda de Audiências</H1>
+                <H1 className="text-white text-3xl font-black">Agenda de Audiências</H1>
                 <p className="text-sm text-muted-foreground">
                   {userProfile?.role === 'lawyer' ? 'Seus compromissos judiciais agendados.' : 'Visão global de pauta do escritório.'}
                 </p>
@@ -187,22 +185,22 @@ export default function AudienciasPage() {
                     disabled={isSyncing}
                 >
                     <RefreshCw className={cn("h-4 w-4 mr-2", (isLoading || isSyncing) && "animate-spin")} />
-                    {isSyncing ? 'Sincronizando...' : 'Sincronizar'}
+                    {isSyncing ? 'Sincronizando...' : 'Sincronizar Agenda'}
                 </Button>
             </div>
         </div>
 
         {todayHearings.length > 0 && viewMode !== 'calendar' && (
-            <Card className="border-2 border-primary/20 bg-primary/5">
-                <CardHeader className="pb-3">
+            <Card className="border-2 border-primary/20 bg-primary/5 shadow-[0_0_30px_rgba(245,208,48,0.05)]">
+                <CardHeader className="pb-3 border-b border-white/5">
                     <div className="flex items-center gap-2 text-primary">
                         <Gavel className="h-5 w-5" />
-                        <CardTitle className="text-lg text-white">Foco de Hoje: {todayHearings.length} Audiência(s)</CardTitle>
+                        <CardTitle className="text-lg text-white font-black uppercase tracking-tight">Foco de Hoje: {todayHearings.length} Audiência(s)</CardTitle>
                     </div>
                 </CardHeader>
-                <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 pt-4">
                     {todayHearings.map(h => (
-                        <div key={h.id} className="p-4 rounded-xl bg-[#0f172a] border border-border/50 shadow-sm space-y-3 relative group">
+                        <div key={h.id} className="p-4 rounded-xl bg-[#0f172a] border border-white/5 shadow-sm space-y-3 relative group hover:border-primary/30 transition-all">
                             <div className="absolute top-2 right-2">
                                 <Badge variant="outline" className={cn("text-[9px] font-bold uppercase", statusConfig[h.status || 'PENDENTE'].color)}>
                                     {statusConfig[h.status || 'PENDENTE'].label}
@@ -212,14 +210,17 @@ export default function AudienciasPage() {
                                 <div className="h-10 w-10 rounded-lg bg-primary/10 flex flex-col items-center justify-center border border-primary/20">
                                     <span className="text-[10px] font-black leading-none text-white">{format(h.date.toDate(), 'HH:mm')}</span>
                                 </div>
-                                <div className="min-w-0">
+                                <div className="min-w-0 flex-1">
                                     <p className="font-bold text-sm truncate text-white">{processesMap.get(h.processId)?.name || 'Processo'}</p>
-                                    <p className="text-[10px] text-muted-foreground uppercase font-bold">{h.type}</p>
+                                    <div className="flex items-center gap-1.5 mt-0.5">
+                                        <Badge variant="outline" className="text-[8px] font-black uppercase px-1.5 h-4 border-primary/30 text-primary">{h.type}</Badge>
+                                        <span className="text-[9px] text-slate-400 truncate flex items-center gap-1"><Building className="h-2.5 w-2.5" /> {h.courtBranch}</span>
+                                    </div>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                            <div className="flex items-center gap-2 text-[10px] text-muted-foreground bg-black/20 p-2 rounded-lg border border-white/5">
                                 <MapPin className="h-3 w-3 shrink-0 text-primary" />
-                                <span className="truncate">{h.location}</span>
+                                <span className="truncate font-medium">{h.location}</span>
                             </div>
                         </div>
                     ))}
@@ -228,65 +229,76 @@ export default function AudienciasPage() {
         )}
 
         <Tabs value={viewMode} onValueChange={v => setViewMode(v as any)} className="w-full">
-            <TabsList className="bg-[#0f172a] p-1 border border-border/50 mb-6">
-                <TabsTrigger value="list" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsList className="bg-[#0f172a] p-1 border border-white/10 mb-6 h-12">
+                <TabsTrigger value="list" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground px-6 h-10 font-bold">
                   <ListIcon className="h-4 w-4"/> Próximos 7 Dias
                 </TabsTrigger>
-                <TabsTrigger value="calendar" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <TabsTrigger value="calendar" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground px-6 h-10 font-bold">
                   <CalendarDays className="h-4 w-4"/> Calendário Mensal
                 </TabsTrigger>
-                <TabsTrigger value="history" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                  <History className="h-4 w-4"/> Histórico
+                <TabsTrigger value="history" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground px-6 h-10 font-bold">
+                  <History className="h-4 w-4"/> Histórico de Atas
                 </TabsTrigger>
             </TabsList>
 
             <TabsContent value="list" className="animate-in fade-in duration-300">
-                <Card className="bg-[#0f172a] border-border/50 overflow-hidden">
-                    <div className="divide-y divide-border/30">
+                <Card className="bg-[#0f172a] border-white/10 overflow-hidden shadow-2xl">
+                    <div className="divide-y divide-white/5">
                         {weekDays.map(day => {
                             const daily = hearingsData?.filter(h => isSameDay(h.date.toDate(), day) && h.status === 'PENDENTE') || [];
                             if (daily.length === 0) return null;
 
                             return (
                                 <div key={day.toISOString()} className="p-6">
-                                    <div className="flex items-center gap-4 mb-4">
-                                        <div className="flex flex-col items-center justify-center w-12 h-12 rounded-xl border-2 border-primary/20 bg-primary/5">
+                                    <div className="flex items-center gap-4 mb-6">
+                                        <div className="flex flex-col items-center justify-center w-14 h-14 rounded-2xl border-2 border-primary/20 bg-primary/5">
                                             <span className="text-[10px] font-black uppercase text-primary">{format(day, 'MMM', { locale: ptBR })}</span>
-                                            <span className="text-xl font-black text-white">{format(day, 'dd')}</span>
+                                            <span className="text-2xl font-black text-white">{format(day, 'dd')}</span>
                                         </div>
                                         <div>
-                                            <h3 className="font-bold text-white capitalize">{isToday(day) ? 'Hoje' : format(day, "EEEE", { locale: ptBR })}</h3>
-                                            <p className="text-xs text-muted-foreground">{format(day, "d 'de' MMMM", { locale: ptBR })}</p>
+                                            <h3 className="text-lg font-black text-white capitalize">{isToday(day) ? 'Foco Hoje' : format(day, "EEEE", { locale: ptBR })}</h3>
+                                            <p className="text-xs text-slate-400 font-medium">{format(day, "d 'de' MMMM 'de' yyyy", { locale: ptBR })}</p>
                                         </div>
                                     </div>
-                                    <div className="grid gap-3">
+                                    <div className="grid gap-4">
                                         {daily.map(h => {
                                             const p = processesMap.get(h.processId);
                                             const StatusIcon = statusConfig[h.status || 'PENDENTE'].icon;
                                             return (
-                                                <div key={h.id} className="flex flex-col md:flex-row md:items-center gap-4 p-4 rounded-xl border border-border/30 bg-black/20 hover:bg-black/40 transition-all">
-                                                    <div className="flex items-center gap-2 min-w-[80px]">
+                                                <div key={h.id} className="flex flex-col md:flex-row md:items-center gap-6 p-5 rounded-2xl border border-white/5 bg-black/20 hover:bg-black/40 hover:border-primary/20 transition-all duration-300 group">
+                                                    <div className="flex items-center gap-3 min-w-[100px] border-r border-white/5 pr-4">
                                                         <Clock className="h-4 w-4 text-primary" />
-                                                        <span className="text-sm font-black text-white">{format(h.date.toDate(), 'HH:mm')}</span>
+                                                        <span className="text-base font-black text-white tabular-nums">{format(h.date.toDate(), 'HH:mm')}</span>
                                                     </div>
                                                     <div className="flex-1 min-w-0">
-                                                        <div className="flex items-center gap-2 mb-1">
-                                                            <Badge variant="outline" className="text-[9px] font-black uppercase border-primary/30 text-primary">{h.type}</Badge>
-                                                            <span className="text-[10px] text-muted-foreground truncate">{h.location}</span>
+                                                        <div className="flex flex-wrap items-center gap-2 mb-2">
+                                                            <Badge variant="outline" className="text-[9px] font-black uppercase border-primary/30 text-primary px-2">{h.type}</Badge>
+                                                            <Badge variant="outline" className="text-[9px] font-black uppercase border-white/10 text-slate-400 flex items-center gap-1">
+                                                                <Building className="h-2.5 w-2.5" /> {h.courtBranch || 'Vara não informada'}
+                                                            </Badge>
                                                         </div>
-                                                        <h4 className="font-bold text-base text-white truncate">{p?.name}</h4>
+                                                        <h4 className="font-black text-lg text-white truncate group-hover:text-primary transition-colors">{p?.name}</h4>
+                                                        <p className="text-[10px] text-slate-500 font-mono mt-1">{h.location}</p>
                                                     </div>
-                                                    <div className="flex items-center gap-2">
-                                                        <Badge variant="outline" className={cn("gap-1.5 h-7 px-3", statusConfig[h.status || 'PENDENTE'].color)}>
-                                                            <StatusIcon className="h-3 w-3" />
+                                                    <div className="flex items-center gap-3">
+                                                        <Badge variant="outline" className={cn("gap-1.5 h-8 px-4 text-[10px] font-black uppercase tracking-widest", statusConfig[h.status || 'PENDENTE'].color)}>
+                                                            <StatusIcon className="h-3.5 w-3.5" />
                                                             {statusConfig[h.status || 'PENDENTE'].label}
                                                         </Badge>
                                                         <DropdownMenu>
-                                                            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="text-white/50"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                                                            <DropdownMenuContent align="end" className="bg-card border-border">
-                                                                <DropdownMenuItem onSelect={() => handleUpdateStatus(h.id, 'REALIZADA')}>Marcar como Realizada</DropdownMenuItem>
-                                                                <DropdownMenuItem onSelect={() => handleUpdateStatus(h.id, 'ADIADA')}>Marcar como Adiada</DropdownMenuItem>
-                                                                <DropdownMenuItem className="text-rose-500" onSelect={() => handleUpdateStatus(h.id, 'CANCELADA')}>Cancelar</DropdownMenuItem>
+                                                            <DropdownMenuTrigger asChild>
+                                                                <Button variant="ghost" size="icon" className="text-white/30 hover:text-white rounded-xl h-10 w-10"><MoreVertical className="h-5 w-5" /></Button>
+                                                            </DropdownMenuTrigger>
+                                                            <DropdownMenuContent align="end" className="bg-card border-border w-56 p-1">
+                                                                <DropdownMenuItem onClick={() => handleUpdateStatus(h.id, 'REALIZADA')} className="font-bold gap-2">
+                                                                    <CheckCircle2 className="h-4 w-4 text-emerald-500" /> Marcar como Realizada
+                                                                </DropdownMenuItem>
+                                                                <DropdownMenuItem onClick={() => handleUpdateStatus(h.id, 'ADIADA')} className="font-bold gap-2">
+                                                                    <Clock3 className="h-4 w-4 text-amber-500" /> Marcar como Adiada
+                                                                </DropdownMenuItem>
+                                                                <DropdownMenuItem className="text-rose-500 font-bold gap-2" onClick={() => handleUpdateStatus(h.id, 'CANCELADA')}>
+                                                                    <XCircle className="h-4 w-4" /> Cancelar Audiência
+                                                                </DropdownMenuItem>
                                                             </DropdownMenuContent>
                                                         </DropdownMenu>
                                                     </div>
@@ -297,33 +309,39 @@ export default function AudienciasPage() {
                                 </div>
                             )
                         })}
+                        {hearingsData && hearingsData.filter(h => h.status === 'PENDENTE').length === 0 && (
+                            <div className="flex flex-col items-center justify-center py-32 opacity-30">
+                                <CalendarDays className="h-16 w-16 mb-4" />
+                                <p className="font-black uppercase tracking-widest">Sem audiências pendentes nos próximos 7 dias</p>
+                            </div>
+                        )}
                     </div>
                 </Card>
             </TabsContent>
 
             <TabsContent value="calendar" className="animate-in fade-in duration-300">
               <div className="grid lg:grid-cols-12 gap-6">
-                <Card className="lg:col-span-8 bg-[#0f172a] border-border/50 p-6">
-                  <div className="flex items-center justify-between mb-8">
-                    <h2 className="text-xl font-black text-white uppercase tracking-tight">
+                <Card className="lg:col-span-8 bg-[#0f172a] border-white/10 p-6 shadow-2xl">
+                  <div className="flex items-center justify-between mb-10">
+                    <h2 className="text-2xl font-black text-white uppercase tracking-tighter">
                       {format(currentDate, 'MMMM yyyy', { locale: ptBR })}
                     </h2>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCurrentDate(subMonths(currentDate, 1))}>
-                        <ChevronLeft className="h-4 w-4" />
+                    <div className="flex gap-3">
+                      <Button variant="outline" size="icon" className="h-10 w-10 rounded-xl bg-white/5 border-white/10" onClick={() => setCurrentDate(subMonths(currentDate, 1))}>
+                        <ChevronLeft className="h-5 w-5" />
                       </Button>
-                      <Button variant="outline" size="sm" className="h-8 text-[10px] font-bold uppercase" onClick={() => setCurrentDate(new Date())}>
+                      <Button variant="outline" size="sm" className="h-10 px-6 text-[10px] font-black uppercase rounded-xl border-white/10" onClick={() => setCurrentDate(new Date())}>
                         Hoje
                       </Button>
-                      <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCurrentDate(addMonths(currentDate, 1))}>
-                        <ChevronRight className="h-4 w-4" />
+                      <Button variant="outline" size="icon" className="h-10 w-10 rounded-xl bg-white/5 border-white/10" onClick={() => setCurrentDate(addMonths(currentDate, 1))}>
+                        <ChevronRight className="h-5 w-5" />
                       </Button>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-7 gap-1">
                     {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(d => (
-                      <div key={d} className="text-center text-[10px] font-black uppercase text-muted-foreground pb-4">{d}</div>
+                      <div key={d} className="text-center text-[10px] font-black uppercase text-slate-500 pb-6 tracking-widest">{d}</div>
                     ))}
                     {monthDays.map((day, i) => {
                       const dailyHearings = hearingsData?.filter(h => isSameDay(h.date.toDate(), day)) || [];
@@ -336,10 +354,10 @@ export default function AudienciasPage() {
                           key={i}
                           onClick={() => setSelectedDay(day)}
                           className={cn(
-                            "relative aspect-square p-2 flex flex-col items-center justify-start border border-border/20 transition-all group",
-                            !isCurrentMonth && "opacity-20",
-                            isSelected ? "bg-primary/10 border-primary/50" : "hover:bg-white/5",
-                            isTodayDay && !isSelected && "bg-white/5"
+                            "relative aspect-square p-2 flex flex-col items-center justify-start border border-white/5 transition-all group rounded-xl",
+                            !isCurrentMonth && "opacity-10",
+                            isSelected ? "bg-primary/10 border-primary/40 shadow-inner" : "hover:bg-white/5",
+                            isTodayDay && !isSelected && "bg-white/5 border-primary/20"
                           )}
                         >
                           <span className={cn(
@@ -350,11 +368,12 @@ export default function AudienciasPage() {
                             {format(day, 'd')}
                           </span>
                           
-                          <div className="mt-auto flex flex-wrap justify-center gap-0.5">
+                          <div className="mt-auto flex flex-wrap justify-center gap-1 pb-1">
                             {dailyHearings.slice(0, 3).map(h => (
                               <div key={h.id} className={cn(
                                 "w-1.5 h-1.5 rounded-full",
-                                h.status === 'REALIZADA' ? "bg-emerald-500" : "bg-primary"
+                                h.status === 'REALIZADA' ? "bg-emerald-500 shadow-[0_0_5px_rgba(16,185,129,0.5)]" : 
+                                h.status === 'CANCELADA' ? "bg-rose-500" : "bg-primary shadow-[0_0_5px_rgba(245,208,48,0.5)]"
                               )} />
                             ))}
                             {dailyHearings.length > 3 && <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />}
@@ -366,39 +385,45 @@ export default function AudienciasPage() {
                 </Card>
 
                 <div className="lg:col-span-4 space-y-4">
-                  <Card className="bg-[#0f172a] border-border/50 flex flex-col h-full min-h-[400px]">
-                    <CardHeader className="border-b border-border/30 pb-4">
+                  <Card className="bg-[#0f172a] border-white/10 flex flex-col h-full min-h-[400px] shadow-2xl overflow-hidden">
+                    <CardHeader className="border-b border-white/5 pb-4 bg-white/5">
                       <div className="flex items-center justify-between">
-                        <CardTitle className="text-sm font-black uppercase tracking-widest text-primary">
+                        <CardTitle className="text-xs font-black uppercase tracking-[0.2em] text-primary">
                           {selectedDay ? format(selectedDay, "dd 'de' MMMM", { locale: ptBR }) : 'Selecione um dia'}
                         </CardTitle>
-                        <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
-                          {hearingsForSelectedDay.length} Eventos
+                        <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20 text-[10px] font-black">
+                          {hearingsForSelectedDay.length} Evento(s)
                         </Badge>
                       </div>
                     </CardHeader>
                     <CardContent className="p-0 flex-1">
-                      <ScrollArea className="h-[500px]">
-                        <div className="p-4 space-y-3">
+                      <ScrollArea className="h-[550px]">
+                        <div className="p-4 space-y-4">
                           {hearingsForSelectedDay.length > 0 ? (
                             hearingsForSelectedDay.map(h => (
-                              <div key={h.id} className="p-3 rounded-xl border border-border/30 bg-black/20 space-y-2">
+                              <div key={h.id} className="p-4 rounded-2xl border border-white/5 bg-black/30 space-y-3 hover:border-primary/20 transition-all">
                                 <div className="flex items-center justify-between">
-                                  <span className="text-xs font-black text-white">{format(h.date.toDate(), 'HH:mm')}</span>
-                                  <Badge variant="outline" className={cn("text-[8px] font-black uppercase", statusConfig[h.status || 'PENDENTE'].color)}>
+                                  <div className="flex items-center gap-2">
+                                    <Clock className="h-3 w-3 text-primary" />
+                                    <span className="text-xs font-black text-white">{format(h.date.toDate(), 'HH:mm')}</span>
+                                  </div>
+                                  <Badge variant="outline" className={cn("text-[8px] font-black uppercase tracking-widest", statusConfig[h.status || 'PENDENTE'].color)}>
                                     {h.status}
                                   </Badge>
                                 </div>
-                                <p className="text-xs font-bold text-slate-200 truncate">{processesMap.get(h.processId)?.name}</p>
-                                <p className="text-[10px] text-muted-foreground truncate flex items-center gap-1">
-                                  <MapPin className="h-3 w-3 text-primary" /> {h.location}
+                                <div className="space-y-1">
+                                    <p className="text-xs font-black text-slate-200 leading-tight truncate">{processesMap.get(h.processId)?.name}</p>
+                                    <p className="text-[9px] text-primary font-bold uppercase flex items-center gap-1.5"><Building className="h-3 w-3" /> {h.courtBranch || 'Vara não informada'}</p>
+                                </div>
+                                <p className="text-[10px] text-slate-500 truncate flex items-center gap-1.5">
+                                  <MapPin className="h-3 w-3 text-primary shrink-0" /> {h.location}
                                 </p>
                               </div>
                             ))
                           ) : (
-                            <div className="flex flex-col items-center justify-center py-20 text-center opacity-30">
-                              <CalendarIcon className="h-10 w-10 mb-2" />
-                              <p className="text-xs font-bold uppercase">Sem compromissos</p>
+                            <div className="flex flex-col items-center justify-center py-32 text-center opacity-20">
+                              <CalendarIcon className="h-12 w-12 mb-3" />
+                              <p className="text-[10px] font-black uppercase tracking-widest">Sem compromissos para este dia</p>
                             </div>
                           )}
                         </div>
@@ -410,39 +435,42 @@ export default function AudienciasPage() {
             </TabsContent>
 
             <TabsContent value="history" className="animate-in fade-in duration-300">
-                <Card className="bg-[#0f172a] border-border/50 overflow-hidden">
+                <Card className="bg-[#0f172a] border-white/10 overflow-hidden shadow-2xl">
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm text-left">
-                        <thead className="bg-muted/30 text-[10px] uppercase font-black tracking-widest text-muted-foreground border-b border-border/50">
+                        <thead className="bg-white/5 text-[10px] uppercase font-black tracking-[0.2em] text-slate-500 border-b border-white/5">
                           <tr>
-                            <th className="px-6 py-4">Data/Hora</th>
-                            <th className="px-6 py-4">Processo</th>
-                            <th className="px-6 py-4">Tipo</th>
-                            <th className="px-6 py-4">Local</th>
-                            <th className="px-6 py-4 text-right">Status</th>
+                            <th className="px-6 py-5">Data/Hora</th>
+                            <th className="px-6 py-5">Processo</th>
+                            <th className="px-6 py-5">Vara / Juízo</th>
+                            <th className="px-6 py-5">Tipo</th>
+                            <th className="px-6 py-5 text-right">Status Final</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-border/20">
+                        <tbody className="divide-y divide-white/5">
                           {historyHearings.map(h => {
                               const config = statusConfig[h.status];
                               const StatusIcon = config.icon;
                               return (
-                                <tr key={h.id} className="hover:bg-white/5 transition-colors">
-                                    <td className="px-6 py-4 text-white font-bold whitespace-nowrap">
+                                <tr key={h.id} className="hover:bg-white/[0.02] transition-colors group">
+                                    <td className="px-6 py-5 text-white font-black whitespace-nowrap">
                                       {format(h.date.toDate(), 'dd/MM/yyyy HH:mm')}
                                     </td>
-                                    <td className="px-6 py-4 text-slate-300 truncate max-w-[250px]">
+                                    <td className="px-6 py-5 text-slate-300 truncate max-w-[250px] font-bold group-hover:text-primary transition-colors">
                                       {processesMap.get(h.processId)?.name || 'Processo não encontrado'}
                                     </td>
-                                    <td className="px-6 py-4">
-                                      <Badge variant="outline" className="text-[10px] font-black uppercase bg-white/5 border-white/10">
+                                    <td className="px-6 py-5">
+                                      <div className="flex items-center gap-2 text-[10px] text-slate-400 font-medium">
+                                        <Building className="h-3 w-3 text-slate-600" />
+                                        <span className="truncate max-w-[200px]">{h.courtBranch || 'N/A'}</span>
+                                      </div>
+                                    </td>
+                                    <td className="px-6 py-5">
+                                      <Badge variant="outline" className="text-[10px] font-black uppercase bg-white/5 border-white/10 text-slate-400">
                                         {h.type}
                                       </Badge>
                                     </td>
-                                    <td className="px-6 py-4 text-muted-foreground text-xs truncate max-w-[200px]">
-                                      {h.location}
-                                    </td>
-                                    <td className="px-6 py-4 text-right">
+                                    <td className="px-6 py-5 text-right">
                                       <Badge variant="outline" className={cn("gap-1.5 h-7 px-3 text-[9px] font-black uppercase tracking-widest", config.color)}>
                                           <StatusIcon className="h-3 w-3" />
                                           {config.label}
@@ -453,9 +481,9 @@ export default function AudienciasPage() {
                           })}
                           {historyHearings.length === 0 && (
                             <tr>
-                              <td colSpan={5} className="px-6 py-32 text-center text-muted-foreground italic bg-black/10">
-                                <History className="h-10 w-10 mx-auto mb-4 opacity-20" />
-                                <p className="font-bold uppercase tracking-widest text-[10px]">Nenhuma audiência no histórico operacional</p>
+                              <td colSpan={5} className="px-6 py-40 text-center text-muted-foreground italic bg-black/10">
+                                <History className="h-16 w-16 mx-auto mb-6 opacity-10" />
+                                <p className="font-black uppercase tracking-[0.3em] text-[10px]">Nenhuma pauta finalizada no histórico</p>
                               </td>
                             </tr>
                           )}
