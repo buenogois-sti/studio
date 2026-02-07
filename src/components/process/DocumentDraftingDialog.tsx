@@ -22,7 +22,8 @@ import {
   CheckCircle2,
   ChevronRight,
   FolderOpen,
-  ArrowRight
+  ArrowRight,
+  Bot
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -103,14 +104,29 @@ export function DocumentDraftingDialog({ process, open, onOpenChange }: Document
             <div>
               <DialogTitle className="text-xl font-black font-headline">Gerador de Rascunhos</DialogTitle>
               <DialogDescription className="text-slate-400">
-                Criando atalhos inteligentes para: <span className="text-white font-bold">{process?.name}</span>
+                Processando inteligência documental para: <span className="text-white font-bold">{process?.name}</span>
               </DialogDescription>
             </div>
           </div>
         </DialogHeader>
 
         <div className="p-6 space-y-6">
-          {generatedUrl ? (
+          {isDrafting ? (
+            <div className="py-20 flex flex-col items-center justify-center text-center space-y-6 animate-in fade-in duration-500">
+              <div className="relative">
+                <div className="h-24 w-24 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <Bot className="h-10 w-10 text-primary" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-xl font-black text-white tracking-tighter uppercase">Processando Automação</h3>
+                <p className="text-sm text-slate-400 max-w-xs mx-auto">
+                  Estamos copiando o modelo, preenchendo as tags de qualificação e organizando na pasta do processo...
+                </p>
+              </div>
+            </div>
+          ) : generatedUrl ? (
             <div className="py-12 flex flex-col items-center justify-center text-center space-y-6 animate-in zoom-in-95 duration-500">
               <div className="relative">
                 <div className="h-24 w-24 rounded-3xl bg-emerald-500/10 flex items-center justify-center border-2 border-emerald-500/20">
@@ -123,7 +139,7 @@ export function DocumentDraftingDialog({ process, open, onOpenChange }: Document
               <div className="space-y-2">
                 <h3 className="text-2xl font-black text-white tracking-tighter">RASCUNHO PRONTO</h3>
                 <p className="text-sm text-slate-400 max-w-sm mx-auto">
-                  O documento <strong>{lastTemplateName}</strong> foi gerado e salvo na pasta do processo. Use o editor oficial do Google para concluir a peça.
+                  O documento <strong>{lastTemplateName}</strong> foi gerado com sucesso! Clique abaixo para abrir no Google Docs.
                 </p>
               </div>
               <div className="flex flex-col gap-3 w-full max-w-md pt-4">
@@ -147,7 +163,7 @@ export function DocumentDraftingDialog({ process, open, onOpenChange }: Document
               <div className="relative group">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 group-focus-within:text-primary transition-colors" />
                 <Input 
-                  placeholder="Qual peça deseja rascunhar? (ex: Recurso, Manifestação...)" 
+                  placeholder="Pesquise por modelo ou categoria..." 
                   className="pl-10 h-14 bg-black/40 border-white/10 text-white focus:border-primary transition-all rounded-xl text-base shadow-inner" 
                   value={searchTerm} 
                   onChange={(e) => setSearchTerm(e.target.value)} 
@@ -158,7 +174,7 @@ export function DocumentDraftingDialog({ process, open, onOpenChange }: Document
                 {isLoading ? (
                   <div className="flex flex-col items-center justify-center h-full space-y-4 py-20">
                     <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                    <p className="text-xs font-black uppercase tracking-widest text-slate-500">Acessando Acervo de Modelos...</p>
+                    <p className="text-xs font-black uppercase tracking-widest text-slate-500">Acessando Biblioteca de Elite...</p>
                   </div>
                 ) : filteredTemplates.length > 0 ? (
                   <div className="grid gap-3">
@@ -166,20 +182,17 @@ export function DocumentDraftingDialog({ process, open, onOpenChange }: Document
                       <button 
                         key={t.id} 
                         onClick={() => handleSelectTemplate(t)}
-                        disabled={isDrafting !== null}
                         className={cn(
                           "w-full flex items-center justify-between p-5 rounded-2xl border transition-all duration-300 group text-left",
-                          isDrafting === t.id 
-                            ? "bg-primary/10 border-primary/40 shadow-[0_0_20px_rgba(245,208,48,0.05)]" 
-                            : "bg-white/5 border-white/5 hover:border-primary/30 hover:bg-white/[0.08]"
+                          "bg-white/5 border-white/5 hover:border-primary/30 hover:bg-white/[0.08]"
                         )}
                       >
                         <div className="flex items-start gap-4 flex-1 min-w-0">
                           <div className={cn(
                             "h-12 w-12 rounded-xl flex items-center justify-center shrink-0 transition-all shadow-inner",
-                            isDrafting === t.id ? "bg-primary text-primary-foreground" : "bg-black/40 text-slate-500 group-hover:text-primary group-hover:bg-primary/10"
+                            "bg-black/40 text-slate-500 group-hover:text-primary group-hover:bg-primary/10"
                           )}>
-                            {isDrafting === t.id ? <Loader2 className="h-6 w-6 animate-spin" /> : <FileText className="h-6 w-6" />}
+                            <FileText className="h-6 w-6" />
                           </div>
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2 mb-1">
@@ -211,7 +224,7 @@ export function DocumentDraftingDialog({ process, open, onOpenChange }: Document
         <div className="p-4 bg-white/5 border-t border-white/5 flex items-center justify-center gap-2">
           <FolderOpen className="h-3 w-3 text-slate-500" />
           <span className="text-[9px] font-black uppercase text-slate-500 tracking-widest">
-            A Bueno Gois utiliza Google Docs para edição e inteligência documental
+            Integração Bueno Gois & Google Workspace (Docs API)
           </span>
         </div>
       </DialogContent>

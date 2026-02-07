@@ -54,16 +54,6 @@ export async function searchProcesses(query: string): Promise<Process[]> {
     try {
         const q = query.trim().toLowerCase();
         
-        // Busca exata por número do processo primeiro
-        const exactMatch = await firestoreAdmin.collection('processes')
-            .where('processNumber', '==', query.trim())
-            .limit(1)
-            .get();
-        
-        if (!exactMatch.empty) {
-            return [{ id: exactMatch.docs[0].id, ...exactMatch.docs[0].data() } as Process];
-        }
-
         const snapshot = await firestoreAdmin.collection('processes')
             .orderBy('updatedAt', 'desc')
             .limit(150)
@@ -73,8 +63,7 @@ export async function searchProcesses(query: string): Promise<Process[]> {
             .map(doc => ({ id: doc.id, ...doc.data() } as Process))
             .filter(p => 
                 p.name.toLowerCase().includes(q) || 
-                (p.processNumber || '').includes(q) ||
-                p.opposingParties?.some(party => party.name.toLowerCase().includes(q))
+                (p.processNumber || '').includes(q)
             );
 
         return results.slice(0, 10);
@@ -86,7 +75,7 @@ export async function searchProcesses(query: string): Promise<Process[]> {
 
 export async function draftDocument(
     processId: string, 
-    templateId: string, 
+    templateIdOrLink: string, 
     documentName: string,
     category: string
 ): Promise<{ success: boolean; url?: string; error?: string }> {
@@ -113,23 +102,23 @@ export async function draftDocument(
         const { drive, docs } = apiClients;
         
         // Re-fetch para pegar driveFolderId atualizado
-        const updatedProcess = await firestoreAdmin.collection('processes').doc(processId).get();
-        const physicalFolderId = updatedProcess.data()?.driveFolderId;
+        const updatedProcessSnap = await firestoreAdmin.collection('processes').doc(processId).get();
+        const physicalFolderId = updatedProcessSnap.data()?.driveFolderId;
         if (!physicalFolderId) throw new Error("Pasta do processo não disponível no Drive.");
 
         // Define subpasta baseada em heurística de categoria
         const categoryMap: Record<string, string> = {
             'procuração': '01 - Petições',
             'contrato': '01 - Petições',
-            'ata': '04 - Atas e Audiências',
-            'audiência': '04 - Atas e Audiências',
-            'recurso': '03 - Recursos',
+            'ata': '05 - Atas e Audiências',
+            'audiência': '05 - Atas e Audiências',
+            'recurso': '04 - Recursos',
             'decisão': '02 - Decisões e Sentenças',
             'sentença': '02 - Decisões e Sentenças',
         };
         
-        const targetFolder = Object.entries(categoryMap).find(([key]) => category.toLowerCase().includes(key))?.[1] || '01 - Petições';
-        const targetFolderId = await ensureSubfolder(drive, physicalFolderId, targetFolder);
+        const targetFolderName = Object.entries(categoryMap).find(([key]) => category.toLowerCase().includes(key))?.[1] || '01 - Petições';
+        const targetFolderId = await ensureSubfolder(drive, physicalFolderId, targetFolderName);
 
         // Coleta dados em paralelo para o preenchimento
         const [clientDoc, staffDoc] = await Promise.all([
@@ -141,7 +130,7 @@ export async function draftDocument(
         const staffData = staffDoc?.data() as Staff | undefined;
         const officeData = settingsDoc.data();
 
-        const cleanTemplateId = extractFileId(templateId);
+        const cleanTemplateId = extractFileId(templateIdOrLink);
         const newFileName = `${documentName} - ${processData.name}`;
         
         // Copiar o modelo para a pasta do processo
@@ -149,7 +138,7 @@ export async function draftDocument(
 
         if (!copiedFile.id) throw new Error("Falha ao criar cópia do modelo no Google Drive.");
 
-        // Preparar dados para substituição
+        // Preparar dados para substituição (Tags)
         const clientAddr = clientData.address ? `${clientData.address.street || ''}, nº ${clientData.address.number || 'S/N'}, ${clientData.address.neighborhood || ''}, ${clientData.address.city || ''}/${clientData.address.state || ''}` : '---';
         const staffAddr = staffData?.address ? `${staffData.address.street || ''}, nº ${staffData.address.number || 'S/N'}, ${staffData.address.neighborhood || ''}, ${staffData.address.city || ''}/${staffData.address.state || ''}` : '---';
         const clientFull = `${clientData.firstName} ${clientData.lastName || ''}`.trim();
@@ -159,6 +148,8 @@ export async function draftDocument(
             'RECLAMANTE_NOME': clientFull,
             'CLIENTE_CPF_CNPJ': clientData.document || '---',
             'CLIENTE_RG': clientData.rg || '---',
+            'CLIENTE_RG_ORGAO': clientData.rgIssuer || 'SSP/SP',
+            'CLIENTE_RG_EXPEDICAO': clientData.rgIssuanceDate ? format(new Date(clientData.rgIssuanceDate as any), "dd/MM/yyyy") : '---',
             'CLIENTE_NACIONALIDADE': clientData.nationality || 'brasileiro(a)',
             'CLIENTE_ESTADO_CIVIL': clientData.civilStatus || 'solteiro(a)',
             'CLIENTE_PROFISSAO': clientData.profession || 'ajudante geral',
@@ -167,6 +158,7 @@ export async function draftDocument(
             'PROCESSO_VARA': processData.courtBranch || '---',
             'PROCESSO_FORUM': processData.court || '---',
             'RECLAMADA_NOME': processData.opposingParties?.[0]?.name || '---',
+            'RECLAMADA_LISTA_TODOS': processData.opposingParties?.map(p => p.name).join(', ') || '---',
             'ADVOGADO_LIDER_NOME': staffData ? `${staffData.firstName} ${staffData.lastName}` : '---',
             'ADVOGADO_LIDER_OAB': staffData?.oabNumber || '---',
             'ADVOGADO_LIDER_ENDERECO_PROFISSIONAL': staffAddr,
@@ -175,20 +167,22 @@ export async function draftDocument(
             'DATA_HOJE': format(new Date(), "dd/MM/yyyy"),
         };
 
+        // Processa as tags no rascunho
         await replacePlaceholdersInDoc(docs, copiedFile.id, dataMap);
 
-        // Registrar na linha do tempo
+        // Registrar na linha do tempo do processo
         await firestoreAdmin.collection('processes').doc(processId).update({
             timeline: FieldValue.arrayUnion({
                 id: uuidv4(),
                 type: 'petition',
-                description: `DOCUMENTO GERADO: "${documentName}"`,
+                description: `DOCUMENTO GERADO: "${documentName}". Disponível no Drive.`,
                 date: Timestamp.now(),
                 authorName: session.user.name || 'Sistema'
             }),
             updatedAt: FieldValue.serverTimestamp()
         });
 
+        // Retorna o link completo da cópia gerada
         return { success: true, url: copiedFile.webViewLink! };
     } catch (error: any) {
         console.error("[draftDocument] Erro crítico:", error);

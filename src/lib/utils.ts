@@ -7,20 +7,30 @@ export function cn(...inputs: ClassValue[]) {
 
 /**
  * Extrai o ID de um arquivo do Google Drive a partir de um link compartilhado.
- * Otimizado para evitar loops de regex em strings inválidas.
+ * Suporta formatos de /d/, id=, folders/ e IDs diretos.
  */
 export function extractFileId(input: string): string {
   if (!input || typeof input !== 'string') return '';
   const trimmed = input.trim();
   
-  if (trimmed.length < 20) return trimmed;
-  if (!trimmed.includes('/') && !trimmed.includes('=')) return trimmed;
-  
-  const match = trimmed.match(/\/d\/([a-zA-Z0-9_-]{25,})/) || 
-                trimmed.match(/id=([a-zA-Z0-9_-]{25,})/) ||
-                trimmed.match(/folders\/([a-zA-Z0-9_-]{25,})/);
+  const patterns = [
+    /\/d\/([a-zA-Z0-9_-]{25,})/,
+    /id=([a-zA-Z0-9_-]{25,})/,
+    /folders\/([a-zA-Z0-9_-]{25,})/,
+    /document\/d\/([a-zA-Z0-9_-]{25,})/
+  ];
 
-  return match?.[1] || trimmed;
+  for (const pattern of patterns) {
+    const match = trimmed.match(pattern);
+    if (match && match[1]) return match[1];
+  }
+
+  // Se não encontrar padrão, mas a string tiver tamanho de ID, retorna ela mesma
+  if (trimmed.length >= 25 && !trimmed.includes('/') && !trimmed.includes(' ')) {
+    return trimmed;
+  }
+
+  return trimmed;
 }
 
 /**
