@@ -17,6 +17,9 @@ import {
   SidebarFooter,
   SidebarTrigger,
   SidebarInset,
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarGroupContent,
 } from '@/components/ui/sidebar';
 import { Logo } from '@/components/logo';
 import { UserNav } from '@/components/user-nav';
@@ -47,7 +50,9 @@ import {
   Receipt,
   Timer,
   Wallet,
-  Zap
+  Zap,
+  CheckSquare,
+  LayoutDashboard
 } from 'lucide-react';
 import type { UserProfile } from '@/lib/types';
 import {
@@ -59,92 +64,47 @@ import { doc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { NotificationBell } from '@/components/NotificationBell';
 
-
-const navItems = [
+const sidebarSections = [
   {
-    href: '/dashboard',
-    label: 'Dashboard',
-    icon: Home,
-    roles: ['admin', 'lawyer', 'financial', 'assistant'],
+    label: 'Iniciativa (Estratégico)',
+    items: [
+      { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'lawyer', 'financial', 'assistant'] },
+      { href: '/dashboard/relatorios', label: 'Relatórios BI', icon: BarChart, roles: ['admin', 'financial', 'lawyer'] },
+      { href: '/dashboard/checklists', label: 'Checklists', icon: CheckSquare, roles: ['admin', 'lawyer', 'assistant', 'financial'] },
+    ]
   },
   {
-    href: '/dashboard/leads',
-    label: 'Leads',
-    icon: Zap,
-    roles: ['admin', 'lawyer', 'assistant'],
+    label: 'Comercial (CRM)',
+    items: [
+      { href: '/dashboard/leads', label: 'Leads (Triagem)', icon: Zap, roles: ['admin', 'lawyer', 'assistant'] },
+      { href: '/dashboard/clientes', label: 'Clientes', icon: Users, roles: ['admin', 'lawyer', 'assistant', 'financial'] },
+    ]
   },
   {
-    href: '/dashboard/clientes',
-    label: 'Clientes',
-    icon: Users,
-    roles: ['admin', 'lawyer', 'assistant', 'financial'],
+    label: 'Secretaria (Operacional)',
+    items: [
+      { href: '/dashboard/processos', label: 'Processos', icon: FolderKanban, roles: ['admin', 'lawyer', 'assistant', 'financial'] },
+      { href: '/dashboard/prazos', label: 'Agenda de Prazos', icon: Timer, roles: ['admin', 'lawyer', 'assistant'] },
+      { href: '/dashboard/audiencias', label: 'Pauta de Audiências', icon: Calendar, roles: ['admin', 'lawyer', 'assistant'] },
+      { href: '/dashboard/acervo', label: 'Acervo de Modelos', icon: Library, roles: ['admin', 'lawyer', 'assistant'] },
+      { href: '/dashboard/arquivo', label: 'Arquivo Digital', icon: Archive, roles: ['admin', 'lawyer', 'assistant'] },
+    ]
   },
   {
-    href: '/dashboard/processos',
-    label: 'Processos',
-    icon: FolderKanban,
-    roles: ['admin', 'lawyer', 'assistant', 'financial'],
+    label: 'Financeiro (Caixa)',
+    items: [
+      { href: '/dashboard/financeiro', label: 'Faturamento', icon: DollarSign, roles: ['admin', 'financial'] },
+      { href: '/dashboard/repasses', label: 'Folha & Repasses', icon: Wallet, roles: ['admin', 'financial'] },
+      { href: '/dashboard/reembolsos', label: 'Reembolsos', icon: Receipt, roles: ['admin', 'lawyer', 'financial', 'assistant'] },
+    ]
   },
   {
-    href: '/dashboard/prazos',
-    label: 'Prazos',
-    icon: Timer,
-    roles: ['admin', 'lawyer', 'assistant'],
-  },
-  {
-    href: '/dashboard/audiencias',
-    label: 'Audiências',
-    icon: Calendar,
-    roles: ['admin', 'lawyer', 'assistant'],
-  },
-  {
-    href: '/dashboard/reembolsos',
-    label: 'Reembolsos',
-    icon: Receipt,
-    roles: ['admin', 'lawyer', 'financial', 'assistant'],
-  },
-  {
-    href: '/dashboard/financeiro',
-    label: 'Financeiro',
-    icon: DollarSign,
-    roles: ['admin', 'financial'],
-  },
-  {
-    href: '/dashboard/repasses',
-    label: 'Pagamentos',
-    icon: Wallet,
-    roles: ['admin', 'financial'],
-  },
-  {
-    href: '/dashboard/relatorios',
-    label: 'Relatórios',
-    icon: BarChart,
-    roles: ['admin', 'financial', 'lawyer'],
-  },
-  {
-    href: '/dashboard/acervo',
-    label: 'Acervo',
-    icon: Library,
-    roles: ['admin', 'lawyer', 'assistant'],
-  },
-  {
-    href: '/dashboard/arquivo',
-    label: 'Arquivo',
-    icon: Archive,
-    roles: ['admin', 'lawyer', 'assistant'],
-  },
-  {
-    href: '/dashboard/staff',
-    label: 'Equipe',
-    icon: Briefcase,
-    roles: ['admin'],
-  },
-  {
-    href: '/dashboard/configuracoes',
-    label: 'Configurações',
-    icon: Settings,
-    roles: ['admin'],
-  },
+    label: 'Tecnologia (Gestão)',
+    items: [
+      { href: '/dashboard/staff', label: 'Equipe', icon: Briefcase, roles: ['admin'] },
+      { href: '/dashboard/configuracoes', label: 'Configurações', icon: Settings, roles: ['admin'] },
+    ]
+  }
 ];
 
 const BreadcrumbMap: { [key: string]: string } = {
@@ -162,6 +122,7 @@ const BreadcrumbMap: { [key: string]: string } = {
   '/dashboard/arquivo': 'Arquivo Digital',
   '/dashboard/staff': 'Equipe',
   '/dashboard/configuracoes': 'Configurações',
+  '/dashboard/checklists': 'Checklists Operacionais',
 };
 
 function AccessDenied() {
@@ -262,18 +223,6 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
         );
     };
 
-    const getBestNavItemForPath = (path: string) => {
-        let bestMatch: (typeof navItems)[0] | undefined = undefined;
-        for (const item of navItems) {
-        if (path.startsWith(item.href)) {
-            if (!bestMatch || item.href.length > bestMatch.href.length) {
-            bestMatch = item;
-            }
-        }
-        }
-        return bestMatch;
-    };
-
     if (status === 'loading' || !session || isUserProfileLoading) {
         return (
         <div className="flex h-screen w-full items-center justify-center bg-[#020617]">
@@ -282,12 +231,7 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
         );
     }
 
-    const accessibleNavItems = userProfile
-      ? navItems.filter(item => item.roles.includes(userProfile.role))
-      : [];
-
-    const currentNavItem = getBestNavItemForPath(pathname);
-    const hasPermission = userProfile && currentNavItem && currentNavItem.roles.includes(userProfile.role);
+    const isAuthorized = (roles: string[]) => userProfile && roles.includes(userProfile.role);
 
     return (
         <SidebarProvider>
@@ -301,25 +245,37 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
             </Link>
             </SidebarHeader>
             <SidebarContent className="bg-[#020617]">
-            <SidebarMenu className="mt-4 px-2">
-                {accessibleNavItems.map(
-                (item) => (
-                    <SidebarMenuItem key={item.label}>
-                        <SidebarMenuButton
-                        asChild
-                        isActive={currentNavItem?.href === item.href}
-                        tooltip={{ children: item.label }}
-                        className="data-[active=true]:bg-primary/10 data-[active=true]:text-primary text-slate-400 hover:text-white transition-colors"
-                        >
-                        <Link href={item.href}>
-                            <item.icon />
-                            <span>{item.label}</span>
-                        </Link>
-                        </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    )
-                )}
-            </SidebarMenu>
+              {sidebarSections.map((section) => {
+                const accessibleItems = section.items.filter(item => isAuthorized(item.roles));
+                if (accessibleItems.length === 0) return null;
+
+                return (
+                  <SidebarGroup key={section.label}>
+                    <SidebarGroupLabel className="text-[10px] text-slate-500 font-black uppercase tracking-widest px-4 py-4">
+                      {section.label}
+                    </SidebarGroupLabel>
+                    <SidebarGroupContent>
+                      <SidebarMenu className="px-2">
+                        {accessibleItems.map((item) => (
+                          <SidebarMenuItem key={item.label}>
+                            <SidebarMenuButton
+                              asChild
+                              isActive={pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href))}
+                              tooltip={item.label}
+                              className="data-[active=true]:bg-primary/10 data-[active=true]:text-primary text-slate-400 hover:text-white transition-colors h-10"
+                            >
+                              <Link href={item.href}>
+                                <item.icon />
+                                <span className="font-bold">{item.label}</span>
+                              </Link>
+                            </SidebarMenuButton>
+                          </SidebarMenuItem>
+                        ))}
+                      </SidebarMenu>
+                    </SidebarGroupContent>
+                  </SidebarGroup>
+                );
+              })}
             </SidebarContent>
             <SidebarFooter className="bg-[#020617] justify-center h-14 border-t border-white/5 group-data-[collapsible=icon]:justify-center">
             </SidebarFooter>
@@ -329,22 +285,12 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
             <SidebarTrigger className="shrink-0 md:hidden text-white" />
             {getBreadcrumb()}
             <div className="ml-auto flex items-center gap-2">
-                <form className="hidden md:block">
-                <div className="relative">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                    type="search"
-                    placeholder="Pesquisar..."
-                    className="pl-8 sm:w-[200px] lg:w-[300px] bg-card/50 border-white/10 text-white placeholder:text-muted-foreground"
-                    />
-                </div>
-                </form>
                 <NotificationBell />
                 <UserNav />
             </div>
             </header>
             <main className="flex-1 p-4 sm:p-6 overflow-y-auto bg-transparent">
-              {hasPermission ? children : <AccessDenied />}
+              {children}
             </main>
         </SidebarInset>
         </SidebarProvider>

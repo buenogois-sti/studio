@@ -41,7 +41,6 @@ service cloud.firestore {
     }
 
     match /reimbursements/{reimbursementId} {
-      // Regra de Leitura: Admin/Financial veem tudo, User vê apenas os seus documentos
       allow read: if isAuthenticated() && (
         isOneOfRoles(['admin', 'financial']) || 
         (resource.data.userId == request.auth.uid) ||
@@ -69,7 +68,6 @@ service cloud.firestore {
     }
 
     match /leads/{leadId} {
-      // Regra de Leitura: Admin/Assistant veem todos. Advogados veem apenas os designados ou criados por eles.
       allow read: if isAuthenticated() && (
         isOneOfRoles(['admin', 'assistant']) || 
         (resource.data.lawyerId == request.auth.uid) ||
@@ -121,6 +119,17 @@ service cloud.firestore {
     match /document_templates/{templateId} {
       allow read: if isAuthenticated();
       allow write: if isAdmin();
+    }
+
+    match /checklist_templates/{templateId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /checklist_executions/{executionId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAdmin();
     }
 
     match /system_settings/{settingId} {

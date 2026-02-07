@@ -344,3 +344,38 @@ export type DocumentTemplate = {
   createdAt: Timestamp;
   updatedAt?: Timestamp;
 };
+
+// CHECKLIST TYPES
+export type ChecklistItemType = 'YES_NO' | 'YES_NO_MAYBE' | 'TEXT' | 'NUMBER';
+
+export type ChecklistItem = {
+  id: string;
+  label: string;
+  type: ChecklistItemType;
+  required: boolean;
+  options?: string[]; // Para tipos customizados se necessário no futuro
+};
+
+export type ChecklistTemplate = {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  items: ChecklistItem[];
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+  createdBy: string;
+  createdByName: string;
+};
+
+export type ChecklistExecution = {
+  id: string;
+  templateId: string;
+  templateTitle: string;
+  userId: string;
+  userName: string;
+  answers: Record<string, any>; // Key: itemId, Value: answer
+  status: 'COMPLETED' | 'DRAFT';
+  executedAt: Timestamp;
+  observations?: string;
+};
