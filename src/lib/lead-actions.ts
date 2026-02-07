@@ -1,4 +1,3 @@
-
 'use server';
 
 import { firestoreAdmin } from '@/firebase/admin';
@@ -84,6 +83,33 @@ export async function updateLeadStatus(id: string, status: LeadStatus) {
   }
 }
 
+export async function assignLeadToLawyer(leadId: string, lawyerId: string) {
+  if (!firestoreAdmin) throw new Error('Servidor indisponível.');
+  try {
+    const lawyerDoc = await firestoreAdmin.collection('staff').doc(lawyerId).get();
+    if (!lawyerDoc.exists) throw new Error('Advogado não encontrado.');
+    const lawyerData = lawyerDoc.data();
+
+    await firestoreAdmin.collection('leads').doc(leadId).update({
+      lawyerId,
+      updatedAt: Timestamp.now()
+    });
+
+    await createNotification({
+      userId: lawyerId,
+      title: "Lead Encaminhado",
+      description: `Um novo lead foi atribuído à sua pauta de triagem.`,
+      type: 'info',
+      href: '/dashboard/leads'
+    });
+
+    revalidatePath('/dashboard/leads');
+    return { success: true };
+  } catch (error: any) {
+    throw new Error(error.message);
+  }
+}
+
 export async function convertLeadToProcess(leadId: string) {
   if (!firestoreAdmin) throw new Error('Servidor indisponível.');
   const session = await getServerSession(authOptions);
@@ -96,6 +122,20 @@ export async function convertLeadToProcess(leadId: string) {
     
     const leadData = leadDoc.data() as Lead;
     if (leadData.status === 'CONVERTIDO') throw new Error('Este lead já foi convertido em processo.');
+
+    // Validar se o cliente tem os dados mínimos
+    const clientDoc = await firestoreAdmin.collection('clients').doc(leadData.clientId).get();
+    const clientData = clientDoc.data();
+    
+    const requiredFields = ['document', 'rg', 'address'];
+    const missing = requiredFields.filter(f => !clientData?.[f]);
+    
+    if (missing.length > 0 && leadData.priority === 'CRITICA') {
+        // Permitir conversão crítica mesmo sem dados, mas avisar
+        console.warn('Converting critical lead with missing data:', missing);
+    } else if (missing.length > 0) {
+        throw new Error(`Complete o cadastro do cliente antes da conversão. Faltando: ${missing.join(', ')}`);
+    }
 
     const processRef = firestoreAdmin.collection('processes').doc();
     

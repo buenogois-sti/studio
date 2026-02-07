@@ -69,8 +69,20 @@ service cloud.firestore {
     }
 
     match /leads/{leadId} {
-      allow read: if isAuthenticated();
-      allow create, update: if isOneOfRoles(['admin', 'lawyer', 'assistant']);
+      // Regra de Leitura: Admin/Assistant veem todos. Advogados veem apenas os designados ou criados por eles.
+      allow read: if isAuthenticated() && (
+        isOneOfRoles(['admin', 'assistant']) || 
+        (resource.data.lawyerId == request.auth.uid) ||
+        (request.resource.data.lawyerId == request.auth.uid)
+      );
+      
+      allow create: if isAuthenticated();
+      
+      allow update: if isAuthenticated() && (
+        isOneOfRoles(['admin', 'assistant']) || 
+        (resource.data.lawyerId == request.auth.uid)
+      );
+      
       allow delete: if isAdmin();
     }
 

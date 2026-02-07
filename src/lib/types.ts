@@ -84,7 +84,7 @@ export type TeamParticipant = {
   percentage: number;
 };
 
-export type LeadStatus = 'NOVO' | 'EM_ELABORACAO' | 'PRONTO' | 'CONVERTIDO' | 'REPROVADO';
+export type LeadStatus = 'NOVO' | 'ENTREVISTA' | 'DOCUMENTACAO' | 'CONTRATUAL' | 'PRONTO' | 'CONVERTIDO' | 'REPROVADO';
 export type LeadPriority = 'BAIXA' | 'MEDIA' | 'ALTA' | 'CRITICA';
 
 export type Lead = {
