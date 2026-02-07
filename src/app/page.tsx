@@ -1,9 +1,31 @@
+
 'use client';
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Phone, MapPin, MessageCircle, Star, Briefcase, Clock, Shield, HeartHandshake, Landmark, FileText, Users, Handshake, Building, ChevronRight, ArrowRight, Sparkles, Target, Quote, CheckCircle2 } from 'lucide-react';
+import { 
+  Phone, 
+  MapPin, 
+  MessageCircle, 
+  Star, 
+  Briefcase, 
+  Clock, 
+  Shield, 
+  HeartHandshake, 
+  Landmark, 
+  FileText, 
+  Users, 
+  Handshake, 
+  Building, 
+  ChevronRight, 
+  ArrowRight, 
+  Sparkles, 
+  Target, 
+  Quote, 
+  CheckCircle2,
+  Instagram
+} from 'lucide-react';
 import { WhatsAppFloating } from '@/components/WhatsAppFloating';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
@@ -14,6 +36,8 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from "@/components/ui/carousel";
+import { useFirebase, useDoc, useMemoFirebase } from '@/firebase';
+import { doc } from 'firebase/firestore';
 
 function LandingLogo({ className }: { className?: string }) {
     return (
@@ -229,7 +253,12 @@ AnimatedGradientBg.displayName = 'AnimatedGradientBg';
 
 export default function LandingPage() {
   const scrollY = useScrollPosition();
+  const { firestore } = useFirebase();
   const whatsappUrl = "https://wa.me/5511980590128?text=Olá!%20Vi%20o%20site%20da%20Bueno%20Gois%20Advogados%20e%20gostaria%20de%20saber%20mais%20sobre%20seus%20serviços.";
+
+  const settingsRef = useMemoFirebase(() => firestore ? doc(firestore, 'system_settings', 'general') : null, [firestore]);
+  const { data: settings } = useDoc<any>(settingsRef);
+  const instagramUrl = settings?.instagram;
 
   return (
     <div className="bg-background text-foreground font-body overflow-x-hidden antialiased">
@@ -250,6 +279,11 @@ export default function LandingPage() {
                 <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-primary transition-all duration-300 group-hover:w-full" />
               </Link>
             ))}
+            {instagramUrl && (
+              <Link href={instagramUrl} target="_blank" className="hover:text-primary transition-all duration-300 hover:scale-110">
+                <Instagram className="h-5 w-5" />
+              </Link>
+            )}
           </nav>
           <Button 
             asChild 
@@ -482,6 +516,17 @@ export default function LandingPage() {
       </main>
 
       <footer className="py-12 bg-[#0b1324] text-white/60 text-center text-sm">
+        <div className="flex justify-center gap-6 mb-6">
+          {instagramUrl && (
+            <Link 
+              href={instagramUrl} 
+              target="_blank" 
+              className="h-10 w-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-primary hover:text-primary-foreground transition-all duration-300"
+            >
+              <Instagram className="h-5 w-5" />
+            </Link>
+          )}
+        </div>
         <p>&copy; {new Date().getFullYear()} Bueno Gois Advogados e Associados. Todos os direitos reservados.</p>
       </footer>
 

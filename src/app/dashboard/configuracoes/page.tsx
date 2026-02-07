@@ -1,7 +1,7 @@
 
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { useSession, signOut } from 'next-auth/react';
 import { Button } from "@/components/ui/button";
@@ -34,7 +34,8 @@ import {
   Scale,
   DollarSign,
   Percent,
-  Info
+  Info,
+  Instagram
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -677,6 +678,46 @@ function LicenseTab() {
 }
 
 export default function ConfiguracoesPage() {
+  const { firestore, isUserLoading } = useFirebase();
+  const { toast } = useToast();
+  const [isSavingGeneral, setIsSavingGeneral] = useState(false);
+
+  const generalSettingsRef = useMemoFirebase(() => firestore ? doc(firestore, 'system_settings', 'general') : null, [firestore]);
+  const { data: generalSettings, isLoading: isLoadingGeneral } = useDoc<any>(generalSettingsRef);
+
+  const [generalForm, setGeneralForm] = useState({
+    officeName: 'Bueno Gois Advogados e Associados',
+    adminEmail: 'contato@buenogoisadvogado.com.br',
+    address: 'Rua Marechal Deodoro, 1594 - Sala 2, São Bernardo do Campo / SP',
+    phone: '(11) 98059-0128',
+    instagram: ''
+  });
+
+  useEffect(() => {
+    if (generalSettings) {
+      setGeneralForm({
+        officeName: generalSettings.officeName || 'Bueno Gois Advogados e Associados',
+        adminEmail: generalSettings.adminEmail || 'contato@buenogoisadvogado.com.br',
+        address: generalSettings.address || 'Rua Marechal Deodoro, 1594 - Sala 2, São Bernardo do Campo / SP',
+        phone: generalSettings.phone || '(11) 98059-0128',
+        instagram: generalSettings.instagram || ''
+      });
+    }
+  }, [generalSettings]);
+
+  const handleSaveGeneral = async () => {
+    if (!generalSettingsRef) return;
+    setIsSavingGeneral(true);
+    try {
+      await setDoc(generalSettingsRef, generalForm, { merge: true });
+      toast({ title: 'Configurações salvas!', description: 'As informações da instituição foram atualizadas.' });
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Erro ao salvar', description: error.message });
+    } finally {
+      setIsSavingGeneral(false);
+    }
+  };
+
   return (
     <div className="flex flex-col gap-8 pb-10">
       <div className="flex items-center justify-between">
@@ -709,25 +750,59 @@ export default function ConfiguracoesPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Nome do Escritório</Label>
-                  <Input defaultValue="Bueno Gois Advogados e Associados" className="bg-black/40 border-white/10 h-11 text-white" />
+                  <Input 
+                    value={generalForm.officeName} 
+                    onChange={e => setGeneralForm({...generalForm, officeName: e.target.value})}
+                    className="bg-black/40 border-white/10 h-11 text-white" 
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">E-mail Administrativo</Label>
-                  <Input type="email" defaultValue="contato@buenogoisadvogado.com.br" className="bg-black/40 border-white/10 h-11 text-white" />
+                  <Input 
+                    type="email" 
+                    value={generalForm.adminEmail} 
+                    onChange={e => setGeneralForm({...generalForm, adminEmail: e.target.value})}
+                    className="bg-black/40 border-white/10 h-11 text-white" 
+                  />
                 </div>
                 <div className="md:col-span-2 space-y-2">
                   <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Endereço da Sede</Label>
-                  <Input defaultValue="Rua Marechal Deodoro, 1594 - Sala 2, São Bernardo do Campo / SP" className="bg-black/40 border-white/10 h-11 text-white" />
+                  <Input 
+                    value={generalForm.address} 
+                    onChange={e => setGeneralForm({...generalForm, address: e.target.value})}
+                    className="bg-black/40 border-white/10 h-11 text-white" 
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Telefone / PABX</Label>
-                  <Input defaultValue="(11) 98059-0128" className="bg-black/40 border-white/10 h-11 text-white" />
+                  <Input 
+                    value={generalForm.phone} 
+                    onChange={e => setGeneralForm({...generalForm, phone: e.target.value})}
+                    className="bg-black/40 border-white/10 h-11 text-white" 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Instagram (URL)</Label>
+                  <div className="relative">
+                    <Instagram className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary" />
+                    <Input 
+                      value={generalForm.instagram} 
+                      onChange={e => setGeneralForm({...generalForm, instagram: e.target.value})}
+                      placeholder="https://instagram.com/buenogois" 
+                      className="pl-10 bg-black/40 border-white/10 h-11 text-white" 
+                    />
+                  </div>
                 </div>
               </div>
             </CardContent>
             <CardFooter className="bg-white/5 p-6 border-t border-white/5">
-              <Button className="bg-primary text-primary-foreground font-black px-8 h-11 uppercase text-[11px] tracking-widest shadow-xl shadow-primary/20">
-                <Save className="h-4 w-4 mr-2" /> Atualizar Cadastro
+              <Button 
+                onClick={handleSaveGeneral}
+                disabled={isSavingGeneral}
+                className="bg-primary text-primary-foreground font-black px-8 h-11 uppercase text-[11px] tracking-widest shadow-xl shadow-primary/20"
+              >
+                {isSavingGeneral ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                Atualizar Cadastro
               </Button>
             </CardFooter>
           </Card>
