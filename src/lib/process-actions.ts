@@ -107,19 +107,19 @@ export async function draftDocument(
 
         // 2. Define a subpasta de destino baseada na categoria do modelo
         let targetFolderName = '01 - Petições'; // Default
-        if (category.toLowerCase().includes('procuração') || category.toLowerCase().includes('contrato')) {
-            // Em processos, procurações costumam ir em Petições ou pasta de Entrada. 
-            // Mas no Bueno Gois, seguimos a estrutura do Drive.
+        const cat = category.toLowerCase();
+        if (cat.includes('procuração') || cat.includes('contrato')) {
             targetFolderName = '01 - Petições';
-        } else if (category.toLowerCase().includes('ata') || category.toLowerCase().includes('audiência')) {
+        } else if (cat.includes('ata') || cat.includes('audiência')) {
             targetFolderName = '04 - Atas e Audiências';
-        } else if (category.toLowerCase().includes('recurso')) {
+        } else if (cat.includes('recurso')) {
             targetFolderName = '03 - Recursos';
+        } else if (cat.includes('decisão') || cat.includes('sentença')) {
+            targetFolderName = '02 - Decisões e Sentenças';
         }
 
         let targetFolderId = await findSubfolder(drive, processData.driveFolderId, targetFolderName);
         
-        // Se a pasta não existir por algum motivo, cria agora
         if (!targetFolderId) {
             const folder = await createFolder(processData.driveFolderId, targetFolderName);
             targetFolderId = folder.id!;
@@ -133,11 +133,15 @@ export async function draftDocument(
         const newFileName = `${documentName} - ${processData.name}`;
         const copiedFile = await copyFile(cleanTemplateId, newFileName, targetFolderId);
 
+        if (!copiedFile.webViewLink) {
+            throw new Error("O Google Drive não retornou o link de edição. Verifique as permissões do modelo.");
+        }
+
         // 5. Registra na timeline do processo
         const timelineEvent: TimelineEvent = {
             id: uuidv4(),
             type: 'petition',
-            description: `DOCUMENTO GERADO: Rascunho de "${documentName}" criado na pasta "${targetFolderName}".`,
+            description: `RASCUNHO GERADO: "${documentName}" criado na pasta "${targetFolderName}". Link de edição disponibilizado para o advogado.`,
             date: Timestamp.now() as any,
             authorName: session.user.name || 'Sistema'
         };
@@ -147,18 +151,18 @@ export async function draftDocument(
             updatedAt: FieldValue.serverTimestamp()
         });
 
-        // 6. Notifica o usuário
+        // 6. Notifica o usuário com o link direto
         await createNotification({
             userId: session.user.id,
-            title: "Rascunho Pronto",
-            description: `O documento "${documentName}" foi gerado e está pronto para edição.`,
+            title: "Rascunho Pronto p/ Edição",
+            description: `O documento "${documentName}" está pronto no Google Docs.`,
             type: 'success',
-            href: copiedFile.webViewLink || '#'
+            href: copiedFile.webViewLink
         });
 
         return { 
             success: true, 
-            url: copiedFile.webViewLink || undefined 
+            url: copiedFile.webViewLink 
         };
 
     } catch (error: any) {

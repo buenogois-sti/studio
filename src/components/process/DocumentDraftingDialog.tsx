@@ -16,13 +16,13 @@ import {
   FileText, 
   Loader2, 
   Search, 
-  ArrowRight, 
   ExternalLink, 
   Sparkles,
   FileCheck,
   CheckCircle2,
   ChevronRight,
-  FolderOpen
+  FolderOpen,
+  ArrowRight
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -67,7 +67,7 @@ export function DocumentDraftingDialog({ process, open, onOpenChange }: Document
             setGeneratedUrl(result.url);
             toast({
                 title: 'Rascunho Criado!',
-                description: `O documento "${template.name}" foi gerado na pasta do processo.`,
+                description: `O documento "${template.name}" está pronto para edição no Google Docs.`,
             });
         } else {
             throw new Error(result.error);
@@ -103,7 +103,7 @@ export function DocumentDraftingDialog({ process, open, onOpenChange }: Document
             <div>
               <DialogTitle className="text-xl font-black font-headline">Gerador de Rascunhos</DialogTitle>
               <DialogDescription className="text-slate-400">
-                Criando documentos estratégicos para: <span className="text-white font-bold">{process?.name}</span>
+                Criando atalhos inteligentes para: <span className="text-white font-bold">{process?.name}</span>
               </DialogDescription>
             </div>
           </div>
@@ -113,32 +113,32 @@ export function DocumentDraftingDialog({ process, open, onOpenChange }: Document
           {generatedUrl ? (
             <div className="py-12 flex flex-col items-center justify-center text-center space-y-6 animate-in zoom-in-95 duration-500">
               <div className="relative">
-                <div className="h-20 w-20 rounded-full bg-emerald-500/20 flex items-center justify-center border-2 border-emerald-500/30">
-                  <FileCheck className="h-10 w-10 text-emerald-400" />
+                <div className="h-24 w-24 rounded-3xl bg-emerald-500/10 flex items-center justify-center border-2 border-emerald-500/20">
+                  <FileCheck className="h-12 w-12 text-emerald-400" />
                 </div>
-                <div className="absolute -bottom-1 -right-1 h-7 w-7 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg">
+                <div className="absolute -bottom-2 -right-2 h-8 w-8 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg border-2 border-[#020617]">
                   <CheckCircle2 className="h-4 w-4 text-white" />
                 </div>
               </div>
               <div className="space-y-2">
-                <h3 className="text-xl font-bold text-white">Documento Gerado com Sucesso!</h3>
-                <p className="text-sm text-slate-400 max-w-sm">
-                  O rascunho de <strong>{lastTemplateName}</strong> foi salvo e organizado no Google Drive do processo.
+                <h3 className="text-2xl font-black text-white tracking-tighter">RASCUNHO PRONTO</h3>
+                <p className="text-sm text-slate-400 max-w-sm mx-auto">
+                  O documento <strong>{lastTemplateName}</strong> foi gerado e salvo na pasta do processo. Use o editor oficial do Google para concluir a peça.
                 </p>
               </div>
-              <div className="flex flex-col sm:flex-row gap-3 w-full max-w-md pt-4">
+              <div className="flex flex-col gap-3 w-full max-w-md pt-4">
                 <Button 
-                  className="flex-1 bg-primary text-primary-foreground font-black uppercase tracking-widest text-[11px] h-12 shadow-xl shadow-primary/20"
+                  className="w-full bg-primary text-primary-foreground font-black uppercase tracking-widest text-xs h-14 shadow-xl shadow-primary/20 hover:scale-[1.02] transition-all"
                   onClick={() => window.open(generatedUrl, '_blank')}
                 >
-                  <ExternalLink className="h-4 w-4 mr-2" /> Abrir no Editor
+                  <ExternalLink className="h-5 w-5 mr-2" /> Abrir no Google Docs
                 </Button>
                 <Button 
-                  variant="outline" 
-                  className="flex-1 border-white/10 text-slate-300 hover:bg-white/5 h-12 font-bold uppercase text-[10px]"
+                  variant="ghost" 
+                  className="w-full text-slate-500 hover:text-white h-10 font-bold uppercase text-[10px]"
                   onClick={() => setGeneratedUrl(null)}
                 >
-                  Gerar Outro
+                  Gerar outro modelo <ArrowRight className="ml-2 h-3 w-3" />
                 </Button>
               </div>
             </div>
@@ -147,8 +147,8 @@ export function DocumentDraftingDialog({ process, open, onOpenChange }: Document
               <div className="relative group">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 group-focus-within:text-primary transition-colors" />
                 <Input 
-                  placeholder="Pesquisar modelos (ex: Procuração, Recurso, Manifestação...)" 
-                  className="pl-10 h-12 bg-black/40 border-white/10 text-white focus:border-primary transition-all rounded-xl" 
+                  placeholder="Qual peça deseja rascunhar? (ex: Recurso, Manifestação...)" 
+                  className="pl-10 h-14 bg-black/40 border-white/10 text-white focus:border-primary transition-all rounded-xl text-base shadow-inner" 
                   value={searchTerm} 
                   onChange={(e) => setSearchTerm(e.target.value)} 
                 />
@@ -158,7 +158,7 @@ export function DocumentDraftingDialog({ process, open, onOpenChange }: Document
                 {isLoading ? (
                   <div className="flex flex-col items-center justify-center h-full space-y-4 py-20">
                     <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                    <p className="text-xs font-black uppercase tracking-widest text-slate-500">Acessando Acervo...</p>
+                    <p className="text-xs font-black uppercase tracking-widest text-slate-500">Acessando Acervo de Modelos...</p>
                   </div>
                 ) : filteredTemplates.length > 0 ? (
                   <div className="grid gap-3">
@@ -168,15 +168,15 @@ export function DocumentDraftingDialog({ process, open, onOpenChange }: Document
                         onClick={() => handleSelectTemplate(t)}
                         disabled={isDrafting !== null}
                         className={cn(
-                          "w-full flex items-center justify-between p-4 rounded-2xl border transition-all duration-300 group text-left",
+                          "w-full flex items-center justify-between p-5 rounded-2xl border transition-all duration-300 group text-left",
                           isDrafting === t.id 
-                            ? "bg-primary/10 border-primary/40" 
+                            ? "bg-primary/10 border-primary/40 shadow-[0_0_20px_rgba(245,208,48,0.05)]" 
                             : "bg-white/5 border-white/5 hover:border-primary/30 hover:bg-white/[0.08]"
                         )}
                       >
                         <div className="flex items-start gap-4 flex-1 min-w-0">
                           <div className={cn(
-                            "h-12 w-12 rounded-xl flex items-center justify-center shrink-0 transition-all",
+                            "h-12 w-12 rounded-xl flex items-center justify-center shrink-0 transition-all shadow-inner",
                             isDrafting === t.id ? "bg-primary text-primary-foreground" : "bg-black/40 text-slate-500 group-hover:text-primary group-hover:bg-primary/10"
                           )}>
                             {isDrafting === t.id ? <Loader2 className="h-6 w-6 animate-spin" /> : <FileText className="h-6 w-6" />}
@@ -211,7 +211,7 @@ export function DocumentDraftingDialog({ process, open, onOpenChange }: Document
         <div className="p-4 bg-white/5 border-t border-white/5 flex items-center justify-center gap-2">
           <FolderOpen className="h-3 w-3 text-slate-500" />
           <span className="text-[9px] font-black uppercase text-slate-500 tracking-widest">
-            Os documentos são salvos automaticamente na pasta do processo no Drive
+            A Bueno Gois utiliza Google Docs para edição e inteligência documental
           </span>
         </div>
       </DialogContent>
