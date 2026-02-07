@@ -826,6 +826,7 @@ export default function ConfiguracoesPage() {
   const { firestore, isUserLoading } = useFirebase();
   const { toast } = useToast();
   const [isSavingGeneral, setIsSavingGeneral] = useState(false);
+  const isDev = process.env.NODE_ENV === 'development';
 
   const generalSettingsRef = useMemoFirebase(() => firestore ? doc(firestore, 'system_settings', 'general') : null, [firestore]);
   const { data: generalSettings, isLoading: isLoadingGeneral } = useDoc<any>(generalSettingsRef);
@@ -876,7 +877,9 @@ export default function ConfiguracoesPage() {
         <TabsList className="bg-[#0f172a] p-1 border border-white/5 mb-8 h-12 flex overflow-x-auto no-scrollbar justify-start">
           <TabsTrigger value="geral" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold px-6 h-10 shrink-0">Geral</TabsTrigger>
           <TabsTrigger value="seo" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold px-6 h-10 shrink-0">SEO & Analytics</TabsTrigger>
-          <TabsTrigger value="integracoes" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold px-6 h-10 shrink-0">Integrações</TabsTrigger>
+          {isDev && (
+            <TabsTrigger value="integracoes" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold px-6 h-10 shrink-0">Integrações</TabsTrigger>
+          )}
           <TabsTrigger value="usuarios" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold px-6 h-10 shrink-0">Usuários</TabsTrigger>
           <TabsTrigger value="financeiro" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold px-6 h-10 shrink-0">Financeiro</TabsTrigger>
           <TabsTrigger value="kit-cliente" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold px-6 h-10 shrink-0">Kit Cliente</TabsTrigger>
@@ -958,9 +961,11 @@ export default function ConfiguracoesPage() {
           <SEOTab />
         </TabsContent>
 
-        <TabsContent value="integracoes" className="animate-in fade-in duration-300">
-          <IntegrationsTab />
-        </TabsContent>
+        {isDev && (
+          <TabsContent value="integracoes" className="animate-in fade-in duration-300">
+            <IntegrationsTab />
+          </TabsContent>
+        )}
 
         <TabsContent value="usuarios" className="animate-in fade-in duration-300">
           <UsersTab />
