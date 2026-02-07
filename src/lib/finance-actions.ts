@@ -180,3 +180,160 @@ export async function createFinancialTitle(data: Partial<FinancialTitle>) {
         throw new Error(error.message);
     }
 }
+
+/**
+ * Deleta um crédito específico de um colaborador.
+ */
+export async function deleteStaffCredit(staffId: string, creditId: string) {
+  if (!firestoreAdmin) throw new Error("Servidor inacessível.");
+  try {
+    await firestoreAdmin.collection(`staff/${staffId}/credits`).doc(creditId).delete();
+    return { success: true };
+  } catch (error: any) {
+    throw new Error(error.message);
+  }
+}
+
+/**
+ * Atualiza um crédito existente.
+ */
+export async function updateStaffCredit(staffId: string, creditId: string, data: Partial<StaffCredit>) {
+  if (!firestoreAdmin) throw new Error("Servidor inacessível.");
+  try {
+    await firestoreAdmin.collection(`staff/${staffId}/credits`).doc(creditId).update(data);
+    return { success: true };
+  } catch (error: any) {
+    throw new Error(error.message);
+  }
+}
+
+/**
+ * Adiciona um crédito manual para um colaborador.
+ */
+export async function addManualStaffCredit(staffId: string, data: Partial<StaffCredit>) {
+  if (!firestoreAdmin) throw new Error("Servidor inacessível.");
+  try {
+    await firestoreAdmin.collection(`staff/${staffId}/credits`).add({
+      ...data,
+      status: data.status || 'DISPONIVEL',
+      date: Timestamp.now(),
+    });
+    return { success: true };
+  } catch (error: any) {
+    throw new Error(error.message);
+  }
+}
+
+/**
+ * Atualiza a previsão de pagamento para uma lista de créditos.
+ */
+export async function updateCreditForecast(staffId: string, creditIds: string[], forecastDate: string) {
+  if (!firestoreAdmin) throw new Error("Servidor inacessível.");
+  const batch = firestoreAdmin.batch();
+  const [year, month, day] = forecastDate.split('-').map(Number);
+  const forecastTimestamp = Timestamp.fromDate(new Date(year, month - 1, day));
+
+  creditIds.forEach(id => {
+    const ref = firestoreAdmin.collection(`staff/${staffId}/credits`).doc(id);
+    batch.update(ref, { paymentForecast: forecastTimestamp });
+  });
+
+  await batch.commit();
+  return { success: true };
+}
+
+/**
+ * Solicita o desbloqueio de um crédito retido.
+ */
+export async function requestCreditUnlock(staffId: string, creditId: string, reason: string) {
+  if (!firestoreAdmin) throw new Error("Servidor inacessível.");
+  try {
+    const ref = firestoreAdmin.collection(`staff/${staffId}/credits`).doc(creditId);
+    await ref.update({ 
+      unlockRequested: true,
+      unlockReason: reason,
+      unlockRequestedAt: FieldValue.serverTimestamp()
+    });
+    
+    // Notificar financeiro
+    const financialUsersSnap = await firestoreAdmin.collection('users').where('role', 'in', ['admin', 'financial']).get();
+    for (const userDoc of financialUsersSnap.docs) {
+      await createNotification({
+        userId: userDoc.id,
+        title: "Solicitação de Desbloqueio",
+        description: `Um colaborador solicitou a liberação de um crédito retido.`,
+        type: 'finance',
+        href: '/dashboard/repasses'
+      });
+    }
+    
+    return { success: true };
+  } catch (error: any) {
+    throw new Error(error.message);
+  }
+}
+
+/**
+ * Executa a rotina de inadimplência para um título vencido.
+ */
+export async function processLatePaymentRoutine(titleId: string) {
+  if (!firestoreAdmin) throw new Error("Servidor inacessível.");
+  const session = await getServerSession(authOptions);
+  if (!session) throw new Error("Não autorizado.");
+
+  try {
+    const titleRef = firestoreAdmin.collection('financial_titles').doc(titleId);
+    const titleSnap = await titleRef.get();
+    const titleData = titleSnap.data() as FinancialTitle;
+
+    if (!titleData.processId) return { success: false, error: "Título sem processo vinculado." };
+
+    const processRef = firestoreAdmin.collection('processes').doc(titleData.processId);
+    
+    const dueDate = titleData.dueDate instanceof Timestamp ? titleData.dueDate.toDate() : new Date(titleData.dueDate as any);
+    
+    const timelineEvent: TimelineEvent = {
+      id: uuidv4(),
+      type: 'system',
+      description: `ALERTA DE INADIMPLÊNCIA: Parcela "${titleData.description}" vencida em ${format(dueDate, 'dd/MM/yy')}. Rotina de cobrança iniciada.`,
+      date: Timestamp.now() as any,
+      authorName: session.user.name || 'Sistema'
+    };
+
+    await processRef.update({
+      timeline: FieldValue.arrayUnion(timelineEvent),
+      updatedAt: FieldValue.serverTimestamp()
+    });
+
+    return { success: true };
+  } catch (error: any) {
+    throw new Error(error.message);
+  }
+}
+
+/**
+ * Lança a folha de pagamento (pro-labore fixo) para todos os colaboradores.
+ */
+export async function launchPayroll() {
+  if (!firestoreAdmin) throw new Error("Servidor inacessível.");
+  const staffSnap = await firestoreAdmin.collection('staff').get();
+  let count = 0;
+
+  const currentMonth = format(new Date(), 'MMMM/yyyy', { locale: ptBR });
+
+  for (const s of staffSnap.docs) {
+    const data = s.data() as Staff;
+    if (data.remuneration?.type === 'FIXO_MENSAL' && data.remuneration.fixedMonthlyValue) {
+      await s.ref.collection('credits').add({
+        type: 'SALARIO',
+        description: `Pro-labore Mensal - ${currentMonth}`,
+        value: data.remuneration.fixedMonthlyValue,
+        status: 'DISPONIVEL',
+        date: Timestamp.now()
+      });
+      count++;
+    }
+  }
+
+  return { success: true, count };
+}
