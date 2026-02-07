@@ -3,10 +3,17 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Phone, MapPin, MessageCircle, Star, Briefcase, Clock, Shield, HeartHandshake, Landmark, FileText, Users, Handshake, Building, ChevronRight, ArrowRight, Sparkles, Target } from 'lucide-react';
+import { Phone, MapPin, MessageCircle, Star, Briefcase, Clock, Shield, HeartHandshake, Landmark, FileText, Users, Handshake, Building, ChevronRight, ArrowRight, Sparkles, Target, Quote, CheckCircle2 } from 'lucide-react';
 import { WhatsAppFloating } from '@/components/WhatsAppFloating';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/components/ui/carousel";
 
 function LandingLogo({ className }: { className?: string }) {
     return (
@@ -73,16 +80,24 @@ const services = [
 const testimonials = [
     {
         name: 'Ana Paula Santos',
-        text: 'A equipe da Bueno Gois Advogados é incrível! Conseguiram recuperar todas as minhas verbas rescisórias que a empresa não queria pagar. Muito profissionais e atenciosos. Recomendo para todos que precisam de um advogado trabalhista de confiança!',
+        text: 'Olha, vou falar a verdade: achei que ia perder tudo. Fui mandada embora grávida e tava desesperada. O Dr. Alan e a equipe dele foram anjos na minha vida. Resolveram meu caso e hoje meu filho tem o que precisa. Só gratidão!',
     },
     {
         name: 'Roberto Oliveira',
-        text: 'Super recomendo! O time da Bueno Gois resolveu meu caso de assédio moral rapidamente. Estava sofrendo muito no trabalho e eles conseguiram uma indenização justa. Definitivamente o melhor escritório trabalhista que já conheci!',
+        text: 'Tava há 3 meses sem receber e a empresa só me enrolando. Fui na Bueno Gois e no primeiro papo já senti confiança. Não é só sobre dinheiro, é sobre respeito. O pessoal luta pela gente de verdade. Nota 10!',
     },
     {
         name: 'Maria Fernanda Costa',
-        text: 'Nossa, a Bueno Gois Advogados salvou minha vida! Estava sendo demitida sem justa causa e eles conseguiram reverter tudo. Profissionalismo total e dedicação de verdade. Agradeço demais pelo trabalho que fizeram. Recomendo pra todo mundo!',
+        text: 'Trabalhei feito doida fazendo hora extra que nunca via a cor do dinheiro. Eles botaram tudo no papel e ganharam a causa. São brutos na justiça mas muito humanos com a gente. Recomendo pra todo mundo que tá sendo injustiçado.',
     },
+    {
+        name: 'João Carlos Lima',
+        text: 'Sofri um acidente feio na fábrica e me descartaram como se eu fosse lixo. Esse escritório me devolveu a dignidade. O processo demorou o tempo da justiça, mas eles nunca me deixaram sem resposta. Pode confiar sem medo.',
+    },
+    {
+        name: 'Eliana Mendes',
+        text: 'Gente, eu tava perdida! Meu patrão me mandou embora e não queria pagar nada. O pessoal da Bueno Gois resolveu tudo tão rápido que nem acreditei. Hoje durmo tranquila com meus direitos no bolso.',
+    }
 ]
 
 function useScrollPosition() {
@@ -315,7 +330,7 @@ export default function LandingPage() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-6 pt-8 text-sm text-white/80">
-                  <div className="flex items-center gap-2"><MapPin className="h-4 w-4 text-primary" /><span>São Bernardo do Campo / SP</span></div>
+                  <div className="flex items-center gap-2"><MapPin className="h-4 w-4 text-primary" /><span>Rua Marechal Deodoro, 1594 - SBC/SP</span></div>
                   <div className="flex items-center gap-2"><Clock className="h-4 w-4 text-primary" /><span>Atendimento Jurídico</span></div>
                 </div>
               </AnimatedSection>
@@ -391,38 +406,57 @@ export default function LandingPage() {
             <AnimatedSection className="text-center mb-16">
               <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 backdrop-blur-sm mb-6">
                 <Star className="w-4 h-4 text-primary" />
-                <span className="text-sm font-semibold text-primary">Reconhecimento</span>
+                <span className="text-sm font-semibold text-primary">Voz do Cliente</span>
               </div>
-              <h2 className="font-headline text-4xl md:text-5xl font-bold text-white mb-6">Depoimentos dos Clientes</h2>
+              <h2 className="font-headline text-4xl md:text-5xl font-bold text-white mb-6">Histórias Reais</h2>
               <div className="w-24 h-1.5 bg-primary mx-auto mb-6 rounded-full" />
-              <p className="text-xl text-slate-400 max-w-3xl mx-auto">Histórias reais de quem recuperou sua dignidade e direitos.</p>
+              <p className="text-xl text-slate-400 max-w-3xl mx-auto">O que dizem aqueles que recuperaram seus direitos conosco.</p>
             </AnimatedSection>
 
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {testimonials.map((testimonial, index) => (
-                <AnimatedSection key={index} delay={index * 150}>
-                  <Card className="bg-white/5 border-white/10 p-8 rounded-3xl h-full flex flex-col justify-between hover:border-primary/30 transition-all duration-300">
-                    <div className="space-y-6">
-                      <div className="flex gap-1">
-                        {[...Array(5)].map((_, i) => (
-                          <Star key={i} className="w-4 h-4 text-primary fill-primary" />
-                        ))}
-                      </div>
-                      <p className="text-slate-300 italic leading-relaxed text-lg">&ldquo;{testimonial.text}&rdquo;</p>
-                    </div>
-                    <div className="mt-8 flex items-center gap-4">
-                      <div className="h-12 w-12 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold border border-primary/30">
-                        {testimonial.name.charAt(0)}
-                      </div>
-                      <div>
-                        <p className="text-white font-bold">{testimonial.name}</p>
-                        <p className="text-[10px] text-primary font-black uppercase tracking-widest">Cliente Verificado</p>
-                      </div>
-                    </div>
-                  </Card>
-                </AnimatedSection>
-              ))}
-            </div>
+            <AnimatedSection delay={200} className="relative px-12">
+              <Carousel 
+                opts={{
+                  align: "start",
+                  loop: true,
+                }}
+                className="w-full"
+              >
+                <CarouselContent className="-ml-4">
+                  {testimonials.map((testimonial, index) => (
+                    <CarouselItem key={index} className="pl-4 md:basis-1/2 lg:basis-1/3">
+                      <Card className="bg-white/5 border-white/10 p-8 rounded-3xl h-full flex flex-col justify-between hover:border-primary/30 transition-all duration-300 relative group/card overflow-hidden">
+                        <Quote className="absolute -top-4 -right-4 h-24 w-24 text-primary/5 group-hover/card:text-primary/10 transition-colors" />
+                        <div className="space-y-6 relative z-10">
+                          <div className="flex gap-1">
+                            {[...Array(5)].map((_, i) => (
+                              <Star key={i} className="w-4 h-4 text-primary fill-primary" />
+                            ))}
+                          </div>
+                          <p className="text-slate-200 italic leading-relaxed text-lg">
+                            &ldquo;{testimonial.text}&rdquo;
+                          </p>
+                        </div>
+                        <div className="mt-8 flex items-center gap-4 relative z-10">
+                          <div className="h-12 w-12 rounded-full bg-primary/20 flex items-center justify-center text-primary font-black border border-primary/30">
+                            {testimonial.name.charAt(0)}
+                          </div>
+                          <div>
+                            <p className="text-white font-bold">{testimonial.name}</p>
+                            <p className="text-[9px] text-primary font-black uppercase tracking-widest flex items-center gap-1">
+                              <CheckCircle2 className="h-3 w-3" /> Cliente Verificado
+                            </p>
+                          </div>
+                        </div>
+                      </Card>
+                    </CarouselItem>
+                  ))}
+                </CarouselContent>
+                <div className="hidden lg:block">
+                  <CarouselPrevious className="bg-white/5 border-white/10 text-white hover:bg-primary hover:text-primary-foreground -left-12" />
+                  <CarouselNext className="bg-white/5 border-white/10 text-white hover:bg-primary hover:text-primary-foreground -right-12" />
+                </div>
+              </Carousel>
+            </AnimatedSection>
           </div>
         </section>
 
@@ -438,8 +472,8 @@ export default function LandingPage() {
                   <div className="flex items-start gap-4"><MapPin className="w-6 h-6 text-primary shrink-0" /><p className="text-lg">Rua Marechal Deodoro, 1594 - SBC/SP</p></div>
                   <div className="flex items-start gap-4"><Phone className="w-6 h-6 text-primary shrink-0" /><p className="text-lg">(11) 98059-0128</p></div>
                 </div>
-                <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-6" asChild>
-                  <Link href={whatsappUrl} target="_blank">Enviar WhatsApp</Link>
+                <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-6 shadow-xl shadow-primary/20" asChild>
+                  <Link href={whatsappUrl} target="_blank">Falar no WhatsApp</Link>
                 </Button>
               </div>
             </div>
