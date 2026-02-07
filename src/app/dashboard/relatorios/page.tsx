@@ -250,7 +250,7 @@ const FinancialEvolutionChart = React.memo(({ data }: { data: any[] }) => {
               formatter={(val: number) => val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
             />
             <Area type="monotone" dataKey="receita" name="Entradas" stroke="#10b981" fillOpacity={1} fill="url(#colorRec)" strokeWidth={3} />
-            <Area type="monotone" dataKey="despesa" name="Saídas" stroke="#ef4444" fill="transparent" strokeWidth={2} strokeDasharray="5 5" />
+            <Area type="monotone" dataKey="receita" name="Saídas" stroke="#ef4444" fill="transparent" strokeWidth={2} strokeDasharray="5 5" />
           </AreaChart>
         </ResponsiveContainer>
       </CardContent>
@@ -258,6 +258,59 @@ const FinancialEvolutionChart = React.memo(({ data }: { data: any[] }) => {
   );
 });
 FinancialEvolutionChart.displayName = 'FinancialEvolutionChart';
+
+// --- DATA PROCESSING HELPERS ---
+
+function financialBreackdown(titles: FinancialTitle[]) {
+  const months: any[] = [];
+  const now = new Date();
+  for (let i = 5; i >= 0; i--) {
+    const d = subMonths(now, i);
+    months.push({ month: format(d, 'MMM/yy', { locale: ptBR }), key: format(d, 'yyyy-MM'), receita: 0, despesa: 0 });
+  }
+  (titles || []).forEach(t => {
+    if (t.status === 'PAGO' && t.paymentDate) {
+      const mKey = format(t.paymentDate.toDate(), 'yyyy-MM');
+      const m = months.find(m => m.key === mKey);
+      if (m) t.type === 'RECEITA' ? m.receita += t.value : m.despesa += t.value;
+    }
+  });
+  return months;
+}
+
+function operationalVolumeBreackdown(hearings: Hearing[], deadlines: LegalDeadline[]) {
+  const months: any[] = [];
+  const now = new Date();
+  for (let i = 5; i >= 0; i--) {
+    const d = subMonths(now, i);
+    months.push({ month: format(d, 'MMM/yy', { locale: ptBR }), key: format(d, 'yyyy-MM'), audiencias: 0, prazos: 0 });
+  }
+  (hearings || []).forEach(h => {
+    const m = months.find(m => m.key === format(h.date.toDate(), 'yyyy-MM'));
+    if (m) m.audiencias++;
+  });
+  (deadlines || []).forEach(d => {
+    const m = months.find(m => m.key === format(d.endDate.toDate(), 'yyyy-MM'));
+    if (m) m.prazos++;
+  });
+  return months;
+}
+
+function revenueByOrigin(titles: FinancialTitle[]) {
+  const origins: Record<string, number> = {};
+  (titles || []).filter(t => t.type === 'RECEITA' && t.status === 'PAGO').forEach(t => {
+    origins[t.origin] = (origins[t.origin] || 0) + t.value;
+  });
+  return Object.entries(origins).map(([name, value]) => ({ name, value }));
+}
+
+function calculateOverdueRate(titles: FinancialTitle[]) {
+  const now = new Date();
+  const validTitles = (titles || []).filter(t => t.type === 'RECEITA');
+  const total = validTitles.reduce((s, t) => s + t.value, 0);
+  const overdue = validTitles.filter(t => t.status === 'PENDENTE' && isBefore(t.dueDate instanceof Timestamp ? t.dueDate.toDate() : new Date(t.dueDate as any), now)).reduce((s, t) => s + t.value, 0);
+  return total > 0 ? ((overdue / total) * 100).toFixed(1) : 0;
+}
 
 // --- MAIN PAGE ---
 
@@ -406,57 +459,4 @@ export default function RelatoriosPage() {
       )}
     </div>
   );
-}
-
-// --- DATA PROCESSING HELPERS ---
-
-function financialBreackdown(titles: FinancialTitle[]) {
-  const months: any[] = [];
-  const now = new Date();
-  for (let i = 5; i >= 0; i--) {
-    const d = subMonths(now, i);
-    months.push({ month: format(d, 'MMM/yy', { locale: ptBR }), key: format(d, 'yyyy-MM'), receita: 0, despesa: 0 });
-  }
-  (titles || []).forEach(t => {
-    if (t.status === 'PAGO' && t.paymentDate) {
-      const mKey = format(t.paymentDate.toDate(), 'yyyy-MM');
-      const m = months.find(m => m.key === mKey);
-      if (m) t.type === 'RECEITA' ? m.receita += t.value : m.despesa += t.value;
-    }
-  });
-  return months;
-}
-
-function operationalVolumeBreackdown(hearings: Hearing[], deadlines: LegalDeadline[]) {
-  const months: any[] = [];
-  const now = new Date();
-  for (let i = 5; i >= 0; i--) {
-    const d = subMonths(now, i);
-    months.push({ month: format(d, 'MMM/yy', { locale: ptBR }), key: format(d, 'yyyy-MM'), audiencias: 0, prazos: 0 });
-  }
-  (hearings || []).forEach(h => {
-    const m = months.find(m => m.key === format(h.date.toDate(), 'yyyy-MM'));
-    if (m) m.audiencias++;
-  });
-  (deadlines || []).forEach(d => {
-    const m = months.find(m => m.key === format(d.endDate.toDate(), 'yyyy-MM'));
-    if (m) m.prazos++;
-  });
-  return months;
-}
-
-function revenueByOrigin(titles: FinancialTitle[]) {
-  const origins: Record<string, number> = {};
-  (titles || []).filter(t => t.type === 'RECEITA' && t.status === 'PAGO').forEach(t => {
-    origins[t.origin] = (origins[t.origin] || 0) + t.value;
-  });
-  return Object.entries(origins).map(([name, value]) => ({ name, value }));
-}
-
-function calculateOverdueRate(titles: FinancialTitle[]) {
-  const now = new Date();
-  const validTitles = (titles || []).filter(t => t.type === 'RECEITA');
-  const total = validTitles.reduce((s, t) => s + t.value, 0);
-  const overdue = validTitles.filter(t => t.status === 'PENDENTE' && isBefore(t.dueDate instanceof Timestamp ? t.dueDate.toDate() : new Date(t.dueDate as any), now)).reduce((s, t) => s + t.value, 0);
-  return total > 0 ? ((overdue / total) * 100).toFixed(1) : 0;
 }

@@ -30,7 +30,10 @@ import {
   ShieldCheck,
   Smartphone,
   Mail,
-  HelpCircle
+  HelpCircle,
+  Eye,
+  ExternalLink,
+  RotateCcw
 } from 'lucide-react';
 import { 
   format, 
@@ -61,6 +64,8 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { H1 } from '@/components/ui/typography';
@@ -70,6 +75,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { HearingReturnDialog } from '@/components/process/HearingReturnDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useRouter } from 'next/navigation';
 
 const statusConfig: Record<HearingStatus, { label: string; icon: any; color: string }> = {
     PENDENTE: { label: 'Pendente', icon: Clock3, color: 'text-blue-500 bg-blue-500/10' },
@@ -97,6 +103,7 @@ export default function AudienciasPage() {
   const [returnHearing, setReturnHearing] = React.useState<Hearing | null>(null);
   const [isProcessing, setIsProcessing] = React.useState<string | null>(null);
   const { toast } = useToast();
+  const router = useRouter();
 
   const userProfileRef = useMemoFirebase(
     () => (firestore && user?.uid ? doc(firestore, 'users', user.uid) : null),
@@ -156,7 +163,7 @@ export default function AudienciasPage() {
 
   const historyHearings = React.useMemo(() => {
     if (!hearingsData) return [];
-    return hearingsData
+    return [...hearingsData]
         .filter(h => h.status !== 'PENDENTE')
         .sort((a, b) => b.date.seconds - a.date.seconds);
   }, [hearingsData]);
@@ -519,6 +526,7 @@ export default function AudienciasPage() {
                               const StatusIcon = config.icon;
                               const isPendingReturn = h.status === 'REALIZADA' && !h.hasFollowUp;
                               const NotifIcon = h.notificationMethod ? notificationIconMap[h.notificationMethod] : HelpCircle;
+                              const process = processesMap.get(h.processId);
 
                               return (
                                 <tr key={h.id} className={cn("hover:bg-white/[0.02] transition-colors group", isPendingReturn && "bg-amber-500/[0.03]")}>
@@ -528,7 +536,7 @@ export default function AudienciasPage() {
                                     <td className="px-6 py-5">
                                       <div className="flex flex-col">
                                         <span className="text-slate-300 font-bold group-hover:text-primary transition-colors truncate max-w-[200px]">
-                                          {processesMap.get(h.processId)?.name}
+                                          {process?.name}
                                         </span>
                                         <div className="flex items-center gap-2 mt-1">
                                           <span className="text-[9px] text-slate-500 uppercase font-black">{h.type}</span>
@@ -571,17 +579,33 @@ export default function AudienciasPage() {
                                       )}
                                     </td>
                                     <td className="px-6 py-5 text-right">
-                                      {isPendingReturn ? (
-                                        <Button 
-                                          size="sm" 
-                                          className="bg-amber-600 hover:bg-amber-500 text-white font-black uppercase text-[9px] h-8 shadow-lg shadow-amber-900/20"
-                                          onClick={() => setReturnHearing(h)}
-                                        >
-                                          Dar Retorno
-                                        </Button>
-                                      ) : (
-                                        <Button variant="ghost" size="icon" className="text-white/20"><MoreVertical className="h-4 w-4" /></Button>
-                                      )}
+                                      <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                          <Button variant="ghost" size="icon" className="text-white/20 hover:text-white rounded-full bg-white/5">
+                                            <MoreVertical className="h-4 w-4" />
+                                          </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end" className="bg-[#0f172a] border-white/10 w-56 p-1">
+                                          <DropdownMenuLabel className="text-[9px] font-black uppercase text-slate-500 tracking-widest px-2 py-1.5">Gerenciamento</DropdownMenuLabel>
+                                          {isPendingReturn && (
+                                            <DropdownMenuItem onClick={() => setReturnHearing(h)} className="font-bold gap-2 text-amber-400 focus:bg-amber-500/10">
+                                              <History className="h-4 w-4" /> Dar Retorno
+                                            </DropdownMenuItem>
+                                          )}
+                                          <DropdownMenuItem onClick={() => handleUpdateStatus(h, 'PENDENTE')} className="font-bold gap-2 text-blue-400 focus:bg-blue-500/10">
+                                            <RotateCcw className="h-4 w-4" /> Reativar Ato
+                                          </DropdownMenuItem>
+                                          <DropdownMenuSeparator className="bg-white/5" />
+                                          <DropdownMenuItem onClick={() => {
+                                            if (process) router.push(`/dashboard/processos?clientId=${process.clientId}`);
+                                          }} className="font-bold gap-2 text-white">
+                                            <Eye className="h-4 w-4 text-primary" /> Ver Processo
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem onClick={() => window.open(`https://wa.me/55${staffData?.find(s => s.id === h.lawyerId)?.whatsapp?.replace(/\D/g, '')}`, '_blank')} className="font-bold gap-2 text-emerald-400">
+                                            <MessageSquare className="h-4 w-4" /> Falar c/ Advogado
+                                          </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                      </DropdownMenu>
                                     </td>
                                 </tr>
                               );
