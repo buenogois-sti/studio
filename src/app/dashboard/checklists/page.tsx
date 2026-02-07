@@ -26,7 +26,8 @@ import {
   MessageSquare,
   FolderKanban,
   ExternalLink,
-  Calculator
+  Calculator,
+  Printer
 } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy, limit, Timestamp } from 'firebase/firestore';
@@ -468,7 +469,7 @@ function ChecklistEditorDialog({ open, onOpenChange, template }: { open: boolean
           <DialogClose asChild><Button variant="ghost" className="text-slate-400 font-bold uppercase text-[10px] tracking-widest">Cancelar</Button></DialogClose>
           <Button 
             disabled={isSaving} 
-            className="flex-1 bg-primary text-primary-foreground font-black uppercase tracking-widest text-[11px] h-14 shadow-xl shadow-primary/20 hover:scale-[1.02] transition-all"
+            className="flex-1 bg-primary text-primary-foreground font-black uppercase tracking-widest text-[11px] h-11 px-8 shadow-xl shadow-primary/20 hover:scale-[1.02] transition-all"
             onClick={handleSave}
           >
             {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ShieldCheck className="mr-2 h-5 w-5" />}
@@ -522,7 +523,6 @@ function ChecklistExecutorDialog({ open, onOpenChange, template }: { open: boole
   const handleFinish = async () => {
     if (!template) return;
     
-    // Validar itens obrigatórios
     const missing = template.items.filter(i => i.required && (answers[i.id] === undefined || answers[i.id] === ''));
     if (missing.length > 0) {
       toast({ variant: 'destructive', title: 'Pendência!', description: 'Complete todos os passos obrigatórios antes de finalizar.' });
@@ -568,7 +568,6 @@ function ChecklistExecutorDialog({ open, onOpenChange, template }: { open: boole
 
         <ScrollArea className="flex-1 p-6">
           <div className="space-y-10 pb-10">
-            {/* Vínculo com Processo */}
             <div className="space-y-3">
               <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
                 <FolderKanban className="h-3 w-3 text-primary" /> Vínculo Processual (Opcional)
@@ -626,7 +625,6 @@ function ChecklistExecutorDialog({ open, onOpenChange, template }: { open: boole
 
             <Separator className="bg-white/5" />
 
-            {/* Itens do Checklist */}
             <div className="grid gap-6">
               {template.items.map((item, idx) => (
                 <div key={item.id} className="space-y-4 p-6 rounded-3xl bg-white/5 border border-white/5 relative overflow-hidden group hover:bg-white/[0.07] transition-all">
@@ -780,7 +778,6 @@ function ChecklistDetailsDialog({
 
         <ScrollArea className="flex-1 p-6">
           <div className="space-y-10 pb-10" id="checklist-print-area">
-            {/* Metadados da Execução */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-1">
                 <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Responsável</Label>
@@ -806,7 +803,6 @@ function ChecklistDetailsDialog({
 
             <Separator className="bg-white/5" />
 
-            {/* Respostas Detalhadas */}
             <div className="space-y-6">
               <h3 className="text-sm font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
                 <ListChecks className="h-4 w-4 text-primary" /> Verificações Realizadas
