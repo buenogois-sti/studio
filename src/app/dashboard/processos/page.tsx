@@ -1,3 +1,4 @@
+
 'use client';
 import * as React from 'react';
 import {
@@ -28,14 +29,16 @@ import {
   ChevronLeft,
   ChevronRight,
   Handshake,
-  FolderKanban
+  FolderKanban,
+  TrendingUp,
+  Scale
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
@@ -105,6 +108,16 @@ export default function ProcessosPage() {
   
   const clientsMap = React.useMemo(() => new Map(clientsData?.map(c => [c.id, c])), [clientsData]);
   const staffMap = React.useMemo(() => new Map(staffData?.map(s => [s.id, s])), [staffData]);
+
+  // KPIs de Processos
+  const stats = React.useMemo(() => {
+    if (!processesData) return { total: 0, active: 0, totalValue: 0, avgValue: 0 };
+    const total = processesData.length;
+    const active = processesData.filter(p => p.status === 'Ativo').length;
+    const totalValue = processesData.reduce((sum, p) => sum + (p.caseValue || 0), 0);
+    const avgValue = total > 0 ? totalValue / total : 0;
+    return { total, active, totalValue, avgValue };
+  }, [processesData]);
 
   // Busca robusta com debounce
   React.useEffect(() => {
@@ -198,6 +211,46 @@ export default function ProcessosPage() {
               <PlusCircle className="mr-2 h-4 w-4" /> Novo Processo
           </Button>
         </div>
+      </div>
+
+      {/* KPI Bar - NEW */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card className="bg-[#0f172a] border-white/5">
+          <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between">
+            <CardTitle className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Processos Ativos</CardTitle>
+            <FolderKanban className="h-3 w-3 text-primary" />
+          </CardHeader>
+          <CardContent className="p-4 pt-0">
+            <p className="text-xl font-black text-white">{stats.active}</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-[#0f172a] border-white/5">
+          <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between">
+            <CardTitle className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Valor em Risco</CardTitle>
+            <DollarSign className="h-3 w-3 text-emerald-400" />
+          </CardHeader>
+          <CardContent className="p-4 pt-0">
+            <p className="text-xl font-black text-white">{stats.totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-[#0f172a] border-white/5">
+          <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between">
+            <CardTitle className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Ticket Médio</CardTitle>
+            <TrendingUp className="h-3 w-3 text-blue-400" />
+          </CardHeader>
+          <CardContent className="p-4 pt-0">
+            <p className="text-xl font-black text-white">{stats.avgValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-[#0f172a] border-white/5">
+          <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between">
+            <CardTitle className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Eficiência</CardTitle>
+            <Scale className="h-3 w-3 text-amber-400" />
+          </CardHeader>
+          <CardContent className="p-4 pt-0">
+            <p className="text-xl font-black text-white">{((stats.active / (stats.total || 1)) * 100).toFixed(0)}%</p>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="grid gap-4 min-h-[400px]">

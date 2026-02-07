@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -22,7 +23,10 @@ import {
   Loader2,
   Trash2,
   User,
-  Timer
+  Timer,
+  Filter,
+  Activity,
+  Zap
 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { useFirebase } from '@/firebase';
@@ -46,14 +50,21 @@ export function ProcessTimelineSheet({ process, open, onOpenChange }: ProcessTim
   const { toast } = useToast();
   const [isSaving, setIsSaving] = React.useState(false);
   const [isDeleting, setIsDeleting] = React.useState<string | null>(null);
+  const [activeFilter, setActiveFilter] = React.useState<string>('all');
   
   const [newNote, setNewNote] = React.useState('');
   const [eventType, setEventType] = React.useState<TimelineEvent['type']>('note');
 
   const timeline = React.useMemo(() => {
     if (!process?.timeline) return [];
-    return [...process.timeline].sort((a, b) => b.date.seconds - a.date.seconds);
-  }, [process?.timeline]);
+    let list = [...process.timeline].sort((a, b) => b.date.seconds - a.date.seconds);
+    
+    if (activeFilter !== 'all') {
+      list = list.filter(e => e.type === activeFilter);
+    }
+    
+    return list;
+  }, [process?.timeline, activeFilter]);
 
   const handleAddEvent = async () => {
     if (!newNote.trim() || !process || !firestore || !session?.user?.name) return;
@@ -64,7 +75,7 @@ export function ProcessTimelineSheet({ process, open, onOpenChange }: ProcessTim
         id: uuidv4(),
         type: eventType,
         description: newNote.trim(),
-        date: Timestamp.now(),
+        date: Timestamp.now() as any,
         authorName: session.user.name,
       };
 
@@ -105,6 +116,8 @@ export function ProcessTimelineSheet({ process, open, onOpenChange }: ProcessTim
       case 'petition': return <FileUp className="h-4 w-4 text-blue-500" />;
       case 'hearing': return <Calendar className="h-4 w-4 text-emerald-500" />;
       case 'deadline': return <Timer className="h-4 w-4 text-rose-500" />;
+      case 'pericia': return <Zap className="h-4 w-4 text-purple-500" />;
+      case 'system': return <Activity className="h-4 w-4 text-slate-400" />;
       default: return <MessageSquare className="h-4 w-4 text-muted-foreground" />;
     }
   };
@@ -113,8 +126,8 @@ export function ProcessTimelineSheet({ process, open, onOpenChange }: ProcessTim
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="sm:max-w-2xl w-full flex flex-col p-0 bg-[#020617] border-border">
-        <SheetHeader className="p-6 border-b border-border/50 bg-muted/10">
+      <SheetContent className="sm:max-w-2xl w-full flex flex-col p-0 bg-[#020617] border-border overflow-hidden">
+        <SheetHeader className="p-6 border-b border-border/50 bg-muted/10 shrink-0">
           <div className="flex items-center gap-2">
             <History className="h-5 w-5 text-primary" />
             <SheetTitle className="font-headline text-xl text-white">Andamentos do Processo</SheetTitle>
@@ -124,7 +137,7 @@ export function ProcessTimelineSheet({ process, open, onOpenChange }: ProcessTim
 
         <div className="flex-1 overflow-hidden flex flex-col">
           {/* Form Section */}
-          <div className="p-6 border-b border-border/50 bg-[#0f172a] space-y-4">
+          <div className="p-6 border-b border-border/50 bg-[#0f172a] space-y-4 shrink-0">
             <div className="flex flex-wrap gap-2">
               <Button 
                 variant={eventType === 'note' ? 'default' : 'outline'} 
@@ -165,6 +178,32 @@ export function ProcessTimelineSheet({ process, open, onOpenChange }: ProcessTim
               >
                 {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
               </Button>
+            </div>
+          </div>
+
+          {/* New Filters Section */}
+          <div className="px-6 py-3 bg-black/40 border-b border-white/5 flex items-center gap-3 shrink-0 overflow-x-auto no-scrollbar">
+            <Filter className="h-3.5 w-3.5 text-slate-500 shrink-0" />
+            <div className="flex gap-2">
+              {[
+                { id: 'all', label: 'Todos' },
+                { id: 'decision', label: 'Decisões' },
+                { id: 'hearing', label: 'Atos' },
+                { id: 'deadline', label: 'Prazos' },
+                { id: 'petition', label: 'Petições' },
+                { id: 'note', label: 'Notas' }
+              ].map(f => (
+                <button
+                  key={f.id}
+                  onClick={() => setActiveFilter(f.id)}
+                  className={cn(
+                    "whitespace-nowrap text-[9px] font-black uppercase px-2.5 py-1 rounded-full transition-all border",
+                    activeFilter === f.id ? "bg-primary text-primary-foreground border-primary" : "bg-white/5 text-slate-400 border-white/10 hover:border-primary/30"
+                  )}
+                >
+                  {f.label}
+                </button>
+              ))}
             </div>
           </div>
 
@@ -217,7 +256,7 @@ export function ProcessTimelineSheet({ process, open, onOpenChange }: ProcessTim
                 <div className="flex flex-col items-center justify-center py-20 text-center opacity-30">
                     <History className="h-12 w-12 mb-4" />
                     <p className="font-bold text-white">Sem andamentos</p>
-                    <p className="text-xs text-slate-400">Registre o primeiro evento acima.</p>
+                    <p className="text-xs text-slate-400">{activeFilter === 'all' ? 'Registre o primeiro evento acima.' : 'Nenhum evento nesta categoria.'}</p>
                 </div>
               )}
             </div>

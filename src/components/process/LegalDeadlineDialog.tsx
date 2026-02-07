@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -16,7 +17,9 @@ import {
   ChevronDown,
   ChevronUp,
   Calculator,
-  Zap
+  Zap,
+  Sparkles,
+  Bot
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -52,6 +55,7 @@ import { createLegalDeadline, updateLegalDeadline } from '@/lib/deadline-actions
 import { countBusinessDays, addBusinessDays, addCalendarDays, cn } from '@/lib/utils';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
+import { parseLegalPublication } from '@/ai/flows/parse-publication-flow';
 
 const deadlineSchema = z.object({
   type: z.string().min(1, 'O tipo de prazo é obrigatório.'),
@@ -87,6 +91,7 @@ const COMMON_DEADLINES = [
 
 export function LegalDeadlineDialog({ process, deadline, open, onOpenChange, onSuccess }: LegalDeadlineDialogProps) {
   const [isSaving, setIsSaving] = React.useState(false);
+  const [isParsingAI, setIsParsingAI] = React.useState(false);
   const [customType, setCustomType] = React.useState(false);
   const [calcDays, setCalcDays] = React.useState<number | "">("");
   const { toast } = useToast();
@@ -135,6 +140,7 @@ export function LegalDeadlineDialog({ process, deadline, open, onOpenChange, onS
   const startDate = form.watch('startDate');
   const endDate = form.watch('endDate');
   const countingMethod = form.watch('countingMethod');
+  const publicationText = form.watch('publicationText');
 
   const businessDays = React.useMemo(() => countBusinessDays(startDate, endDate), [startDate, endDate]);
   const calendarDays = React.useMemo(() => {
@@ -144,6 +150,36 @@ export function LegalDeadlineDialog({ process, deadline, open, onOpenChange, onS
       return diff < 0 ? 0 : diff;
     } catch (e) { return 0; }
   }, [startDate, endDate]);
+
+  const handleAIParse = async () => {
+    if (!publicationText || publicationText.length < 20) {
+      toast({ variant: 'destructive', title: 'Texto curto demais', description: 'Cole o conteúdo da publicação para a IA analisar.' });
+      return;
+    }
+
+    setIsParsingAI(true);
+    try {
+      const result = await parseLegalPublication({ text: publicationText });
+      if (result) {
+        form.setValue('type', result.deadlineType, { shouldValidate: true });
+        form.setValue('countingMethod', result.isBusinessDays ? 'useful' : 'calendar');
+        setCalcDays(result.daysCount);
+        
+        // Auto-calcula a data fatal se houver data de início
+        if (startDate) {
+          const start = new Date(startDate);
+          const finalDate = result.isBusinessDays ? addBusinessDays(start, result.daysCount) : addCalendarDays(start, result.daysCount);
+          form.setValue('endDate', format(finalDate, 'yyyy-MM-dd'));
+        }
+
+        toast({ title: 'Análise Concluída!', description: `A IA identificou um prazo de ${result.daysCount} dias para ${result.deadlineType}.` });
+      }
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'Erro na IA', description: 'Não foi possível interpretar a publicação.' });
+    } finally {
+      setIsParsingAI(false);
+    }
+  };
 
   const handleApplyCalculation = () => {
     if (calcDays === "" || !startDate) {
@@ -223,25 +259,40 @@ export function LegalDeadlineDialog({ process, deadline, open, onOpenChange, onS
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 pt-4">
             
-            <FormField
-              control={form.control}
-              name="publicationText"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-white flex items-center gap-2 font-bold mb-2">
-                      <FileText className="h-4 w-4 text-primary" /> Texto da Publicação / Despacho
-                  </FormLabel>
-                  <FormControl>
-                    <Textarea 
-                      placeholder="Cole aqui o texto oficial do Diário da Justiça ou do despacho judicial..." 
-                      className="min-h-[120px] bg-background border-border resize-none text-[11px] leading-relaxed font-mono" 
-                      {...field} 
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <FormLabel className="text-white flex items-center gap-2 font-bold">
+                    <FileText className="h-4 w-4 text-primary" /> Texto da Publicação / Despacho
+                </FormLabel>
+                <Button 
+                  type="button" 
+                  size="sm" 
+                  variant="outline" 
+                  onClick={handleAIParse}
+                  disabled={isParsingAI || !publicationText}
+                  className="h-8 border-primary/30 text-primary hover:bg-primary/10 text-[10px] font-black uppercase tracking-widest gap-2"
+                >
+                  {isParsingAI ? <Loader2 className="h-3 w-3 animate-spin" /> : <Bot className="h-3 w-3" />}
+                  Analisar com IA
+                </Button>
+              </div>
+              <FormField
+                control={form.control}
+                name="publicationText"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <Textarea 
+                        placeholder="Cole aqui o texto oficial do Diário da Justiça para que a IA ajude no preenchimento..." 
+                        className="min-h-[120px] bg-background border-border resize-none text-[11px] leading-relaxed font-mono" 
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <FormField
@@ -348,8 +399,11 @@ export function LegalDeadlineDialog({ process, deadline, open, onOpenChange, onS
             />
 
             <div className="p-6 rounded-2xl bg-primary/5 border-2 border-primary/20 space-y-4">
-              <div className="flex items-center gap-2 text-primary font-black uppercase text-[10px] tracking-[0.2em]">
-                <Calculator className="h-3.5 w-3.5" /> Calculadora de Vencimento
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-primary font-black uppercase text-[10px] tracking-[0.2em]">
+                  <Calculator className="h-3.5 w-3.5" /> Calculadora de Vencimento
+                </div>
+                {isParsingAI && <span className="text-[9px] text-primary animate-pulse font-bold">Aguardando IA...</span>}
               </div>
               <div className="flex items-end gap-3">
                 <div className="flex-1 space-y-2">
