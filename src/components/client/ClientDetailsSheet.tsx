@@ -27,7 +27,9 @@ import {
   AlertCircle,
   MessageSquare,
   Building,
-  Sparkles
+  Sparkles,
+  Heart,
+  Globe
 } from 'lucide-react';
 import type { Client } from '@/lib/types';
 import { useToast } from '@/components/ui/use-toast';
@@ -56,7 +58,7 @@ export function ClientDetailsSheet({ client, open, onOpenChange }: ClientDetails
       client.bankInfo?.pixKey
     ];
     
-    const pfFields = [client.lastName, client.rg, client.motherName];
+    const pfFields = [client.lastName, client.rg, client.motherName, client.nationality, client.civilStatus, client.profession];
     const pjFields = [client.stateRegistration, client.municipalRegistration];
 
     const fields = isPJ ? [...commonFields, ...pjFields] : [...commonFields, ...pfFields];
@@ -94,6 +96,9 @@ Tipo: ${client.clientType || 'Não informado'}
 ${isPJ ? 'CNPJ' : 'CPF'}: ${client.document}
 ${isPJ ? `Inscrição Estadual: ${client.stateRegistration || 'Não informado'}
 Inscrição Municipal: ${client.municipalRegistration || 'Não informado'}` : `RG: ${client.rg || 'Não informado'}
+Nacionalidade: ${client.nationality || 'brasileiro(a)'}
+Estado Civil: ${client.civilStatus || 'solteiro(a)'}
+Profissão: ${client.profession || 'Não informado'}
 Nome da Mãe: ${client.motherName || 'Não informado'}`}
 Área: ${client.legalArea || 'Não informado'}
 
@@ -274,6 +279,9 @@ Gerado em: ${format(new Date(), "dd/MM/yyyy HH:mm")}
                   </>
                 ) : (
                   <>
+                    <InfoRow icon={Globe} label="Nacionalidade" value={client.nationality} />
+                    <InfoRow icon={Heart} label="Estado Civil" value={client.civilStatus} />
+                    <InfoRow icon={Briefcase} label="Profissão" value={client.profession} className="col-span-full" />
                     <InfoRow icon={FileText} label="RG" value={client.rg} actionType="copy" />
                     <InfoRow icon={Briefcase} label="Área Jurídica" value={client.legalArea} />
                     <InfoRow icon={User} label="Nome da Mãe" value={client.motherName} className="col-span-full" />

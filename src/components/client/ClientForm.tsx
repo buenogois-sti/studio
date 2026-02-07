@@ -384,32 +384,6 @@ export function ClientForm({
                 <>
                   <FormField
                     control={form.control}
-                    name="motherName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Nome da Mãe</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Nome completo da mãe" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="rg"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>RG</FormLabel>
-                        <FormControl>
-                          <Input placeholder="00.000.000-0" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
                     name="nationality"
                     render={({ field }) => (
                       <FormItem>
@@ -442,6 +416,32 @@ export function ClientForm({
                         <FormLabel>Profissão</FormLabel>
                         <FormControl>
                           <Input placeholder="Ex: ajudante geral" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="rg"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>RG</FormLabel>
+                        <FormControl>
+                          <Input placeholder="00.000.000-0" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="motherName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Nome da Mãe</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Nome completo da mãe" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
