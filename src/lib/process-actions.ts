@@ -8,6 +8,7 @@ import { revalidatePath } from 'next/cache';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/options';
 import { createNotification } from './notification-actions';
+import { extractFileId } from './utils';
 
 // Helper simplificado para evitar N+1 durante buscas em lote
 async function serializeProcessBasic(doc: adminFirestore.DocumentSnapshot): Promise<Process | null> {
@@ -87,7 +88,7 @@ export async function archiveProcess(processId: string): Promise<{ success: bool
     }
 }
 
-export async function draftDocument(processId: string, templateFileId: string, fileName: string): Promise<{ success: boolean; url?: string; error?: string }> {
+export async function draftDocument(processId: string, templateInput: string, fileName: string): Promise<{ success: boolean; url?: string; error?: string }> {
     if (!firestoreAdmin) throw new Error("Servidor indisponível.");
     const session = await getServerSession(authOptions);
 
@@ -105,6 +106,10 @@ export async function draftDocument(processId: string, templateFileId: string, f
             if (!updatedData.driveFolderId) throw new Error("Falha ao sincronizar pasta do processo no Drive.");
             processData.driveFolderId = updatedData.driveFolderId;
         }
+
+        // Sanitiza o ID do modelo (aceita link ou ID direto)
+        const templateFileId = extractFileId(templateInput);
+        if (!templateFileId) throw new Error("ID do modelo inválido ou não informado.");
 
         const newFileName = `${fileName} - ${processData.name}`;
         const copiedFile = await copyFile(templateFileId, newFileName, processData.driveFolderId);

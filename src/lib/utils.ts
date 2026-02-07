@@ -6,6 +6,29 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
+ * Extrai o ID de um arquivo do Google Drive a partir de um link compartilhado.
+ * Se já for um ID, retorna o próprio valor.
+ */
+export function extractFileId(input: string): string {
+  if (!input) return '';
+  
+  // Caso o input seja uma URL de edição ou visualização
+  const match = input.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  if (match && match[1]) {
+    return match[1];
+  }
+  
+  // Caso seja uma URL de download/export
+  const idOnlyMatch = input.match(/id=([a-zA-Z0-9_-]+)/);
+  if (idOnlyMatch && idOnlyMatch[1]) {
+    return idOnlyMatch[1];
+  }
+  
+  // Retorna o input limpo caso já seja o ID
+  return input.trim();
+}
+
+/**
  * Resume um endereço longo (geralmente do OSM) para um formato mais legível e profissional.
  * Ex: Fórum - Rua, Número - Cidade - Estado - CEP, País
  */
@@ -48,7 +71,7 @@ export function countBusinessDays(startDate: string, endDate: string): number {
   const start = new Date(startDate);
   const end = new Date(endDate);
   
-  if (isNaN(start.getTime()) || isNaN(end.getTime())) return 0;
+  if (isNaN(start.getTime()) || iNaN(end.getTime())) return 0;
   if (end < start) return 0;
 
   let count = 0;
