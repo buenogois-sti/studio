@@ -11,7 +11,10 @@ import {
   ArrowRight, 
   AlertCircle,
   FileText,
-  CalendarDays
+  CalendarDays,
+  Gavel,
+  Timer,
+  Plus
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -37,11 +40,20 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import type { Hearing } from '@/lib/types';
 import { processHearingReturn } from '@/lib/hearing-actions';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 
 const returnSchema = z.object({
-  resultNotes: z.string().min(10, 'Descreva detalhadamente o que ocorreu na audiência.'),
+  resultNotes: z.string().min(10, 'Descreva detalhadamente o que ocorreu no ato.'),
   nextStepType: z.string().optional(),
   nextStepDeadline: z.string().optional(),
+  // Novas opções de iteração
+  createLegalDeadline: z.boolean().default(false),
+  scheduleNewHearing: z.boolean().default(false),
+  newHearingType: z.enum(['UNA', 'CONCILIACAO', 'INSTRUCAO', 'JULGAMENTO', 'PERICIA', 'OUTRA']).optional(),
+  newHearingDate: z.string().optional(),
+  newHearingTime: z.string().optional(),
 });
 
 interface HearingReturnDialogProps {
@@ -61,6 +73,9 @@ export function HearingReturnDialog({ hearing, open, onOpenChange, onSuccess }: 
       resultNotes: '',
       nextStepType: 'Manifestação sobre documentos',
       nextStepDeadline: '',
+      createLegalDeadline: false,
+      scheduleNewHearing: false,
+      newHearingType: 'UNA',
     }
   });
 
@@ -69,9 +84,10 @@ export function HearingReturnDialog({ hearing, open, onOpenChange, onSuccess }: 
     setIsSaving(true);
     try {
       await processHearingReturn(hearing.id, values);
-      toast({ title: 'Retorno Processado!', description: 'O andamento foi registrado e o próximo passo agendado.' });
+      toast({ title: 'Retorno Processado!', description: 'O andamento foi registrado e as pendências agendadas.' });
       onSuccess?.();
       onOpenChange(false);
+      form.reset();
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Erro ao salvar retorno', description: error.message });
     } finally {
@@ -81,16 +97,18 @@ export function HearingReturnDialog({ hearing, open, onOpenChange, onSuccess }: 
 
   if (!hearing) return null;
 
+  const isPericia = hearing.type === 'PERICIA';
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-xl bg-card border-border">
+      <DialogContent className="sm:max-w-2xl bg-card border-border max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-white font-headline text-xl">
             <History className="h-6 w-6 text-primary" />
-            Retorno de Audiência
+            {isPericia ? 'Retorno de Perícia Técnica' : 'Retorno de Audiência'}
           </DialogTitle>
           <DialogDescription className="text-slate-400">
-            Registre o resultado da audiência e defina o seguimento jurídico do caso.
+            Registre o desfecho do ato e defina a próxima iteração do processo para: <span className="text-white font-bold">{hearing.processName || 'Processo'}</span>
           </DialogDescription>
         </DialogHeader>
 
@@ -103,11 +121,13 @@ export function HearingReturnDialog({ hearing, open, onOpenChange, onSuccess }: 
               render={({ field }) => (
                 <FormItem>
                   <FormLabel className="text-white font-bold flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-primary" /> O que ocorreu na audiência? *
+                    <FileText className="h-4 w-4 text-primary" /> Síntese do Ato *
                   </FormLabel>
                   <FormControl>
                     <Textarea 
-                      placeholder="Resuma a ata, propostas de acordo, testemunhas ouvidas e ordens do juiz..." 
+                      placeholder={isPericia 
+                        ? "Descreva o que foi analisado pelo perito, quesitos respondidos e clima da diligência..." 
+                        : "Resuma a ata, propostas de acordo, testemunhas ouvidas e ordens do juiz..."}
                       className="min-h-[120px] bg-background border-border resize-none text-sm leading-relaxed" 
                       {...field} 
                     />
@@ -117,40 +137,110 @@ export function HearingReturnDialog({ hearing, open, onOpenChange, onSuccess }: 
               )}
             />
 
-            <div className="p-4 rounded-2xl bg-primary/5 border border-primary/20 space-y-4">
-              <div className="flex items-center gap-2 text-primary font-black uppercase text-[10px] tracking-widest">
-                <ArrowRight className="h-3 w-3" /> Seguimento Jurídico (Próximo Passo)
+            <div className="space-y-4 p-6 rounded-2xl bg-primary/5 border border-primary/20">
+              <div className="flex items-center gap-2 text-primary font-black uppercase text-[10px] tracking-widest mb-4">
+                <ArrowRight className="h-3 w-3" /> Seguimento Jurídico (Iteração)
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="nextStepType"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-[10px] uppercase font-bold text-slate-500">Próxima Providência</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Ex: Manifestar sobre Laudo" className="h-10 bg-background border-border" {...field} />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="nextStepDeadline"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-[10px] uppercase font-bold text-slate-500">Vencimento do Passo</FormLabel>
-                      <FormControl>
-                        <Input type="date" className="h-10 bg-background border-border" {...field} />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-2">
+                    <FormField
+                      control={form.control}
+                      name="createLegalDeadline"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center space-x-2 space-y-0">
+                          <FormControl>
+                            <Checkbox 
+                              checked={field.value} 
+                              onCheckedChange={field.onChange} 
+                              className="border-primary data-[state=checked]:bg-primary"
+                            />
+                          </FormControl>
+                          <Label className="text-xs font-bold text-slate-200 cursor-pointer">Lançar Prazo Fatal (Diário)</Label>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <FormField
+                      control={form.control}
+                      name="scheduleNewHearing"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center space-x-2 space-y-0">
+                          <FormControl>
+                            <Checkbox 
+                              checked={field.value} 
+                              onCheckedChange={field.onChange}
+                              className="border-primary data-[state=checked]:bg-primary"
+                            />
+                          </FormControl>
+                          <Label className="text-xs font-bold text-slate-200 cursor-pointer">Reagendar/Novo Ato Judicial</Label>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="nextStepDeadline"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-[10px] uppercase font-bold text-slate-500">Data p/ Próxima Ação</FormLabel>
+                        <FormControl>
+                          <Input type="date" className="h-10 bg-background border-border" {...field} />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                </div>
               </div>
-              <p className="text-[9px] text-slate-500 italic">
-                Ao preencher estes campos, uma tarefa de seguimento será criada no Google Tasks para lembrá-lo.
-              </p>
+
+              {form.watch('scheduleNewHearing') && (
+                <div className="pt-4 border-t border-white/5 grid grid-cols-1 md:grid-cols-3 gap-3 animate-in fade-in zoom-in-95 duration-300">
+                  <FormField
+                    control={form.control}
+                    name="newHearingType"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-[9px] uppercase font-bold text-primary">Tipo de Ato</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl><SelectTrigger className="h-9 text-xs bg-background border-primary/20"><SelectValue /></SelectTrigger></FormControl>
+                          <SelectContent className="bg-[#0f172a] text-white">
+                            <SelectItem value="UNA">Audiência Una</SelectItem>
+                            <SelectItem value="INSTRUCAO">Instrução</SelectItem>
+                            <SelectItem value="PERICIA">Perícia</SelectItem>
+                            <SelectItem value="CONCILIACAO">Conciliação</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="newHearingDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-[9px] uppercase font-bold text-primary">Nova Data</FormLabel>
+                        <FormControl><Input type="date" className="h-9 text-xs bg-background" {...field} /></FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="newHearingTime"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-[9px] uppercase font-bold text-primary">Horário</FormLabel>
+                        <FormControl><Input type="time" className="h-9 text-xs bg-background" {...field} /></FormControl>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              )}
             </div>
 
             <DialogFooter className="pt-4 gap-2">
@@ -160,10 +250,10 @@ export function HearingReturnDialog({ hearing, open, onOpenChange, onSuccess }: 
               <Button 
                 type="submit" 
                 disabled={isSaving} 
-                className="bg-primary text-primary-foreground hover:bg-primary/90 font-black uppercase tracking-widest text-[11px] px-8 h-11"
+                className="bg-primary text-primary-foreground hover:bg-primary/90 font-black uppercase tracking-widest text-[11px] px-8 h-12 shadow-xl shadow-primary/20"
               >
                 {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
-                Finalizar e Seguir Processo
+                Finalizar e Atualizar Agenda
               </Button>
             </DialogFooter>
           </form>

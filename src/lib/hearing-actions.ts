@@ -1,4 +1,3 @@
-
 'use server';
 
 import { firestoreAdmin } from '@/firebase/admin';
@@ -7,7 +6,7 @@ import { add, formatISO, format } from 'date-fns';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/options';
 import { createNotification } from './notification-actions';
-import type { HearingStatus, HearingType, NotificationMethod } from './types';
+import type { HearingStatus, HearingType, NotificationMethod, TimelineEvent } from './types';
 import { summarizeAddress } from './utils';
 import { Timestamp, FieldValue } from 'firebase-admin/firestore';
 import { v4 as uuidv4 } from 'uuid';
@@ -163,7 +162,7 @@ export async function createHearing(data: {
       });
 
       const event = {
-        summary: `⚖️ Audiência [${type}] | ${clientInfo.name} (Dr. ${lawyerName})`,
+        summary: `${type === 'PERICIA' ? '🔍 Perícia' : '⚖️ Audiência'} [${type}] | ${clientInfo.name} (Dr. ${lawyerName})`,
         location: location,
         description: description,
         start: { dateTime: formatISO(startDateTime), timeZone: 'America/Sao_Paulo' },
@@ -193,8 +192,8 @@ export async function createHearing(data: {
     if (lawyerId !== session.user.id) {
       await createNotification({
         userId: lawyerId,
-        title: "Nova Audiência Agendada",
-        description: `${session.user.name} agendou uma audiência (${type}) para você no processo ${processData?.name}.`,
+        title: "Pauta Atualizada",
+        description: `${session.user.name} agendou um ato (${type}) para você no processo ${processData?.name}.`,
         type: 'hearing',
         href: `/dashboard/audiencias`,
       });
@@ -222,12 +221,13 @@ export async function updateHearingStatus(hearingId: string, status: HearingStat
             try {
                 const { calendar } = await getGoogleApiClientsForUser();
                 const prefix = status === 'REALIZADA' ? '✅ ' : status === 'CANCELADA' ? '❌ ' : status === 'ADIADA' ? '⏳ ' : '';
+                const typeLabel = hearing.type === 'PERICIA' ? 'Perícia' : 'Audiência';
                 
                 await calendar.events.patch({
                     calendarId: 'primary',
                     eventId: hearing.googleCalendarEventId,
                     requestBody: {
-                        summary: `${prefix}Audiência [${hearing.type}] | ${hearing.responsibleParty}`,
+                        summary: `${prefix}${typeLabel} [${hearing.type}] | ${hearing.responsibleParty}`,
                     }
                 });
             } catch (calendarError: any) {
@@ -241,7 +241,16 @@ export async function updateHearingStatus(hearingId: string, status: HearingStat
     }
 }
 
-export async function processHearingReturn(hearingId: string, data: { resultNotes: string; nextStepType?: string; nextStepDeadline?: string }) {
+export async function processHearingReturn(hearingId: string, data: { 
+  resultNotes: string; 
+  nextStepType?: string; 
+  nextStepDeadline?: string;
+  createLegalDeadline?: boolean;
+  scheduleNewHearing?: boolean;
+  newHearingType?: HearingType;
+  newHearingDate?: string;
+  newHearingTime?: string;
+}) {
   if (!firestoreAdmin) throw new Error('Servidor indisponível.');
   const session = await getServerSession(authOptions);
   if (!session) throw new Error('Não autenticado.');
@@ -251,11 +260,11 @@ export async function processHearingReturn(hearingId: string, data: { resultNote
     const hearingSnap = await hearingRef.get();
     const hearingData = hearingSnap.data();
     
-    if (!hearingSnap.exists || !hearingData) throw new Error('Audiência não encontrada.');
+    if (!hearingSnap.exists || !hearingData) throw new Error('Ato não encontrado.');
 
     const batch = firestoreAdmin.batch();
 
-    // 1. Atualizar status da audiência
+    // 1. Atualizar status do ato atual
     batch.update(hearingRef, {
       status: 'REALIZADA',
       resultNotes: data.resultNotes,
@@ -265,10 +274,10 @@ export async function processHearingReturn(hearingId: string, data: { resultNote
 
     // 2. Criar evento na timeline do processo
     const processRef = firestoreAdmin.collection('processes').doc(hearingData.processId);
-    const timelineEvent = {
+    const timelineEvent: TimelineEvent = {
       id: uuidv4(),
-      type: 'hearing',
-      description: `RESULTADO DA AUDIÊNCIA (${hearingData.type}): ${data.resultNotes}`,
+      type: hearingData.type === 'PERICIA' ? 'pericia' : 'hearing',
+      description: `RESULTADO DO ATO (${hearingData.type}): ${data.resultNotes}`,
       date: Timestamp.now(),
       authorName: session.user.name || 'Advogado'
     };
@@ -277,10 +286,12 @@ export async function processHearingReturn(hearingId: string, data: { resultNote
       updatedAt: FieldValue.serverTimestamp()
     });
 
-    // 3. Agendar próximo passo no Google Tasks se houver prazo
+    // 3. Agendar iterações futuras
+    const { tasks } = await getGoogleApiClientsForUser();
+
+    // 3.1. Tarefa de seguimento genérica
     if (data.nextStepType && data.nextStepDeadline) {
       try {
-        const { tasks } = await getGoogleApiClientsForUser();
         const taskDate = new Date(data.nextStepDeadline);
         taskDate.setUTCHours(0, 0, 0, 0);
 
@@ -288,13 +299,30 @@ export async function processHearingReturn(hearingId: string, data: { resultNote
           tasklist: '@default',
           requestBody: {
             title: `📋 SEGUIMENTO: ${data.nextStepType} | ${hearingData.processName || 'Processo'}`,
-            notes: `Referente ao retorno da audiência realizada em ${format(hearingData.date.toDate(), 'dd/MM/yyyy')}.\nResultado: ${data.resultNotes}`,
+            notes: `Referente ao retorno do ato realizado em ${format(hearingData.date.toDate(), 'dd/MM/yyyy')}.\nResultado: ${data.resultNotes}`,
             due: taskDate.toISOString(),
           }
         });
       } catch (e) {
         console.warn('Google Tasks sync failed during hearing return:', e);
       }
+    }
+
+    // 3.2. Agendar nova data (se designada em ata)
+    if (data.scheduleNewHearing && data.newHearingDate && data.newHearingTime) {
+      // Criar nova audiência/perícia via createHearing logic
+      await createHearing({
+        processId: hearingData.processId,
+        processName: hearingData.processName,
+        lawyerId: hearingData.lawyerId,
+        hearingDate: `${data.newHearingDate}T${data.newHearingTime}`,
+        location: hearingData.location,
+        courtBranch: hearingData.courtBranch,
+        responsibleParty: hearingData.responsibleParty,
+        status: 'PENDENTE',
+        type: data.newHearingType || 'UNA',
+        notes: `Designada em ata após o ato de ${format(hearingData.date.toDate(), 'dd/MM/yyyy')}`
+      });
     }
 
     await batch.commit();
