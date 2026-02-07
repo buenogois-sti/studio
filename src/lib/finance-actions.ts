@@ -32,224 +32,101 @@ const eventTypeToOriginMap: Record<CreateEventData['type'], FinancialTitle['orig
 };
 
 export async function createFinancialEventAndTitles(data: CreateEventData) {
-  if (!firestoreAdmin) {
-    throw new Error("A conexão com o servidor de dados falhou.");
-  }
+  if (!firestoreAdmin) throw new Error("Banco de dados inacessível.");
   const { processId, type, eventDate, description, totalValue, installments, firstDueDate } = data;
 
-  if (installments < 1) {
-    throw new Error("O número de parcelas deve ser pelo menos 1.");
-  }
+  const processDoc = await firestoreAdmin.collection('processes').doc(processId).get();
+  if (!processDoc.exists) throw new Error("Processo não encontrado.");
+  const processData = processDoc.data() as Process;
 
   const batch = firestoreAdmin.batch();
-
-  const processDoc = await firestoreAdmin.collection('processes').doc(processId).get();
-  if (!processDoc.exists) {
-    throw new Error("Processo associado não encontrado.");
-  }
-  const processData = processDoc.data() as Process;
-  const leadLawyerId = processData.leadLawyerId;
-
   const eventRef = firestoreAdmin.collection('financial_events').doc();
-  const newEvent: Omit<FinancialEvent, 'id'> = {
-    processId,
-    type,
-    eventDate: new Date(eventDate),
-    description,
-    totalValue,
-  };
-  batch.set(eventRef, newEvent);
+  batch.set(eventRef, { processId, type, eventDate: new Date(eventDate), description, totalValue });
 
-  const installmentValue = totalValue / installments;
+  const instVal = totalValue / (installments || 1);
   const origin = eventTypeToOriginMap[type];
 
   for (let i = 0; i < installments; i++) {
     const titleRef = firestoreAdmin.collection('financial_titles').doc();
-    const titleDescription = installments > 1 ? `${description} - Parcela ${i + 1}/${installments}` : description;
-    const dueDate = addMonths(new Date(firstDueDate), i);
-
-    const newTitle: Omit<FinancialTitle, 'id'> = {
+    batch.set(titleRef, {
       financialEventId: eventRef.id,
-      processId: processId,
+      processId,
       clientId: processData.clientId,
-      description: titleDescription,
+      description: installments > 1 ? `${description} (${i + 1}/${installments})` : description,
       type: 'RECEITA',
-      origin: origin,
-      value: installmentValue,
-      dueDate: dueDate,
+      origin,
+      value: instVal,
+      dueDate: addMonths(new Date(firstDueDate), i),
       status: 'PENDENTE',
-    };
-    batch.set(titleRef, newTitle);
+    });
   }
 
-  // REGRA DE NEGÓCIO DE REPASSE (HONORÁRIOS SOBRE HONORÁRIOS)
-  const isRevenueSubjectToCommission = ['ACORDO', 'SENTENCA', 'EXECUCAO', 'CONTRATO'].includes(type);
-
-  if (leadLawyerId && isRevenueSubjectToCommission) {
-    const lawyerDoc = await firestoreAdmin.collection('staff').doc(leadLawyerId).get();
-    if (lawyerDoc.exists) {
-      const lawyerData = lawyerDoc.data() as Staff;
-      const rem = lawyerData.remuneration;
-
-      if (rem) {
-        let lawyerValue = 0;
-        // O Escritório geralmente retém 30% como honorários totais
-        const officeFeeTotal = totalValue * 0.3;
-
-        // Se o advogado tem uma participação (ex: 30% da sucumbência)
-        if ((rem.type === 'SUCUMBENCIA' || rem.type === 'QUOTA_LITIS') && rem.lawyerPercentage) {
-          // O crédito do advogado é uma porcentagem DO HONORÁRIO DO ESCRITÓRIO
-          lawyerValue = officeFeeTotal * (rem.lawyerPercentage / 100);
-        }
-
-        if (lawyerValue > 0) {
-          const creditRef = firestoreAdmin.collection(`staff/${leadLawyerId}/credits`).doc();
-          const newCredit: Omit<StaffCredit, 'id'> = {
-            type: 'HONORARIOS',
-            processId,
-            description: `Part. Honorários (${rem.type}): ${description}`,
-            value: lawyerValue,
-            status: 'RETIDO', // Inicia retido até o cliente pagar
-            date: Timestamp.now() as any,
-            financialEventId: eventRef.id
-          };
-          batch.set(creditRef, newCredit);
-        }
+  // Regra de Repasse automática
+  if (processData.leadLawyerId && ['ACORDO', 'SENTENCA', 'EXECUCAO', 'CONTRATO'].includes(type)) {
+    const staffDoc = await firestoreAdmin.collection('staff').doc(processData.leadLawyerId).get();
+    const rem = (staffDoc.data() as Staff | undefined)?.remuneration;
+    if (rem && (rem.type === 'SUCUMBENCIA' || rem.type === 'QUOTA_LITIS') && rem.lawyerPercentage) {
+      const lawyerVal = (totalValue * 0.3) * (rem.lawyerPercentage / 100);
+      if (lawyerVal > 0) {
+        batch.set(firestoreAdmin.collection(`staff/${processData.leadLawyerId}/credits`).doc(), {
+          type: 'HONORARIOS',
+          processId,
+          description: `Participação: ${description}`,
+          value: lawyerVal,
+          status: 'RETIDO',
+          date: Timestamp.now(),
+          financialEventId: eventRef.id
+        });
       }
     }
   }
 
   try {
     await batch.commit();
-    return { success: true, message: `Evento financeiro e ${installments} título(s) criados com sucesso!` };
+    return { success: true };
   } catch (error: any) {
-    console.error("Error committing financial event batch:", error);
-    throw new Error(error.message || 'Falha ao salvar o evento e os títulos financeiros.');
+    throw new Error("Erro ao salvar transações financeiras.");
   }
 }
 
-export async function updateFinancialTitleStatus(titleId: string, status: 'PAGO' | 'PENDENTE' | 'ATRASADO'): Promise<{ success: boolean; message: string }> {
-    if (!firestoreAdmin) throw new Error("A conexão com o servidor de dados falhou.");
+export async function updateFinancialTitleStatus(titleId: string, status: 'PAGO' | 'PENDENTE' | 'ATRASADO') {
+    if (!firestoreAdmin) throw new Error("Servidor inacessível.");
     try {
         const titleRef = firestoreAdmin.collection('financial_titles').doc(titleId);
         const titleDoc = await titleRef.get();
-        if (!titleDoc.exists) throw new Error('Título não encontrado.');
-        
-        const titleData = titleDoc.data() as FinancialTitle;
+        const titleData = titleDoc.data() as FinancialTitle | undefined;
+        if (!titleDoc.exists || !titleData) throw new Error('Título não encontrado.');
 
-        const updateData: any = { status };
-        if (status === 'PAGO') {
-            updateData.paymentDate = FieldValue.serverTimestamp();
-            
-            // AUTOMATIZAÇÃO: Liberar créditos vinculados a este evento financeiro
-            if (titleData.financialEventId) {
-                const staffSnapshot = await firestoreAdmin.collection('staff').get();
-                for (const staffDoc of staffSnapshot.docs) {
-                    const creditsQuery = await staffDoc.ref.collection('credits')
-                        .where('financialEventId', '==', titleData.financialEventId)
-                        .where('status', '==', 'RETIDO')
-                        .get();
-                    
-                    for (const creditDoc of creditsQuery.docs) {
-                        await creditDoc.ref.update({ 
-                          status: 'DISPONIVEL',
-                          unlockedAt: FieldValue.serverTimestamp()
-                        });
-                    }
-                }
-            }
-        } else {
-            updateData.paymentDate = FieldValue.delete();
+        const batch = firestoreAdmin.batch();
+        batch.update(titleRef, { 
+            status, 
+            paymentDate: status === 'PAGO' ? FieldValue.serverTimestamp() : FieldValue.delete(),
+            updatedAt: FieldValue.serverTimestamp()
+        });
 
-            // Reverter liberação se o título for estornado
-            if (titleData.financialEventId) {
-                const staffSnapshot = await firestoreAdmin.collection('staff').get();
-                for (const staffDoc of staffSnapshot.docs) {
-                    const creditsQuery = await staffDoc.ref.collection('credits')
-                        .where('financialEventId', '==', titleData.financialEventId)
-                        .where('status', '==', 'DISPONIVEL')
-                        .get();
-                    
-                    for (const creditDoc of creditsQuery.docs) {
-                        await creditDoc.ref.update({ status: 'RETIDO' });
-                    }
-                }
+        // Liberação de créditos vinculados
+        if (titleData.financialEventId) {
+            const staffSnap = await firestoreAdmin.collection('staff').get();
+            for (const s of staffSnap.docs) {
+                const creds = await s.ref.collection('credits')
+                    .where('financialEventId', '==', titleData.financialEventId)
+                    .get();
+                creds.docs.forEach(c => batch.update(c.ref, { 
+                    status: status === 'PAGO' ? 'DISPONIVEL' : 'RETIDO',
+                    unlockedAt: status === 'PAGO' ? FieldValue.serverTimestamp() : FieldValue.delete()
+                }));
             }
         }
 
-        await titleRef.update(updateData);
-        return { success: true, message: 'Status atualizado!' };
+        await batch.commit();
+        return { success: true };
     } catch (error: any) {
-        throw new Error(error.message || 'Falha ao atualizar status.');
+        throw new Error(error.message);
     }
-}
-
-export async function processLatePaymentRoutine(titleId: string) {
-  if (!firestoreAdmin) throw new Error("Servidor indisponível.");
-  const session = await getServerSession(authOptions);
-  if (!session) throw new Error("Não autorizado.");
-
-  try {
-    const titleRef = firestoreAdmin.collection('financial_titles').doc(titleId);
-    const titleSnap = await titleRef.get();
-    if (!titleSnap.exists) throw new Error("Título não encontrado.");
-    const titleData = titleSnap.data() as FinancialTitle;
-
-    await titleRef.update({ status: 'ATRASADO', updatedAt: FieldValue.serverTimestamp() });
-
-    if (titleData.processId) {
-      const processRef = firestoreAdmin.collection('processes').doc(titleData.processId);
-      const timelineEvent: TimelineEvent = {
-        id: uuidv4(),
-        type: 'system',
-        description: `ALERTA FINANCEIRO: Detectado atraso no pagamento da parcela "${titleData.description}". Rotina de cobrança iniciada.`,
-        date: Timestamp.now() as any,
-        authorName: session.user.name || 'Financeiro'
-      };
-      await processRef.update({
-        timeline: FieldValue.arrayUnion(timelineEvent),
-        updatedAt: FieldValue.serverTimestamp()
-      });
-    }
-
-    return { success: true };
-  } catch (error: any) {
-    throw new Error(error.message);
-  }
-}
-
-export async function requestCreditUnlock(staffId: string, creditId: string, reason: string) {
-  if (!firestoreAdmin) throw new Error("Servidor indisponível.");
-  const session = await getServerSession(authOptions);
-  if (!session) throw new Error("Não autorizado.");
-
-  try {
-    const creditRef = firestoreAdmin.collection(`staff/${staffId}/credits`).doc(creditId);
-    await creditRef.update({
-      unlockRequested: true,
-      unlockReason: reason,
-      updatedAt: FieldValue.serverTimestamp()
-    });
-
-    const admins = await firestoreAdmin.collection('users').where('role', '==', 'admin').get();
-    for (const admin of admins.docs) {
-      await createNotification({
-        userId: admin.id,
-        title: "Solicitação de Desbloqueio",
-        description: `${session.user.name} solicitou a liberação de um saldo retido.`,
-        type: 'warning',
-        href: '/dashboard/repasses'
-      });
-    }
-
-    return { success: true };
-  } catch (error: any) {
-    throw new Error(error.message);
-  }
 }
 
 export async function processRepasse(staffId: string, creditIds: string[], totalValue: number) {
-  if (!firestoreAdmin) throw new Error("Servidor indisponível.");
+  if (!firestoreAdmin) throw new Error("Servidor inacessível.");
   const session = await getServerSession(authOptions);
   if (!session) throw new Error("Não autorizado.");
 
@@ -258,174 +135,48 @@ export async function processRepasse(staffId: string, creditIds: string[], total
   const staffDoc = await staffRef.get();
   const staffData = staffDoc.data() as Staff;
 
-  for (const id of creditIds) {
-    const creditRef = staffRef.collection('credits').doc(id);
-    batch.update(creditRef, { 
+  creditIds.forEach(id => {
+    batch.update(staffRef.collection('credits').doc(id), { 
       status: 'PAGO', 
       paymentDate: FieldValue.serverTimestamp(),
       paidBy: session.user.name 
     });
-  }
+  });
 
-  const titleRef = firestoreAdmin.collection('financial_titles').doc();
-  const newTitle: Omit<FinancialTitle, 'id'> = {
-    description: `Repasse Consolidado: ${staffData.firstName} ${staffData.lastName}`,
+  batch.set(firestoreAdmin.collection('financial_titles').doc(), {
+    description: `Repasse: ${staffData.firstName} ${staffData.lastName}`,
     type: 'DESPESA',
     origin: 'HONORARIOS_PAGOS',
     value: totalValue,
     dueDate: new Date(),
-    paymentDate: Timestamp.now() as any,
+    paymentDate: Timestamp.now(),
     status: 'PAGO',
     paidToStaffId: staffId
-  };
-  batch.set(titleRef, newTitle);
+  });
 
-  try {
-    await batch.commit();
-    
-    await createNotification({
-      userId: staffId,
-      title: "Repasse Recebido",
-      description: `O escritório processou um pagamento de ${totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} para você.`,
-      type: 'finance',
-      href: '/dashboard/repasses'
-    });
+  await batch.commit();
+  await createNotification({
+    userId: staffId,
+    title: "Pagamento Efetuado",
+    description: `Créditos liquidados no valor de ${totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}.`,
+    type: 'finance',
+    href: '/dashboard/repasses'
+  });
 
-    return { success: true };
-  } catch (error: any) {
-    throw new Error(error.message);
-  }
+  return { success: true };
 }
 
-export async function updateCreditForecast(staffId: string, creditIds: string[], forecastDate: string) {
-  if (!firestoreAdmin) throw new Error("Servidor indisponível.");
-  const session = await getServerSession(authOptions);
-  if (!session || !['admin', 'financial'].includes(session.user.role || '')) {
-    throw new Error("Apenas administradores podem definir previsões de pagamento.");
-  }
-
-  const batch = firestoreAdmin.batch();
-  const staffRef = firestoreAdmin.collection('staff').doc(staffId);
-
-  for (const id of creditIds) {
-    const creditRef = staffRef.collection('credits').doc(id);
-    batch.update(creditRef, { 
-      paymentForecast: Timestamp.fromDate(new Date(forecastDate))
-    });
-  }
-
-  try {
-    await batch.commit();
-    return { success: true };
-  } catch (error: any) {
-    throw new Error(error.message);
-  }
-}
-
-export async function launchPayroll() {
-  if (!firestoreAdmin) throw new Error("Servidor indisponível.");
-  const session = await getServerSession(authOptions);
-  if (!session || session.user.role !== 'admin') throw new Error("Apenas administradores podem processar folha.");
-
-  const batch = firestoreAdmin.batch();
-  const staffSnap = await firestoreAdmin.collection('staff').get();
-  let count = 0;
-
-  const currentMonthKey = format(new Date(), 'yyyy-MM');
-
-  for (const doc of staffSnap.docs) {
-    const data = doc.data() as Staff;
-    
-    if (data.remuneration?.type === 'FIXO_MENSAL' && data.remuneration.fixedMonthlyValue) {
-      const existingRef = await doc.ref.collection('credits')
-        .where('monthKey', '==', currentMonthKey)
-        .where('type', '==', 'SALARIO')
-        .get();
-
-      if (existingRef.empty) {
-        const creditRef = doc.ref.collection('credits').doc();
-        batch.set(creditRef, {
-          type: 'SALARIO',
-          description: `Pro-labore/Salário: ${format(new Date(), 'MMMM/yyyy', { locale: ptBR })}`,
-          value: data.remuneration.fixedMonthlyValue,
-          status: 'DISPONIVEL',
-          date: FieldValue.serverTimestamp(),
-          monthKey: currentMonthKey
-        });
-        count++;
-      }
-    }
-  }
-
-  if (count > 0) {
-    await batch.commit();
-  }
-  
-  return { success: true, count };
-}
-
-export async function deleteStaffCredit(staffId: string, creditId: string) {
-  if (!firestoreAdmin) throw new Error("Servidor indisponível.");
-  const session = await getServerSession(authOptions);
-  if (!session || !['admin', 'financial'].includes(session.user.role || '')) {
-    throw new Error("Não autorizado.");
-  }
-
-  try {
-    await firestoreAdmin.collection(`staff/${staffId}/credits`).doc(creditId).delete();
-    return { success: true };
-  } catch (error: any) {
-    throw new Error(error.message);
-  }
-}
-
-export async function updateStaffCredit(staffId: string, creditId: string, data: Partial<StaffCredit>) {
-  if (!firestoreAdmin) throw new Error("Servidor indisponível.");
-  try {
-    await firestoreAdmin.collection(`staff/${staffId}/credits`).doc(creditId).update({
-      ...data,
-      updatedAt: FieldValue.serverTimestamp()
-    });
-    return { success: true };
-  } catch (error: any) {
-    throw new Error(error.message);
-  }
-}
-
-export async function addManualStaffCredit(staffId: string, data: Partial<StaffCredit>) {
-  if (!firestoreAdmin) throw new Error("Servidor indisponível.");
-  try {
-    const ref = firestoreAdmin.collection(`staff/${staffId}/credits`).doc();
-    await ref.set({
-      ...data,
-      id: ref.id,
-      date: FieldValue.serverTimestamp(),
-      status: data.status || 'DISPONIVEL'
-    });
-    return { success: true, id: ref.id };
-  } catch (error: any) {
-    throw new Error(error.message);
-  }
-}
-
-export async function createFinancialTitle(data: Partial<Omit<FinancialTitle, 'id' | 'paymentDate'>> & { processId?: string }): Promise<{ success: boolean; message: string }> {
-    if (!firestoreAdmin) throw new Error("A conexão com o servidor de dados falhou.");
+export async function createFinancialTitle(data: Partial<FinancialTitle>) {
+    if (!firestoreAdmin) throw new Error("Servidor inacessível.");
     try {
-        let clientId: string | undefined = undefined;
-        if (data.processId) {
-          const processDoc = await firestoreAdmin.collection('processes').doc(data.processId).get();
-          if (processDoc.exists) {
-              clientId = (processDoc.data() as Process).clientId;
-          }
+        let clientId = data.clientId;
+        if (data.processId && !clientId) {
+          const p = await firestoreAdmin.collection('processes').doc(data.processId).get();
+          clientId = p.data()?.clientId;
         }
-
-        const newTitle = { ...data, clientId };
-        if(!newTitle.processId) delete newTitle.processId;
-        if(!newTitle.clientId) delete newTitle.clientId;
-
-        await firestoreAdmin.collection('financial_titles').add(newTitle);
-        return { success: true, message: 'Título financeiro criado com sucesso!' };
+        await firestoreAdmin.collection('financial_titles').add({ ...data, clientId, updatedAt: FieldValue.serverTimestamp() });
+        return { success: true };
     } catch (error: any) {
-        throw new Error(error.message || 'Falha ao criar o título.');
+        throw new Error(error.message);
     }
 }

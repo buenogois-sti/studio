@@ -3,15 +3,16 @@ import { firestoreAdmin } from '@/firebase/admin';
 import type { Client } from './types';
 import { firestore } from 'firebase-admin';
 
-// Helper function to serialize a Firestore document into a Client object with robust fallbacks
+/**
+ * Serializa um snapshot do Firestore para o tipo Client com proteções contra campos nulos.
+ */
 function serializeClient(doc: firestore.DocumentSnapshot): Client | null {
     const data = doc.data();
-    const id = doc.id;
-
     if (!data) return null;
 
-    // Handle createdAt with multiple fallbacks to prevent dropping documents from results
+    const id = doc.id;
     let createdAtString = new Date().toISOString();
+    
     if (data.createdAt) {
         if (typeof data.createdAt.toDate === 'function') {
             createdAtString = data.createdAt.toDate().toISOString();
@@ -21,31 +22,33 @@ function serializeClient(doc: firestore.DocumentSnapshot): Client | null {
     }
 
     return {
-        id: id,
+        id,
         firstName: data.firstName || '',
         lastName: data.lastName || '',
         document: data.document || '',
         email: data.email || '',
         avatar: data.avatar || '',
         createdAt: createdAtString,
-        clientType: data.clientType,
-        motherName: data.motherName,
-        rg: data.rg,
-        ctps: data.ctps,
-        pis: data.pis,
-        phone: data.phone,
-        mobile: data.mobile,
-        emergencyContact: data.emergencyContact,
-        legalArea: data.legalArea,
-        address: data.address,
-        bankInfo: data.bankInfo,
+        clientType: data.clientType || 'Pessoa Física',
+        status: data.status || 'active',
+        motherName: data.motherName || '',
+        rg: data.rg || '',
+        ctps: data.ctps || '',
+        pis: data.pis || '',
+        nationality: data.nationality || 'brasileiro(a)',
+        civilStatus: data.civilStatus || 'solteiro(a)',
+        profession: data.profession || '',
+        phone: data.phone || '',
+        mobile: data.mobile || '',
+        legalArea: data.legalArea || '',
+        address: data.address || {},
+        bankInfo: data.bankInfo || {},
         driveFolderId: data.driveFolderId,
-        sheetId: data.sheetId,
     };
 }
 
 export async function createClient(data: Partial<Client>): Promise<{ success: boolean; id?: string; error?: string }> {
-    if (!firestoreAdmin) throw new Error("A conexão com o servidor de dados falhou.");
+    if (!firestoreAdmin) throw new Error("Servidor de dados inacessível.");
     try {
         const docRef = await firestoreAdmin.collection('clients').add({
             ...data,
@@ -62,44 +65,49 @@ export async function createClient(data: Partial<Client>): Promise<{ success: bo
 
 export async function searchClients(query: string): Promise<Client[]> {
     if (!query || query.length < 2) return [];
-    
-    if (!firestoreAdmin) {
-        console.error('[searchClients] firestoreAdmin não inicializado');
-        throw new Error("A conexão com o servidor de dados falhou.");
-    }
+    if (!firestoreAdmin) throw new Error("A conexão com o servidor de dados falhou.");
     
     try {
-        console.log('[searchClients] Iniciando busca por:', query);
-        const clientsSnapshot = await firestoreAdmin.collection('clients').get();
-        console.log('[searchClients] Total de clientes na base:', clientsSnapshot.docs.length);
-        
-        const lowerCaseQuery = query.toLowerCase().replace(/\D/g, ''); // For document matching
-        const textQuery = query.toLowerCase();
+        const cleanQuery = query.trim();
+        const docOnlyQuery = cleanQuery.replace(/\D/g, '');
 
-        const filtered = clientsSnapshot.docs
+        // 1. Tenta busca exata por documento (Muito mais rápido)
+        if (docOnlyQuery.length >= 11) {
+            const exactMatch = await firestoreAdmin.collection('clients')
+                .where('document', '==', cleanQuery)
+                .limit(1)
+                .get();
+            
+            if (!exactMatch.empty) {
+                const client = serializeClient(exactMatch.docs[0]);
+                return client ? [client] : [];
+            }
+        }
+
+        // 2. Fallback para busca textual (Limitada para evitar congelamento)
+        const clientsSnapshot = await firestoreAdmin.collection('clients')
+            .orderBy('updatedAt', 'desc')
+            .limit(100) // Limite de varredura para performance
+            .get();
+        
+        const textQuery = cleanQuery.toLowerCase();
+
+        return clientsSnapshot.docs
             .map(serializeClient)
             .filter((client): client is Client => {
                 if (!client) return false;
                 const fullName = `${client.firstName} ${client.lastName}`.toLowerCase();
-                const docClean = (client.document || '').replace(/\D/g, '');
-                
-                return fullName.includes(textQuery) || 
-                       (docClean && docClean.includes(lowerCaseQuery)) ||
-                       (client.document || '').includes(textQuery);
+                return fullName.includes(textQuery) || (client.document || '').includes(textQuery);
             })
             .slice(0, 10);
-        
-        console.log('[searchClients] Resultados após filtro:', filtered.length);
-        return filtered;
     } catch (error) {
-        console.error("[searchClients] Erro na busca:", error);
+        console.error("[searchClients] Erro:", error);
         return [];
     }
 }
 
 export async function getClientById(clientId: string): Promise<Client | null> {
     if (!clientId || !firestoreAdmin) return null;
-    
     try {
         const clientDoc = await firestoreAdmin.collection('clients').doc(clientId).get();
         return clientDoc.exists ? serializeClient(clientDoc) : null;
@@ -110,8 +118,7 @@ export async function getClientById(clientId: string): Promise<Client | null> {
 }
 
 export async function bulkCreateClients(clients: Partial<Client>[]): Promise<{ success: boolean; count: number; error?: string }> {
-    if (!firestoreAdmin) throw new Error("A conexão com o servidor de dados falhou.");
-
+    if (!firestoreAdmin) throw new Error("Servidor inacessível.");
     try {
         const batch = firestoreAdmin.batch();
         const clientsCollection = firestoreAdmin.collection('clients');

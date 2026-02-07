@@ -12,116 +12,78 @@ import { v4 as uuidv4 } from 'uuid';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-/**
- * Busca uma subpasta específica por nome dentro de uma pasta pai de forma idempotente.
- */
 async function ensureSubfolder(drive: any, parentId: string, folderName: string): Promise<string> {
     const res = await drive.files.list({
         q: `'${parentId}' in parents and name = '${folderName}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
         fields: 'files(id)',
+        pageSize: 1,
         supportsAllDrives: true,
         includeItemsFromAllDrives: true,
     });
     
-    if (res.data.files && res.data.files.length > 0) {
-        return res.data.files[0].id;
-    }
+    if (res.data.files && res.data.files.length > 0) return res.data.files[0].id;
 
     const folder = await drive.files.create({
-        requestBody: {
-            name: folderName,
-            mimeType: 'application/vnd.google-apps.folder',
-            parents: [parentId],
-        },
+        requestBody: { name: folderName, mimeType: 'application/vnd.google-apps.folder', parents: [parentId] },
         fields: 'id',
         supportsAllDrives: true,
     });
-    
     return folder.data.id;
 }
 
-/**
- * Realiza a substituição de placeholders (tags) no documento Google Docs.
- */
 async function replacePlaceholdersInDoc(docsApi: any, fileId: string, dataMap: Record<string, string>) {
     const requests = Object.entries(dataMap).map(([key, value]) => ({
         replaceAllText: {
-            containsText: {
-                text: `{{${key}}}`,
-                matchCase: true,
-            },
+            containsText: { text: `{{${key}}}`, matchCase: true },
             replaceText: value || '',
         },
     }));
 
     if (requests.length === 0) return;
-
     try {
-        await docsApi.documents.batchUpdate({
-            documentId: fileId,
-            requestBody: {
-                requests,
-            },
-        });
+        await docsApi.documents.batchUpdate({ documentId: fileId, requestBody: { requests } });
     } catch (error) {
-        console.error('[replacePlaceholders] Failed to update document:', error);
+        console.error('[replacePlaceholders] Error:', error);
     }
 }
 
 export async function searchProcesses(query: string): Promise<Process[]> {
     if (!query || query.length < 2) return [];
-    
-    if (!firestoreAdmin) {
-        throw new Error("A conexão com o servidor de dados falhou.");
-    }
+    if (!firestoreAdmin) throw new Error("Servidor inacessível.");
     
     try {
-        const processesSnapshot = await firestoreAdmin.collection('processes')
-            .orderBy('updatedAt', 'desc')
-            .limit(200)
+        const q = query.trim().toLowerCase();
+        
+        // Busca exata por número do processo primeiro
+        const exactMatch = await firestoreAdmin.collection('processes')
+            .where('processNumber', '==', query.trim())
+            .limit(1)
             .get();
         
-        const processes = processesSnapshot.docs.map(doc => {
-            const data = doc.data();
-            return { id: doc.id, ...data } as Process;
-        });
+        if (!exactMatch.empty) {
+            return [{ id: exactMatch.docs[0].id, ...exactMatch.docs[0].data() } as Process];
+        }
 
-        const q = query.toLowerCase();
-        const filtered = processes.filter(process => {
-            const matchesBasic = process.name.toLowerCase().includes(q) || 
-                                (process.processNumber || '').includes(q);
-            
-            const matchesOpposing = !!process.opposingParties?.some(party => 
-                party.name.toLowerCase().includes(q)
+        const snapshot = await firestoreAdmin.collection('processes')
+            .orderBy('updatedAt', 'desc')
+            .limit(150)
+            .get();
+        
+        const results = snapshot.docs
+            .map(doc => ({ id: doc.id, ...doc.data() } as Process))
+            .filter(p => 
+                p.name.toLowerCase().includes(q) || 
+                (p.processNumber || '').includes(q) ||
+                p.opposingParties?.some(party => party.name.toLowerCase().includes(q))
             );
 
-            return matchesBasic || matchesOpposing;
-        });
-
-        return filtered.slice(0, 10);
+        return results.slice(0, 10);
     } catch (error) {
         console.error("Error searching processes:", error);
         return [];
     }
 }
 
-export async function archiveProcess(processId: string): Promise<{ success: boolean; error?: string }> {
-    if (!firestoreAdmin) throw new Error("Servidor indisponível.");
-    try {
-        await firestoreAdmin.collection('processes').doc(processId).update({
-            status: 'Arquivado',
-            updatedAt: new Date(),
-        });
-        return { success: true };
-    } catch (error: any) {
-        return { success: false, error: error.message };
-    }
-}
-
-/**
- * Gera um rascunho de documento a partir de um modelo, organizando-o na subpasta correta do processo
- * e preenchendo automaticamente os dados do cliente e do processo.
- */
 export async function draftDocument(
     processId: string, 
     templateId: string, 
@@ -133,130 +95,95 @@ export async function draftDocument(
     if (!session) throw new Error("Não autorizado.");
 
     try {
-        const { drive, docs } = await getGoogleApiClientsForUser();
-        const processRef = firestoreAdmin.collection('processes').doc(processId);
-        const processDoc = await processRef.get();
+        const [apiClients, processDoc, settingsDoc] = await Promise.all([
+            getGoogleApiClientsForUser(),
+            firestoreAdmin.collection('processes').doc(processId).get(),
+            firestoreAdmin.collection('system_settings').doc('general').get()
+        ]);
+
         if (!processDoc.exists) throw new Error("Processo não encontrado.");
-        
         const processData = processDoc.data() as Process;
 
-        // 1. Garante a pasta física no Drive do processo (dentro do cliente)
+        // Garante estrutura do Drive
         await syncProcessToDrive(processId);
-        const updatedDoc = await processRef.get();
-        const finalProcessData = updatedDoc.data() as Process;
+        const { drive, docs } = apiClients;
+        
+        // Re-fetch para pegar driveFolderId atualizado
+        const updatedProcess = await firestoreAdmin.collection('processes').doc(processId).get();
+        const physicalFolderId = updatedProcess.data()?.driveFolderId;
+        if (!physicalFolderId) throw new Error("Pasta do processo não disponível.");
 
-        if (!finalProcessData.driveFolderId) throw new Error("Não foi possível localizar a pasta física do processo.");
+        // Define subpasta baseada em heurística de categoria
+        const categoryMap: Record<string, string> = {
+            'procuração': '01 - Petições',
+            'contrato': '01 - Petições',
+            'ata': '04 - Atas e Audiências',
+            'audiência': '04 - Atas e Audiências',
+            'recurso': '03 - Recursos',
+            'decisão': '02 - Decisões e Sentenças',
+            'sentença': '02 - Decisões e Sentenças',
+        };
+        
+        const targetFolder = Object.entries(categoryMap).find(([key]) => category.toLowerCase().includes(key))?.[1] || '01 - Petições';
+        const targetFolderId = await ensureSubfolder(drive, physicalFolderId, targetFolder);
 
-        // 2. Define a subpasta de destino baseada na categoria do modelo
-        let targetFolderName = '01 - Petições';
-        const cat = category.toLowerCase();
-        if (cat.includes('procuração') || cat.includes('contrato')) {
-            targetFolderName = '01 - Petições';
-        } else if (cat.includes('ata') || cat.includes('audiência')) {
-            targetFolderName = '04 - Atas e Audiências';
-        } else if (cat.includes('recurso')) {
-            targetFolderName = '03 - Recursos';
-        } else if (cat.includes('decisão') || cat.includes('sentença')) {
-            targetFolderName = '02 - Decisões e Sentenças';
-        }
+        // Coleta dados em paralelo para o preenchimento
+        const [clientDoc, staffDoc] = await Promise.all([
+            firestoreAdmin.collection('clients').doc(processData.clientId).get(),
+            processData.leadLawyerId ? firestoreAdmin.collection('staff').doc(processData.leadLawyerId).get() : Promise.resolve(null)
+        ]);
 
-        const targetFolderId = await ensureSubfolder(drive, finalProcessData.driveFolderId, targetFolderName);
-
-        // 3. Busca os dados para preenchimento
-        const clientDoc = await firestoreAdmin.collection('clients').doc(finalProcessData.clientId).get();
         const clientData = clientDoc.data() as Client;
-
-        const settingsDoc = await firestoreAdmin.collection('system_settings').doc('general').get();
-        const officeData = settingsDoc.exists ? settingsDoc.data() : null;
-
-        let lawyerName = 'Advogado Responsável';
-        let lawyerOAB = 'Pendente';
-        let lawyerNationality = 'brasileiro(a)';
-        let lawyerCivilStatus = 'solteiro(a)';
-        let lawyerAddress = 'Rua Marechal Deodoro, 1594 - Sala 2, SBC/SP';
-
-        if (finalProcessData.leadLawyerId) {
-            const staffDoc = await firestoreAdmin.collection('staff').doc(finalProcessData.leadLawyerId).get();
-            if (staffDoc.exists) {
-                const staffData = staffDoc.data() as Staff;
-                lawyerName = `${staffData.firstName} ${staffData.lastName}`;
-                lawyerOAB = staffData.oabNumber || 'Pendente';
-                lawyerNationality = staffData.nationality || 'brasileiro(a)';
-                lawyerCivilStatus = staffData.civilStatus || 'solteiro(a)';
-                if (staffData.address) {
-                    lawyerAddress = `${staffData.address.street || ''}, nº ${staffData.address.number || 'S/N'}, ${staffData.address.neighborhood || ''}, ${staffData.address.city || ''}/${staffData.address.state || ''}`;
-                }
-            }
-        }
+        const staffData = staffDoc?.data() as Staff | undefined;
+        const officeData = settingsDoc.data();
 
         const cleanTemplateId = extractFileId(templateId);
-        if (!cleanTemplateId) throw new Error("ID do modelo inválido.");
-
-        const newFileName = `${documentName} - ${finalProcessData.name}`;
+        const newFileName = `${documentName} - ${processData.name}`;
         const copiedFile = await copyFile(cleanTemplateId, newFileName, targetFolderId);
 
-        if (!copiedFile.id || !copiedFile.webViewLink) {
-            throw new Error("Falha ao copiar o arquivo no Google Drive.");
-        }
+        if (!copiedFile.id) throw new Error("Falha ao criar arquivo no Drive.");
 
-        // 4. Mapeamento de Tags
-        const clientAddress = clientData.address 
-            ? `${clientData.address.street || ''}, nº ${clientData.address.number || 'S/N'}, ${clientData.address.neighborhood || ''}, ${clientData.address.city || ''}/${clientData.address.state || ''}`
-            : 'Endereço não informado';
-
-        const clientFullName = `${clientData.firstName} ${clientData.lastName || ''}`.trim();
-        const firstOpposingParty = finalProcessData.opposingParties?.[0]?.name || '---';
-        
-        const qualification = `${clientFullName}, ${clientData.nationality || 'brasileiro(a)'}, ${clientData.civilStatus || 'solteiro(a)'}, ${clientData.profession || 'ajudante geral'}, portador(a) do RG nº ${clientData.rg || '---'}${clientData.rgIssuer ? ` ${clientData.rgIssuer}` : ''}, inscrito(a) no CPF/MF sob nº ${clientData.document || '---'}, residente e domiciliado em ${clientAddress}`;
+        const clientAddr = clientData.address ? `${clientData.address.street || ''}, nº ${clientData.address.number || 'S/N'}, ${clientData.address.neighborhood || ''}, ${clientData.address.city || ''}/${clientData.address.state || ''}` : '---';
+        const staffAddr = staffData?.address ? `${staffData.address.street || ''}, nº ${staffData.address.number || 'S/N'}, ${staffData.address.neighborhood || ''}, ${staffData.address.city || ''}/${staffData.address.state || ''}` : '---';
+        const clientFull = `${clientData.firstName} ${clientData.lastName || ''}`.trim();
 
         const dataMap = {
-            'CLIENTE_NOME_COMPLETO': clientFullName,
-            'RECLAMANTE_NOME': clientFullName,
+            'CLIENTE_NOME_COMPLETO': clientFull,
+            'RECLAMANTE_NOME': clientFull,
             'CLIENTE_CPF_CNPJ': clientData.document || '---',
             'CLIENTE_RG': clientData.rg || '---',
             'CLIENTE_NACIONALIDADE': clientData.nationality || 'brasileiro(a)',
             'CLIENTE_ESTADO_CIVIL': clientData.civilStatus || 'solteiro(a)',
             'CLIENTE_PROFISSAO': clientData.profession || 'ajudante geral',
-            'CLIENTE_QUALIFICACAO_COMPLETA': qualification,
-            'CLIENTE_ENDERECO_COMPLETO': clientAddress,
-            'PROCESSO_NUMERO_CNJ': finalProcessData.processNumber || 'Pendente',
-            'PROCESSO_VARA': finalProcessData.courtBranch || '---',
-            'PROCESSO_FORUM': finalProcessData.court || '---',
-            'RECLAMADA_NOME': firstOpposingParty,
-            'ADVOGADO_LIDER_NOME': lawyerName,
-            'ADVOGADO_LIDER_OAB': lawyerOAB,
-            'ESCRITORIO_NOME': officeData?.officeName || 'Bueno Gois Advogados e Associados',
+            'CLIENTE_ENDERECO_COMPLETO': clientAddr,
+            'PROCESSO_NUMERO_CNJ': processData.processNumber || 'Pendente',
+            'PROCESSO_VARA': processData.courtBranch || '---',
+            'PROCESSO_FORUM': processData.court || '---',
+            'RECLAMADA_NOME': processData.opposingParties?.[0]?.name || '---',
+            'ADVOGADO_LIDER_NOME': staffData ? `${staffData.firstName} ${staffData.lastName}` : '---',
+            'ADVOGADO_LIDER_OAB': staffData?.oabNumber || '---',
+            'ADVOGADO_LIDER_ENDERECO_PROFISSIONAL': staffAddr,
+            'ESCRITORIO_NOME': officeData?.officeName || 'Bueno Gois Advogados',
             'DATA_EXTENSO': format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR }),
             'DATA_HOJE': format(new Date(), "dd/MM/yyyy"),
         };
 
         await replacePlaceholdersInDoc(docs, copiedFile.id, dataMap);
 
-        const timelineEvent: TimelineEvent = {
-            id: uuidv4(),
-            type: 'petition',
-            description: `DOCUMENTO GERADO: "${documentName}" a partir de modelo automatizado.`,
-            date: Timestamp.now() as any,
-            authorName: session.user.name || 'Sistema'
-        };
-
-        await processRef.update({
-            timeline: FieldValue.arrayUnion(timelineEvent),
+        await firestoreAdmin.collection('processes').doc(processId).update({
+            timeline: FieldValue.arrayUnion({
+                id: uuidv4(),
+                type: 'petition',
+                description: `DOCUMENTO GERADO: "${documentName}"`,
+                date: Timestamp.now(),
+                authorName: session.user.name || 'Sistema'
+            }),
             updatedAt: FieldValue.serverTimestamp()
         });
 
-        await createNotification({
-            userId: session.user.id,
-            title: "Rascunho Gerado",
-            description: `O documento "${documentName}" está pronto na pasta do processo.`,
-            type: 'success',
-            href: copiedFile.webViewLink
-        });
-
-        return { success: true, url: copiedFile.webViewLink };
-
+        return { success: true, url: copiedFile.webViewLink! };
     } catch (error: any) {
-        console.error("Error drafting document:", error);
-        return { success: false, error: error.message || 'Erro interno ao gerar documento.' };
+        console.error("[draftDocument] Error:", error);
+        return { success: false, error: error.message };
     }
 }
