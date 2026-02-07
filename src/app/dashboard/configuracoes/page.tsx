@@ -43,7 +43,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
-import { useDoc, useFirebase, useMemoFirebase } from '@/firebase';
+import { useDoc, useFirebase, useMemoFirebase, useCollection } from '@/firebase';
 import { doc, collection, setDoc } from 'firebase/firestore';
 import type { UserProfile, UserRole, UserRoleInfo, SEOSettings } from '@/lib/types';
 import { ClientKitManager } from '@/components/settings/client-kit-manager';
@@ -203,7 +203,7 @@ function UsersTab() {
             const invitedUsers = await getUserRoles();
             const existingUsers = activeUsers || [];
             
-            const existingUserEmails = new Set(existingUsers.map(u => u.email.toLowerCase()));
+            const existingUserEmails = new Set(existingUsers.map((u: UserProfile) => u.email.toLowerCase()));
             const pendingInvites = invitedUsers.filter(r => !existingUserEmails.has(r.email.toLowerCase()));
 
             const combined = [...existingUsers, ...pendingInvites];
@@ -872,7 +872,7 @@ export default function ConfiguracoesPage() {
         </div>
       </div>
 
-      <Tabs defaultValue="usuarios" className="w-full">
+      <Tabs defaultValue="geral" className="w-full">
         <TabsList className="bg-[#0f172a] p-1 border border-white/5 mb-8 h-12 flex overflow-x-auto no-scrollbar justify-start">
           <TabsTrigger value="geral" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold px-6 h-10 shrink-0">Geral</TabsTrigger>
           <TabsTrigger value="seo" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold px-6 h-10 shrink-0">SEO & Analytics</TabsTrigger>

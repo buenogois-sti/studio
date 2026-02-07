@@ -1,4 +1,3 @@
-
 'use client';
 import * as React from 'react';
 import {
@@ -18,7 +17,9 @@ import {
   Gavel,
   Zap,
   Wallet,
-  Receipt
+  Receipt,
+  Briefcase,
+  Clock
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import {
@@ -417,7 +418,7 @@ export default function Dashboard() {
   }, [role, titlesData, processesData, hearingsData, creditsData, deadlinesData]);
 
   const chartData = React.useMemo(() => {
-    const months = [];
+    const months: { month: string; key: string; newCases: number; }[] = [];
     const now = new Date();
     for (let i = 5; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);

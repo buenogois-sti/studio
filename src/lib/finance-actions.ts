@@ -184,6 +184,40 @@ export async function updateFinancialTitleStatus(titleId: string, status: 'PAGO'
     }
 }
 
+export async function processLatePaymentRoutine(titleId: string) {
+  if (!firestoreAdmin) throw new Error("Servidor indisponível.");
+  const session = await getServerSession(authOptions);
+  if (!session) throw new Error("Não autorizado.");
+
+  try {
+    const titleRef = firestoreAdmin.collection('financial_titles').doc(titleId);
+    const titleSnap = await titleRef.get();
+    if (!titleSnap.exists) throw new Error("Título não encontrado.");
+    const titleData = titleSnap.data() as FinancialTitle;
+
+    await titleRef.update({ status: 'ATRASADO', updatedAt: FieldValue.serverTimestamp() });
+
+    if (titleData.processId) {
+      const processRef = firestoreAdmin.collection('processes').doc(titleData.processId);
+      const timelineEvent: TimelineEvent = {
+        id: uuidv4(),
+        type: 'system',
+        description: `ALERTA FINANCEIRO: Detectado atraso no pagamento da parcela "${titleData.description}". Rotina de cobrança iniciada.`,
+        date: Timestamp.now() as any,
+        authorName: session.user.name || 'Financeiro'
+      };
+      await processRef.update({
+        timeline: FieldValue.arrayUnion(timelineEvent),
+        updatedAt: FieldValue.serverTimestamp()
+      });
+    }
+
+    return { success: true };
+  } catch (error: any) {
+    throw new Error(error.message);
+  }
+}
+
 export async function requestCreditUnlock(staffId: string, creditId: string, reason: string) {
   if (!firestoreAdmin) throw new Error("Servidor indisponível.");
   const session = await getServerSession(authOptions);
@@ -340,6 +374,35 @@ export async function deleteStaffCredit(staffId: string, creditId: string) {
   try {
     await firestoreAdmin.collection(`staff/${staffId}/credits`).doc(creditId).delete();
     return { success: true };
+  } catch (error: any) {
+    throw new Error(error.message);
+  }
+}
+
+export async function updateStaffCredit(staffId: string, creditId: string, data: Partial<StaffCredit>) {
+  if (!firestoreAdmin) throw new Error("Servidor indisponível.");
+  try {
+    await firestoreAdmin.collection(`staff/${staffId}/credits`).doc(creditId).update({
+      ...data,
+      updatedAt: FieldValue.serverTimestamp()
+    });
+    return { success: true };
+  } catch (error: any) {
+    throw new Error(error.message);
+  }
+}
+
+export async function addManualStaffCredit(staffId: string, data: Partial<StaffCredit>) {
+  if (!firestoreAdmin) throw new Error("Servidor indisponível.");
+  try {
+    const ref = firestoreAdmin.collection(`staff/${staffId}/credits`).doc();
+    await ref.set({
+      ...data,
+      id: ref.id,
+      date: FieldValue.serverTimestamp(),
+      status: data.status || 'DISPONIVEL'
+    });
+    return { success: true, id: ref.id };
   } catch (error: any) {
     throw new Error(error.message);
   }
