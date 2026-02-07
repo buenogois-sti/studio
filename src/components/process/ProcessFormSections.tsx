@@ -16,7 +16,9 @@ import {
   Smartphone,
   Sparkles,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  MapPin,
+  FileText
 } from 'lucide-react';
 import { Control, useFieldArray, useFormContext, useWatch } from 'react-hook-form';
 
@@ -243,46 +245,67 @@ export function PartiesSection({ control, partyFields, onAddParty, onRemoveParty
         <div className="grid gap-4">
           {partyFields.length > 0 ? (
             partyFields.map((field, index) => (
-              <div key={field.id} className="p-6 rounded-2xl border border-white/10 bg-black/40 hover:border-primary/40 transition-all duration-300 space-y-4 animate-in slide-in-from-right-2">
+              <div key={field.id} className="p-6 rounded-2xl border border-white/10 bg-black/40 hover:border-primary/40 transition-all duration-300 space-y-6 animate-in slide-in-from-right-2">
                 <div className="flex items-start justify-between gap-4">
-                  <FormField
-                    control={control}
-                    name={`opposingParties.${index}.name`}
-                    render={({ field: nameField }) => (
-                      <FormItem className="flex-1">
-                        <FormLabel className="text-[10px] uppercase font-black text-primary tracking-widest">
-                          Razão Social / Nome Completo *
-                        </FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="Digite o nome oficial..."
-                            className="h-11 bg-black/20 border-white/10"
-                            onKeyDown={(e) => e.stopPropagation()}
-                            {...nameField}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={control}
+                      name={`opposingParties.${index}.name`}
+                      render={({ field: nameField }) => (
+                        <FormItem>
+                          <FormLabel className="text-[10px] uppercase font-black text-primary tracking-widest">
+                            Razão Social / Nome Completo *
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="Digite o nome oficial..."
+                              className="h-11 bg-black/20 border-white/10"
+                              onKeyDown={(e) => e.stopPropagation()}
+                              {...nameField}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={control}
+                      name={`opposingParties.${index}.document`}
+                      render={({ field: docField }) => (
+                        <FormItem>
+                          <FormLabel className="text-[10px] uppercase font-black text-slate-500 tracking-widest">
+                            CNPJ / CPF
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="00.000.000/0000-00"
+                              className="h-11 bg-black/20 border-white/10 font-mono"
+                              onKeyDown={(e) => e.stopPropagation()}
+                              {...docField}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon"
                     onClick={() => onRemoveParty(index)}
-                    className="mt-7 text-rose-500 hover:bg-rose-500/10 h-10 w-10 rounded-xl"
+                    className="mt-7 text-rose-500 hover:bg-rose-500/10 h-10 w-10 rounded-xl shrink-0"
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-white/5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField
                     control={control}
                     name={`opposingParties.${index}.email`}
                     render={({ field: emailField }) => (
                       <FormItem>
-                        <FormLabel className="text-[9px] uppercase font-bold text-slate-500">Email de Contato</FormLabel>
+                        <FormLabel className="text-[9px] uppercase font-bold text-slate-500">Email Jurídico / RH</FormLabel>
                         <FormControl>
                           <div className="relative">
                             <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500" />
@@ -294,7 +317,6 @@ export function PartiesSection({ control, partyFields, onAddParty, onRemoveParty
                             />
                           </div>
                         </FormControl>
-                        <FormMessage className="text-[10px]" />
                       </FormItem>
                     )}
                   />
@@ -303,7 +325,7 @@ export function PartiesSection({ control, partyFields, onAddParty, onRemoveParty
                     name={`opposingParties.${index}.phone`}
                     render={({ field: phoneField }) => (
                       <FormItem>
-                        <FormLabel className="text-[9px] uppercase font-bold text-slate-500">Telefone / RH</FormLabel>
+                        <FormLabel className="text-[9px] uppercase font-bold text-slate-500">Telefone</FormLabel>
                         <FormControl>
                           <div className="relative">
                             <Smartphone className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500" />
@@ -319,6 +341,45 @@ export function PartiesSection({ control, partyFields, onAddParty, onRemoveParty
                     )}
                   />
                 </div>
+
+                <FormField
+                  control={control}
+                  name={`opposingParties.${index}.address`}
+                  render={({ field: addrField }) => (
+                    <FormItem>
+                      <FormLabel className="text-[9px] uppercase font-bold text-slate-500">Endereço Completo</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <MapPin className="absolute left-3 top-3 h-4 w-4 text-slate-500" />
+                          <Textarea 
+                            placeholder="Rua, número, bairro, cidade - UF..." 
+                            className="pl-10 min-h-[80px] text-xs bg-black/20 resize-none pt-2" 
+                            {...addrField} 
+                            onKeyDown={(e) => e.stopPropagation()} 
+                          />
+                        </div>
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={control}
+                  name={`opposingParties.${index}.observation`}
+                  render={({ field: obsField }) => (
+                    <FormItem>
+                      <FormLabel className="text-[9px] uppercase font-bold text-slate-500">Observações do Réu</FormLabel>
+                      <FormControl>
+                        <Input 
+                          placeholder="Ex: Faz parte do grupo econômico X..." 
+                          className="h-10 text-xs bg-black/20" 
+                          {...obsField} 
+                          onKeyDown={(e) => e.stopPropagation()} 
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
               </div>
             ))
           ) : (

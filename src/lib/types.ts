@@ -84,8 +84,11 @@ export type TimelineEvent = {
 
 export type OpposingParty = {
   name: string;
+  document?: string;
   email?: string;
   phone?: string;
+  address?: string;
+  observation?: string;
 };
 
 export type TeamParticipant = {

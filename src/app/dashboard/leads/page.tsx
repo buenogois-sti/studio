@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -37,7 +38,8 @@ import {
   FolderOpen,
   Lock,
   ExternalLink,
-  Download
+  Download,
+  Hash
 } from 'lucide-react';
 import { 
   DndContext, 
@@ -618,7 +620,7 @@ function LeadDetailsSheet({ lead, client, open, onOpenChange, onConvert, isProce
                     <h3 className="text-xl font-black font-headline text-white">Reclamadas (Polo Passivo)</h3>
                     <p className="text-xs text-slate-500">Identifique todas as partes que figurarão no polo passivo da ação.</p>
                   </div>
-                  <Button variant="outline" size="sm" onClick={() => append({ name: '', email: '', phone: '' })} className="font-bold border-primary/20 text-primary hover:bg-primary/10 rounded-xl">
+                  <Button variant="outline" size="sm" onClick={() => append({ name: '', document: '', email: '', phone: '', address: '', observation: '' })} className="font-bold border-primary/20 text-primary hover:bg-primary/10 rounded-xl">
                     <PlusCircle className="h-4 w-4 mr-2" /> Adicionar Réu
                   </Button>
                 </div>
@@ -626,21 +628,49 @@ function LeadDetailsSheet({ lead, client, open, onOpenChange, onConvert, isProce
                 <div className="space-y-4">
                   {fields.map((field, index) => (
                     <Card key={field.id} className="bg-white/5 border-white/10 rounded-2xl overflow-hidden group/item">
-                      <CardContent className="p-6 grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
-                        <div className="md:col-span-5 space-y-2">
-                          <Label className="text-[10px] uppercase font-black text-slate-500 tracking-widest">Razão Social / Nome Fantasia *</Label>
-                          <Input {...opposingForm.register(`parties.${index}.name`)} className="bg-black/40 border-white/10 h-11" placeholder="Nome oficial da empresa" />
+                      <CardContent className="p-6 space-y-6">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label className="text-[10px] uppercase font-black text-slate-500 tracking-widest">Razão Social / Nome Completo *</Label>
+                              <Input {...opposingForm.register(`parties.${index}.name`)} className="bg-black/40 border-white/10 h-11" placeholder="Nome oficial da empresa ou pessoa" />
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-[10px] uppercase font-black text-slate-500 tracking-widest">CNPJ / CPF</Label>
+                              <Input {...opposingForm.register(`parties.${index}.document`)} className="bg-black/40 border-white/10 h-11 font-mono" placeholder="00.000.000/0000-00" />
+                            </div>
+                          </div>
+                          <Button variant="ghost" size="icon" onClick={() => remove(index)} className="text-rose-500 hover:bg-rose-500/10 h-11 w-11 rounded-xl shrink-0"><Trash2 className="h-5 w-5" /></Button>
                         </div>
-                        <div className="md:col-span-4 space-y-2">
-                          <Label className="text-[10px] uppercase font-black text-slate-500 tracking-widest">E-mail Jurídico / RH</Label>
-                          <Input {...opposingForm.register(`parties.${index}.email`)} className="bg-black/40 border-white/10 h-11" placeholder="rh@empresa.com.br" />
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label className="text-[10px] uppercase font-black text-slate-500 tracking-widest">E-mail Jurídico / RH</Label>
+                            <div className="relative">
+                              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                              <Input {...opposingForm.register(`parties.${index}.email`)} className="bg-black/40 border-white/10 h-11 pl-10" placeholder="rh@empresa.com.br" />
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-[10px] uppercase font-black text-slate-500 tracking-widest">Telefone de Contato</Label>
+                            <div className="relative">
+                              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                              <Input {...opposingForm.register(`parties.${index}.phone`)} className="bg-black/40 border-white/10 h-11 pl-10" placeholder="(00) 0000-0000" />
+                            </div>
+                          </div>
                         </div>
-                        <div className="md:col-span-2 space-y-2">
-                          <Label className="text-[10px] uppercase font-black text-slate-500 tracking-widest">Telefone</Label>
-                          <Input {...opposingForm.register(`parties.${index}.phone`)} className="bg-black/40 border-white/10 h-11" placeholder="(00) 0000-0000" />
+
+                        <div className="space-y-2">
+                          <Label className="text-[10px] uppercase font-black text-slate-500 tracking-widest">Endereço Completo</Label>
+                          <div className="relative">
+                            <MapPin className="absolute left-3 top-3 h-4 w-4 text-slate-500" />
+                            <Textarea {...opposingForm.register(`parties.${index}.address`)} className="bg-black/40 border-white/10 min-h-[80px] pl-10 pt-2 resize-none" placeholder="Rua, número, bairro, cidade - UF, CEP" />
+                          </div>
                         </div>
-                        <div className="md:col-span-1 flex justify-end">
-                          <Button variant="ghost" size="icon" onClick={() => remove(index)} className="text-rose-500 hover:bg-rose-500/10 h-11 w-11 rounded-xl"><Trash2 className="h-5 w-5" /></Button>
+
+                        <div className="space-y-2">
+                          <Label className="text-[10px] uppercase font-black text-slate-500 tracking-widest">Observações / Particularidades</Label>
+                          <Input {...opposingForm.register(`parties.${index}.observation`)} className="bg-black/40 border-white/10 h-11" placeholder="Ex: Grupo econômico X, sócio majoritário Y..." />
                         </div>
                       </CardContent>
                     </Card>
