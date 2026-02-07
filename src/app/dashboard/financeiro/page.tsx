@@ -1,3 +1,4 @@
+
 'use client';
 import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -136,6 +137,10 @@ function ClientReceiptDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-5xl bg-slate-50 text-slate-900 p-0 overflow-hidden border-none shadow-2xl">
+        <DialogHeader className="sr-only">
+          <DialogTitle>Emissão de Recibo de Liquidação</DialogTitle>
+          <DialogDescription>Documento oficial para prestação de contas com o cliente.</DialogDescription>
+        </DialogHeader>
         <div className="flex flex-col lg:flex-row h-[90vh]">
           <div className="w-full lg:w-80 bg-slate-900 p-6 text-white shrink-0 print:hidden overflow-y-auto">
             <div className="space-y-8">
@@ -150,7 +155,7 @@ function ClientReceiptDialog({
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold uppercase text-slate-500">Modelo de Recibo</label>
                   <Select value={receiptMode} onValueChange={(v: any) => setReceiptMode(v)}>
-                    <SelectTrigger className="bg-white/5 border-white/10 text-white h-10">
+                    <SelectTrigger className="bg-white/5 border-white/10 text-white h-10 shadow-none">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -169,7 +174,7 @@ function ClientReceiptDialog({
                           type="number" 
                           value={feePercentage} 
                           onChange={(e) => setFeePercentage(Number(e.target.value))}
-                          className="bg-white/5 border-white/10 text-white pl-10"
+                          className="bg-white/5 border-white/10 text-white pl-10 h-10"
                         />
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-primary font-bold">%</span>
                       </div>
@@ -424,7 +429,7 @@ function NewTitleDialog({ onCreated }: { onCreated: () => void }) {
                   <FormItem>
                     <FormLabel className="text-white">Tipo</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl><SelectTrigger className="bg-background border-border"><SelectValue /></SelectTrigger></FormControl>
+                      <FormControl><SelectTrigger className="bg-background border-border shadow-none"><SelectValue /></SelectTrigger></FormControl>
                       <SelectContent>
                         <SelectItem value="RECEITA">Entrada (Receita)</SelectItem>
                         <SelectItem value="DESPESA">Saída (Despesa)</SelectItem>
@@ -440,7 +445,7 @@ function NewTitleDialog({ onCreated }: { onCreated: () => void }) {
                   <FormItem>
                     <FormLabel className="text-white">Categoria</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl><SelectTrigger className="bg-background border-border"><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
+                      <FormControl><SelectTrigger className="bg-background border-border shadow-none"><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
                       <SelectContent>
                         <SelectItem value="HONORARIOS_CONTRATUAIS">Honorários</SelectItem>
                         <SelectItem value="SUCUMBENCIA">Sucumbência</SelectItem>
@@ -511,7 +516,7 @@ function NewTitleDialog({ onCreated }: { onCreated: () => void }) {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel className="text-white">Descrição</FormLabel>
-                  <FormControl><Input className="bg-background border-border" placeholder="Ex: Honorários Processo X" {...field} /></FormControl>
+                  <FormControl><Input className="bg-background border-border h-11" placeholder="Ex: Honorários Processo X" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )}
@@ -527,7 +532,7 @@ function NewTitleDialog({ onCreated }: { onCreated: () => void }) {
                       <div className="relative">
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-bold">R$</span>
                         <Input 
-                          className="bg-background border-border pl-9" 
+                          className="bg-background border-border pl-9 h-11" 
                           type="text"
                           value={formatCurrencyValue(field.value)}
                           onChange={(e) => handleValueChange(e, field.onChange)}
@@ -544,7 +549,7 @@ function NewTitleDialog({ onCreated }: { onCreated: () => void }) {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-white">Vencimento</FormLabel>
-                    <FormControl><Input type="date" className="bg-background border-border" {...field} /></FormControl>
+                    <FormControl><Input type="date" className="bg-background border-border h-11 text-white" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -574,14 +579,14 @@ export default function FinanceiroPage() {
   const [expandedGroups, setExpandedGroups] = React.useState<Set<string>>(new Set());
   const { toast } = useToast();
 
-  const titlesQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'financial_titles'), orderBy('dueDate', 'asc')) : null), [firestore, refreshKey]);
+  const titlesQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'financial_titles'), orderBy('dueDate', 'asc'), limit(300)) : null), [firestore, refreshKey]);
   const { data: titlesData, isLoading: isLoadingTitles } = useCollection<FinancialTitle>(titlesQuery);
 
-  const clientsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'clients') : null), [firestore]);
+  const clientsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'clients'), limit(100)) : null), [firestore]);
   const { data: clientsData } = useCollection<Client>(clientsQuery);
   const clientsMap = React.useMemo(() => new Map(clientsData?.map(c => [c.id, c])), [clientsData]);
 
-  const processesQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'processes') : null), [firestore]);
+  const processesQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'processes'), limit(100)) : null), [firestore]);
   const { data: processesData } = useCollection<Process>(processesQuery);
   const processesMap = React.useMemo(() => new Map(processesData?.map(p => [p.id, p])), [processesData]);
   
@@ -712,13 +717,13 @@ export default function FinanceiroPage() {
 
       <Tabs defaultValue="receitas" className="flex-1 flex flex-col">
         <TabsList className="grid w-full grid-cols-3 bg-[#0f172a] border border-white/5 rounded-lg p-1 gap-1 h-12">
-            <TabsTrigger value="receitas" className="rounded-md data-[state=active]:bg-emerald-500/20 data-[state=active]:text-emerald-400 font-bold">
+            <TabsTrigger value="receitas" className="rounded-md data-[state=active]:bg-emerald-500/20 data-[state=active]:text-emerald-400 font-bold h-10">
               <ArrowUpRight className="h-4 w-4 mr-2" /> Receitas
             </TabsTrigger>
-            <TabsTrigger value="despesas" className="rounded-md data-[state=active]:bg-rose-500/20 data-[state=active]:text-rose-400 font-bold">
+            <TabsTrigger value="despesas" className="rounded-md data-[state=active]:bg-rose-500/20 data-[state=active]:text-rose-400 font-bold h-10">
               <ArrowDownRight className="h-4 w-4 mr-2" /> Despesas
             </TabsTrigger>
-            <TabsTrigger value="relatorios" className="rounded-md data-[state=active]:bg-purple-500/20 data-[state=active]:text-purple-400 font-bold">
+            <TabsTrigger value="relatorios" className="rounded-md data-[state=active]:bg-purple-500/20 data-[state=active]:text-purple-400 font-bold h-10">
               <BarChart3 className="h-4 w-4 mr-2" /> Painel BI
             </TabsTrigger>
         </TabsList>

@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -124,6 +125,10 @@ function StaffVoucherDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-4xl bg-white text-slate-900 p-0 overflow-hidden border-none shadow-none print:shadow-none">
+        <DialogHeader className="sr-only">
+          <DialogTitle>Comprovante de Liquidação Profissional</DialogTitle>
+          <DialogDescription>Extrato detalhado de pagamentos realizados ao colaborador.</DialogDescription>
+        </DialogHeader>
         <ScrollArea className="max-h-[90vh] print:max-h-full">
           <div className="p-10 space-y-8 bg-white" id="staff-voucher-print-area">
             <div className="flex justify-between items-center border-b-2 border-slate-900 pb-4">
@@ -230,7 +235,7 @@ function PaymentHistory({ onShowVoucher }: { onShowVoucher: (t: FinancialTitle) 
   return (
     <Card className="bg-[#0f172a] border-white/5 overflow-hidden">
       <Table>
-        <TableHeader><TableRow className="border-white/5"><TableHead className="text-muted-foreground">Data Pagamento</TableHead><TableHead className="text-muted-foreground">Descrição</TableHead><TableHead className="text-right text-muted-foreground">Valor Liquidado</TableHead><TableHead className="text-right text-muted-foreground">Ações</TableHead></TableRow></TableHeader>
+        <TableHeader><TableRow className="border-white/5 shadow-none"><TableHead className="text-muted-foreground">Data Pagamento</TableHead><TableHead className="text-muted-foreground">Descrição</TableHead><TableHead className="text-right text-muted-foreground">Valor Liquidado</TableHead><TableHead className="text-right text-muted-foreground">Ações</TableHead></TableRow></TableHeader>
         <TableBody>
           {history?.map(t => (
             <TableRow key={t.id} className="border-white/5 hover:bg-white/5">
@@ -285,7 +290,7 @@ function PayoutList({ filterRole, onRefresh, onPaid }: { filterRole?: string; on
     <div className="space-y-4">
       <div className="relative w-full max-w-sm"><Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" /><Input placeholder="Pesquisar colaborador..." className="pl-8 bg-card border-border/50 text-white" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /></div>
       <Card className="bg-[#0f172a] border-white/5 overflow-hidden">
-        <Table><TableHeader><TableRow className="border-white/5"><TableHead className="text-muted-foreground">Nome do Colaborador</TableHead><TableHead className="text-muted-foreground">Perfil</TableHead><TableHead className="text-right text-muted-foreground">Total Disponível</TableHead><TableHead className="text-right text-muted-foreground">Ação</TableHead></TableRow></TableHeader>
+        <Table><TableHeader><TableRow className="border-white/5 shadow-none"><TableHead className="text-muted-foreground">Nome do Colaborador</TableHead><TableHead className="text-muted-foreground">Perfil</TableHead><TableHead className="text-right text-muted-foreground">Total Disponível</TableHead><TableHead className="text-right text-muted-foreground">Ação</TableHead></TableRow></TableHeader>
           <TableBody>{isLoadingStaff ? (Array.from({ length: 3 }).map((_, i) => (<TableRow key={i}><TableCell colSpan={4}><Skeleton className="h-10 w-full bg-white/5" /></TableCell></TableRow>))) : filteredStaff.map(member => (
               <TableRow key={member.id} className="border-white/5 hover:bg-white/5 transition-colors">
                 <TableCell><div className="flex items-center gap-3"><div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">{member.firstName.charAt(0)}{member.lastName.charAt(0)}</div><span className="font-bold text-white">{member.firstName} {member.lastName}</span></div></TableCell>
@@ -349,7 +354,7 @@ function ManageCreditsDialog({ staff, open, onOpenChange, onUpdate }: { staff: S
 
   const creditsQuery = useMemoFirebase(() => {
     if (!firestore || !staff) return null;
-    return query(collection(firestore, `staff/${staff.id}/credits`), orderBy('date', 'desc'));
+    return query(collection(firestore, `staff/${staff.id}/credits`), orderBy('date', 'desc'), limit(100));
   }, [firestore, staff?.id, open]);
 
   const { data: credits, isLoading } = useCollection<any>(creditsQuery);
@@ -384,7 +389,7 @@ function ManageCreditsDialog({ staff, open, onOpenChange, onUpdate }: { staff: S
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-4xl bg-[#020617] border-white/10 p-0 overflow-hidden h-[85vh] flex flex-col">
         <DialogHeader className="p-6 border-b border-white/5 bg-white/5"><div className="flex items-center justify-between"><div className="flex items-center gap-4"><div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-black text-lg">{staff.firstName.charAt(0)}{staff.lastName.charAt(0)}</div><div><DialogTitle className="text-xl font-black text-white">{staff.firstName} {staff.lastName}</DialogTitle><DialogDescription className="text-slate-400">Auditoria e gestão de lançamentos pendentes</DialogDescription></div></div><Button size="sm" onClick={() => setIsAdding(true)} className="gap-2"><Plus className="h-4 w-4" /> Novo Lançamento</Button></div></DialogHeader>
-        <div className="flex-1 overflow-hidden flex flex-col"><div className="p-4 bg-black/20 flex items-center gap-2"><Button variant={filter === 'ALL' ? 'default' : 'ghost'} size="sm" onClick={() => setFilter('ALL')} className="text-[10px] uppercase font-black h-8">Todos Pendentes</Button><Button variant={filter === 'DISPONIVEL' ? 'default' : 'ghost'} size="sm" onClick={() => setFilter('DISPONIVEL')} className="text-[10px] uppercase font-black h-8 text-emerald-400">Disponíveis</Button><Button variant={filter === 'RETIDO' ? 'default' : 'ghost'} size="sm" onClick={() => setFilter('RETIDO')} className="text-[10px] uppercase font-black h-8 text-blue-400">Retidos</Button></div><ScrollArea className="flex-1"><div className="p-6">{isLoading ? (<div className="space-y-4">{[...Array(3)].map((_, i) => <Skeleton className="h-16 w-full bg-white/5" />)}</div>) : filteredCredits.length > 0 ? (<div className="space-y-3">{filteredCredits.map(c => (<div key={c.id} className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5 group hover:border-white/20 transition-all"><div className="flex-1 min-w-0 mr-4"><div className="flex items-center gap-2 mb-1"><Badge variant="outline" className={cn("text-[8px] font-black uppercase px-1.5 h-4 border-none", c.status === 'DISPONIVEL' ? "bg-emerald-500/20 text-emerald-400" : "bg-blue-500/20 text-blue-400")}>{c.status}</Badge><span className="text-[10px] text-muted-foreground font-medium">{c.date ? format(c.date.toDate(), 'dd/MM/yyyy') : 'N/A'}</span></div><p className="text-sm font-bold text-white truncate">{c.description}</p><p className="text-[10px] text-slate-500 uppercase font-bold">{c.type}</p></div><div className="flex items-center gap-6"><span className="text-sm font-black text-white tabular-nums">{c.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span><div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"><Button variant="ghost" size="icon" className="h-8 w-8 text-blue-400" onClick={() => setEditingCredit(c)}><Edit className="h-4 w-4" /></Button><Button variant="ghost" size="icon" className="h-8 w-8 text-rose-500" onClick={() => handleDelete(c.id)} disabled={isProcessing === c.id}>{isProcessing === c.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}</Button></div></div></div>))}</div>) : (<div className="text-center py-20 opacity-30"><FileText className="h-12 w-12 mx-auto mb-2" /><p className="text-sm font-bold uppercase">Nenhum lançamento encontrado</p></div>)}</div></ScrollArea></div>
+        <div className="flex-1 overflow-hidden flex flex-col"><div className="p-4 bg-black/20 flex items-center gap-2"><Button variant={filter === 'ALL' ? 'default' : 'ghost'} size="sm" onClick={() => setFilter('ALL')} className="text-[10px] uppercase font-black h-8">Todos Pendentes</Button><Button variant={filter === 'DISPONIVEL' ? 'default' : 'ghost'} size="sm" onClick={() => setFilter('DISPONIVEL')} className="text-[10px] uppercase font-black h-8 text-emerald-400">Disponíveis</Button><Button variant={filter === 'RETIDO' ? 'default' : 'ghost'} size="sm" onClick={() => setFilter('RETIDO')} className="text-[10px] uppercase font-black h-8 text-blue-400">Retidos</Button></div><ScrollArea className="flex-1"><div className="p-6">{isLoading ? (<div className="space-y-4">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-16 w-full bg-white/5 rounded-xl" />)}</div>) : filteredCredits.length > 0 ? (<div className="space-y-3">{filteredCredits.map(c => (<div key={c.id} className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5 group hover:border-white/20 transition-all"><div className="flex-1 min-w-0 mr-4"><div className="flex items-center gap-2 mb-1"><Badge variant="outline" className={cn("text-[8px] font-black uppercase px-1.5 h-4 border-none", c.status === 'DISPONIVEL' ? "bg-emerald-500/20 text-emerald-400" : "bg-blue-500/20 text-blue-400")}>{c.status}</Badge><span className="text-[10px] text-muted-foreground font-medium">{c.date ? format(c.date.toDate(), 'dd/MM/yyyy') : 'N/A'}</span></div><p className="text-sm font-bold text-white truncate">{c.description}</p><p className="text-[10px] text-slate-500 uppercase font-bold">{c.type}</p></div><div className="flex items-center gap-6"><span className="text-sm font-black text-white tabular-nums">{c.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span><div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"><Button variant="ghost" size="icon" className="h-8 w-8 text-blue-400" onClick={() => setEditingCredit(c)}><Edit className="h-4 w-4" /></Button><Button variant="ghost" size="icon" className="h-8 w-8 text-rose-500" onClick={() => handleDelete(c.id)} disabled={isProcessing === c.id}>{isProcessing === c.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}</Button></div></div></div>))}</div>) : (<div className="text-center py-20 opacity-30"><FileText className="h-12 w-12 mx-auto mb-2" /><p className="text-sm font-bold uppercase">Nenhum lançamento encontrado</p></div>)}</div></ScrollArea></div>
         <DialogFooter className="p-6 border-t border-white/5 bg-black/20"><DialogClose asChild><Button variant="ghost">Fechar Painel</Button></DialogClose></DialogFooter>
       </DialogContent>
     </Dialog>
@@ -467,10 +472,10 @@ export default function RepassesPage() {
 
       <Tabs defaultValue="lawyers" className="w-full">
         <TabsList className="grid w-full grid-cols-4 bg-[#0f172a] border border-white/5 p-1 h-12">
-          <TabsTrigger value="lawyers" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold"><Briefcase className="h-4 w-4" /> Honorários</TabsTrigger>
-          <TabsTrigger value="staff" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold"><Users className="h-4 w-4" /> Administrativo</TabsTrigger>
-          <TabsTrigger value="providers" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold"><ShieldCheck className="h-4 w-4" /> Fornecedores</TabsTrigger>
-          <TabsTrigger value="history" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold"><History className="h-4 w-4" /> Histórico</TabsTrigger>
+          <TabsTrigger value="lawyers" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold h-10"><Briefcase className="h-4 w-4" /> Honorários</TabsTrigger>
+          <TabsTrigger value="staff" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold h-10"><Users className="h-4 w-4" /> Administrativo</TabsTrigger>
+          <TabsTrigger value="providers" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold h-10"><ShieldCheck className="h-4 w-4" /> Fornecedores</TabsTrigger>
+          <TabsTrigger value="history" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold h-10"><History className="h-4 w-4" /> Histórico</TabsTrigger>
         </TabsList>
         <TabsContent value="lawyers" className="mt-6"><PayoutList filterRole="lawyer" onRefresh={() => setRefreshKey(k => k + 1)} onPaid={handleRepassePaid} /></TabsContent>
         <TabsContent value="staff" className="mt-6"><PayoutList filterRole="employee" onRefresh={() => setRefreshKey(k => k + 1)} onPaid={handleRepassePaid} /></TabsContent>

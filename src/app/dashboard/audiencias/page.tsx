@@ -47,10 +47,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useFirebase, useCollection, useMemoFirebase, useDoc } from '@/firebase';
-import { collection, query, where, doc, limit, orderBy } from 'firebase/firestore';
+import { collection, query, where, doc, limit, orderBy, Timestamp } from 'firebase/firestore';
 import type { Hearing, Process, HearingStatus, UserProfile, Staff } from '@/lib/types';
 import { useToast } from '@/components/ui/use-toast';
-import { updateHearingStatus, syncHearings } from '@/lib/hearing-actions';
+import { updateHearingStatus } from '@/lib/hearing-actions';
 import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
@@ -75,7 +75,6 @@ const statusConfig: Record<HearingStatus, { label: string; icon: any; color: str
 export default function AudienciasPage() {
   const { firestore, isUserLoading, user } = useFirebase();
   const [refreshKey, setRefreshKey] = React.useState(0);
-  const [isSyncing, setIsSyncing] = React.useState(false);
   const [viewMode, setViewMode] = React.useState<'list' | 'calendar' | 'history'>('list');
   const [currentDate, setCurrentDate] = React.useState(new Date());
   const [selectedDay, setSelectedDay] = React.useState<Date | null>(new Date());
@@ -89,33 +88,30 @@ export default function AudienciasPage() {
   );
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
 
-  // OTIMIZAÇÃO: Consulta de Staff limitada
   const staffQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'staff'), limit(50)) : null, [firestore]);
   const { data: staffData } = useCollection<Staff>(staffQuery);
   const lawyers = staffData?.filter(s => s.role === 'lawyer' || s.role === 'partner') || [];
 
-  // OTIMIZAÇÃO: Audiências com filtros de servidor e limite
   const hearingsQuery = useMemoFirebase(() => {
     if (!firestore || !userProfile) return null;
     const base = collection(firestore, 'hearings');
     
-    // Admins e Assistentes podem ver tudo ou filtrar por advogado
+    // OTIMIZAÇÃO: Filtro de data para não carregar audiências muito antigas (limitado a 3 meses atrás)
+    const threeMonthsAgo = Timestamp.fromDate(subMonths(new Date(), 3));
+
     if (userProfile.role === 'admin' || userProfile.role === 'assistant') {
       if (selectedLawyerFilter !== 'all') {
-        // ESSA QUERY PRECISA DE ÍNDICE COMPOSTO: lawyerId + date
-        return query(base, where('lawyerId', '==', selectedLawyerFilter), orderBy('date', 'asc'), limit(150));
+        return query(base, where('lawyerId', '==', selectedLawyerFilter), where('date', '>=', threeMonthsAgo), orderBy('date', 'asc'), limit(100));
       }
-      return query(base, orderBy('date', 'asc'), limit(300));
+      return query(base, where('date', '>=', threeMonthsAgo), orderBy('date', 'asc'), limit(200));
     }
     
-    // Advogados veem apenas as suas
-    return query(base, where('lawyerId', '==', userProfile.id), orderBy('date', 'asc'), limit(150));
+    return query(base, where('lawyerId', '==', userProfile.id), where('date', '>=', threeMonthsAgo), orderBy('date', 'asc'), limit(100));
   }, [firestore, userProfile, selectedLawyerFilter, refreshKey]);
 
   const { data: hearingsData, isLoading: isLoadingHearings, error: hearingsError } = useCollection<Hearing>(hearingsQuery);
 
-  // OTIMIZAÇÃO: Processos limitados para o Map
-  const processesQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'processes'), limit(200)) : null, [firestore]);
+  const processesQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'processes'), limit(100)) : null, [firestore]);
   const { data: processesData } = useCollection<Process>(processesQuery);
   const processesMap = React.useMemo(() => new Map(processesData?.map(p => [p.id, p])), [processesData]);
 
@@ -132,13 +128,6 @@ export default function AudienciasPage() {
           toast({ variant: 'destructive', title: 'Erro', description: e.message });
       }
   }, [toast]);
-
-  const todayHearings = React.useMemo(() => {
-      if (!hearingsData) return [];
-      return hearingsData
-        .filter(h => isToday(h.date.toDate()) && h.status !== 'REALIZADA')
-        .sort((a, b) => a.date.seconds - b.date.seconds);
-  }, [hearingsData]);
 
   const weekDays = React.useMemo(() => {
     const days = [];
@@ -177,13 +166,16 @@ export default function AudienciasPage() {
       <div className="p-6">
         <Alert variant="destructive" className="bg-rose-500/10 border-rose-500/20 text-rose-400">
           <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Índice Necessário (Status 400)</AlertTitle>
+          <AlertTitle>Configuração Necessária (Firestore Index)</AlertTitle>
           <AlertDescription className="text-xs mt-2 space-y-4">
-            <p>Para visualizar a pauta global filtrada, o Firebase exige a criação de um índice composto manual.</p>
+            <p>O Firebase requer um índice composto para esta visualização filtrada.</p>
             <div className="bg-black/20 p-4 rounded-lg space-y-2 border border-white/10 font-mono text-[10px]">
               <p>Coleção: 'hearings'</p>
               <p>Campos: 'lawyerId' (ASC) e 'date' (ASC)</p>
             </div>
+            <Button variant="outline" size="sm" className="mt-2 text-[10px] uppercase font-bold border-rose-500/30" asChild>
+              <a href="https://console.firebase.google.com" target="_blank">Abrir Console Firebase</a>
+            </Button>
           </AlertDescription>
         </Alert>
       </div>
@@ -205,7 +197,7 @@ export default function AudienciasPage() {
                   <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 animate-in fade-in">
                     <Filter className="h-3.5 w-3.5 text-primary" />
                     <Select value={selectedLawyerFilter} onValueChange={setSelectedLawyerFilter}>
-                      <SelectTrigger className="border-none bg-transparent h-7 text-xs font-bold w-[180px] focus:ring-0">
+                      <SelectTrigger className="border-none bg-transparent h-7 text-xs font-bold w-[180px] focus:ring-0 shadow-none">
                         <SelectValue placeholder="Filtrar Advogado..." />
                       </SelectTrigger>
                       <SelectContent className="bg-[#0f172a] border-white/10 text-white">
@@ -223,9 +215,9 @@ export default function AudienciasPage() {
                     size="sm" 
                     className="h-10 border-white/10 text-slate-300 hover:bg-white/5" 
                     onClick={() => setRefreshKey(prev => prev + 1)}
-                    disabled={isSyncing}
+                    disabled={isLoading}
                 >
-                    <RefreshCw className={cn("h-4 w-4 mr-2", (isLoading || isSyncing) && "animate-spin")} />
+                    <RefreshCw className={cn("h-4 w-4 mr-2", isLoading && "animate-spin")} />
                     Atualizar Pauta
                 </Button>
             </div>
@@ -238,7 +230,7 @@ export default function AudienciasPage() {
                 <AlertCircle className="h-5 w-5 text-amber-500" />
                 <div>
                   <p className="text-sm font-bold text-amber-200">Retornos Jurídicos Pendentes</p>
-                  <p className="text-xs text-amber-400/70">Existem {pendingReturns.length} audiência(s) realizada(s) aguardando o seguimento jurídico do caso.</p>
+                  <p className="text-xs text-amber-400/70">Existem {pendingReturns.length} audiência(s) realizada(s) aguardando o seguimento jurídico.</p>
                 </div>
               </div>
               <Button 
@@ -267,7 +259,7 @@ export default function AudienciasPage() {
             </TabsList>
 
             <TabsContent value="list" className="animate-in fade-in duration-300">
-                <Card className="bg-[#0f172a] border-white/10 overflow-hidden shadow-2xl">
+                <Card className="bg-[#0f172a] border-white/5 overflow-hidden shadow-2xl">
                     <div className="divide-y divide-white/5">
                         {weekDays.map(day => {
                             const daily = hearingsData?.filter(h => isSameDay(h.date.toDate(), day) && h.status === 'PENDENTE') || [];
@@ -340,7 +332,7 @@ export default function AudienciasPage() {
 
             <TabsContent value="calendar" className="animate-in fade-in duration-300">
               <div className="grid lg:grid-cols-12 gap-6">
-                <Card className="lg:col-span-8 bg-[#0f172a] border-white/10 p-6 shadow-2xl">
+                <Card className="lg:col-span-8 bg-[#0f172a] border-white/5 p-6 shadow-2xl">
                   <div className="flex items-center justify-between mb-10">
                     <h2 className="text-2xl font-black text-white uppercase tracking-tighter">
                       {format(currentDate, 'MMMM yyyy', { locale: ptBR })}
@@ -391,8 +383,8 @@ export default function AudienciasPage() {
                             {dailyHearings.slice(0, 3).map(h => (
                               <div key={h.id} className={cn(
                                 "w-1.5 h-1.5 rounded-full",
-                                h.status === 'REALIZADA' ? "bg-emerald-500 shadow-[0_0_5px_rgba(16,185,129,0.5)]" : 
-                                h.status === 'CANCELADA' ? "bg-rose-500" : "bg-primary shadow-[0_0_5px_rgba(245,208,48,0.5)]"
+                                h.status === 'REALIZADA' ? "bg-emerald-500" : 
+                                h.status === 'CANCELADA' ? "bg-rose-500" : "bg-primary"
                               )} />
                             ))}
                           </div>
@@ -403,7 +395,7 @@ export default function AudienciasPage() {
                 </Card>
 
                 <div className="lg:col-span-4 space-y-4">
-                  <Card className="bg-[#0f172a] border-white/10 flex flex-col h-full min-h-[400px] shadow-2xl overflow-hidden">
+                  <Card className="bg-[#0f172a] border-white/5 flex flex-col h-full min-h-[400px] shadow-2xl overflow-hidden">
                     <CardHeader className="border-b border-white/5 pb-4 bg-white/5">
                       <div className="flex items-center justify-between">
                         <CardTitle className="text-xs font-black uppercase tracking-[0.2em] text-primary">
@@ -453,7 +445,7 @@ export default function AudienciasPage() {
             </TabsContent>
 
             <TabsContent value="history" className="animate-in fade-in duration-300">
-                <Card className="bg-[#0f172a] border-white/10 overflow-hidden shadow-2xl">
+                <Card className="bg-[#0f172a] border-white/5 overflow-hidden shadow-2xl">
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm text-left">
                         <thead className="bg-white/5 text-[10px] uppercase font-black tracking-[0.2em] text-slate-500 border-b border-white/5">

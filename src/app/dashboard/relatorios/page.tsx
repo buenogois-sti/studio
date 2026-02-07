@@ -35,7 +35,6 @@ import {
   Area,
   PieChart,
   Pie,
-  Cell,
   Cell as RechartsCell
 } from 'recharts';
 import { format, subMonths, startOfMonth, endOfMonth, isWithinInterval, isBefore, startOfDay, isToday } from 'date-fns';
@@ -45,7 +44,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { H1 } from '@/components/ui/typography';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, Timestamp, query, orderBy, where } from 'firebase/firestore';
+import { collection, Timestamp, query, orderBy, where, limit } from 'firebase/firestore';
 import type { Process, Client, FinancialTitle, Staff, LegalDeadline, Hearing, Lead } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -57,26 +56,29 @@ const COLORS = ['#F5D030', '#3b82f6', '#10b981', '#f43f5e', '#8b5cf6', '#ec4899'
 export default function RelatoriosPage() {
   const { firestore, isUserLoading } = useFirebase();
 
+  // OTIMIZAÇÃO: Filtro de data para reduzir leituras em coleções grandes
+  const sixMonthsAgo = React.useMemo(() => Timestamp.fromDate(subMonths(new Date(), 6)), []);
+
   // Queries
-  const clientsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'clients') : null, [firestore]);
+  const clientsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'clients'), limit(200)) : null, [firestore]);
   const { data: clientsData } = useCollection<Client>(clientsQuery);
 
-  const processesQuery = useMemoFirebase(() => firestore ? collection(firestore, 'processes') : null, [firestore]);
+  const processesQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'processes'), where('createdAt', '>=', sixMonthsAgo), limit(500)) : null, [firestore]);
   const { data: processesData } = useCollection<Process>(processesQuery);
 
-  const titlesQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'financial_titles'), orderBy('dueDate', 'desc')) : null, [firestore]);
+  const titlesQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'financial_titles'), where('dueDate', '>=', sixMonthsAgo), orderBy('dueDate', 'desc'), limit(500)) : null, [firestore]);
   const { data: titlesData, error: titlesError } = useCollection<FinancialTitle>(titlesQuery);
 
-  const staffQuery = useMemoFirebase(() => firestore ? collection(firestore, 'staff') : null, [firestore]);
+  const staffQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'staff'), limit(100)) : null, [firestore]);
   const { data: staffData } = useCollection<Staff>(staffQuery);
 
-  const deadlinesQuery = useMemoFirebase(() => firestore ? collection(firestore, 'deadlines') : null, [firestore]);
+  const deadlinesQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'deadlines'), where('endDate', '>=', sixMonthsAgo), limit(500)) : null, [firestore]);
   const { data: deadlinesData } = useCollection<LegalDeadline>(deadlinesQuery);
 
-  const hearingsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'hearings') : null, [firestore]);
+  const hearingsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'hearings'), where('date', '>=', sixMonthsAgo), limit(500)) : null, [firestore]);
   const { data: hearingsData } = useCollection<Hearing>(hearingsQuery);
 
-  const leadsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'leads') : null, [firestore]);
+  const leadsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'leads'), where('createdAt', '>=', sixMonthsAgo), limit(500)) : null, [firestore]);
   const { data: leadsData, error: leadsError } = useCollection<Lead>(leadsQuery);
 
   // 1. Processamento de Prazos (Vencidos e Pendentes)
@@ -172,12 +174,16 @@ export default function RelatoriosPage() {
         <H1 className="text-white">Relatórios</H1>
         <Alert variant="destructive" className="bg-rose-500/10 border-rose-500/20 text-rose-400">
           <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Erro de Sincronização (Status 400)</AlertTitle>
+          <AlertTitle>Índices Requeridos no Firestore</AlertTitle>
           <AlertDescription className="text-xs mt-2 space-y-4">
-            <p>O sistema encontrou uma falha ao tentar cruzar dados filtrados. Isso geralmente ocorre quando o Firebase exige um índice manual.</p>
+            <p>O sistema exige a criação de índices manuais no Google Cloud para processar as queries de BI.</p>
             <div className="bg-black/20 p-4 rounded-lg space-y-2 border border-white/10 font-mono text-[10px]">
-              <p>Verifique se os índices de 'financial_titles' e 'leads' estão ativos no Firebase Console.</p>
+              <p>Coleção: 'financial_titles' -> 'dueDate' (DESC)</p>
+              <p>Coleção: 'leads' -> 'createdAt' (ASC)</p>
             </div>
+            <Button variant="outline" size="sm" asChild className="h-8 text-[10px] font-black uppercase">
+              <a href="https://console.firebase.google.com" target="_blank">Gerar Índices Agora</a>
+            </Button>
           </AlertDescription>
         </Alert>
       </div>
@@ -243,10 +249,10 @@ export default function RelatoriosPage() {
 
         <Card className="bg-[#0f172a] border-blue-500/20 border-2 relative overflow-hidden group">
           <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:scale-110 transition-transform"><Zap className="h-12 w-12 text-blue-500" /></div>
-          <CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-blue-400 tracking-widest">Novos Leads (Mês)</CardTitle></CardHeader>
+          <CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-blue-400 tracking-widest">Novos Leads (Recentes)</CardTitle></CardHeader>
           <CardContent className="p-4 pt-0">
             <p className="text-3xl font-black text-blue-400 tabular-nums">{leadsData?.length || 0}</p>
-            <p className="text-[10px] text-blue-400/60 font-bold uppercase mt-1">Entrada de novos casos</p>
+            <p className="text-[10px] text-blue-400/60 font-bold uppercase mt-1">Entrada no período</p>
           </CardContent>
         </Card>
       </div>
