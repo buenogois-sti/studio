@@ -41,7 +41,7 @@ import {
   Copy,
   BookMarked
 } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from '@/alert';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
 import { useDoc, useFirebase, useMemoFirebase, useCollection } from '@/firebase';
@@ -703,7 +703,7 @@ function SEOTab() {
               <h4 className="text-xs font-black uppercase tracking-widest">Rastreamento & Analytics</h4>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div grid grid-cols-1 md:grid-cols-2 gap-6>
               <div className="space-y-2">
                 <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Google Analytics ID (G-XXXXXXX)</Label>
                 <Input 
@@ -833,7 +833,7 @@ function TagsDictionaryTab() {
           </ScrollArea>
         </CardContent>
         <CardFooter className="bg-white/5 p-6 border-t border-white/5 flex items-center gap-3">
-          <Info className="h-5 w-5 text-blue-400 shrink-0" />
+          <div className="h-5 w-5 text-blue-400 shrink-0"><Info className="h-full w-full" /></div>
           <p className="text-xs text-slate-400 leading-relaxed italic">
             Dica: Ao colar as tags no Google Docs, certifique-se de que não há espaços extras entre as chaves. Exemplo correto: <code className="text-primary font-bold">{"{{"}CLIENTE_NOME_COMPLETO{"}}"}</code>.
           </p>
@@ -917,7 +917,7 @@ function LicenseTab() {
                         </Button>
                     </div>
                     <div className="p-5 rounded-2xl bg-blue-500/5 border border-blue-500/20 text-blue-400/80 text-[11px] italic leading-relaxed">
-                        <Info className="h-4 w-4 inline-block mr-2" />
+                        <div className="h-4 w-4 inline-block mr-2"><Info className="h-full w-full" /></div>
                         O plano de manutenção Bueno Gois inclui atualizações críticas de segurança, monitoramento de performance, garantia de integridade das APIs do Google e suporte a novos colaboradores.
                     </div>
                 </CardContent>
