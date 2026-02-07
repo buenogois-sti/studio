@@ -17,7 +17,8 @@ import {
   Info,
   ChevronLeft,
   ChevronRight,
-  FolderKanban
+  FolderKanban,
+  FolderOpen
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
@@ -262,8 +263,8 @@ export default function ClientsPage() {
                           <span className="text-[9px] text-muted-foreground font-bold uppercase">Cadastrado em {typeof client.createdAt === 'string' ? new Date(client.createdAt).toLocaleDateString() : client.createdAt.toDate().toLocaleDateString()}</span>
                           
                           {client.driveFolderId ? (
-                            <a href={`https://drive.google.com/drive/folders/${client.driveFolderId}`} target="_blank" className="text-emerald-400 font-bold text-[9px] uppercase flex items-center gap-1 hover:bg-emerald-500/10 px-2.5 py-1 rounded-md transition-all">
-                              <CheckCircle2 className="h-3 w-3" /> Drive OK
+                            <a href={`https://drive.google.com/drive/folders/${client.driveFolderId}`} target="_blank" className="text-emerald-400 font-bold text-[9px] uppercase flex items-center gap-1.5 hover:bg-emerald-500/10 px-2.5 py-1 rounded-md transition-all">
+                              <FolderOpen className="h-3 w-3" /> Acessar Pasta
                             </a>
                           ) : (
                             <Button variant="ghost" size="sm" className="h-6 text-[9px] font-bold uppercase text-amber-400 p-0 px-2" onClick={() => handleSyncClient(client)} disabled={syncing}>

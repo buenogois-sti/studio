@@ -30,7 +30,8 @@ import {
   Handshake,
   FolderKanban,
   TrendingUp,
-  Scale
+  Scale,
+  FolderOpen
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
@@ -423,8 +424,8 @@ export default function ProcessosPage() {
                     <div className="flex items-center justify-between pt-2">
                       <div className="flex items-center gap-4">
                         {p.driveFolderId ? (
-                          <a href={`https://drive.google.com/drive/folders/${p.driveFolderId}`} target="_blank" className="text-emerald-400 font-black text-[9px] uppercase flex items-center gap-1.5 hover:bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20 transition-all">
-                            <CheckCircle2 className="h-3 w-3" /> Drive OK
+                          <a href={`https://drive.google.com/drive/folders/${p.driveFolderId}`} target="_blank" className="text-emerald-400 font-black text-[9px] uppercase flex items-center gap-1.5 hover:bg-emerald-500/10 px-3 py-1.5 rounded-full border border-emerald-500/20 transition-all shadow-lg shadow-emerald-950/20">
+                            <FolderOpen className="h-3.5 w-3.5" /> Acessar Pasta no Drive
                           </a>
                         ) : (
                           <Button variant="ghost" size="sm" className="h-7 text-[9px] font-black uppercase text-amber-400 px-3 bg-amber-500/5 hover:bg-amber-500/10 border border-amber-500/20 rounded-full" onClick={() => handleSyncProcess(p)} disabled={isSyncing === p.id}>
