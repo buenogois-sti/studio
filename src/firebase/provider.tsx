@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { DependencyList, createContext, useContext, ReactNode, useMemo, useState, useEffect, useRef } from 'react';
@@ -6,7 +5,8 @@ import { FirebaseApp } from 'firebase/app';
 import { Firestore } from 'firebase/firestore';
 import { Auth, User, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
 import { useSession } from 'next-auth/react';
-import { FirebaseErrorListener } from '@/components/FirebaseErrorListener'
+import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
+import { firebaseConfig } from './config';
 
 interface FirebaseProviderProps {
   children: ReactNode;
@@ -40,12 +40,6 @@ export interface FirebaseServicesAndUser {
   userError: Error | null;
 }
 
-export interface UserHookResult {
-  user: User | null;
-  isUserLoading: boolean;
-  userError: Error | null;
-}
-
 export const FirebaseContext = createContext<FirebaseContextState | undefined>(undefined);
 
 export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
@@ -69,36 +63,22 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
         return;
       }
 
-      console.log('[Firebase Auth] Sincronizando com Custom Token...');
-      
       signInWithCustomToken(auth, session.customToken).then(() => {
         console.log('[Firebase Auth] ✅ User signed in with custom token');
         lastTokenRef.current = session.customToken!;
       }).catch((error: any) => {
         const errorCode = error?.code || 'UNKNOWN_ERROR';
-        const clientProject = auth.app.options.projectId;
-        const expectedProject = 'studio-7080106838-23904';
+        const clientProject = firebaseConfig.projectId;
         
-        let tokenAudience = 'unknown';
-        try {
-          const parts = session.customToken!.split('.');
-          if (parts.length > 1) {
-            const payload = JSON.parse(atob(parts[1]));
-            tokenAudience = payload.aud || 'not found in payload';
-          }
-        } catch (e) {}
-
         console.error('[Firebase Auth] ❌ Erro ao autenticar Custom Token:', {
           code: errorCode,
           message: error.message,
           clientProject,
-          tokenAudience,
-          expectedProject,
-          fullError: error
+          expectedProject: 'studio-7080106838-23904',
         });
 
-        if (errorCode === 'auth/invalid-custom-token' || errorCode === 'auth/argument-error') {
-           console.warn(`[Firebase Auth] ⚠️ ERRO CRÍTICO: O token gerado no servidor não é compatível com o cliente. Verifique se o FIREBASE_SERVICE_ACCOUNT_JSON no seu .env.local pertence EXATAMENTE ao projeto "${expectedProject}".`);
+        if (errorCode === 'auth/invalid-custom-token') {
+           console.warn(`[Firebase Auth] ⚠️ ERRO CRÍTICO: O token gerado no servidor não é compatível com o cliente. Verifique se o FIREBASE_SERVICE_ACCOUNT_JSON no seu .env.local pertence EXATAMENTE ao projeto "${clientProject}".`);
         }
         
         setUserAuthState((state) => ({ ...state, userError: error, isUserLoading: false }));
@@ -167,31 +147,19 @@ export const useFirebase = (): FirebaseServicesAndUser => {
   };
 };
 
-export const useAuth = (): Auth => {
-  const { auth } = useFirebase();
-  return auth;
-};
-
-export const useFirestore = (): Firestore => {
-  const { firestore } = useFirebase();
-  return firestore;
-};
-
-export const useFirebaseApp = (): FirebaseApp => {
-  const { firebaseApp } = useFirebase();
-  return firebaseApp;
-};
-
-type MemoFirebase <T> = T & {__memo?: boolean};
-
-export function useMemoFirebase<T>(factory: () => T, deps: DependencyList): T | (MemoFirebase<T>) {
-  const memoized = useMemo(factory, deps);
-  if(typeof memoized !== 'object' || memoized === null) return memoized;
-  (memoized as MemoFirebase<T>).__memo = true;
+export function useMemoFirebase<T>(factory: () => T, deps: DependencyList): T & {__memo?: boolean} {
+  const memoized = useMemo(factory, deps) as any;
+  if (memoized && typeof memoized === 'object') {
+    memoized.__memo = true;
+  }
   return memoized;
 }
 
-export const useUser = (): UserHookResult => {
+export const useUser = () => {
   const { user, isUserLoading, userError } = useFirebase();
   return { user, isUserLoading, userError };
 };
+
+export const useAuth = () => useFirebase().auth;
+export const useFirestore = () => useFirebase().firestore;
+export const useFirebaseApp = () => useFirebase().firebaseApp;

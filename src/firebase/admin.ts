@@ -1,4 +1,3 @@
-
 import admin from 'firebase-admin';
 import { firebaseConfig } from './config';
 
@@ -18,8 +17,7 @@ if (!admin.apps.length) {
 
       // Validação Crítica de Project ID
       if (serviceAccount.project_id !== firebaseConfig.projectId) {
-        const errorMsg = `❌ PROJECT ID MISMATCH: O servidor está configurado para o projeto '${serviceAccount.project_id}' mas o cliente espera '${firebaseConfig.projectId}'. O login vai falhar.`;
-        console.error('[Firebase Admin]', errorMsg);
+        console.error(`[Firebase Admin] ❌ PROJECT ID MISMATCH: O servidor está configurado para o projeto '${serviceAccount.project_id}' mas o cliente espera '${firebaseConfig.projectId}'. O login vai falhar.`);
       }
 
       admin.initializeApp({
