@@ -24,10 +24,15 @@ import {
   Quote, 
   CheckCircle2,
   Instagram,
-  Scale
+  Scale,
+  AtSign,
+  ShieldCheck,
+  Lock,
+  Smartphone
 } from 'lucide-react';
 import { WhatsAppFloating } from '@/components/WhatsAppFloating';
 import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import {
   Carousel,
@@ -87,7 +92,7 @@ const services = [
     {
       icon: Users,
       title: 'Reconhecimento de Vínculo',
-      description: 'Defendo reconhecimento de vínculo empregatício em casos de trabalho informal, terceirização irregular e falsa cooperativa.',
+      description: 'Defendo reconhecimento de vínculo empregatício em常 cases de trabalho informal, terceirização irregular e falsa cooperativa.',
     },
     {
       icon: Handshake,
@@ -422,7 +427,7 @@ export function LandingClient({ initialSettings, initialSeo }: { initialSettings
                     <p className="text-gray-700 text-sm font-medium uppercase tracking-wider">Justiça para o trabalhador acima de tudo.</p>
                   </div>
                 </AnimatedSection>
-                <p className="text-lg text-gray-600 leading-relaxed text-justify">Somos um escritório com foco exclusivo na defesa do trabalhador, aliando tecnologia e experiência para garantir resultados sólidos e proteção aos seus direitos fundamentais.</p>
+                <p className="text-lg text-gray-600 leading-relaxed text-justify">Somos um escritório com foco exclusivo na defesa do trabalhador, aliando tecnologia e experiênca para garantir resultados sólidos e proteção aos seus direitos fundamentais.</p>
                 <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-7 px-8 rounded-xl shadow-lg transition-all hover:scale-105" asChild>
                   <Link href={whatsappUrl} target="_blank"><MessageCircle className="mr-3 h-5 w-5" /> Fale com um Especialista</Link>
                 </Button>
@@ -525,18 +530,99 @@ export function LandingClient({ initialSettings, initialSeo }: { initialSettings
         </section>
       </main>
 
-      <footer className="py-12 bg-[#0b1324] text-white/60 text-center text-sm border-t border-white/5">
-        <div className="flex justify-center gap-6 mb-6">
-          <Link 
-            href={instagramUrl} 
-            target="_blank" 
-            className="h-12 w-12 rounded-full bg-white/5 flex items-center justify-center hover:bg-primary hover:text-primary-foreground transition-all duration-300"
-            aria-label="Instagram"
-          >
-            <Instagram className="h-6 w-6" />
-          </Link>
+      {/* Footer Evoluído */}
+      <footer className="relative bg-[#020617] text-white pt-24 pb-12 border-t-2 border-primary/30">
+        <div className="container mx-auto px-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 lg:gap-8 mb-16">
+            
+            {/* Coluna 1: Branding */}
+            <div className="space-y-6">
+              <div className="bg-white p-2 rounded-xl inline-block">
+                <img src="/logo.png" alt="Bueno Gois" className="h-16 w-auto" />
+              </div>
+              <p className="text-slate-400 text-sm leading-relaxed text-justify">
+                {currentSettings?.officeName || 'Bueno Gois Advogados e Associados'}. 
+                Especialistas em Direito do Trabalho, unindo tradição e tecnologia para proteger os direitos de quem constrói o país.
+              </p>
+              <div className="flex items-center gap-4">
+                <Link href={instagramUrl} target="_blank" className="h-10 w-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-primary hover:text-primary-foreground transition-all duration-300">
+                  <Instagram className="h-5 w-5" />
+                </Link>
+                <Link href="#" className="h-10 w-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-primary hover:text-primary-foreground transition-all duration-300">
+                  <AtSign className="h-5 w-5" />
+                </Link>
+              </div>
+            </div>
+
+            {/* Coluna 2: Especialidades */}
+            <div className="space-y-6">
+              <h4 className="text-xs font-black uppercase tracking-[0.2em] text-primary flex items-center gap-2">
+                <ShieldCheck className="h-4 w-4" /> Especialidades
+              </h4>
+              <ul className="grid gap-3 text-sm text-slate-400 font-medium">
+                {['Rescisão de Contrato', 'Horas Extras', 'Assédio no Trabalho', 'Acidente de Trabalho', 'Danos Morais'].map(item => (
+                  <li key={item} className="hover:text-primary transition-colors flex items-center gap-2 group">
+                    <ChevronRight className="h-3 w-3 text-primary/40 group-hover:translate-x-1 transition-transform" />
+                    <Link href="#servicos">{item}</Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Coluna 3: Links Rápidos */}
+            <div className="space-y-6">
+              <h4 className="text-xs font-black uppercase tracking-[0.2em] text-primary flex items-center gap-2">
+                <Building className="h-4 w-4" /> Escritório
+              </h4>
+              <ul className="grid gap-3 text-sm text-slate-400 font-medium">
+                {['Início', 'Sobre Nós', 'Depoimentos', 'Localização'].map(item => (
+                  <li key={item} className="hover:text-primary transition-colors flex items-center gap-2 group">
+                    <ChevronRight className="h-3 w-3 text-primary/40 group-hover:translate-x-1 transition-transform" />
+                    <Link href={`#${item.toLowerCase().replace(' ', '')}`}>{item}</Link>
+                  </li>
+                ))}
+                <li className="pt-2">
+                  <Link href="/login" className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest bg-white/5 px-3 py-1.5 rounded-full hover:bg-primary hover:text-primary-foreground transition-all">
+                    <Lock className="h-3 w-3" /> Área Restrita
+                  </Link>
+                </li>
+              </ul>
+            </div>
+
+            {/* Coluna 4: Contato */}
+            <div className="space-y-6">
+              <h4 className="text-xs font-black uppercase tracking-[0.2em] text-primary flex items-center gap-2">
+                <Smartphone className="h-4 w-4" /> Contato
+              </h4>
+              <div className="space-y-4 text-sm text-slate-400">
+                <div className="flex items-start gap-3">
+                  <MapPin className="h-5 w-5 text-primary shrink-0" />
+                  <p className="leading-tight">
+                    {currentSettings?.address || 'Rua Marechal Deodoro, 1594 - Sala 2, São Bernardo do Campo / SP'}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Phone className="h-5 w-5 text-primary shrink-0" />
+                  <p className="font-bold text-white">{currentSettings?.phone || '(11) 98059-0128'}</p>
+                </div>
+                <div className="pt-4">
+                  <Badge variant="outline" className="border-emerald-500/20 text-emerald-400 bg-emerald-500/5 text-[9px] font-black uppercase py-1 px-3">
+                    <CheckCircle2 className="h-3 w-3 mr-1.5" /> Atendimento Online Ativo
+                  </Badge>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-12 border-t border-white/5 flex flex-col md:flex-row items-center justify-between gap-6 text-[10px] font-black uppercase tracking-widest text-slate-500">
+            <p>&copy; {new Date().getFullYear()} {currentSettings?.officeName || 'Bueno Gois Advogados e Associados'}. OAB/SP 00.000</p>
+            <div className="flex gap-8">
+              <Link href="#" className="hover:text-primary transition-colors">Termos de Uso</Link>
+              <Link href="#" className="hover:text-primary transition-colors">Privacidade</Link>
+              <p className="text-primary/40">Powered by LexFlow Elite</p>
+            </div>
+          </div>
         </div>
-        <p>&copy; {new Date().getFullYear()} Bueno Gois Advogados e Associados. Todos os direitos reservados. Advocacia Especializada em São Bernardo do Campo.</p>
       </footer>
 
       <WhatsAppFloating
