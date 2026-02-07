@@ -59,9 +59,9 @@ import { useSession } from 'next-auth/react';
 
 const COLORS = ['#F5D030', '#3b82f6', '#10b981', '#f43f5e', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316'];
 
-// --- VISÕES DE RELATÓRIO SEGMENTADAS ---
+// --- SUB-COMPONENTES MEMOIZADOS PARA PERFORMANCE ---
 
-function AdminReports({ data }: { data: any }) {
+const AdminReports = React.memo(({ data }: { data: any }) => {
   if (!data) return null;
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -112,9 +112,10 @@ function AdminReports({ data }: { data: any }) {
       <FinancialEvolutionChart data={data.financial || []} />
     </div>
   );
-}
+});
+AdminReports.displayName = 'AdminReports';
 
-function LawyerReports({ data }: { data: any }) {
+const LawyerReports = React.memo(({ data }: { data: any }) => {
   if (!data) return null;
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -164,9 +165,10 @@ function LawyerReports({ data }: { data: any }) {
       </div>
     </div>
   );
-}
+});
+LawyerReports.displayName = 'LawyerReports';
 
-function FinancialReports({ data }: { data: any }) {
+const FinancialReports = React.memo(({ data }: { data: any }) => {
   if (!data) return null;
   return (
     <div className="space-y-8">
@@ -196,9 +198,10 @@ function FinancialReports({ data }: { data: any }) {
       </div>
     </div>
   );
-}
+});
+FinancialReports.displayName = 'FinancialReports';
 
-function AssistantReports({ data }: { data: any }) {
+const AssistantReports = React.memo(({ data }: { data: any }) => {
   if (!data) return null;
   return (
     <div className="space-y-8">
@@ -219,11 +222,10 @@ function AssistantReports({ data }: { data: any }) {
       </Card>
     </div>
   );
-}
+});
+AssistantReports.displayName = 'AssistantReports';
 
-// --- SHARED REPORT COMPONENTS ---
-
-function FinancialEvolutionChart({ data }: { data: any[] }) {
+const FinancialEvolutionChart = React.memo(({ data }: { data: any[] }) => {
   return (
     <Card className="bg-[#0f172a] border-white/5 shadow-2xl">
       <CardHeader>
@@ -254,7 +256,8 @@ function FinancialEvolutionChart({ data }: { data: any[] }) {
       </CardContent>
     </Card>
   );
-}
+});
+FinancialEvolutionChart.displayName = 'FinancialEvolutionChart';
 
 // --- MAIN PAGE ---
 
@@ -331,7 +334,6 @@ export default function RelatoriosPage() {
       if (role === 'lawyer') {
         const creditsSnap = await getDocs(query(collection(firestore, `staff/${session.user.id}/credits`), where('date', '>=', sixMonthsAgo), where('status', '==', 'PAGO')));
         const credits = creditsSnap.docs.map(d => d.data() as StaffCredit);
-        // Agrupar por mês
         const feeMonths: Record<string, number> = {};
         credits.forEach(c => {
           const m = format(c.date.toDate(), 'MMM/yy', { locale: ptBR });

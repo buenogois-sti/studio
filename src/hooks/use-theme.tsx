@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -14,7 +15,7 @@ const ThemeContext = React.createContext<ThemeContextType | undefined>(undefined
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
-    // Remove dark class if it exists
+    // Force light theme reliably
     document.documentElement.classList.remove('dark');
     localStorage.removeItem('theme');
   }, []);
