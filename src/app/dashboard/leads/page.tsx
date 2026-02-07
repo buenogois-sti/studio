@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -257,6 +258,7 @@ function LeadDetailsSheet({ lead, client, open, onOpenChange, onConvert, isProce
   const [files, setFiles] = React.useState<any[]>([]);
   const [isUploading, setIsUploading] = React.useState(false);
   const [isLoadingFiles, setIsLoadingFiles] = React.useState(false);
+  const [isSearchingCep, setIsSearchingCep] = React.useState<number | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -291,6 +293,31 @@ function LeadDetailsSheet({ lead, client, open, onOpenChange, onConvert, isProce
       fetchFiles();
     }
   }, [lead, opposingForm, open, activeTab, fetchFiles]);
+
+  const handleOpposingCepSearch = async (index: number) => {
+    const cep = opposingForm.getValues(`parties.${index}.cep`)?.replace(/\D/g, '');
+    if (!cep || cep.length !== 8) {
+      toast({ variant: 'destructive', title: 'CEP Inválido' });
+      return;
+    }
+
+    setIsSearchingCep(index);
+    try {
+      const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+      const data = await response.json();
+      if (data.erro) {
+        toast({ variant: 'destructive', title: 'CEP não encontrado' });
+      } else {
+        const address = `${data.logradouro}, ${data.bairro}, ${data.localidade} - ${data.uf}`;
+        opposingForm.setValue(`parties.${index}.address`, address);
+        toast({ title: 'Endereço localizado!' });
+      }
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'Erro ao buscar CEP' });
+    } finally {
+      setIsSearchingCep(null);
+    }
+  };
 
   const toBase64 = (file: File) => new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -407,7 +434,7 @@ function LeadDetailsSheet({ lead, client, open, onOpenChange, onConvert, isProce
                         <div className="flex items-start justify-between gap-4">
                           <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
-                              <Label className="text-[10px] uppercase font-black text-slate-500 tracking-widest">Razão Social / Nome Completo *</Label>
+                              <Label className="text-[10px] uppercase font-black text-primary tracking-widest">Razão Social / Nome Completo *</Label>
                               <Input {...opposingForm.register(`parties.${index}.name`)} className="bg-black/40 border-white/10 h-11" placeholder="Nome oficial da empresa ou pessoa" />
                             </div>
                             <div className="space-y-2">
@@ -435,11 +462,33 @@ function LeadDetailsSheet({ lead, client, open, onOpenChange, onConvert, isProce
                           </div>
                         </div>
 
-                        <div className="space-y-2">
-                          <Label className="text-[10px] uppercase font-black text-slate-500 tracking-widest">Endereço Completo</Label>
-                          <div className="relative">
-                            <MapPin className="absolute left-3 top-3 h-4 w-4 text-slate-500" />
-                            <Textarea {...opposingForm.register(`parties.${index}.address`)} className="bg-black/40 border-white/10 min-h-[80px] pl-10 pt-2 resize-none" placeholder="Rua, número, bairro, cidade - UF, CEP" />
+                        <div className="space-y-4">
+                          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                            <div className="md:col-span-1 space-y-2">
+                              <Label className="text-[10px] uppercase font-black text-slate-500 tracking-widest">CEP</Label>
+                              <div className="relative">
+                                <Input 
+                                  {...opposingForm.register(`parties.${index}.cep`)} 
+                                  className="bg-black/40 border-white/10 h-11 pr-10" 
+                                  placeholder="00000-000" 
+                                  maxLength={9}
+                                />
+                                <button 
+                                  type="button" 
+                                  onClick={() => handleOpposingCepSearch(index)}
+                                  className="absolute right-2 top-1/2 -translate-y-1/2 text-primary hover:scale-110 transition-transform"
+                                >
+                                  {isSearchingCep === index ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                                </button>
+                              </div>
+                            </div>
+                            <div className="md:col-span-3 space-y-2">
+                              <Label className="text-[10px] uppercase font-black text-slate-500 tracking-widest">Endereço Completo</Label>
+                              <div className="relative">
+                                <MapPin className="absolute left-3 top-3 h-4 w-4 text-slate-500" />
+                                <Textarea {...opposingForm.register(`parties.${index}.address`)} className="bg-black/40 border-white/10 min-h-[80px] pl-10 pt-2 resize-none" placeholder="Rua, número, bairro, cidade - UF" />
+                              </div>
+                            </div>
                           </div>
                         </div>
 

@@ -88,6 +88,7 @@ export type OpposingParty = {
   email?: string;
   phone?: string;
   address?: string;
+  cep?: string;
   observation?: string;
 };
 

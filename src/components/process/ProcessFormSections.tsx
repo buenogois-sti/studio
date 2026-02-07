@@ -18,7 +18,11 @@ import {
   CheckCircle2,
   AlertCircle,
   MapPin,
-  FileText
+  FileText,
+  Search,
+  Loader2,
+  Mail,
+  Phone
 } from 'lucide-react';
 import { Control, useFieldArray, useFormContext, useWatch } from 'react-hook-form';
 
@@ -40,6 +44,7 @@ import { ClientCreationModal } from './ClientCreationModal';
 import { cn } from '@/lib/utils';
 import type { Client, Staff } from '@/lib/types';
 import type { ProcessFormValues } from '@/hooks/use-process-form';
+import { useToast } from '@/components/ui/use-toast';
 
 interface SectionHeaderProps {
   icon: React.ReactNode;
@@ -212,6 +217,35 @@ interface PartiesSectionProps {
 }
 
 export function PartiesSection({ control, partyFields, onAddParty, onRemoveParty }: PartiesSectionProps) {
+  const { setValue, getValues } = useFormContext<ProcessFormValues>();
+  const [isSearchingCep, setIsSearchingCep] = useState<number | null>(null);
+  const { toast } = useToast();
+
+  const handleOpposingCepSearch = async (index: number) => {
+    const cep = getValues(`opposingParties.${index}.cep` as any)?.replace(/\D/g, '');
+    if (!cep || cep.length !== 8) {
+      toast({ variant: 'destructive', title: 'CEP Inválido' });
+      return;
+    }
+
+    setIsSearchingCep(index);
+    try {
+      const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+      const data = await response.json();
+      if (data.erro) {
+        toast({ variant: 'destructive', title: 'CEP não encontrado' });
+      } else {
+        const address = `${data.logradouro}, ${data.bairro}, ${data.localidade} - ${data.uf}`;
+        setValue(`opposingParties.${index}.address` as any, address, { shouldDirty: true });
+        toast({ title: 'Endereço localizado!' });
+      }
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'Erro ao buscar CEP' });
+    } finally {
+      setIsSearchingCep(null);
+    }
+  };
+
   return (
     <div className="space-y-8 max-w-3xl mx-auto">
       <SectionHeader 
@@ -308,7 +342,7 @@ export function PartiesSection({ control, partyFields, onAddParty, onRemoveParty
                         <FormLabel className="text-[9px] uppercase font-bold text-slate-500">Email Jurídico / RH</FormLabel>
                         <FormControl>
                           <div className="relative">
-                            <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500" />
+                            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500" />
                             <Input 
                               placeholder="juridico@empresa.com" 
                               className="pl-10 h-10 text-xs bg-black/20" 
@@ -328,7 +362,7 @@ export function PartiesSection({ control, partyFields, onAddParty, onRemoveParty
                         <FormLabel className="text-[9px] uppercase font-bold text-slate-500">Telefone</FormLabel>
                         <FormControl>
                           <div className="relative">
-                            <Smartphone className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500" />
+                            <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500" />
                             <Input 
                               placeholder="(00) 0000-0000" 
                               className="pl-10 h-10 text-xs bg-black/20" 
@@ -342,26 +376,59 @@ export function PartiesSection({ control, partyFields, onAddParty, onRemoveParty
                   />
                 </div>
 
-                <FormField
-                  control={control}
-                  name={`opposingParties.${index}.address`}
-                  render={({ field: addrField }) => (
-                    <FormItem>
-                      <FormLabel className="text-[9px] uppercase font-bold text-slate-500">Endereço Completo</FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <MapPin className="absolute left-3 top-3 h-4 w-4 text-slate-500" />
-                          <Textarea 
-                            placeholder="Rua, número, bairro, cidade - UF..." 
-                            className="pl-10 min-h-[80px] text-xs bg-black/20 resize-none pt-2" 
-                            {...addrField} 
-                            onKeyDown={(e) => e.stopPropagation()} 
-                          />
-                        </div>
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                  <div className="md:col-span-1 space-y-2">
+                    <FormField
+                      control={control}
+                      name={`opposingParties.${index}.cep` as any}
+                      render={({ field: cepField }) => (
+                        <FormItem>
+                          <FormLabel className="text-[9px] uppercase font-bold text-slate-500">CEP</FormLabel>
+                          <FormControl>
+                            <div className="relative">
+                              <Input 
+                                placeholder="00000-000" 
+                                className="h-10 pr-10 text-xs bg-black/20" 
+                                {...cepField} 
+                                onKeyDown={(e) => e.stopPropagation()} 
+                                maxLength={9}
+                              />
+                              <button 
+                                type="button" 
+                                onClick={() => handleOpposingCepSearch(index)}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 text-primary hover:scale-110 transition-transform"
+                              >
+                                {isSearchingCep === index ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
+                              </button>
+                            </div>
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <div className="md:col-span-3 space-y-2">
+                    <FormField
+                      control={control}
+                      name={`opposingParties.${index}.address`}
+                      render={({ field: addrField }) => (
+                        <FormItem>
+                          <FormLabel className="text-[9px] uppercase font-bold text-slate-500">Endereço Completo</FormLabel>
+                          <FormControl>
+                            <div className="relative">
+                              <MapPin className="absolute left-3 top-3 h-4 w-4 text-slate-500" />
+                              <Textarea 
+                                placeholder="Rua, número, bairro, cidade - UF..." 
+                                className="pl-10 min-h-[80px] text-xs bg-black/20 resize-none pt-2" 
+                                {...addrField} 
+                                onKeyDown={(e) => e.stopPropagation()} 
+                              />
+                            </div>
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
 
                 <FormField
                   control={control}
