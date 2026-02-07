@@ -37,14 +37,16 @@ import {
   Globe,
   BarChart3,
   Tag,
-  FileText
+  FileText,
+  Copy,
+  BookMarked
 } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from '@/alert';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
-import { useDoc, useFirebase, useMemoFirebase, useCollection, updateDocumentNonBlocking } from '@/firebase';
+import { useDoc, useFirebase, useMemoFirebase, useCollection } from '@/firebase';
 import { doc, collection, setDoc } from 'firebase/firestore';
-import type { UserProfile, UserRole, UserRoleInfo, SEOSettings } from '@/lib/types';
+import type { UserProfile, UserRoleInfo, SEOSettings } from '@/lib/types';
 import { ClientKitManager } from '@/components/settings/client-kit-manager';
 import { TemplateLibraryManager } from '@/components/settings/template-library-manager';
 import { Switch } from '@/components/ui/switch';
@@ -61,13 +63,12 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { initializeAdminDriveStructure } from '@/lib/admin-drive-actions';
 import { cn } from '@/lib/utils';
 import { Textarea } from '@/components/ui/textarea';
+import { Separator } from '@/components/ui/separator';
 
 const roleSchema = z.object({
   email: z.string().email('Formato de email inválido.'),
   role: z.enum(['admin', 'lawyer', 'financial', 'assistant'], { required_error: 'Selecione um perfil.' }),
 });
-
-const Separator = ({ className }: { className?: string }) => <div className={cn("h-px w-full bg-border", className)} />;
 
 function InviteUserDialog({ onInvite, userToEdit }: { onInvite: () => void, userToEdit: (UserRoleInfo | UserProfile) | null }) {
     const [open, setOpen] = React.useState(false);
@@ -737,6 +738,111 @@ function SEOTab() {
   );
 }
 
+function TagsDictionaryTab() {
+  const { toast } = useToast();
+  const sections = [
+    {
+      title: "Tags de Qualificação do Cliente",
+      items: [
+        { tag: "{{CLIENTE_NOME_COMPLETO}}", desc: "Nome completo ou Razão Social" },
+        { tag: "{{CLIENTE_PRIMEIRO_NOME}}", desc: "Apenas o primeiro nome (ideal para saudações)" },
+        { tag: "{{CLIENTE_CPF_CNPJ}}", desc: "CPF ou CNPJ formatado" },
+        { tag: "{{CLIENTE_RG}}", desc: "Número do RG" },
+        { tag: "{{CLIENTE_PIS}}", desc: "Número do PIS/PASEP" },
+        { tag: "{{CLIENTE_CTPS}}", desc: "Número da Carteira de Trabalho" },
+        { tag: "{{CLIENTE_MAE}}", desc: "Nome da mãe (se cadastrado)" },
+        { tag: "{{CLIENTE_ENDERECO_COMPLETO}}", desc: "Logradouro, nº, Bairro, Cidade/UF" },
+        { tag: "{{CLIENTE_CIDADE}}", desc: "Cidade do endereço" },
+        { tag: "{{CLIENTE_WHATSAPP}}", desc: "Número de celular/whatsapp" },
+      ]
+    },
+    {
+      title: "Tags do Processo / Ação",
+      items: [
+        { tag: "{{PROCESSO_NUMERO_CNJ}}", desc: "Número oficial CNJ (ex: 0000000-00...)" },
+        { tag: "{{PROCESSO_TITULO}}", desc: "Nome dado ao processo no sistema" },
+        { tag: "{{PROCESSO_AREA}}", desc: "Área jurídica (Trabalhista, Cível, etc)" },
+        { tag: "{{PROCESSO_VARA}}", desc: "Vara ou Câmara designada (ex: 2ª Vara do Trabalho)" },
+        { tag: "{{PROCESSO_FORUM}}", desc: "Fórum ou Comarca" },
+        { tag: "{{PROCESSO_VALOR}}", desc: "Valor da causa formatado em R$" },
+        { tag: "{{REU_NOME}}", desc: "Nome do primeiro réu/parte contrária" },
+      ]
+    },
+    {
+      title: "Tags do Escritório & Data",
+      items: [
+        { tag: "{{ESCRITORIO_NOME}}", desc: "Nome da banca configurado na aba Geral" },
+        { tag: "{{ESCRITORIO_ENDERECO}}", desc: "Endereço da sede configurado na aba Geral" },
+        { tag: "{{DATA_EXTENSO}}", desc: "Data de hoje (ex: 15 de maio de 2024)" },
+        { tag: "{{DATA_HOJE}}", desc: "Data de hoje curta (ex: 15/05/2024)" },
+      ]
+    }
+  ];
+
+  const copy = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast({ title: "Tag copiada!", description: `Use ${text} no seu modelo do Google Docs.` });
+  };
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-500">
+      <Card className="bg-[#0f172a] border-white/5">
+        <CardHeader className="bg-white/5 border-b border-white/5">
+          <div className="flex items-center gap-3 text-primary mb-1">
+            <BookMarked className="h-6 w-6" />
+            <CardTitle className="text-white font-headline text-xl">Dicionário de Tags de Automação</CardTitle>
+          </div>
+          <CardDescription className="text-slate-400">
+            Copie as tags abaixo e use-as em seus modelos no Google Docs. O sistema fará a substituição automática durante a geração do rascunho.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="p-0">
+          <ScrollArea className="h-[600px]">
+            <div className="p-8 space-y-10">
+              {sections.map((section, idx) => (
+                <div key={idx} className="space-y-4">
+                  <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-primary flex items-center gap-2">
+                    <CheckCircle2 className="h-3 w-3" /> {section.title}
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {section.items.map((item, i) => (
+                      <div 
+                        key={i} 
+                        className="flex items-center justify-between p-4 rounded-2xl bg-black/40 border border-white/5 hover:border-primary/30 transition-all group"
+                      >
+                        <div className="space-y-1 min-w-0">
+                          <code className="text-xs font-black text-white bg-primary/10 px-2 py-1 rounded select-all group-hover:text-primary transition-colors">
+                            {item.tag}
+                          </code>
+                          <p className="text-[10px] text-slate-500 font-medium truncate">{item.desc}</p>
+                        </div>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 text-white/20 hover:text-white"
+                          onClick={() => copy(item.tag)}
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+        </CardContent>
+        <CardFooter className="bg-white/5 p-6 border-t border-white/5 flex items-center gap-3">
+          <Info className="h-5 w-5 text-blue-400 shrink-0" />
+          <p className="text-xs text-slate-400 leading-relaxed italic">
+            Dica: Ao colar as tags no Google Docs, certifique-se de que não há espaços extras entre as chaves. Exemplo correto: <code className="text-primary font-bold">{"{{"}CLIENTE_NOME_COMPLETO{"}}"}</code>.
+          </p>
+        </CardFooter>
+      </Card>
+    </div>
+  );
+}
+
 function LicenseTab() {
     return (
         <div className="space-y-6">
@@ -812,7 +918,7 @@ function LicenseTab() {
                     </div>
                     <div className="p-5 rounded-2xl bg-blue-500/5 border border-blue-500/20 text-blue-400/80 text-[11px] italic leading-relaxed">
                         <Info className="h-4 w-4 inline-block mr-2" />
-                        O plan de manutenção Bueno Gois inclui atualizações críticas de segurança, monitoramento de performance, garantia de integridade das APIs do Google e suporte a novos colaboradores.
+                        O plano de manutenção Bueno Gois inclui atualizações críticas de segurança, monitoramento de performance, garantia de integridade das APIs do Google e suporte a novos colaboradores.
                     </div>
                 </CardContent>
             </Card>
@@ -880,6 +986,7 @@ export default function ConfiguracoesPage() {
           )}
           <TabsTrigger value="usuarios" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold px-6 h-10 shrink-0">Usuários</TabsTrigger>
           <TabsTrigger value="financeiro" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold px-6 h-10 shrink-0">Financeiro</TabsTrigger>
+          <TabsTrigger value="tags" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold px-6 h-10 shrink-0">Dicionário de Tags</TabsTrigger>
           <TabsTrigger value="kit-cliente" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold px-6 h-10 shrink-0">Kit Cliente</TabsTrigger>
           <TabsTrigger value="modelos-acervo" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold px-6 h-10 shrink-0">Modelos</TabsTrigger>
           <TabsTrigger value="backup" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold px-6 h-10 shrink-0">Backup</TabsTrigger>
@@ -970,6 +1077,10 @@ export default function ConfiguracoesPage() {
 
         <TabsContent value="financeiro" className="animate-in fade-in duration-300">
           <FinancialTab />
+        </TabsContent>
+
+        <TabsContent value="tags" className="animate-in fade-in duration-300">
+          <TagsDictionaryTab />
         </TabsContent>
 
         <TabsContent value="kit-cliente" className="animate-in fade-in duration-300">

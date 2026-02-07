@@ -155,9 +155,12 @@ export async function draftDocument(
             targetFolderId = folder.id!;
         }
 
-        // 3. Busca os dados do cliente para o preenchimento
+        // 3. Busca os dados do cliente e do escritório para o preenchimento
         const clientDoc = await firestoreAdmin.collection('clients').doc(processData.clientId).get();
         const clientData = clientDoc.data() as Client;
+
+        const settingsDoc = await firestoreAdmin.collection('system_settings').doc('general').get();
+        const officeData = settingsDoc.exists ? settingsDoc.data() : null;
 
         // 4. Sanitiza o ID do modelo
         const cleanTemplateId = extractFileId(templateId);
@@ -171,21 +174,43 @@ export async function draftDocument(
             throw new Error("Falha ao copiar o arquivo no Google Drive.");
         }
 
-        // 6. Inteligência: Preenchimento Automático de Dados (Data Merge)
+        // 6. Inteligência: Preenchimento Automático de Dados (Data Merge Avançado)
         const clientAddress = clientData.address 
             ? `${clientData.address.street || ''}, ${clientData.address.number || 'S/N'}, ${clientData.address.neighborhood || ''}, ${clientData.address.city || ''}/${clientData.address.state || ''}`
             : 'Endereço não informado';
 
         const dataMap = {
-            'CLIENTE_NOME': `${clientData.firstName} ${clientData.lastName || ''}`.trim(),
+            // Tags de Cliente
+            'CLIENTE_NOME_COMPLETO': `${clientData.firstName} ${clientData.lastName || ''}`.trim(),
+            'CLIENTE_PRIMEIRO_NOME': clientData.firstName || '',
             'CLIENTE_DOCUMENTO': clientData.document || '---',
-            'CLIENTE_CPF': clientData.document || '---',
+            'CLIENTE_CPF_CNPJ': clientData.document || '---',
             'CLIENTE_RG': clientData.rg || '---',
+            'CLIENTE_PIS': clientData.pis || '---',
+            'CLIENTE_CTPS': clientData.ctps || '---',
+            'CLIENTE_MAE': clientData.motherName || '---',
             'CLIENTE_EMAIL': clientData.email || '---',
-            'CLIENTE_ENDERECO': clientAddress,
-            'PROCESSO_NUMERO': processData.processNumber || 'Pendente',
+            'CLIENTE_WHATSAPP': clientData.mobile || '---',
+            'CLIENTE_ENDERECO_COMPLETO': clientAddress,
+            'CLIENTE_CIDADE': clientData.address?.city || '---',
+            'CLIENTE_BAIRRO': clientData.address?.neighborhood || '---',
+            
+            // Tags de Processo
+            'PROCESSO_TITULO': processData.name || '',
+            'PROCESSO_NUMERO_CNJ': processData.processNumber || 'Pendente',
+            'PROCESSO_AREA': processData.legalArea || '---',
+            'PROCESSO_FORUM': processData.court || '---',
+            'PROCESSO_VARA': processData.courtBranch || '---',
+            'PROCESSO_VALOR': (processData.caseValue || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
             'REU_NOME': processData.opposingParties?.[0]?.name || 'Parte contrária não identificada',
-            'DATA_HOJE': format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR }),
+            
+            // Tags de Escritório
+            'ESCRITORIO_NOME': officeData?.officeName || 'Bueno Gois Advogados e Associados',
+            'ESCRITORIO_ENDERECO': officeData?.address || 'Rua Marechal Deodoro, 1594 - Sala 2, SBC/SP',
+            
+            // Outros
+            'DATA_EXTENSO': format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR }),
+            'DATA_HOJE': format(new Date(), "dd/MM/yyyy"),
         };
 
         await replacePlaceholdersInDoc(docs, copiedFile.id, dataMap);
