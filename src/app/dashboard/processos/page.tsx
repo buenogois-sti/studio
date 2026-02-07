@@ -32,7 +32,8 @@ import {
   FolderKanban,
   TrendingUp,
   Scale,
-  FolderOpen
+  FolderOpen,
+  ArchiveX
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
@@ -47,7 +48,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, doc, deleteDoc, query, limit, orderBy } from 'firebase/firestore';
+import { collection, doc, deleteDoc, query, limit, orderBy, updateDoc, arrayUnion, Timestamp } from 'firebase/firestore';
 import type { Process, Client, Staff, Hearing, FinancialEvent } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/use-toast';
@@ -62,6 +63,7 @@ import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { searchProcesses } from '@/lib/process-actions';
+import { v4 as uuidv4 } from 'uuid';
 
 const STATUS_CONFIG = {
   'Ativo': { label: 'Ativo', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20', icon: CheckCircle2 },
@@ -86,8 +88,11 @@ export default function ProcessosPage() {
   const [eventProcess, setEventProcess] = React.useState<Process | null>(null);
   const [expandedProcessId, setExpandedProcessId] = React.useState<string | null>(null);
   const [currentPage, setCurrentPage] = React.useState(1);
+  const [processToArchive, setProcessToArchive] = React.useState<Process | null>(null);
+  const [isArchiving, setIsArchiving] = React.useState(false);
 
   const { firestore, isUserLoading } = useFirebase();
+  const { data: session } = useSession();
   const { toast } = useToast();
   const searchParams = useSearchParams();
   const clientIdFilter = searchParams.get('clientId');
@@ -160,6 +165,8 @@ export default function ProcessosPage() {
 
   const filteredProcesses = React.useMemo(() => {
     let result = searchResults || processesData || [];
+    // Filtramos para não mostrar arquivados na listagem principal
+    result = result.filter(p => p.status !== 'Arquivado');
     if (clientIdFilter) result = result.filter(p => p.clientId === clientIdFilter);
     return result;
   }, [processesData, searchResults, clientIdFilter]);
@@ -185,6 +192,38 @@ export default function ProcessosPage() {
       setIsSyncing(null);
     }
   }, [toast, isSyncing]);
+
+  const handleArchive = async () => {
+    if (!processToArchive || !firestore || isArchiving) return;
+    setIsArchiving(true);
+    try {
+      const processRef = doc(firestore, 'processes', processToArchive.id);
+      
+      const timelineEvent = {
+        id: uuidv4(),
+        type: 'system',
+        description: `PROCESSO ARQUIVADO: Encerrado por ${session?.user?.name || 'Usuário'}. Movido para o Arquivo Digital.`,
+        date: Timestamp.now(),
+        authorName: session?.user?.name || 'Sistema'
+      };
+
+      await updateDoc(processRef, {
+        status: 'Arquivado',
+        updatedAt: Timestamp.now(),
+        timeline: arrayUnion(timelineEvent)
+      });
+
+      toast({ 
+        title: 'Processo Arquivado!', 
+        description: `"${processToArchive.name}" foi movido para o arquivo.` 
+      });
+      setProcessToArchive(null);
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Erro ao arquivar', description: error.message });
+    } finally {
+      setIsArchiving(false);
+    }
+  };
 
   const isLoading = isUserLoading || isLoadingProcesses || isSearching;
 
@@ -322,6 +361,10 @@ export default function ProcessosPage() {
                             <DropdownMenuSeparator className="bg-white/5" />
                             <DropdownMenuItem onClick={() => { setEditingProcess(p); setIsSheetOpen(true); }} className="gap-2 cursor-pointer">
                               <FileText className="h-4 w-4 text-slate-400" /> <span className="font-bold">Editar Dados do Caso</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator className="bg-white/5" />
+                            <DropdownMenuItem onClick={() => setProcessToArchive(p)} className="gap-2 cursor-pointer text-rose-500 focus:bg-rose-500/10">
+                              <ArchiveX className="h-4 w-4" /> <span className="font-bold">Arquivar Processo</span>
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -515,6 +558,29 @@ export default function ProcessosPage() {
       <QuickHearingDialog process={selectedProcess} open={isHearingOpen} onOpenChange={setIsHearingOpen} />
       <LegalDeadlineDialog process={selectedProcess} open={isDeadlineOpen} onOpenChange={setIsDeadlineOpen} />
       <FinancialEventDialog process={eventProcess} open={!!eventProcess} onOpenChange={o => !o && setEventProcess(null)} onEventCreated={() => {}} />
+
+      <AlertDialog open={!!processToArchive} onOpenChange={(open) => !isArchiving && !open && setProcessToArchive(null)}>
+        <AlertDialogContent className="bg-[#0f172a] border-white/10 text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Archive className="h-5 w-5 text-amber-400" />
+              Confirmar Arquivamento
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-400">
+              Tem certeza que deseja arquivar o processo <strong>{processToArchive?.name}</strong>? 
+              <br /><br />
+              Esta ação removerá o caso da listagem ativa e o moverá para o <strong>Arquivo Digital</strong>. O histórico e os documentos no Drive permanecerão intactos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2">
+            <AlertDialogCancel disabled={isArchiving} className="bg-transparent border-white/10 text-slate-400">Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleArchive} disabled={isArchiving} className="bg-amber-600 text-white hover:bg-amber-700 font-bold border-none">
+              {isArchiving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Archive className="mr-2 h-4 w-4" />}
+              Confirmar Arquivamento
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
