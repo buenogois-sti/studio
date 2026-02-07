@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -32,7 +33,9 @@ import {
   CreditCard,
   Building,
   History,
-  MessageSquare
+  MessageSquare,
+  Plus,
+  FolderOpen
 } from 'lucide-react';
 import { 
   DndContext, 
@@ -53,7 +56,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 
 import { useFirebase, useCollection, useMemoFirebase, useDoc } from '@/firebase';
-import { collection, query, orderBy, doc, deleteDoc, Timestamp, limit, updateDoc } from 'firebase/firestore';
+import { collection, query, orderBy, doc, deleteDoc, Timestamp, limit, updateDoc, where } from 'firebase/firestore';
 import type { Lead, Client, Staff, LeadStatus, LeadPriority, UserProfile, OpposingParty } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -93,7 +96,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Textarea } from '@/components/ui/textarea';
-import { createLead, updateLeadStatus, convertLeadToProcess, assignLeadToLawyer, updateLeadOpposingParties } from '@/lib/lead-actions';
+import { createLead, updateLeadStatus, convertLeadToProcess, updateLeadOpposingParties } from '@/lib/lead-actions';
 import { ClientSearchInput } from '@/components/process/ClientSearchInput';
 import { ClientCreationModal } from '@/components/process/ClientCreationModal';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -103,6 +106,7 @@ import { Separator } from '@/components/ui/separator';
 import { ClientForm } from '@/components/client/ClientForm';
 import { H2 } from '@/components/ui/typography';
 import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const STAGES: LeadStatus[] = ['NOVO', 'ENTREVISTA', 'DOCUMENTACAO', 'CONTRATUAL', 'PRONTO'];
 
@@ -110,7 +114,7 @@ const stageConfig: Record<LeadStatus, { label: string; color: string; icon: any;
   NOVO: { label: 'Triagem', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20', icon: Zap, description: 'Novos contatos' },
   ENTREVISTA: { label: 'Atendimento', color: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20', icon: UserCircle, description: 'Entrevista técnica' },
   DOCUMENTACAO: { label: 'Burocracia', color: 'bg-amber-500/10 text-amber-400 border-amber-500/20', icon: Clock, description: 'Dados e provas' },
-  CONTRATUAL: { label: 'Contratual', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20', icon: ShieldCheck, description: 'Assinaturas' },
+  CONTRATUAL: { label: 'Contratual', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20', icon: ShieldCheck, description: 'Asssignatures' },
   PRONTO: { label: 'Protocolo', color: 'bg-purple-500/10 text-purple-400 border-purple-500/20', icon: CheckCircle2, description: 'Pronto p/ distribuir' },
   DISTRIBUIDO: { label: 'Distribuído', color: 'bg-slate-500/10 text-slate-400 border-slate-500/20', icon: FolderKanban, description: 'Migrado' },
   ABANDONADO: { label: 'Abandonado', color: 'bg-rose-500/10 text-rose-400 border-rose-500/20', icon: AlertCircle, description: 'Arquivado' },
@@ -263,7 +267,7 @@ export default function LeadsPage() {
               leads={filteredLeads.filter(l => l.status === stage)}
               clientsMap={clientsMap}
               staffMap={staffMap}
-              onCardClick={(l) => { setSelectedLead(l); setIsDetailsOpen(true); }}
+              onCardClick={(l: Lead) => { setSelectedLead(l); setIsDetailsOpen(true); }}
             />
           ))}
         </div>
@@ -468,7 +472,7 @@ function LeadDetailsSheet({ lead, client, open, onOpenChange, onConvert, isProce
         <SheetHeader className="p-6 border-b border-white/5 bg-white/5">
           <div className="flex items-center justify-between">
             <div>
-              <Badge variant="outline" className={cn("text-[9px] font-black uppercase mb-2", stageConfig[lead.status].color)}>Fase Atual: {stageConfig[lead.status].label}</Badge>
+              <Badge variant="outline" className={cn("text-[9px] font-black uppercase mb-2", stageConfig[lead.status as LeadStatus].color)}>Fase Atual: {stageConfig[lead.status as LeadStatus].label}</Badge>
               <SheetTitle className="text-2xl font-black font-headline text-white">{lead.title}</SheetTitle>
               <SheetDescription className="text-slate-400">Origem: {lead.captureSource} | Ref: #{lead.id.substring(0, 6)}</SheetDescription>
             </div>
@@ -597,8 +601,6 @@ function LeadDetailsSheet({ lead, client, open, onOpenChange, onConvert, isProce
                     <p className="text-sm text-slate-300 font-medium">Lead registrado via {lead.captureSource}.</p>
                   </div>
                 </div>
-                
-                {/* Eventos de troca de fase seriam listados aqui se persistidos na timeline */}
               </div>
             </TabsContent>
           </div>

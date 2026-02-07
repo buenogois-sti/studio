@@ -1,3 +1,4 @@
+
 'use server';
 import { firestoreAdmin } from '@/firebase/admin';
 import type { FinancialTitle, Process, FinancialEvent, Staff, StaffCredit, TimelineEvent } from './types';
@@ -228,13 +229,14 @@ export async function addManualStaffCredit(staffId: string, data: Partial<StaffC
  * Atualiza a previsão de pagamento para uma lista de créditos.
  */
 export async function updateCreditForecast(staffId: string, creditIds: string[], forecastDate: string) {
-  if (!firestoreAdmin) throw new Error("Servidor inacessível.");
-  const batch = firestoreAdmin.batch();
+  const admin = firestoreAdmin;
+  if (!admin) throw new Error("Servidor inacessível.");
+  const batch = admin.batch();
   const [year, month, day] = forecastDate.split('-').map(Number);
   const forecastTimestamp = Timestamp.fromDate(new Date(year, month - 1, day));
 
   creditIds.forEach(id => {
-    const ref = firestoreAdmin.collection(`staff/${staffId}/credits`).doc(id);
+    const ref = admin.collection(`staff/${staffId}/credits`).doc(id);
     batch.update(ref, { paymentForecast: forecastTimestamp });
   });
 
