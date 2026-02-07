@@ -1,7 +1,6 @@
 'use server';
 import { firestoreAdmin } from '@/firebase/admin';
-import type { Process, DocumentTemplate, TimelineEvent } from './types';
-import type { firestore as adminFirestore } from 'firebase-admin';
+import type { Process, DocumentTemplate, TimelineEvent, Client } from './types';
 import { copyFile, createFolder } from './drive-actions';
 import { syncProcessToDrive, getGoogleApiClientsForUser } from './drive';
 import { revalidatePath } from 'next/cache';
@@ -11,6 +10,8 @@ import { createNotification } from './notification-actions';
 import { extractFileId } from './utils';
 import { Timestamp, FieldValue } from 'firebase-admin/firestore';
 import { v4 as uuidv4 } from 'uuid';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 /**
  * Busca uma subpasta específica por nome dentro de uma pasta pai.
@@ -23,6 +24,34 @@ async function findSubfolder(drive: any, parentId: string, folderName: string): 
         includeItemsFromAllDrives: true,
     });
     return res.data.files?.[0]?.id || null;
+}
+
+/**
+ * Realiza a substituição de placeholders (tags) no documento Google Docs.
+ */
+async function replacePlaceholdersInDoc(docsApi: any, fileId: string, dataMap: Record<string, string>) {
+    const requests = Object.entries(dataMap).map(([key, value]) => ({
+        replaceAllText: {
+            containsText: {
+                text: `{{${key}}}`,
+                matchCase: true,
+            },
+            replaceText: value || '',
+        },
+    }));
+
+    if (requests.length === 0) return;
+
+    try {
+        await docsApi.documents.batchUpdate({
+            documentId: fileId,
+            requestBody: {
+                requests,
+            },
+        });
+    } catch (error) {
+        console.error('[replacePlaceholders] Failed to update document:', error);
+    }
 }
 
 export async function searchProcesses(query: string): Promise<Process[]> {
@@ -76,7 +105,8 @@ export async function archiveProcess(processId: string): Promise<{ success: bool
 }
 
 /**
- * Gera um rascunho de documento a partir de um modelo, organizando-o na subpasta correta do processo.
+ * Gera um rascunho de documento a partir de um modelo, organizando-o na subpasta correta do processo
+ * e preenchendo automaticamente os dados do cliente e do processo.
  */
 export async function draftDocument(
     processId: string, 
@@ -89,7 +119,7 @@ export async function draftDocument(
     if (!session) throw new Error("Não autorizado.");
 
     try {
-        const { drive } = await getGoogleApiClientsForUser();
+        const { drive, docs } = await getGoogleApiClientsForUser();
         const processRef = firestoreAdmin.collection('processes').doc(processId);
         const processDoc = await processRef.get();
         if (!processDoc.exists) throw new Error("Processo não encontrado.");
@@ -106,7 +136,7 @@ export async function draftDocument(
         if (!processData.driveFolderId) throw new Error("Não foi possível localizar a pasta do processo.");
 
         // 2. Define a subpasta de destino baseada na categoria do modelo
-        let targetFolderName = '01 - Petições'; // Default
+        let targetFolderName = '01 - Petições';
         const cat = category.toLowerCase();
         if (cat.includes('procuração') || cat.includes('contrato')) {
             targetFolderName = '01 - Petições';
@@ -125,23 +155,46 @@ export async function draftDocument(
             targetFolderId = folder.id!;
         }
 
-        // 3. Sanitiza o ID do modelo
+        // 3. Busca os dados do cliente para o preenchimento
+        const clientDoc = await firestoreAdmin.collection('clients').doc(processData.clientId).get();
+        const clientData = clientDoc.data() as Client;
+
+        // 4. Sanitiza o ID do modelo
         const cleanTemplateId = extractFileId(templateId);
         if (!cleanTemplateId) throw new Error("ID do modelo inválido.");
 
-        // 4. Copia o arquivo para a subpasta
+        // 5. Copia o arquivo para a subpasta
         const newFileName = `${documentName} - ${processData.name}`;
         const copiedFile = await copyFile(cleanTemplateId, newFileName, targetFolderId);
 
-        if (!copiedFile.webViewLink) {
-            throw new Error("O Google Drive não retornou o link de edição. Verifique as permissões do modelo.");
+        if (!copiedFile.id || !copiedFile.webViewLink) {
+            throw new Error("Falha ao copiar o arquivo no Google Drive.");
         }
 
-        // 5. Registra na timeline do processo
+        // 6. Inteligência: Preenchimento Automático de Dados (Data Merge)
+        const clientAddress = clientData.address 
+            ? `${clientData.address.street || ''}, ${clientData.address.number || 'S/N'}, ${clientData.address.neighborhood || ''}, ${clientData.address.city || ''}/${clientData.address.state || ''}`
+            : 'Endereço não informado';
+
+        const dataMap = {
+            'CLIENTE_NOME': `${clientData.firstName} ${clientData.lastName || ''}`.trim(),
+            'CLIENTE_DOCUMENTO': clientData.document || '---',
+            'CLIENTE_CPF': clientData.document || '---',
+            'CLIENTE_RG': clientData.rg || '---',
+            'CLIENTE_EMAIL': clientData.email || '---',
+            'CLIENTE_ENDERECO': clientAddress,
+            'PROCESSO_NUMERO': processData.processNumber || 'Pendente',
+            'REU_NOME': processData.opposingParties?.[0]?.name || 'Parte contrária não identificada',
+            'DATA_HOJE': format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR }),
+        };
+
+        await replacePlaceholdersInDoc(docs, copiedFile.id, dataMap);
+
+        // 7. Registra na timeline do processo
         const timelineEvent: TimelineEvent = {
             id: uuidv4(),
             type: 'petition',
-            description: `RASCUNHO GERADO: "${documentName}" criado na pasta "${targetFolderName}". Link de edição disponibilizado para o advogado.`,
+            description: `DOCUMENTO AUTOMATIZADO: "${documentName}" gerado com sucesso. Dados do cliente (${clientData.firstName}) vinculados ao modelo.`,
             date: Timestamp.now() as any,
             authorName: session.user.name || 'Sistema'
         };
@@ -151,11 +204,11 @@ export async function draftDocument(
             updatedAt: FieldValue.serverTimestamp()
         });
 
-        // 6. Notifica o usuário com o link direto
+        // 8. Notifica o usuário
         await createNotification({
             userId: session.user.id,
-            title: "Rascunho Pronto p/ Edição",
-            description: `O documento "${documentName}" está pronto no Google Docs.`,
+            title: "Documento Pronto!",
+            description: `O documento "${documentName}" foi preenchido e está na pasta do processo.`,
             type: 'success',
             href: copiedFile.webViewLink
         });
@@ -167,9 +220,6 @@ export async function draftDocument(
 
     } catch (error: any) {
         console.error("Error drafting document:", error);
-        if (error.message.includes('File not found')) {
-            throw new Error(`Modelo não encontrado. Certifique-se de compartilhar o arquivo original com o e-mail: studio-7080106838-23904@studio-7080106838-23904.iam.gserviceaccount.com`);
-        }
-        return { success: false, error: error.message || 'Erro interno ao gerar rascunho.' };
+        return { success: false, error: error.message || 'Erro interno ao gerar documento.' };
     }
 }

@@ -1,6 +1,6 @@
 'use server';
 
-import { google, type drive_v3, type sheets_v4, type calendar_v3, type tasks_v1 } from 'googleapis';
+import { google, type drive_v3, type sheets_v4, type calendar_v3, type tasks_v1, type docs_v1 } from 'googleapis';
 import { firestoreAdmin } from '@/firebase/admin';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/options';
@@ -47,6 +47,7 @@ interface GoogleApiClients {
     sheets: sheets_v4.Sheets;
     calendar: calendar_v3.Calendar;
     tasks: tasks_v1.Tasks;
+    docs: docs_v1.Docs;
 }
 
 export async function getGoogleApiClientsForUser(): Promise<GoogleApiClients> {
@@ -63,8 +64,9 @@ export async function getGoogleApiClientsForUser(): Promise<GoogleApiClients> {
     const sheets = google.sheets({ version: 'v4', auth });
     const calendar = google.calendar({ version: 'v3', auth });
     const tasks = google.tasks({ version: 'v1', auth });
+    const docs = google.docs({ version: 'v1', auth });
     
-    return { drive, sheets, calendar, tasks };
+    return { drive, sheets, calendar, tasks, docs };
 }
 
 async function createMultipleFolders(drive: drive_v3.Drive, parentId: string, folderNames: string[]): Promise<Map<string, string>> {
@@ -114,7 +116,7 @@ export async function syncClientToDrive(clientId: string, clientName: string): P
     if (!firestoreAdmin) throw new Error("A conexão com o servidor de dados falhou.");
     
     try {
-        const { drive, sheets } = await getGoogleApiClientsForUser();
+        const { drive } = await getGoogleApiClientsForUser();
 
         const clientRef = firestoreAdmin.collection('clients').doc(clientId);
         const clientDoc = await clientRef.get();
