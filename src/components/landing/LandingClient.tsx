@@ -537,7 +537,7 @@ export function LandingClient({ initialSettings, initialSeo }: { initialSettings
             
             {/* Coluna 1: Branding */}
             <div className="space-y-6">
-              <div className="bg-white p-2 rounded-xl inline-block">
+              <div className="p-2 rounded-xl inline-block">
                 <img src="/logo.png" alt="Bueno Gois" className="h-16 w-auto" />
               </div>
               <p className="text-slate-400 text-sm leading-relaxed text-justify">
