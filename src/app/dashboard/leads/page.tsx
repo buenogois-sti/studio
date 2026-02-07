@@ -35,7 +35,8 @@ import {
   History,
   MessageSquare,
   Plus,
-  FolderOpen
+  FolderOpen,
+  Lock
 } from 'lucide-react';
 import { 
   DndContext, 
@@ -192,6 +193,26 @@ export default function LeadsPage() {
     const lead = leadsData?.find(l => l.id === leadId);
 
     if (lead && lead.status !== newStatus && STAGES.includes(newStatus)) {
+      // REGRA DE NEGÓCIO: Bloqueio por falta de dados para contrato
+      if (newStatus === 'CONTRATUAL' || newStatus === 'PRONTO') {
+        const client = clientsMap.get(lead.clientId);
+        if (client) {
+          const isPJ = client.clientType === 'Pessoa Jurídica';
+          const hasDocument = !!client.document;
+          const hasAddress = !!client.address?.street && !!client.address?.number && !!client.address?.zipCode && !!client.address?.city;
+          const hasRG = isPJ || !!client.rg; // Para PJ o RG é opcional ou do representante
+
+          if (!hasDocument || !hasAddress || !hasRG) {
+            toast({
+              variant: 'destructive',
+              title: 'Impedimento: Dados Faltantes',
+              description: 'Para avançar à fase contratual, você deve preencher o RG, CPF/CNPJ e Endereço Completo do cliente na aba "Burocracia".',
+            });
+            return;
+          }
+        }
+      }
+
       try {
         await updateLeadStatus(leadId, newStatus);
         toast({ title: `Fase atualizada: ${stageConfig[newStatus].label}` });
@@ -384,6 +405,16 @@ function LeadCard({ lead, client, lawyer, onClick }: { lead: Lead; client?: Clie
   const style = { transform: CSS.Translate.toString(transform), transition };
   const priority = priorityConfig[lead.priority as LeadPriority];
 
+  const isLocked = React.useMemo(() => {
+    if (lead.status === 'DOCUMENTACAO') {
+      const isPJ = client?.clientType === 'Pessoa Jurídica';
+      const hasBasic = !!client?.document && !!client?.address?.street && !!client?.address?.zipCode;
+      const hasPF = !isPJ && !!client?.rg;
+      return !hasBasic || (!isPJ && !hasPF);
+    }
+    return false;
+  }, [lead.status, client]);
+
   return (
     <Card 
       ref={setNodeRef} 
@@ -399,9 +430,16 @@ function LeadCard({ lead, client, lawyer, onClick }: { lead: Lead; client?: Clie
     >
       <CardContent className="p-4 space-y-4">
         <div className="flex items-start justify-between">
-          <Badge variant="outline" className={cn("text-[8px] font-black uppercase border-none px-1.5 h-4.5", priority.color)}>
-            {priority.label}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className={cn("text-[8px] font-black uppercase border-none px-1.5 h-4.5", priority.color)}>
+              {priority.label}
+            </Badge>
+            {isLocked && (
+              <Badge variant="outline" className="text-[8px] font-black uppercase bg-amber-500/10 text-amber-500 border-amber-500/20 px-1.5 h-4.5 gap-1">
+                <Lock className="h-2.5 w-2.5" /> Pendência
+              </Badge>
+            )}
+          </div>
           {lead.isUrgent && (
             <div className="flex items-center gap-1 text-rose-500 animate-pulse">
               <span className="text-[8px] font-black uppercase">Urgente</span>
@@ -502,8 +540,8 @@ function LeadDetailsSheet({ lead, client, open, onOpenChange, onConvert, isProce
               <TabsContent value="burocracia" className="m-0 space-y-8 animate-in fade-in duration-300">
                 <Alert className="bg-amber-500/10 border-amber-500/20 text-amber-400 p-6 rounded-3xl">
                   <Info className="h-5 w-5" />
-                  <AlertTitle className="font-black uppercase tracking-tighter text-base">Complemento de Cadastro</AlertTitle>
-                  <AlertDescription className="text-xs font-medium mt-1">Para gerar a procuração e o contrato na fase seguinte, preencha o RG, CPF e Endereço completo abaixo.</AlertDescription>
+                  <AlertTitle className="font-black uppercase tracking-tighter text-base">Requisito para Fase Contratual</AlertTitle>
+                  <AlertDescription className="text-xs font-medium mt-1">Para gerar a procuração e o contrato na fase seguinte, preencha obrigatoriamente o <strong>RG</strong>, <strong>CPF/CNPJ</strong> e <strong>Endereço Completo</strong> (com número e CEP) abaixo.</AlertDescription>
                 </Alert>
                 <ClientForm client={client} onSave={() => toast({ title: 'Cadastro Atualizado!' })} />
               </TabsContent>
