@@ -74,15 +74,14 @@ export default function ClientsPage() {
   const { firestore } = useFirebase();
   const { data: session, status } = useSession();
 
-  // OTIMIZAÇÃO: Limites estritos para evitar congelamento
+  // Queries básicas com limite fixo para evitar sobrecarga inicial
   const clientsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'clients'), orderBy('updatedAt', 'desc'), limit(100)) : null), [firestore]);
   const { data: clientsData, isLoading: isLoadingClients } = useCollection<Client>(clientsQuery);
-  const clients = clientsData || [];
-
+  
   const processesQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'processes'), limit(200)) : null), [firestore]);
   const { data: processesData, isLoading: isLoadingProcesses } = useCollection<Process>(processesQuery);
-  const processes = processesData || [];
 
+  // Busca com debounce
   React.useEffect(() => {
     if (!searchTerm.trim()) {
       setSearchResults(null);
@@ -105,22 +104,44 @@ export default function ClientsPage() {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
+  // Reset da página ao filtrar
   React.useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, statusFilter]);
 
+  // Filtro base
+  const filteredClients = React.useMemo(() => {
+    let result = searchResults || clientsData || [];
+    if (statusFilter !== 'all') {
+      result = result.filter(c => c.status === statusFilter);
+    }
+    return result;
+  }, [clientsData, searchResults, statusFilter]);
+
+  // Paginação
+  const totalPages = Math.max(1, Math.ceil(filteredClients.length / ITEMS_PER_PAGE));
+  const paginatedClients = React.useMemo(() => {
+    return filteredClients.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+  }, [filteredClients, currentPage]);
+
+  // OTIMIZAÇÃO CRÍTICA: Cálculo de mapas APENAS para os itens visíveis
   const processesByClientMap = React.useMemo(() => {
     const map = new Map<string, number>();
-    processes.forEach(p => {
-      map.set(p.clientId, (map.get(p.clientId) || 0) + 1);
+    if (!processesData) return map;
+    
+    // Filtramos os processos apenas dos clientes que estão na página atual
+    const visibleClientIds = new Set(paginatedClients.map(c => c.id));
+    processesData.forEach(p => {
+      if (visibleClientIds.has(p.clientId)) {
+        map.set(p.clientId, (map.get(p.clientId) || 0) + 1);
+      }
     });
     return map;
-  }, [processes]);
+  }, [processesData, paginatedClients]);
 
   const clientIntegrityMap = React.useMemo(() => {
     const map = new Map<string, number>();
-    const baseList = searchResults || clients;
-    baseList.forEach(client => {
+    paginatedClients.forEach(client => {
       const fields = [
         client.firstName, client.lastName, client.document, client.email,
         client.mobile, client.rg, client.ctps, client.pis,
@@ -131,18 +152,7 @@ export default function ClientsPage() {
       map.set(client.id, Math.round((filled / fields.length) * 100));
     });
     return map;
-  }, [clients, searchResults]);
-
-  const filteredClients = React.useMemo(() => {
-    let result = searchResults || clients;
-    if (statusFilter !== 'all') result = result.filter(c => c.status === statusFilter);
-    return result;
-  }, [clients, searchResults, statusFilter]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredClients.length / ITEMS_PER_PAGE));
-  const paginatedClients = React.useMemo(() => {
-    return filteredClients.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
-  }, [filteredClients, currentPage]);
+  }, [paginatedClients]);
 
   const handleAddNew = React.useCallback(() => { setEditingClient(null); setIsSheetOpen(true); }, []);
   const handleEdit = React.useCallback((client: Client) => { setEditingClient(client); setIsSheetOpen(true); }, []);
