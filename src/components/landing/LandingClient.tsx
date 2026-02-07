@@ -259,8 +259,9 @@ export function LandingClient({ initialSettings, initialSeo }: { initialSettings
 
   const settingsRef = useMemoFirebase(() => firestore ? doc(firestore, 'system_settings', 'general') : null, [firestore]);
   const { data: settings } = useDoc<any>(settingsRef);
+  
   const currentSettings = settings || initialSettings;
-  const instagramUrl = currentSettings?.instagram;
+  const instagramUrl = currentSettings?.instagram || "https://www.instagram.com/buenogoisadvogado/";
 
   return (
     <div className="bg-background text-foreground font-body overflow-x-hidden antialiased">
@@ -274,6 +275,7 @@ export function LandingClient({ initialSettings, initialSeo }: { initialSettings
       >
         <div className="container mx-auto flex items-center justify-between p-4 text-white">
           <LandingLogo />
+          
           <nav className="hidden md:flex items-center space-x-8 text-sm font-medium">
             {['Início', 'Serviços', 'Sobre', 'Depoimentos', 'Contato'].map(item => (
               <Link key={item} href={`#${item.toLowerCase()}`} className="hover:text-primary transition-all duration-300 hover:scale-110 relative group">
@@ -281,19 +283,25 @@ export function LandingClient({ initialSettings, initialSeo }: { initialSettings
                 <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-primary transition-all duration-300 group-hover:w-full" />
               </Link>
             ))}
-            {instagramUrl && (
-              <Link href={instagramUrl} target="_blank" className="hover:text-primary transition-all duration-300 hover:scale-110" aria-label="Siga-nos no Instagram">
-                <Instagram className="h-5 w-5" />
-              </Link>
-            )}
           </nav>
-          <Button 
-            asChild 
-            variant="outline" 
-            className="hidden md:flex bg-transparent border-primary text-primary hover:bg-primary hover:text-primary-foreground transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-primary/50"
-          >
-            <Link href="/login">Área ADV</Link>
-          </Button>
+
+          <div className="flex items-center gap-4">
+            <Link 
+              href={instagramUrl} 
+              target="_blank" 
+              className="text-white hover:text-primary transition-all duration-300 hover:scale-110 p-2" 
+              aria-label="Siga-nos no Instagram"
+            >
+              <Instagram className="h-6 w-6" />
+            </Link>
+            <Button 
+              asChild 
+              variant="outline" 
+              className="hidden md:flex bg-transparent border-primary text-primary hover:bg-primary hover:text-primary-foreground transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-primary/50"
+            >
+              <Link href="/login">Área ADV</Link>
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -527,16 +535,14 @@ export function LandingClient({ initialSettings, initialSeo }: { initialSettings
 
       <footer className="py-12 bg-[#0b1324] text-white/60 text-center text-sm border-t border-white/5">
         <div className="flex justify-center gap-6 mb-6">
-          {instagramUrl && (
-            <Link 
-              href={instagramUrl} 
-              target="_blank" 
-              className="h-10 w-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-primary hover:text-primary-foreground transition-all duration-300"
-              aria-label="Instagram"
-            >
-              <Instagram className="h-5 w-5" />
-            </Link>
-          )}
+          <Link 
+            href={instagramUrl} 
+            target="_blank" 
+            className="h-12 w-12 rounded-full bg-white/5 flex items-center justify-center hover:bg-primary hover:text-primary-foreground transition-all duration-300"
+            aria-label="Instagram"
+          >
+            <Instagram className="h-6 w-6" />
+          </Link>
         </div>
         <p>&copy; {new Date().getFullYear()} Bueno Gois Advogados e Associados. Todos os direitos reservados. Advocacia Especializada em São Bernardo do Campo.</p>
       </footer>
