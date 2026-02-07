@@ -6,12 +6,13 @@ import admin from 'firebase-admin';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/options';
 import type { Session } from 'next-auth';
-import type { Client, Process } from './types';
+import type { Client, Process, Lead } from './types';
 import { revalidatePath } from 'next/cache';
 
 // Nomes das pastas raiz para autodescoberta
 const CLIENTS_ROOT_NAME = '00 - CLIENTES';
 const PROCESSES_ROOT_NAME = '00 - PROCESSOS';
+const LEADS_ROOT_NAME = '00 - TRIAGEM (LEADS)';
 
 const CLIENT_FOLDER_STRUCTURE = [
   '01 - Cadastro e Documentos Pessoais',
@@ -175,6 +176,36 @@ export async function syncClientToDrive(clientId: string, clientName: string): P
     } catch (error: any) {
         console.error("[syncClientToDrive] Erro:", error.message);
         return { success: false, error: error.message || "Erro desconhecido na sincronização do cliente." };
+    }
+}
+
+/**
+ * Sincroniza a estrutura de um Lead (Triagem).
+ */
+export async function syncLeadToDrive(leadId: string): Promise<{ success: boolean; id?: string; error?: string }> {
+    if (!firestoreAdmin) return { success: false, error: "Servidor de dados inacessível." };
+
+    try {
+        const leadRef = firestoreAdmin.collection('leads').doc(leadId);
+        const leadDoc = await leadRef.get();
+        if (!leadDoc.exists) throw new Error('Lead não encontrado.');
+        const leadData = leadDoc.data() as Lead;
+
+        const { drive } = await getGoogleApiClientsForUser();
+        const rootLeadsId = await getOrCreateRootFolder(drive, LEADS_ROOT_NAME);
+
+        const leadFolderName = `${leadData.title} - Lead #${leadId.substring(0, 6)}`;
+        const leadFolderId = await ensureFolder(drive, rootLeadsId, leadFolderName);
+
+        await leadRef.update({
+            driveFolderId: leadFolderId,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        return { success: true, id: leadFolderId };
+    } catch (error: any) {
+        console.error("[syncLeadToDrive] Erro:", error.message);
+        return { success: false, error: error.message || "Erro na sincronização do Lead." };
     }
 }
 

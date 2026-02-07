@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -472,7 +471,7 @@ function ChecklistEditorDialog({ open, onOpenChange, template }: { open: boolean
             className="flex-1 bg-primary text-primary-foreground font-black uppercase tracking-widest text-[11px] h-11 px-8 shadow-xl shadow-primary/20 hover:scale-[1.02] transition-all"
             onClick={handleSave}
           >
-            {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ShieldCheck className="mr-2 h-5 w-5" />}
+            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin mr-2" /> : <ShieldCheck className="mr-2 h-5 w-5" />}
             Salvar e Disponibilizar na Banca
           </Button>
         </DialogFooter>
