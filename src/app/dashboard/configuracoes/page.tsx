@@ -754,6 +754,7 @@ function TagsDictionaryTab() {
         { tag: "{{CLIENTE_NACIONALIDADE}}", desc: "Ex: brasileiro(a)" },
         { tag: "{{CLIENTE_ESTADO_CIVIL}}", desc: "Ex: solteiro(a), casado(a)" },
         { tag: "{{CLIENTE_PROFISSAO}}", desc: "Ex: ajudante geral, motorista" },
+        { tag: "{{CLIENTE_QUALIFICACAO_COMPLETA}}", desc: "Bloco completo de dados do cliente." },
         { tag: "{{CLIENTE_ENDERECO_COMPLETO}}", desc: "Logradouro, nº, Bairro, Cidade/UF" },
       ]
     },
@@ -772,8 +773,10 @@ function TagsDictionaryTab() {
       items: [
         { tag: "{{ADVOGADO_LIDER_NOME}}", desc: "Nome do advogado titular" },
         { tag: "{{ADVOGADO_LIDER_OAB}}", desc: "Número da OAB do titular" },
+        { tag: "{{ADVOGADO_LIDER_EMAIL}}", desc: "Email corporativo do responsável" },
         { tag: "{{ESCRITORIO_NOME}}", desc: "Bueno Gois Advogados e Associados" },
         { tag: "{{ESCRITORIO_ENDERECO}}", desc: "Endereço da sede configurado" },
+        { tag: "{{ESCRITORIO_TELEFONE}}", desc: "Telefone/PABX oficial" },
       ]
     },
     {
@@ -978,7 +981,7 @@ export default function ConfiguracoesPage() {
     <div className="flex flex-col gap-8 pb-10">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-black tracking-tight font-headline text-white">Configurações do Sistema</h1>
+          <h1 className="text-3xl font-black tracking-tight font-headline text-white">Configurações do Systema</h1>
           <p className="text-sm text-muted-foreground">Gestão de infraestrutura, pessoas e parâmetros estratégicos.</p>
         </div>
       </div>
@@ -1060,7 +1063,7 @@ export default function ConfiguracoesPage() {
                 disabled={isSavingGeneral}
                 className="bg-primary text-primary-foreground font-black px-8 h-11 uppercase text-[11px] tracking-widest shadow-xl shadow-primary/20"
               >
-                {isSavingGeneral ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                {isSavingGeneral ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
                 Atualizar Cadastro
               </Button>
             </CardFooter>

@@ -165,12 +165,16 @@ export async function draftDocument(
         // 4. Busca dados do advogado líder
         let lawyerName = 'Advogado Responsável';
         let lawyerOAB = 'Pendente';
+        let lawyerEmail = '';
+        let lawyerWhatsapp = '';
         if (processData.leadLawyerId) {
             const staffDoc = await firestoreAdmin.collection('staff').doc(processData.leadLawyerId).get();
             if (staffDoc.exists) {
                 const staffData = staffDoc.data() as Staff;
                 lawyerName = `${staffData.firstName} ${staffData.lastName}`;
                 lawyerOAB = staffData.oabNumber || 'Pendente';
+                lawyerEmail = staffData.email || '';
+                lawyerWhatsapp = staffData.whatsapp || '';
             }
         }
 
@@ -195,6 +199,9 @@ export async function draftDocument(
         const firstOpposingParty = processData.opposingParties?.[0]?.name || '---';
         const allOpposingParties = processData.opposingParties?.map(p => p.name).join(', ') || '---';
 
+        // Helper para qualificação completa
+        const qualification = `${clientFullName}, ${clientData.nationality || 'brasileiro(a)'}, ${clientData.civilStatus || 'solteiro(a)'}, ${clientData.profession || 'ajudante geral'}, portador(a) do RG nº ${clientData.rg || '---'} e do CPF nº ${clientData.document || '---'}, residente em ${clientAddress}`;
+
         const dataMap = {
             // Tags de Cliente / Reclamante
             'CLIENTE_NOME_COMPLETO': clientFullName,
@@ -214,6 +221,7 @@ export async function draftDocument(
             'CLIENTE_NACIONALIDADE': clientData.nationality || 'brasileiro(a)',
             'CLIENTE_ESTADO_CIVIL': clientData.civilStatus || 'solteiro(a)',
             'CLIENTE_PROFISSAO': clientData.profession || 'ajudante geral',
+            'CLIENTE_QUALIFICACAO_COMPLETA': qualification,
             
             // Tags de Processo / Endereçamento
             'PROCESSO_TITULO': processData.name || '',
@@ -231,10 +239,15 @@ export async function draftDocument(
             // Tags de Advogado
             'ADVOGADO_LIDER_NOME': lawyerName,
             'ADVOGADO_LIDER_OAB': lawyerOAB,
+            'ADVOGADO_LIDER_EMAIL': lawyerEmail,
+            'ADVOGADO_LIDER_WHATSAPP': lawyerWhatsapp,
 
             // Tags de Escritório
             'ESCRITORIO_NOME': officeData?.officeName || 'Bueno Gois Advogados e Associados',
             'ESCRITORIO_ENDERECO': officeData?.address || 'Rua Marechal Deodoro, 1594 - Sala 2, SBC/SP',
+            'ESCRITORIO_TELEFONE': officeData?.phone || '(11) 2897-5218',
+            'ESCRITORIO_EMAIL': officeData?.adminEmail || 'contato@buenogoisadvogado.com.br',
+            'ESCRITORIO_INSTAGRAM': officeData?.instagram || '',
             
             // Outros
             'DATA_EXTENSO': format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR }),
