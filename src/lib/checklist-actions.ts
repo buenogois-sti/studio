@@ -1,3 +1,4 @@
+
 'use server';
 
 import { firestoreAdmin } from '@/firebase/admin';
@@ -82,7 +83,7 @@ export async function saveChecklistExecution(data: Omit<ChecklistExecution, 'id'
       await createNotification({
         userId: admin.id,
         title: "Checklist Executado",
-        description: `${session.user.name} completou o checklist: ${data.templateTitle}.`,
+        description: `${session.user.name} completou o checklist: ${data.templateTitle}${data.processName ? ` para o processo ${data.processName}` : ''}.`,
         type: 'success',
         href: '/dashboard/checklists'
       });

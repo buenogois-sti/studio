@@ -389,6 +389,8 @@ export type ChecklistExecution = {
   templateTitle: string;
   userId: string;
   userName: string;
+  processId?: string;
+  processName?: string;
   answers: Record<string, any>;
   status: 'COMPLETED' | 'DRAFT';
   executedAt: Timestamp;

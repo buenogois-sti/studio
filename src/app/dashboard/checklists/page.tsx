@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -22,11 +23,13 @@ import {
   ShieldCheck,
   X,
   AlertTriangle,
-  MessageSquare
+  MessageSquare,
+  FolderKanban,
+  ExternalLink
 } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy, limit, Timestamp } from 'firebase/firestore';
-import type { ChecklistTemplate, ChecklistExecution, ChecklistItem, ChecklistItemType } from '@/lib/types';
+import type { ChecklistTemplate, ChecklistExecution, ChecklistItem, ChecklistItemType, Process } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -75,6 +78,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
+import { searchProcesses } from '@/lib/process-actions';
 
 export default function ChecklistsPage() {
   const { firestore } = useFirebase();
@@ -114,7 +119,7 @@ export default function ChecklistsPage() {
             <CheckSquare className="h-8 w-8 text-primary" />
             Checklists Operacionais
           </h1>
-          <p className="text-sm text-muted-foreground">Padronização de processos e garantia de qualidade do Bueno Gois.</p>
+          <p className="text-sm text-muted-foreground">Padronização de processos e garantia de qualidade da banca.</p>
         </div>
         <div className="flex items-center gap-3">
           {isAdmin && (
@@ -164,12 +169,12 @@ export default function ChecklistsPage() {
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-white/20 hover:text-white"><MoreVertical className="h-4 w-4" /></Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="bg-[#0f172a] border-white/10 text-white">
-                            <DropdownMenuItem onClick={() => { setSelectedTemplate(template); setIsEditorOpen(true); }} className="gap-2">
-                              <Edit className="h-4 w-4" /> Editar Modelo
+                          <DropdownMenuContent align="end" className="bg-[#0f172a] border-white/10 text-white shadow-2xl p-1">
+                            <DropdownMenuItem onClick={() => { setSelectedTemplate(template); setIsEditorOpen(true); }} className="gap-2 focus:bg-white/5">
+                              <Edit className="h-4 w-4 text-primary" /> Editar Modelo
                             </DropdownMenuItem>
                             <DropdownMenuSeparator className="bg-white/5" />
-                            <DropdownMenuItem onClick={() => deleteChecklistTemplate(template.id)} className="text-rose-500 gap-2">
+                            <DropdownMenuItem onClick={() => deleteChecklistTemplate(template.id)} className="text-rose-500 gap-2 focus:bg-rose-500/10">
                               <Trash2 className="h-4 w-4" /> Excluir Permanentemente
                             </DropdownMenuItem>
                           </DropdownMenuContent>
@@ -208,7 +213,7 @@ export default function ChecklistsPage() {
             <Table>
               <TableHeader className="bg-white/5 border-b border-white/10">
                 <TableRow className="hover:bg-transparent">
-                  <TableHead className="text-muted-foreground text-[10px] font-black uppercase">Checklist</TableHead>
+                  <TableHead className="text-muted-foreground text-[10px] font-black uppercase px-6">Checklist / Processo</TableHead>
                   <TableHead className="text-muted-foreground text-[10px] font-black uppercase">Responsável</TableHead>
                   <TableHead className="text-muted-foreground text-[10px] font-black uppercase">Data/Hora</TableHead>
                   <TableHead className="text-center text-muted-foreground text-[10px] font-black uppercase">Status</TableHead>
@@ -217,31 +222,41 @@ export default function ChecklistsPage() {
               </TableHeader>
               <TableBody>
                 {isLoadingExecutions ? (
-                  [...Array(3)].map((_, i) => <TableRow key={i}><TableCell colSpan={5}><Skeleton className="h-10 w-full bg-white/5" /></TableCell></TableRow>)
+                  [...Array(3)].map((_, i) => <TableRow key={i}><TableCell colSpan={5} className="p-6"><Skeleton className="h-10 w-full bg-white/5" /></TableCell></TableRow>)
                 ) : executions?.map(exec => (
-                  <TableRow key={exec.id} className="border-white/5 hover:bg-white/5 transition-colors">
-                    <TableCell className="font-bold text-white">{exec.templateTitle}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-primary text-[8px] font-black">
-                          {exec.userName.charAt(0)}
-                        </div>
-                        <span className="text-sm text-slate-300">{exec.userName}</span>
+                  <TableRow key={exec.id} className="border-white/5 hover:bg-white/5 transition-colors group">
+                    <TableCell className="px-6">
+                      <div className="flex flex-col">
+                        <span className="font-bold text-white text-sm">{exec.templateTitle}</span>
+                        {exec.processName && (
+                          <div className="flex items-center gap-1.5 mt-1 text-primary">
+                            <FolderKanban className="h-3 w-3" />
+                            <span className="text-[10px] font-black uppercase tracking-tighter">{exec.processName}</span>
+                          </div>
+                        )}
                       </div>
                     </TableCell>
-                    <TableCell className="text-xs text-slate-400 font-mono">
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-primary text-[8px] font-black border border-primary/20">
+                          {exec.userName.charAt(0)}
+                        </div>
+                        <span className="text-xs text-slate-300 font-medium">{exec.userName}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-[10px] text-slate-400 font-mono">
                       {exec.executedAt && format(exec.executedAt.toDate(), 'dd/MM/yy HH:mm')}
                     </TableCell>
                     <TableCell className="text-center">
-                      <Badge className="bg-emerald-500/20 text-emerald-400 border-none text-[9px] font-black">CONCLUÍDO</Badge>
+                      <Badge className="bg-emerald-500/20 text-emerald-400 border-none text-[9px] font-black tracking-widest px-2 h-6">CONCLUÍDO</Badge>
                     </TableCell>
                     <TableCell className="text-right px-6">
-                      <Button variant="ghost" size="icon" className="text-white/30"><Info className="h-4 w-4" /></Button>
+                      <Button variant="ghost" size="icon" className="text-white/30 hover:text-white rounded-full bg-white/5 h-8 w-8"><Info className="h-4 w-4" /></Button>
                     </TableCell>
                   </TableRow>
                 ))}
-                {executions?.length === 0 && (
-                  <TableRow><TableCell colSpan={5} className="text-center py-10 text-slate-500 italic">Nenhuma execução registrada.</TableCell></TableRow>
+                {executions?.length === 0 && !isLoadingExecutions && (
+                  <TableRow><TableCell colSpan={5} className="text-center py-20 text-slate-500 italic opacity-40">Nenhuma execução registrada.</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>
@@ -343,7 +358,7 @@ function ChecklistEditorDialog({ open, onOpenChange, template }: { open: boolean
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Título do Checklist *</Label>
-                <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="Ex: Protocolo de Inicial Trabalhista" className="h-11 bg-black/40 border-white/10" />
+                <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="Ex: Protocolo de Inicial Trabalhista" className="h-11 bg-black/40 border-white/10 focus:border-primary transition-all" />
               </div>
               <div className="space-y-2">
                 <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Categoria</Label>
@@ -351,17 +366,17 @@ function ChecklistEditorDialog({ open, onOpenChange, template }: { open: boolean
                   <SelectTrigger className="h-11 bg-black/40 border-white/10">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-[#0f172a] text-white">
-                    <SelectItem value="Operacional">Operacional</SelectItem>
-                    <SelectItem value="Financeiro">Financeiro</SelectItem>
-                    <SelectItem value="Comercial">Comercial</SelectItem>
-                    <SelectItem value="Iniciativa">Iniciativa</SelectItem>
+                  <SelectContent className="bg-[#0f172a] text-white border-white/10 shadow-2xl">
+                    <SelectItem value="Operacional">⭐ Operacional</SelectItem>
+                    <SelectItem value="Financeiro">💰 Financeiro</SelectItem>
+                    <SelectItem value="Comercial">📢 Comercial</SelectItem>
+                    <SelectItem value="Gestão">🛡️ Gestão</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="md:col-span-2 space-y-2">
                 <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Descrição / Finalidade</Label>
-                <Textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Descreva quando e por quem este checklist deve ser executado..." className="bg-black/40 border-white/10 h-20" />
+                <Textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Descreva quando e por quem este checklist deve ser executado..." className="bg-black/40 border-white/10 h-24 resize-none" />
               </div>
             </div>
 
@@ -372,55 +387,57 @@ function ChecklistEditorDialog({ open, onOpenChange, template }: { open: boolean
                 <h3 className="text-sm font-black uppercase tracking-widest text-primary flex items-center gap-2">
                   <ListChecks className="h-4 w-4" /> Itens de Verificação
                 </h3>
-                <Button onClick={addItem} type="button" size="sm" variant="outline" className="h-8 border-primary/20 text-primary hover:bg-primary/10 text-[10px] font-black uppercase">
+                <Button onClick={addItem} type="button" size="sm" variant="outline" className="h-8 border-primary/20 text-primary hover:bg-primary/10 text-[10px] font-black uppercase tracking-widest">
                   <Plus className="h-3 w-3 mr-1" /> Adicionar Passo
                 </Button>
               </div>
 
               <div className="grid gap-3">
                 {items.map((item, idx) => (
-                  <div key={item.id} className="p-4 rounded-2xl bg-white/5 border border-white/5 flex flex-col md:flex-row gap-4 items-start group">
+                  <div key={item.id} className="p-5 rounded-2xl bg-white/5 border border-white/5 flex flex-col md:flex-row gap-4 items-start group hover:border-primary/20 transition-all">
                     <div className="h-8 w-8 rounded-lg bg-black/40 border border-white/10 flex items-center justify-center text-[10px] font-black text-slate-500 shrink-0">
                       {idx + 1}
                     </div>
-                    <div className="flex-1 space-y-3 w-full">
+                    <div className="flex-1 space-y-4 w-full">
                       <Input 
                         value={item.label} 
                         onChange={e => updateItem(item.id, 'label', e.target.value)} 
                         placeholder="Pergunta ou instrução do passo..." 
-                        className="bg-transparent border-0 border-b border-white/10 rounded-none focus-visible:ring-0 focus-visible:border-primary px-0 font-bold"
+                        className="bg-transparent border-0 border-b border-white/10 rounded-none focus-visible:ring-0 focus-visible:border-primary px-0 font-bold text-base h-10"
                       />
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-6">
                         <Select value={item.type} onValueChange={val => updateItem(item.id, 'type', val)}>
-                          <SelectTrigger className="h-8 w-48 text-[10px] font-black uppercase bg-black/40 border-white/5">
+                          <SelectTrigger className="h-9 w-48 text-[10px] font-black uppercase bg-black/40 border-white/5">
                             <SelectValue />
                           </SelectTrigger>
-                          <SelectContent className="bg-[#0f172a] text-white">
-                            <SelectItem value="YES_NO">Sim / Não</SelectItem>
-                            <SelectItem value="YES_NO_MAYBE">Sim / Não / Parcial</SelectItem>
-                            <SelectItem value="TEXT">Resposta em Texto</SelectItem>
-                            <SelectItem value="NUMBER">Valor Numérico</SelectItem>
+                          <SelectContent className="bg-[#0f172a] text-white border-white/10">
+                            <SelectItem value="YES_NO">🔘 Sim / Não</SelectItem>
+                            <SelectItem value="YES_NO_MAYBE">⚪ Sim / Não / Parcial</SelectItem>
+                            <SelectItem value="TEXT">📝 Resposta em Texto</SelectItem>
+                            <SelectItem value="NUMBER">🔢 Valor Numérico</SelectItem>
                           </SelectContent>
                         </Select>
-                        <div className="flex items-center gap-2">
-                          <input 
-                            type="checkbox" 
-                            id={`req-${item.id}`} 
-                            checked={item.required} 
-                            onChange={e => updateItem(item.id, 'required', e.target.checked)} 
-                            className="accent-primary"
-                          />
-                          <Label htmlFor={`req-${item.id}`} className="text-[9px] font-black uppercase text-slate-500 cursor-pointer">Obrigatório</Label>
+                        <div className="flex items-center gap-2 cursor-pointer group/check" onClick={() => updateItem(item.id, 'required', !item.required)}>
+                          <div className={cn(
+                            "h-4 w-4 rounded border flex items-center justify-center transition-all",
+                            item.required ? "bg-primary border-primary text-primary-foreground" : "border-white/20 group-hover/check:border-primary"
+                          )}>
+                            {item.required && <ShieldCheck className="h-3 w-3" />}
+                          </div>
+                          <span className="text-[9px] font-black uppercase text-slate-500 tracking-widest select-none">Obrigatório</span>
                         </div>
                       </div>
                     </div>
-                    <Button variant="ghost" size="icon" onClick={() => removeItem(item.id)} className="text-rose-500 hover:bg-rose-500/10 h-8 w-8 rounded-lg shrink-0">
-                      <Trash2 className="h-4 w-4" />
+                    <Button variant="ghost" size="icon" onClick={() => removeItem(item.id)} className="text-rose-500 hover:bg-rose-500/10 h-10 w-10 rounded-xl shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Trash2 className="h-5 w-5" />
                     </Button>
                   </div>
                 ))}
                 {items.length === 0 && (
-                  <div className="text-center py-10 opacity-20 italic text-xs">Comece adicionando o primeiro passo de verificação.</div>
+                  <div className="text-center py-16 bg-black/20 rounded-3xl border-2 border-dashed border-white/5 opacity-30 flex flex-col items-center gap-3">
+                    <Target className="h-10 w-10" />
+                    <p className="font-bold text-xs uppercase tracking-widest">Adicione o primeiro passo de verificação</p>
+                  </div>
                 )}
               </div>
             </div>
@@ -428,14 +445,14 @@ function ChecklistEditorDialog({ open, onOpenChange, template }: { open: boolean
         </ScrollArea>
 
         <DialogFooter className="p-6 border-t border-white/5 bg-white/5 gap-3">
-          <DialogClose asChild><Button variant="ghost" className="text-slate-400 font-bold uppercase text-[10px]">Cancelar</Button></DialogClose>
+          <DialogClose asChild><Button variant="ghost" className="text-slate-400 font-bold uppercase text-[10px] tracking-widest">Cancelar</Button></DialogClose>
           <Button 
             disabled={isSaving} 
-            className="flex-1 bg-primary text-primary-foreground font-black uppercase tracking-widest text-[11px] h-12 shadow-xl shadow-primary/20"
+            className="flex-1 bg-primary text-primary-foreground font-black uppercase tracking-widest text-[11px] h-14 shadow-xl shadow-primary/20 hover:scale-[1.02] transition-all"
             onClick={handleSave}
           >
-            {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
-            Salvar e Disponibilizar
+            {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ShieldCheck className="mr-2 h-5 w-5" />}
+            Salvar e Disponibilizar na Banca
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -447,14 +464,40 @@ function ChecklistExecutorDialog({ open, onOpenChange, template }: { open: boole
   const [isSaving, setIsSaving] = React.useState(false);
   const [answers, setAnswers] = React.useState<Record<string, any>>({});
   const [observations, setObservations] = React.useState('');
+  const [processSearch, setProcessSearch] = React.useState('');
+  const [processResults, setProcessResults] = React.useState<Process[]>([]);
+  const [selectedProcess, setSelectedProcess] = React.useState<Process | null>(null);
+  const [isSearchingProcess, setIsSearchingProcess] = React.useState(false);
+  
   const { toast } = useToast();
 
   React.useEffect(() => {
     if (template && open) {
       setAnswers({});
       setObservations('');
+      setSelectedProcess(null);
+      setProcessSearch('');
     }
   }, [template, open]);
+
+  React.useEffect(() => {
+    if (processSearch.length < 2) {
+      setProcessResults([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setIsSearchingProcess(true);
+      try {
+        const results = await searchProcesses(processSearch);
+        setProcessResults(results);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setIsSearchingProcess(false);
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [processSearch]);
 
   const handleFinish = async () => {
     if (!template) return;
@@ -462,7 +505,7 @@ function ChecklistExecutorDialog({ open, onOpenChange, template }: { open: boole
     // Validar itens obrigatórios
     const missing = template.items.filter(i => i.required && (answers[i.id] === undefined || answers[i.id] === ''));
     if (missing.length > 0) {
-      toast({ variant: 'destructive', title: 'Pendência', description: 'Complete todos os passos obrigatórios.' });
+      toast({ variant: 'destructive', title: 'Pendência!', description: 'Complete todos os passos obrigatórios antes de finalizar.' });
       return;
     }
 
@@ -471,11 +514,13 @@ function ChecklistExecutorDialog({ open, onOpenChange, template }: { open: boole
       await saveChecklistExecution({
         templateId: template.id,
         templateTitle: template.title,
+        processId: selectedProcess?.id,
+        processName: selectedProcess?.name,
         answers,
         observations,
         status: 'COMPLETED'
       });
-      toast({ title: 'Checklist Concluído!', description: 'O resultado foi transmitido à administração.' });
+      toast({ title: 'Checklist Concluído!', description: 'O relatório foi transmitido à administração.' });
       onOpenChange(false);
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Erro ao salvar', description: e.message });
@@ -488,39 +533,134 @@ function ChecklistExecutorDialog({ open, onOpenChange, template }: { open: boole
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl bg-[#020617] border-white/10 text-white max-h-[90vh] flex flex-col p-0 shadow-2xl">
+      <DialogContent className="sm:max-w-3xl bg-[#020617] border-white/10 text-white max-h-[90vh] flex flex-col p-0 shadow-2xl">
         <DialogHeader className="p-6 border-b border-white/5 bg-primary/5">
-          <DialogTitle className="flex items-center gap-2 text-white font-headline text-xl">
-            <Play className="h-6 w-6 text-primary" />
-            Executando: {template.title}
-          </DialogTitle>
-          <DialogDescription className="text-slate-400">{template.description}</DialogDescription>
+          <div className="flex items-center gap-4">
+            <div className="h-14 w-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0 shadow-inner">
+              <Play className="h-7 w-7 text-primary animate-pulse" />
+            </div>
+            <div>
+              <DialogTitle className="text-xl font-black font-headline text-white leading-tight">Execução: {template.title}</DialogTitle>
+              <DialogDescription className="text-slate-400 mt-1">{template.description}</DialogDescription>
+            </div>
+          </div>
         </DialogHeader>
 
         <ScrollArea className="flex-1 p-6">
-          <div className="space-y-8">
+          <div className="space-y-10 pb-10">
+            {/* Vínculo com Processo */}
+            <div className="space-y-3">
+              <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
+                <FolderKanban className="h-3 w-3 text-primary" /> Vínculo Processual (Opcional)
+              </Label>
+              {selectedProcess ? (
+                <div className="flex items-center justify-between p-4 rounded-2xl border-2 border-primary/30 bg-primary/5 animate-in zoom-in-95">
+                  <div className="flex items-center gap-3 overflow-hidden">
+                    <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-black text-white truncate">{selectedProcess.name}</p>
+                      <p className="text-[10px] text-primary/60 font-mono tracking-widest">{selectedProcess.processNumber || 'Sem Nº CNJ'}</p>
+                    </div>
+                  </div>
+                  <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-500 hover:text-white rounded-xl" onClick={() => setSelectedProcess(null)}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                  <Input 
+                    className="h-12 bg-black/40 border-white/10 pl-10 focus:border-primary transition-all rounded-xl" 
+                    placeholder="Pesquisar processo para vincular..." 
+                    value={processSearch}
+                    onChange={(e) => setProcessSearch(e.target.value)}
+                  />
+                  {isSearchingProcess && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-primary" />}
+                  
+                  {processResults.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 mt-2 bg-[#0f172a] border border-white/10 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-[60] overflow-hidden animate-in fade-in slide-in-from-top-2">
+                      <ScrollArea className="max-h-[250px]">
+                        <div className="p-2 space-y-1">
+                          {processResults.map(p => (
+                            <button
+                              key={p.id}
+                              type="button"
+                              className="w-full text-left p-4 hover:bg-white/5 transition-all rounded-xl border border-transparent hover:border-white/5 group"
+                              onClick={() => {
+                                setSelectedProcess(p);
+                                setProcessResults([]);
+                                setProcessSearch('');
+                              }}
+                            >
+                              <p className="text-sm font-bold text-white group-hover:text-primary transition-colors truncate">{p.name}</p>
+                              <p className="text-[10px] text-slate-500 font-mono uppercase mt-0.5">{p.processNumber || 'Nº não informado'}</p>
+                            </button>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <Separator className="bg-white/5" />
+
+            {/* Itens do Checklist */}
             <div className="grid gap-6">
               {template.items.map((item, idx) => (
-                <div key={item.id} className="space-y-4 p-6 rounded-2xl bg-white/5 border border-white/5 relative overflow-hidden group">
-                  <div className="flex items-start gap-4">
-                    <div className="h-8 w-8 rounded-xl bg-black/40 border border-white/10 flex items-center justify-center text-[10px] font-black text-primary shrink-0">
+                <div key={item.id} className="space-y-4 p-6 rounded-3xl bg-white/5 border border-white/5 relative overflow-hidden group hover:bg-white/[0.07] transition-all">
+                  <div className="flex items-start gap-5">
+                    <div className="h-10 w-10 rounded-2xl bg-black/40 border border-white/10 flex items-center justify-center text-xs font-black text-primary shrink-0 shadow-inner">
                       {idx + 1}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <Label className="text-base font-bold text-white leading-tight block mb-4">{item.label} {item.required && <span className="text-rose-500">*</span>}</Label>
+                      <Label className="text-lg font-black text-white leading-tight block mb-6">
+                        {item.label} {item.required && <span className="text-rose-500 ml-1">*</span>}
+                      </Label>
                       
                       {item.type === 'YES_NO' && (
-                        <RadioGroup value={answers[item.id]} onValueChange={val => setAnswers({...answers, [item.id]: val})} className="flex gap-4">
-                          <div className="flex items-center space-x-2"><RadioGroupItem value="SIM" id={`y-${item.id}`} /><Label htmlFor={`y-${item.id}`} className="text-xs font-bold text-emerald-400 cursor-pointer">SIM</Label></div>
-                          <div className="flex items-center space-x-2"><RadioGroupItem value="NAO" id={`n-${item.id}`} /><Label htmlFor={`n-${item.id}`} className="text-xs font-bold text-rose-400 cursor-pointer">NÃO</Label></div>
+                        <RadioGroup value={answers[item.id]} onValueChange={val => setAnswers({...answers, [item.id]: val})} className="flex gap-6">
+                          <div className={cn(
+                            "flex items-center space-x-3 px-6 py-3 rounded-2xl border-2 transition-all cursor-pointer",
+                            answers[item.id] === 'SIM' ? "bg-emerald-500/10 border-emerald-500/50" : "bg-black/20 border-transparent hover:border-white/10"
+                          )} onClick={() => setAnswers({...answers, [item.id]: 'SIM'})}>
+                            <RadioGroupItem value="SIM" id={`y-${item.id}`} className="border-emerald-500 text-emerald-500" />
+                            <Label htmlFor={`y-${item.id}`} className="text-sm font-black text-emerald-400 cursor-pointer tracking-widest">SIM</Label>
+                          </div>
+                          <div className={cn(
+                            "flex items-center space-x-3 px-6 py-3 rounded-2xl border-2 transition-all cursor-pointer",
+                            answers[item.id] === 'NAO' ? "bg-rose-500/10 border-rose-500/50" : "bg-black/20 border-transparent hover:border-white/10"
+                          )} onClick={() => setAnswers({...answers, [item.id]: 'NAO'})}>
+                            <RadioGroupItem value="NAO" id={`n-${item.id}`} className="border-rose-500 text-rose-500" />
+                            <Label htmlFor={`n-${item.id}`} className="text-sm font-black text-rose-400 cursor-pointer tracking-widest">NÃO</Label>
+                          </div>
                         </RadioGroup>
                       )}
 
                       {item.type === 'YES_NO_MAYBE' && (
                         <RadioGroup value={answers[item.id]} onValueChange={val => setAnswers({...answers, [item.id]: val})} className="flex flex-wrap gap-4">
-                          <div className="flex items-center space-x-2"><RadioGroupItem value="SIM" id={`y-${item.id}`} /><Label htmlFor={`y-${item.id}`} className="text-xs font-bold text-emerald-400 cursor-pointer">SIM</Label></div>
-                          <div className="flex items-center space-x-2"><RadioGroupItem value="NAO" id={`n-${item.id}`} /><Label htmlFor={`n-${item.id}`} className="text-xs font-bold text-rose-400 cursor-pointer">NÃO</Label></div>
-                          <div className="flex items-center space-x-2"><RadioGroupItem value="PARCIAL" id={`m-${item.id}`} /><Label htmlFor={`m-${item.id}`} className="text-xs font-bold text-amber-400 cursor-pointer">PARCIAL</Label></div>
+                          <div className={cn(
+                            "flex items-center space-x-3 px-5 py-3 rounded-2xl border-2 transition-all cursor-pointer",
+                            answers[item.id] === 'SIM' ? "bg-emerald-500/10 border-emerald-500/50" : "bg-black/20 border-transparent hover:border-white/10"
+                          )} onClick={() => setAnswers({...answers, [item.id]: 'SIM'})}>
+                            <RadioGroupItem value="SIM" id={`y-${item.id}`} />
+                            <Label htmlFor={`y-${item.id}`} className="text-xs font-black text-emerald-400 cursor-pointer uppercase tracking-widest">Sim</Label>
+                          </div>
+                          <div className={cn(
+                            "flex items-center space-x-3 px-5 py-3 rounded-2xl border-2 transition-all cursor-pointer",
+                            answers[item.id] === 'NAO' ? "bg-rose-500/10 border-rose-500/50" : "bg-black/20 border-transparent hover:border-white/10"
+                          )} onClick={() => setAnswers({...answers, [item.id]: 'NAO'})}>
+                            <RadioGroupItem value="NAO" id={`n-${item.id}`} />
+                            <Label htmlFor={`n-${item.id}`} className="text-xs font-black text-rose-400 cursor-pointer uppercase tracking-widest">Não</Label>
+                          </div>
+                          <div className={cn(
+                            "flex items-center space-x-3 px-5 py-3 rounded-2xl border-2 transition-all cursor-pointer",
+                            answers[item.id] === 'PARCIAL' ? "bg-amber-500/10 border-amber-500/50" : "bg-black/20 border-transparent hover:border-white/10"
+                          )} onClick={() => setAnswers({...answers, [item.id]: 'PARCIAL'})}>
+                            <RadioGroupItem value="PARCIAL" id={`m-${item.id}`} />
+                            <Label htmlFor={`m-${item.id}`} className="text-xs font-black text-amber-400 cursor-pointer uppercase tracking-widest">Parcial</Label>
+                          </div>
                         </RadioGroup>
                       )}
 
@@ -528,18 +668,21 @@ function ChecklistExecutorDialog({ open, onOpenChange, template }: { open: boole
                         <Textarea 
                           value={answers[item.id] || ''} 
                           onChange={e => setAnswers({...answers, [item.id]: e.target.value})} 
-                          placeholder="Digite sua resposta aqui..." 
-                          className="bg-black/40 border-white/5 text-sm"
+                          placeholder="Digite o detalhamento da verificação..." 
+                          className="bg-black/40 border-white/10 text-sm h-32 focus:border-primary transition-all leading-relaxed"
                         />
                       )}
 
                       {item.type === 'NUMBER' && (
-                        <Input 
-                          type="number" 
-                          value={answers[item.id] || ''} 
-                          onChange={e => setAnswers({...answers, [item.id]: e.target.value})} 
-                          className="bg-black/40 border-white/5 w-32"
-                        />
+                        <div className="relative w-48">
+                          <Input 
+                            type="number" 
+                            value={answers[item.id] || ''} 
+                            onChange={e => setAnswers({...answers, [item.id]: e.target.value})} 
+                            className="bg-black/40 border-white/10 h-12 text-lg font-black pl-10"
+                          />
+                          <Calculator className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                        </div>
                       )}
                     </div>
                   </div>
@@ -551,32 +694,30 @@ function ChecklistExecutorDialog({ open, onOpenChange, template }: { open: boole
 
             <div className="space-y-3">
               <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
-                <MessageSquare className="h-3 w-3" /> Observações Gerais da Execução
+                <MessageSquare className="h-3 w-3 text-primary" /> Notas Finais da Operação
               </Label>
               <Textarea 
                 value={observations} 
                 onChange={e => setObservations(e.target.value)} 
-                placeholder="Algo fora do comum ocorreu? Registre aqui para a administração..." 
-                className="bg-white/5 border-white/10 h-24"
+                placeholder="Existem pontos de atenção que a diretoria deve saber sobre esta execução?" 
+                className="bg-black/40 border-white/10 h-32 resize-none text-sm leading-relaxed"
               />
             </div>
           </div>
         </ScrollArea>
 
         <DialogFooter className="p-6 border-t border-white/5 bg-white/5 gap-3">
-          <DialogClose asChild><Button variant="ghost" className="text-slate-400 font-bold uppercase text-[10px]">Cancelar</Button></DialogClose>
+          <DialogClose asChild><Button variant="ghost" className="text-slate-400 font-bold uppercase text-[10px] tracking-widest h-14">Cancelar</Button></DialogClose>
           <Button 
             disabled={isSaving} 
-            className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase tracking-widest text-[11px] h-12 shadow-xl shadow-emerald-900/20"
+            className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase tracking-widest text-[11px] h-14 shadow-xl shadow-emerald-900/20 hover:scale-[1.02] transition-all"
             onClick={handleFinish}
           >
-            {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
-            Finalizar e Transmitir
+            {isSaving ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <CheckCircle2 className="mr-2 h-5 w-5" />}
+            Finalizar e Transmitir Relatório
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
-
-const Separator = ({ className }: { className?: string }) => <div className={cn("h-px w-full bg-border", className)} />;
