@@ -1,4 +1,3 @@
-
 'use server';
 import { firestoreAdmin } from '@/firebase/admin';
 import type { FinancialTitle, Process, FinancialEvent, Staff, StaffCredit, TimelineEvent } from './types';
@@ -62,7 +61,6 @@ export async function createFinancialEventAndTitles(data: CreateEventData) {
     });
   }
 
-  // Regra de Repasse automática
   if (processData.leadLawyerId && ['ACORDO', 'SENTENCA', 'EXECUCAO', 'CONTRATO'].includes(type)) {
     const staffDoc = await firestoreAdmin.collection('staff').doc(processData.leadLawyerId).get();
     const rem = (staffDoc.data() as Staff | undefined)?.remuneration;
@@ -105,7 +103,6 @@ export async function updateFinancialTitleStatus(titleId: string, status: 'PAGO'
             updatedAt: FieldValue.serverTimestamp()
         });
 
-        // Liberação de créditos vinculados
         if (titleData.financialEventId) {
             const staffSnap = await firestoreAdmin.collection('staff').get();
             for (const s of staffSnap.docs) {
@@ -182,9 +179,6 @@ export async function createFinancialTitle(data: Partial<FinancialTitle>) {
     }
 }
 
-/**
- * Deleta um crédito específico de um colaborador.
- */
 export async function deleteStaffCredit(staffId: string, creditId: string) {
   if (!firestoreAdmin) throw new Error("Servidor inacessível.");
   try {
@@ -195,9 +189,6 @@ export async function deleteStaffCredit(staffId: string, creditId: string) {
   }
 }
 
-/**
- * Atualiza um crédito existente.
- */
 export async function updateStaffCredit(staffId: string, creditId: string, data: Partial<StaffCredit>) {
   if (!firestoreAdmin) throw new Error("Servidor inacessível.");
   try {
@@ -208,9 +199,6 @@ export async function updateStaffCredit(staffId: string, creditId: string, data:
   }
 }
 
-/**
- * Adiciona um crédito manual para um colaborador.
- */
 export async function addManualStaffCredit(staffId: string, data: Partial<StaffCredit>) {
   if (!firestoreAdmin) throw new Error("Servidor inacessível.");
   try {
@@ -225,18 +213,14 @@ export async function addManualStaffCredit(staffId: string, data: Partial<StaffC
   }
 }
 
-/**
- * Atualiza a previsão de pagamento para uma lista de créditos.
- */
 export async function updateCreditForecast(staffId: string, creditIds: string[], forecastDate: string) {
-  const admin = firestoreAdmin;
-  if (!admin) throw new Error("Servidor inacessível.");
-  const batch = admin.batch();
+  if (!firestoreAdmin) throw new Error("Servidor inacessível.");
+  const batch = firestoreAdmin.batch();
   const [year, month, day] = forecastDate.split('-').map(Number);
   const forecastTimestamp = Timestamp.fromDate(new Date(year, month - 1, day));
 
   creditIds.forEach(id => {
-    const ref = admin.collection(`staff/${staffId}/credits`).doc(id);
+    const ref = firestoreAdmin!.collection(`staff/${staffId}/credits`).doc(id);
     batch.update(ref, { paymentForecast: forecastTimestamp });
   });
 
@@ -244,9 +228,6 @@ export async function updateCreditForecast(staffId: string, creditIds: string[],
   return { success: true };
 }
 
-/**
- * Solicita o desbloqueio de um crédito retido.
- */
 export async function requestCreditUnlock(staffId: string, creditId: string, reason: string) {
   if (!firestoreAdmin) throw new Error("Servidor inacessível.");
   try {
@@ -257,7 +238,6 @@ export async function requestCreditUnlock(staffId: string, creditId: string, rea
       unlockRequestedAt: FieldValue.serverTimestamp()
     });
     
-    // Notificar financeiro
     const financialUsersSnap = await firestoreAdmin.collection('users').where('role', 'in', ['admin', 'financial']).get();
     for (const userDoc of financialUsersSnap.docs) {
       await createNotification({
@@ -275,9 +255,6 @@ export async function requestCreditUnlock(staffId: string, creditId: string, rea
   }
 }
 
-/**
- * Executa a rotina de inadimplência para um título vencido.
- */
 export async function processLatePaymentRoutine(titleId: string) {
   if (!firestoreAdmin) throw new Error("Servidor inacessível.");
   const session = await getServerSession(authOptions);
@@ -313,9 +290,6 @@ export async function processLatePaymentRoutine(titleId: string) {
   }
 }
 
-/**
- * Lança a folha de pagamento (pro-labore fixo) para todos os colaboradores.
- */
 export async function launchPayroll() {
   if (!firestoreAdmin) throw new Error("Servidor inacessível.");
   const staffSnap = await firestoreAdmin.collection('staff').get();

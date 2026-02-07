@@ -140,6 +140,118 @@ const leadFormSchema = z.object({
   description: z.string().optional(),
 });
 
+function KanbanColumn({ id, stage, leads, clientsMap, staffMap, onCardClick }: { id: string; stage: string; leads: Lead[]; clientsMap: Map<string, Client>; staffMap: Map<string, Staff>; onCardClick: (l: Lead) => void }) {
+  const { setNodeRef } = useSortable({ id });
+  const config = stageConfig[stage as LeadStatus];
+
+  return (
+    <div ref={setNodeRef} className="flex flex-col gap-4 min-w-[300px] w-full max-w-[320px] bg-white/[0.02] p-4 rounded-3xl border border-white/5">
+      <div className="flex items-center justify-between px-2 mb-2">
+        <div className="flex items-center gap-2">
+          <div className={cn("h-2.5 w-2.5 rounded-full shadow-lg", config.color.split(' ')[1])} />
+          <h3 className="text-xs font-black uppercase tracking-[0.2em] text-white">{config.label}</h3>
+        </div>
+        <Badge variant="secondary" className="bg-white/5 text-slate-400 text-[10px] font-black px-2 h-5">{leads.length}</Badge>
+      </div>
+      
+      <ScrollArea className="flex-1 h-full pr-3">
+        <div className="flex flex-col gap-3 pb-4">
+          <SortableContext items={leads.map(l => l.id)} strategy={verticalListSortingStrategy}>
+            {leads.map((lead: Lead) => (
+              <LeadCard 
+                key={lead.id} 
+                lead={lead} 
+                client={clientsMap.get(lead.clientId)} 
+                lawyer={staffMap.get(lead.lawyerId)}
+                onClick={() => onCardClick(lead)}
+              />
+            ))}
+          </SortableContext>
+          {leads.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-12 opacity-20 border-2 border-dashed border-white/5 rounded-2xl">
+              <Target className="h-8 w-8 mb-2" />
+              <p className="text-[10px] font-bold uppercase tracking-widest">Sem leads</p>
+            </div>
+          )}
+        </div>
+      </ScrollArea>
+    </div>
+  );
+}
+
+function LeadCard({ lead, client, lawyer, onClick }: { lead: Lead; client?: Client; lawyer?: Staff; onClick: () => void }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: lead.id });
+  const style = { transform: CSS.Translate.toString(transform), transition };
+  const priority = priorityConfig[lead.priority as LeadPriority];
+
+  const isLocked = React.useMemo(() => {
+    if (lead.status === 'DOCUMENTACAO') {
+      const isPJ = client?.clientType === 'Pessoa Jurídica';
+      const hasBasic = !!client?.document && !!client?.address?.street && !!client?.address?.zipCode;
+      const hasPF = !isPJ && !!client?.rg;
+      return !hasBasic || (!isPJ && !hasPF);
+    }
+    return false;
+  }, [lead.status, client]);
+
+  return (
+    <Card 
+      ref={setNodeRef} 
+      style={style} 
+      {...attributes} 
+      {...listeners}
+      onClick={onClick}
+      className={cn(
+        "bg-[#0f172a] border-white/5 border-2 hover:border-primary/40 transition-all cursor-grab active:cursor-grabbing group/card shadow-lg",
+        isDragging && "opacity-50 border-primary scale-105 z-50",
+        lead.isUrgent && "border-rose-500/20"
+      )}
+    >
+      <CardContent className="p-4 space-y-4">
+        <div className="flex items-start justify-between">
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className={cn("text-[8px] font-black uppercase border-none px-1.5 h-4.5", priority.color)}>
+              {priority.label}
+            </Badge>
+            {isLocked && (
+              <Badge variant="outline" className="text-[8px] font-black uppercase bg-amber-500/10 text-amber-500 border-amber-500/20 px-1.5 h-4.5 gap-1">
+                <Lock className="h-2.5 w-2.5" /> Pendência
+              </Badge>
+            )}
+          </div>
+          {lead.isUrgent && (
+            <div className="flex items-center gap-1 text-rose-500 animate-pulse">
+              <span className="text-[8px] font-black uppercase">Urgente</span>
+              <Flame className="h-3.5 w-3.5" />
+            </div>
+          )}
+        </div>
+        
+        <h4 className="text-sm font-bold text-slate-200 group-hover/card:text-primary transition-colors line-clamp-2 leading-tight min-h-[40px]">
+          {lead.title}
+        </h4>
+
+        <div className="space-y-2 pt-2 border-t border-white/5">
+          <p className="text-[11px] text-slate-400 font-medium flex items-center gap-2">
+            <UserCircle className="h-3.5 w-3.5 text-blue-400" /> 
+            <span className="truncate">{client?.firstName} {client?.lastName}</span>
+          </p>
+          
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <div className="h-5 w-5 rounded-full bg-primary/10 flex items-center justify-center text-primary text-[8px] font-black border border-primary/20">
+                {lawyer?.firstName?.charAt(0)}
+              </div>
+              <span className="text-[9px] text-slate-500 font-bold uppercase">Dr(a). {lawyer?.firstName}</span>
+            </div>
+            <span className="text-[8px] text-slate-600 font-mono">{format(lead.updatedAt.toDate(), 'dd/MM')}</span>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function LeadsPage() {
   const { firestore, user } = useFirebase();
   const { toast } = useToast();
@@ -196,14 +308,13 @@ export default function LeadsPage() {
     const lead = leadsData?.find(l => l.id === leadId);
 
     if (lead && lead.status !== newStatus && STAGES.includes(newStatus)) {
-      // REGRA DE NEGÓCIO: Bloqueio por falta de dados para contrato
       if (newStatus === 'CONTRATUAL' || newStatus === 'PRONTO') {
         const client = clientsMap.get(lead.clientId);
         if (client) {
           const isPJ = client.clientType === 'Pessoa Jurídica';
           const hasDocument = !!client.document;
           const hasAddress = !!client.address?.street && !!client.address?.number && !!client.address?.zipCode && !!client.address?.city;
-          const hasRG = isPJ || !!client.rg; // Para PJ o RG é opcional ou do representante
+          const hasRG = isPJ || !!client.rg;
 
           if (!hasDocument || !hasAddress || !hasRG) {
             toast({
@@ -364,118 +475,6 @@ export default function LeadsPage() {
   );
 }
 
-function KanbanColumn({ id, stage, leads, clientsMap, staffMap, onCardClick }: { id: string; stage: string; leads: Lead[]; clientsMap: Map<string, Client>; staffMap: Map<string, Staff>; onCardClick: (l: Lead) => void }) {
-  const { setNodeRef } = useSortable({ id });
-  const config = stageConfig[stage as LeadStatus];
-
-  return (
-    <div ref={setNodeRef} className="flex flex-col gap-4 min-w-[300px] w-full max-w-[320px] bg-white/[0.02] p-4 rounded-3xl border border-white/5">
-      <div className="flex items-center justify-between px-2 mb-2">
-        <div className="flex items-center gap-2">
-          <div className={cn("h-2.5 w-2.5 rounded-full shadow-lg", config.color.split(' ')[1])} />
-          <h3 className="text-xs font-black uppercase tracking-[0.2em] text-white">{config.label}</h3>
-        </div>
-        <Badge variant="secondary" className="bg-white/5 text-slate-400 text-[10px] font-black px-2 h-5">{leads.length}</Badge>
-      </div>
-      
-      <ScrollArea className="flex-1 h-full pr-3">
-        <div className="flex flex-col gap-3 pb-4">
-          <SortableContext items={leads.map((l: any) => l.id)} strategy={verticalListSortingStrategy}>
-            {leads.map((lead: Lead) => (
-              <LeadCard 
-                key={lead.id} 
-                lead={lead} 
-                client={clientsMap.get(lead.clientId)} 
-                lawyer={staffMap.get(lead.lawyerId)}
-                onClick={() => onCardClick(lead)}
-              />
-            ))}
-          </SortableContext>
-          {leads.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-12 opacity-20 border-2 border-dashed border-white/5 rounded-2xl">
-              <Target className="h-8 w-8 mb-2" />
-              <p className="text-[10px] font-bold uppercase tracking-widest">Sem leads</p>
-            </div>
-          )}
-        </div>
-      </ScrollArea>
-    </div>
-  );
-}
-
-function LeadCard({ lead, client, lawyer, onClick }: { lead: Lead; client?: Client; lawyer?: Staff; onClick: () => void }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: lead.id });
-  const style = { transform: CSS.Translate.toString(transform), transition };
-  const priority = priorityConfig[lead.priority as LeadPriority];
-
-  const isLocked = React.useMemo(() => {
-    if (lead.status === 'DOCUMENTACAO') {
-      const isPJ = client?.clientType === 'Pessoa Jurídica';
-      const hasBasic = !!client?.document && !!client?.address?.street && !!client?.address?.zipCode;
-      const hasPF = !isPJ && !!client?.rg;
-      return !hasBasic || (!isPJ && !hasPF);
-    }
-    return false;
-  }, [lead.status, client]);
-
-  return (
-    <Card 
-      ref={setNodeRef} 
-      style={style} 
-      {...attributes} 
-      {...listeners}
-      onClick={onClick}
-      className={cn(
-        "bg-[#0f172a] border-white/5 border-2 hover:border-primary/40 transition-all cursor-grab active:cursor-grabbing group/card shadow-lg",
-        isDragging && "opacity-50 border-primary scale-105 z-50",
-        lead.isUrgent && "border-rose-500/20"
-      )}
-    >
-      <CardContent className="p-4 space-y-4">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className={cn("text-[8px] font-black uppercase border-none px-1.5 h-4.5", priority.color)}>
-              {priority.label}
-            </Badge>
-            {isLocked && (
-              <Badge variant="outline" className="text-[8px] font-black uppercase bg-amber-500/10 text-amber-500 border-amber-500/20 px-1.5 h-4.5 gap-1">
-                <Lock className="h-2.5 w-2.5" /> Pendência
-              </Badge>
-            )}
-          </div>
-          {lead.isUrgent && (
-            <div className="flex items-center gap-1 text-rose-500 animate-pulse">
-              <span className="text-[8px] font-black uppercase">Urgente</span>
-              <Flame className="h-3.5 w-3.5" />
-            </div>
-          )}
-        </div>
-        
-        <h4 className="text-sm font-bold text-slate-200 group-hover/card:text-primary transition-colors line-clamp-2 leading-tight min-h-[40px]">
-          {lead.title}
-        </h4>
-
-        <div className="space-y-2 pt-2 border-t border-white/5">
-          <p className="text-[11px] text-slate-400 font-medium flex items-center gap-2">
-            <UserCircle className="h-3.5 w-3.5 text-blue-400" /> 
-            <span className="truncate">{client?.firstName} {client?.lastName}</span>
-          </p>
-          
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5">
-              <div className="h-5 w-5 rounded-full bg-primary/10 flex items-center justify-center text-primary text-[8px] font-black border border-primary/20">
-                {lawyer?.firstName?.charAt(0)}
-              </div>
-              <span className="text-[9px] text-slate-500 font-bold uppercase">Dr(a). {lawyer?.firstName}</span>
-            </div>
-            <span className="text-[8px] text-slate-600 font-mono">{format(lead.updatedAt.toDate(), 'dd/MM')}</span>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
 function LeadDetailsSheet({ lead, client, open, onOpenChange, onConvert, isProcessing }: { lead: Lead | null; client?: Client; open: boolean; onOpenChange: (o: boolean) => void; onConvert: (id: string) => void; isProcessing: boolean }) {
   const [activeTab, setActiveTab] = React.useState('burocracia');
   const [files, setFiles] = React.useState<any[]>([]);
@@ -501,7 +500,7 @@ function LeadDetailsSheet({ lead, client, open, onOpenChange, onConvert, isProce
     setIsLoadingFiles(true);
     try {
       const list = await listFiles(lead.driveFolderId);
-      setFiles(list);
+      setFiles(list || []);
     } catch (e) {
       console.error('[LeadFiles] Error:', e);
     } finally {
@@ -576,7 +575,7 @@ function LeadDetailsSheet({ lead, client, open, onOpenChange, onConvert, isProce
           <SheetHeader className="p-6 border-b border-white/5 bg-white/5">
             <div className="flex items-center justify-between">
               <div>
-                <Badge variant="outline" className={cn("text-[9px] font-black uppercase mb-2", stageConfig[lead.status].color)}>Fase Atual: {stageConfig[lead.status].label}</Badge>
+                <Badge variant="outline" className={cn("text-[9px] font-black uppercase mb-2", stageConfig[lead.status as LeadStatus].color)}>Fase Atual: {stageConfig[lead.status as LeadStatus].label}</Badge>
                 <SheetTitle className="text-2xl font-black font-headline text-white">{lead.title}</SheetTitle>
                 <SheetDescription className="text-slate-400">Origem: {lead.captureSource} | Ref: #{lead.id.substring(0, 6)}</SheetDescription>
               </div>
@@ -596,9 +595,9 @@ function LeadDetailsSheet({ lead, client, open, onOpenChange, onConvert, isProce
           <div className="px-6 bg-white/5 border-b border-white/5">
             <TabsList className="bg-transparent gap-8 h-14 p-0">
               <TabsTrigger value="burocracia" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent text-slate-400 data-[state=active]:text-white font-black uppercase text-[10px] tracking-widest">Dados do Cliente</TabsTrigger>
-              <TabsTrigger value="reclamadas" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent text-slate-400 data-[state=active]:text-white font-black uppercase text-[10px] tracking-widest">Polo Passivo (Réus)</TabsTrigger>
-              <TabsTrigger value="documentos" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent text-slate-400 data-[state=active]:text-white font-black uppercase text-[10px] tracking-widest">Provas & Drive</TabsTrigger>
-              <TabsTrigger value="historico" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent text-slate-400 data-[state=active]:text-white font-black uppercase text-[10px] tracking-widest">Timeline</TabsTrigger>
+              <TabsTrigger value="reclamadas" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent text-slate-400 text-[10px] uppercase font-black tracking-widest">Polo Passivo (Réus)</TabsTrigger>
+              <TabsTrigger value="documentos" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent text-slate-400 text-[10px] uppercase font-black tracking-widest">Provas & Drive</TabsTrigger>
+              <TabsTrigger value="historico" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent text-slate-400 text-[10px] uppercase font-black tracking-widest">Timeline</TabsTrigger>
             </TabsList>
           </div>
 
@@ -754,117 +753,5 @@ function LeadDetailsSheet({ lead, client, open, onOpenChange, onConvert, isProce
         </Tabs>
       </SheetContent>
     </Sheet>
-  );
-}
-
-function KanbanColumn({ id, stage, leads, clientsMap, staffMap, onCardClick }: { id: string; stage: string; leads: Lead[]; clientsMap: Map<string, Client>; staffMap: Map<string, Staff>; onCardClick: (l: Lead) => void }) {
-  const { setNodeRef } = useSortable({ id });
-  const config = stageConfig[stage as LeadStatus];
-
-  return (
-    <div ref={setNodeRef} className="flex flex-col gap-4 min-w-[300px] w-full max-w-[320px] bg-white/[0.02] p-4 rounded-3xl border border-white/5">
-      <div className="flex items-center justify-between px-2 mb-2">
-        <div className="flex items-center gap-2">
-          <div className={cn("h-2.5 w-2.5 rounded-full shadow-lg", config.color.split(' ')[1])} />
-          <h3 className="text-xs font-black uppercase tracking-[0.2em] text-white">{config.label}</h3>
-        </div>
-        <Badge variant="secondary" className="bg-white/5 text-slate-400 text-[10px] font-black px-2 h-5">{leads.length}</Badge>
-      </div>
-      
-      <ScrollArea className="flex-1 h-full pr-3">
-        <div className="flex flex-col gap-3 pb-4">
-          <SortableContext items={leads.map((l: any) => l.id)} strategy={verticalListSortingStrategy}>
-            {leads.map((lead: Lead) => (
-              <LeadCard 
-                key={lead.id} 
-                lead={lead} 
-                client={clientsMap.get(lead.clientId)} 
-                lawyer={staffMap.get(lead.lawyerId)}
-                onClick={() => onCardClick(lead)}
-              />
-            ))}
-          </SortableContext>
-          {leads.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-12 opacity-20 border-2 border-dashed border-white/5 rounded-2xl">
-              <Target className="h-8 w-8 mb-2" />
-              <p className="text-[10px] font-bold uppercase tracking-widest">Sem leads</p>
-            </div>
-          )}
-        </div>
-      </ScrollArea>
-    </div>
-  );
-}
-
-function LeadCard({ lead, client, lawyer, onClick }: { lead: Lead; client?: Client; lawyer?: Staff; onClick: () => void }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: lead.id });
-  const style = { transform: CSS.Translate.toString(transform), transition };
-  const priority = priorityConfig[lead.priority as LeadPriority];
-
-  const isLocked = React.useMemo(() => {
-    if (lead.status === 'DOCUMENTACAO') {
-      const isPJ = client?.clientType === 'Pessoa Jurídica';
-      const hasBasic = !!client?.document && !!client?.address?.street && !!client?.address?.zipCode;
-      const hasPF = !isPJ && !!client?.rg;
-      return !hasBasic || (!isPJ && !hasPF);
-    }
-    return false;
-  }, [lead.status, client]);
-
-  return (
-    <Card 
-      ref={setNodeRef} 
-      style={style} 
-      {...attributes} 
-      {...listeners}
-      onClick={onClick}
-      className={cn(
-        "bg-[#0f172a] border-white/5 border-2 hover:border-primary/40 transition-all cursor-grab active:cursor-grabbing group/card shadow-lg",
-        isDragging && "opacity-50 border-primary scale-105 z-50",
-        lead.isUrgent && "border-rose-500/20"
-      )}
-    >
-      <CardContent className="p-4 space-y-4">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className={cn("text-[8px] font-black uppercase border-none px-1.5 h-4.5", priority.color)}>
-              {priority.label}
-            </Badge>
-            {isLocked && (
-              <Badge variant="outline" className="text-[8px] font-black uppercase bg-amber-500/10 text-amber-500 border-amber-500/20 px-1.5 h-4.5 gap-1">
-                <Lock className="h-2.5 w-2.5" /> Pendência
-              </Badge>
-            )}
-          </div>
-          {lead.isUrgent && (
-            <div className="flex items-center gap-1 text-rose-500 animate-pulse">
-              <span className="text-[8px] font-black uppercase">Urgente</span>
-              <Flame className="h-3.5 w-3.5" />
-            </div>
-          )}
-        </div>
-        
-        <h4 className="text-sm font-bold text-slate-200 group-hover/card:text-primary transition-colors line-clamp-2 leading-tight min-h-[40px]">
-          {lead.title}
-        </h4>
-
-        <div className="space-y-2 pt-2 border-t border-white/5">
-          <p className="text-[11px] text-slate-400 font-medium flex items-center gap-2">
-            <UserCircle className="h-3.5 w-3.5 text-blue-400" /> 
-            <span className="truncate">{client?.firstName} {client?.lastName}</span>
-          </p>
-          
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5">
-              <div className="h-5 w-5 rounded-full bg-primary/10 flex items-center justify-center text-primary text-[8px] font-black border border-primary/20">
-                {lawyer?.firstName?.charAt(0)}
-              </div>
-              <span className="text-[9px] text-slate-500 font-bold uppercase">Dr(a). {lawyer?.firstName}</span>
-            </div>
-            <span className="text-[8px] text-slate-600 font-mono">{format(lead.updatedAt.toDate(), 'dd/MM')}</span>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
   );
 }
