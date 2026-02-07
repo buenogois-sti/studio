@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { DependencyList, createContext, useContext, ReactNode, useMemo, useState, useEffect, useRef } from 'react';
@@ -80,15 +81,27 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
         const clientProject = auth.app.options.projectId;
         const expectedProject = 'studio-7080106838-23904';
         
+        // Decodificar token para ver o projeto real para o qual foi emitido
+        let tokenProject = 'unknown';
+        try {
+          const parts = session.customToken!.split('.');
+          if (parts.length > 1) {
+            // No browser, usamos atob para decodificar o payload do JWT
+            const payload = JSON.parse(atob(parts[1]));
+            tokenProject = payload.aud || 'not found in payload';
+          }
+        } catch (e) {}
+
         console.error('[Firebase Auth] ❌ Erro ao autenticar Custom Token:', {
           code: errorCode,
           message: error.message,
           clientProject,
+          tokenProject,
           expectedProject
         });
 
-        if (clientProject !== expectedProject) {
-          console.warn('[Firebase Auth] ⚠️ PROJECT ID MISMATCH detectado. Verifique .env.local');
+        if (clientProject !== tokenProject) {
+          console.warn(`[Firebase Auth] ⚠️ PROJECT ID MISMATCH: O token foi gerado para o projeto "${tokenProject}", mas o cliente está configurado para "${clientProject}". Verifique se o FIREBASE_SERVICE_ACCOUNT_JSON no seu .env.local pertence ao projeto correto.`);
         }
         
         setUserAuthState((state) => ({ ...state, userError: error, isUserLoading: false }));
@@ -130,10 +143,12 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
   }, [firebaseApp, firestore, auth, userAuthState, sessionStatus]);
 
   return (
-    <FirebaseContext.Provider value={contextValue}>
-      <FirebaseErrorListener />
-      {children}
-    </FirebaseContext.Provider>
+    <div className="contents">
+      <FirebaseContext.Provider value={contextValue}>
+        <FirebaseErrorListener />
+        {children}
+      </FirebaseContext.Provider>
+    </div>
   );
 };
 
