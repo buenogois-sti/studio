@@ -50,7 +50,7 @@ async function replacePlaceholdersInDoc(docsApi: any, fileId: string, dataMap: R
         console.log(`[DocsAutomation] Sucesso na substituição de ${requests.length} tags.`);
     } catch (error: any) {
         console.error('[DocsAutomation] Erro crítico no Google Docs batchUpdate:', error.message);
-        throw new Error(`Falha técnica na edição do rascunho: ${error.message}`);
+        throw new Error(`Falha técnica na edição do rascunho: Certifique-se de que a "Google Docs API" está ATIVADA no Console do Google Cloud. Erro: ${error.message}`);
     }
 }
 
@@ -108,15 +108,14 @@ export async function draftDocument(
 
         const { drive, docs } = apiClients;
         
-        // Re-fetch para pegar driveFolderId atualizado
         const updatedProcessSnap = await firestoreAdmin.collection('processes').doc(processId).get();
         const physicalFolderId = updatedProcessSnap.data()?.driveFolderId;
         if (!physicalFolderId) throw new Error("Pasta do processo não disponível no Drive.");
 
-        // Define subpasta baseada em heurística de categoria
         const categoryMap: Record<string, string> = {
-            'procuração': '01 - Petições',
-            'contrato': '01 - Petições',
+            'procuração': '02 - Contratos e Procurações',
+            'contrato': '02 - Contratos e Procurações',
+            'substabelecimento': '02 - Contratos e Procurações',
             'ata': '05 - Atas e Audiências',
             'audiência': '05 - Atas e Audiências',
             'recurso': '04 - Recursos',
@@ -124,10 +123,9 @@ export async function draftDocument(
             'sentença': '02 - Decisões e Sentenças',
         };
         
-        const targetFolderName = Object.entries(categoryMap).find(([key]) => category.toLowerCase().includes(key))?.[1] || '01 - Petições';
+        const targetFolderName = Object.entries(categoryMap).find(([key]) => category.toLowerCase().includes(key) || documentName.toLowerCase().includes(key))?.[1] || '01 - Petições';
         const targetFolderId = await ensureSubfolder(drive, physicalFolderId, targetFolderName);
 
-        // Coleta dados em paralelo para o preenchimento
         const [clientDoc, staffDoc] = await Promise.all([
             firestoreAdmin.collection('clients').doc(processData.clientId).get(),
             processData.leadLawyerId ? firestoreAdmin.collection('staff').doc(processData.leadLawyerId).get() : Promise.resolve(null)
@@ -140,17 +138,18 @@ export async function draftDocument(
         const cleanTemplateId = extractFileId(templateIdOrLink);
         const newFileName = `${documentName} - ${processData.name}`;
         
-        // Copiar o modelo para a pasta do processo
         const copiedFile = await copyFile(cleanTemplateId, newFileName, targetFolderId);
 
         if (!copiedFile.id) throw new Error("Falha ao criar cópia do modelo no Google Drive.");
 
-        // Preparar dados para substituição (Tags)
-        const clientAddr = clientData.address ? `${clientData.address.street || ''}, nº ${clientData.address.number || 'S/N'}, ${clientData.address.neighborhood || ''}, ${clientData.address.city || ''}/${clientData.address.state || ''}, CEP: ${clientData.address.zipCode || '---'}` : '---';
-        const staffAddr = staffData?.address ? `${staffData.address.street || ''}, nº ${staffData.address.number || 'S/N'}, ${staffData.address.neighborhood || ''}, ${staffData.address.city || ''}/${staffData.address.state || ''}` : '---';
+        // Formatação de Endereços
+        const fmtAddr = (addr: any) => addr ? `${addr.street || ''}, nº ${addr.number || 'S/N'}${addr.complement ? ', ' + addr.complement : ''}, ${addr.neighborhood || ''}, CEP ${addr.zipCode || ''}, ${addr.city || ''}/${addr.state || ''}` : '---';
+        
+        const clientAddr = fmtAddr(clientData.address);
+        const staffAddr = fmtAddr(staffData?.address);
         const clientFull = `${clientData.firstName} ${clientData.lastName || ''}`.trim();
 
-        // Tag Composta: Qualificação Completa (Lógica PF vs PJ)
+        // Tag Composta: Qualificação Completa (PF vs PJ)
         let clientQual = '';
         if (clientData.clientType === 'Pessoa Jurídica') {
             clientQual = `${clientFull}, inscrita no CNPJ sob o nº ${clientData.document || '---'}, com sede na ${clientAddr}`;
@@ -158,8 +157,13 @@ export async function draftDocument(
                 clientQual += `, neste ato representada por seu ${clientData.representativeRole || 'representante legal'}, ${clientData.representativeName}, portador do RG nº ${clientData.representativeRg || '---'} e CPF nº ${clientData.representativeCpf || '---'}`;
             }
         } else {
-            clientQual = `${clientFull}, ${clientData.nationality || 'brasileiro(a)'}, ${clientData.civilStatus || 'solteiro(a)'}, ${clientData.profession || 'trabalhador(a)'}, portador(a) do RG nº ${clientData.rg || '---'} ${clientData.rgIssuer ? clientData.rgIssuer : ''}${clientData.rgIssuanceDate ? ', expedido em ' + format(new Date(clientData.rgIssuanceDate as any), "dd/MM/yyyy") : ''}, inscrito(a) no CPF sob o nº ${clientData.document || '---'}, residente e domiciliado(a) na ${clientAddr}.`;
+            const genderSuffix = clientData.civilStatus?.toLowerCase().endsWith('a') || clientData.nationality?.toLowerCase().endsWith('a') ? 'a' : '';
+            clientQual = `${clientFull}, ${clientData.nationality || 'brasileiro(a)'}, ${clientData.civilStatus || 'solteiro(a)'}, ${clientData.profession || 'trabalhador(a)'}, portador${genderSuffix} da Cédula de Identidade RG nº ${clientData.rg || '---'} ${clientData.rgIssuer ? clientData.rgIssuer : ''}${clientData.rgIssuanceDate ? ', expedida em ' + format(new Date(clientData.rgIssuanceDate as any), "dd/MM/yyyy") : ''}, inscrit${genderSuffix} no CPF sob o nº ${clientData.document || '---'}, residente e domiciliad${genderSuffix} na ${clientAddr}.`;
         }
+
+        // Qualificação Advogado Líder (Para Substabelecimento)
+        const staffFull = staffData ? `${staffData.firstName} ${staffData.lastName}` : '---';
+        const lawyerQual = staffData ? `${staffFull.toUpperCase()}, advogado inscrito na OAB/${staffData.oabNumber?.includes('/') ? staffData.oabNumber : 'SP sob o nº ' + staffData.oabNumber}, ${staffData.nationality || 'brasileiro'}, ${staffData.civilStatus || 'divorciado'}, com escritório profissional situado à ${staffAddr}.` : '---';
 
         const dataMap = {
             'CLIENTE_QUALIFICACAO_COMPLETA': clientQual,
@@ -181,12 +185,12 @@ export async function draftDocument(
             'PROCESSO_FORUM': processData.court || '---',
             'RECLAMADA_NOME': processData.opposingParties?.[0]?.name || '---',
             'RECLAMADA_LISTA_TODOS': processData.opposingParties?.map(p => p.name).join(', ') || '---',
-            'ADVOGADO_LIDER_NOME': staffData ? `${staffData.firstName} ${staffData.lastName}` : '---',
+            'ADVOGADO_LIDER_NOME': staffFull,
             'ADVOGADO_LIDER_OAB': staffData?.oabNumber || '---',
             'ADVOGADO_LIDER_NACIONALIDADE': staffData?.nationality || '---',
             'ADVOGADO_LIDER_ESTADO_CIVIL': staffData?.civilStatus || '---',
             'ADVOGADO_LIDER_ENDERECO_PROFISSIONAL': staffAddr,
-            'ADVOGADO_LIDER_QUALIFICACAO_COMPLETA': staffData ? `${staffData.firstName} ${staffData.lastName}, advogado inscrito na OAB sob o nº ${staffData.oabNumber}, ${staffData.nationality || 'brasileiro'}, ${staffData.civilStatus || 'solteiro'}, com escritório profissional na ${staffAddr}` : '---',
+            'ADVOGADO_LIDER_QUALIFICACAO_COMPLETA': lawyerQual,
             'ESCRITORIO_NOME': officeData?.officeName || 'Bueno Gois Advogados',
             'ESCRITORIO_ENDERECO': officeData?.address || '---',
             'ESCRITORIO_TELEFONE': officeData?.phone || '---',
@@ -195,10 +199,8 @@ export async function draftDocument(
             'DATA_HOJE': format(new Date(), "dd/MM/yyyy"),
         };
 
-        // Processa as tags no rascunho
         await replacePlaceholdersInDoc(docs, copiedFile.id, dataMap);
 
-        // Registrar na linha do tempo do processo
         await firestoreAdmin.collection('processes').doc(processId).update({
             timeline: FieldValue.arrayUnion({
                 id: uuidv4(),
@@ -210,7 +212,6 @@ export async function draftDocument(
             updatedAt: FieldValue.serverTimestamp()
         });
 
-        // Retorna o link completo da cópia gerada
         return { success: true, url: copiedFile.webViewLink! };
     } catch (error: any) {
         console.error("[draftDocument] Erro crítico:", error);
