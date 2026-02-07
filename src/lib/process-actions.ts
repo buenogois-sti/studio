@@ -60,20 +60,31 @@ export async function searchProcesses(query: string): Promise<Process[]> {
     }
     
     try {
-        const processesSnapshot = await firestoreAdmin.collection('processes').limit(100).get();
+        // Otimização: Buscamos os processos mais recentes para filtrar em memória,
+        // garantindo busca por réus e nomes parciais que o Firestore nativo não suporta bem em arrays.
+        const processesSnapshot = await firestoreAdmin.collection('processes').orderBy('updatedAt', 'desc').limit(300).get();
         
         const allProcessesData = await Promise.all(
             processesSnapshot.docs.map(doc => serializeProcess(doc))
         );
 
+        const q = query.toLowerCase();
         const filtered = allProcessesData.filter((process): process is Process => {
             if (!process) return false;
-            const q = query.toLowerCase();
-            return (
-                process.name.toLowerCase().includes(q) ||
-                (process.processNumber || '').includes(q) ||
-                (process.clientName || '').toLowerCase().includes(q)
+            
+            // Busca no Título e Número
+            const matchesBasic = process.name.toLowerCase().includes(q) || 
+                                (process.processNumber || '').includes(q);
+            
+            // Busca no Nome do Cliente
+            const matchesClient = (process.clientName || '').toLowerCase().includes(q);
+            
+            // Busca nos Réus (Polo Passivo)
+            const matchesOpposing = process.opposingParties?.some(party => 
+                party.name.toLowerCase().includes(q)
             );
+
+            return matchesBasic || matchesClient || matchesOpposing;
         });
 
         return filtered.slice(0, 10);

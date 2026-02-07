@@ -1,4 +1,3 @@
-
 'use client';
 import * as React from 'react';
 import {
@@ -21,6 +20,7 @@ import {
   FolderKanban
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
+import { useSearchParams } from 'next/navigation';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -53,6 +53,9 @@ const STATUS_CONFIG: Record<ClientStatus, { label: string; color: string }> = {
 const ITEMS_PER_PAGE = 9;
 
 export default function ClientsPage() {
+  const searchParams = useSearchParams();
+  const urlSearchTerm = searchParams.get('searchTerm');
+
   const [viewMode, setViewMode] = React.useState<'grid' | 'table'>('grid');
   const [isSheetOpen, setIsSheetOpen] = React.useState(false);
   const [isDetailsOpen, setIsDetailsOpen] = React.useState(false);
@@ -61,7 +64,7 @@ export default function ClientsPage() {
   const [clientToDelete, setClientToDelete] = React.useState<Client | null>(null);
   const [isDeleting, setIsDeleting] = React.useState(false);
   const [isSyncing, setIsSyncing] = React.useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = React.useState('');
+  const [searchTerm, setSearchTerm] = React.useState(urlSearchTerm || '');
   const [searchResults, setSearchResults] = React.useState<Client[] | null>(null);
   const [isSearching, setIsSearching] = React.useState(false);
   const [statusFilter, setStatusFilter] = React.useState<ClientStatus | 'all'>('all');
@@ -79,6 +82,7 @@ export default function ClientsPage() {
   const { data: processesData, isLoading: isLoadingProcesses } = useCollection<Process>(processesQuery);
   const processes = processesData || [];
 
+  // Busca inicial baseada na URL ou mudança de termo
   React.useEffect(() => {
     if (!searchTerm.trim()) {
       setSearchResults(null);

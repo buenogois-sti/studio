@@ -1,4 +1,3 @@
-
 'use client';
 import * as React from 'react';
 import {
@@ -58,6 +57,7 @@ import { syncProcessToDrive } from '@/lib/drive';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { format } from 'date-fns';
+import { searchProcesses } from '@/lib/process-actions';
 
 const STATUS_CONFIG = {
   'Ativo': { label: 'Ativo', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20', icon: CheckCircle2 },
@@ -77,6 +77,8 @@ export default function ProcessosPage() {
   const [selectedProcess, setSelectedProcess] = React.useState<Process | null>(null);
   const [isSyncing, setIsSyncing] = React.useState<string | null>(null);
   const [searchTerm, setSearchTerm] = React.useState('');
+  const [searchResults, setSearchResults] = React.useState<Process[] | null>(null);
+  const [isSearching, setIsSearching] = React.useState(false);
   const [eventProcess, setEventProcess] = React.useState<Process | null>(null);
   const [expandedProcessId, setExpandedProcessId] = React.useState<string | null>(null);
   const [currentPage, setCurrentPage] = React.useState(1);
@@ -104,6 +106,29 @@ export default function ProcessosPage() {
   const clientsMap = React.useMemo(() => new Map(clientsData?.map(c => [c.id, c])), [clientsData]);
   const staffMap = React.useMemo(() => new Map(staffData?.map(s => [s.id, s])), [staffData]);
 
+  // Busca robusta com debounce
+  React.useEffect(() => {
+    if (!searchTerm.trim()) {
+      setSearchResults(null);
+      setIsSearching(false);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const results = await searchProcesses(searchTerm);
+        setSearchResults(results);
+      } catch (err) {
+        console.error("Search error:", err);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
   const hearingsByProcessMap = React.useMemo(() => {
     const map = new Map<string, Hearing[]>();
     hearingsData?.forEach(h => {
@@ -122,15 +147,10 @@ export default function ProcessosPage() {
   }, [financialEventsData]);
 
   const filteredProcesses = React.useMemo(() => {
-    if (!processesData) return [];
-    return processesData.filter(p => {
-        const matchesSearch = 
-          p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-          p.processNumber?.includes(searchTerm);
-        const matchesClient = !clientIdFilter || p.clientId === clientIdFilter;
-        return matchesSearch && matchesClient;
-    });
-  }, [processesData, searchTerm, clientIdFilter]);
+    let result = searchResults || processesData || [];
+    if (clientIdFilter) result = result.filter(p => p.clientId === clientIdFilter);
+    return result;
+  }, [processesData, searchResults, clientIdFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filteredProcesses.length / ITEMS_PER_PAGE));
   const paginatedProcesses = React.useMemo(() => {
@@ -154,7 +174,7 @@ export default function ProcessosPage() {
     }
   }, [toast, isSyncing]);
 
-  const isLoading = isUserLoading || isLoadingProcesses;
+  const isLoading = isUserLoading || isLoadingProcesses || isSearching;
 
   return (
     <div className="grid flex-1 items-start gap-6 auto-rows-max">
@@ -166,7 +186,13 @@ export default function ProcessosPage() {
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative w-full max-sm:w-full max-w-sm">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Pesquisar por CNPJ ou Título..." className="pl-8 pr-8 bg-[#0f172a] border-border/50 text-white h-10" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+            <Input 
+              placeholder="Pesquisar por CNPJ, Cliente ou Réu..." 
+              className="pl-8 pr-8 bg-[#0f172a] border-border/50 text-white h-10" 
+              value={searchTerm} 
+              onChange={e => setSearchTerm(e.target.value)} 
+            />
+            {isSearching && <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-primary" />}
           </div>
           <Button size="sm" className="bg-primary text-primary-foreground h-10 px-6 font-bold" onClick={() => { setEditingProcess(null); setIsSheetOpen(true); }} disabled={isLoading}>
               <PlusCircle className="mr-2 h-4 w-4" /> Novo Processo
@@ -253,7 +279,7 @@ export default function ProcessosPage() {
 
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 py-4 border-y border-white/5">
                       <Link 
-                        href={`/dashboard/clientes?searchTerm=${client?.firstName}`} 
+                        href={`/dashboard/clientes?searchTerm=${client ? `${client.firstName} ${client.lastName}` : ''}`} 
                         className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/5 transition-all group/link"
                       >
                         <div className="h-9 w-9 rounded-lg bg-blue-500/10 flex items-center justify-center shrink-0">
