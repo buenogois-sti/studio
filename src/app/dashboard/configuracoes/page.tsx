@@ -36,9 +36,7 @@ import {
   Info,
   Instagram,
   Globe,
-  TrendingUp,
   BarChart3,
-  MousePointer2,
   Tag
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -271,7 +269,8 @@ function UsersTab() {
                   <div className="h-10 w-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-400"><ShieldAlert className="h-5 w-5" /></div>
                   <div><p className="text-[9px] font-black uppercase text-slate-500 tracking-widest">Gestores</p><p className="text-xl font-black text-white">{combinedUsers.filter(u => u.role === 'admin').length}</p></div>
                 </CardContent>
-              </div>
+              </Card>
+            </div>
 
             <Card className="bg-[#0f172a] border-white/5 overflow-hidden">
                 <CardHeader className="flex flex-row items-center justify-between bg-white/5 p-6 border-b border-white/5">
@@ -880,7 +879,6 @@ export default function ConfiguracoesPage() {
           <TabsTrigger value="usuarios" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold px-6 h-10 shrink-0">Usuários</TabsTrigger>
           <TabsTrigger value="financeiro" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold px-6 h-10 shrink-0">Financeiro</TabsTrigger>
           <TabsTrigger value="kit-cliente" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold px-6 h-10 shrink-0">Kit Cliente</TabsTrigger>
-          <TabsTrigger value="modelos-acervo" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold px-6 h-10 shrink-0">Modelos</TabsTrigger>
           <TabsTrigger value="modelos-acervo" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold px-6 h-10 shrink-0">Modelos</TabsTrigger>
           <TabsTrigger value="aparencia" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold px-6 h-10 shrink-0">Aparência</TabsTrigger>
           <TabsTrigger value="backup" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold px-6 h-10 shrink-0">Backup</TabsTrigger>
