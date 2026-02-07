@@ -112,22 +112,31 @@ export async function draftDocument(processId: string, templateInput: string, fi
         if (!templateFileId) throw new Error("ID do modelo inválido ou não informado.");
 
         const newFileName = `${fileName} - ${processData.name}`;
-        const copiedFile = await copyFile(templateFileId, newFileName, processData.driveFolderId);
+        
+        try {
+            const copiedFile = await copyFile(templateFileId, newFileName, processData.driveFolderId);
 
-        if (session?.user?.id) {
-          await createNotification({
-            userId: session.user.id,
-            title: "Rascunho Gerado",
-            description: `O documento "${fileName}" foi criado para o processo ${processData.name}.`,
-            type: 'success',
-            href: copiedFile.webViewLink || '#'
-          });
+            if (session?.user?.id) {
+              await createNotification({
+                userId: session.user.id,
+                title: "Rascunho Gerado",
+                description: `O documento "${fileName}" foi criado para o processo ${processData.name}.`,
+                type: 'success',
+                href: copiedFile.webViewLink || '#'
+              });
+            }
+
+            return { 
+                success: true, 
+                url: copiedFile.webViewLink || undefined 
+            };
+        } catch (copyErr: any) {
+            // Se o erro for 404, damos uma instrução clara sobre compartilhamento
+            if (copyErr.message.includes('File not found')) {
+                throw new Error(`Arquivo não encontrado ou sem permissão. Certifique-se de compartilhar o modelo com o e-mail: studio-7080106838-23904@studio-7080106838-23904.iam.gserviceaccount.com`);
+            }
+            throw copyErr;
         }
-
-        return { 
-            success: true, 
-            url: copiedFile.webViewLink || undefined 
-        };
     } catch (error: any) {
         console.error("Error drafting document:", error);
         return { success: false, error: error.message };

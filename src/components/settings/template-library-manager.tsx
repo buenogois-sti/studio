@@ -20,12 +20,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Badge } from '../ui/badge';
+import { extractFileId } from '@/lib/utils';
 
 const templateSchema = z.object({
   name: z.string().min(3, 'O nome do modelo é obrigatório.'),
   description: z.string().min(3, 'A descrição é obrigatória.'),
   category: z.string().min(3, 'A categoria é obrigatória.'),
-  templateFileId: z.string().min(10, 'O ID do Google Drive é obrigatório.'),
+  templateFileId: z.string().min(10, 'O ID ou Link do Google Drive é obrigatório.'),
 });
 
 function TemplateFormDialog({ template }: { template?: DocumentTemplate | null }) {
@@ -47,9 +48,17 @@ function TemplateFormDialog({ template }: { template?: DocumentTemplate | null }
     const onSubmit = async (values: z.infer<typeof templateSchema>) => {
         if (!firestore) return;
 
+        // Limpa o link para salvar apenas o ID
+        const cleanId = extractFileId(values.templateFileId);
+        if (!cleanId) {
+            toast({ variant: 'destructive', title: 'ID Inválido', description: 'Não foi possível identificar o ID do documento no link fornecido.' });
+            return;
+        }
+
         const docId = template ? template.id : uuidv4();
         const docData = {
             ...values,
+            templateFileId: cleanId,
             id: docId,
             ...(template ? { updatedAt: new Date() } : { createdAt: new Date(), updatedAt: new Date() })
         };
@@ -80,7 +89,7 @@ function TemplateFormDialog({ template }: { template?: DocumentTemplate | null }
                 <DialogHeader>
                     <DialogTitle>{template ? 'Editar Modelo' : 'Adicionar Novo Modelo'}</DialogTitle>
                     <DialogDescription>
-                        Preencha os dados do documento que será disponibilizado no acervo.
+                        Preencha os dados do documento que será disponibilizado no acervo. Você pode colar o link do Google Docs diretamente.
                     </DialogDescription>
                 </DialogHeader>
                 <Form {...form}>
@@ -88,7 +97,7 @@ function TemplateFormDialog({ template }: { template?: DocumentTemplate | null }
                         <FormField control={form.control} name="name" render={({ field }) => ( <FormItem> <FormLabel>Nome do Modelo</FormLabel> <FormControl><Input placeholder="Ex: Procuração Ad Judicia" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
                         <FormField control={form.control} name="description" render={({ field }) => ( <FormItem> <FormLabel>Descrição</FormLabel> <FormControl><Textarea placeholder="Breve descrição sobre a finalidade deste documento." {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
                         <FormField control={form.control} name="category" render={({ field }) => ( <FormItem> <FormLabel>Categoria</FormLabel> <FormControl><Input placeholder="Ex: Procurações, Contratos, Recibos" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
-                        <FormField control={form.control} name="templateFileId" render={({ field }) => ( <FormItem> <FormLabel>ID do Arquivo no Google Drive</FormLabel> <FormControl><Input placeholder="Cole o ID do arquivo modelo do Google Drive" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                        <FormField control={form.control} name="templateFileId" render={({ field }) => ( <FormItem> <FormLabel>Link ou ID do Google Drive</FormLabel> <FormControl><Input placeholder="Cole o link do Google Docs aqui" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
                         <DialogFooter>
                             <DialogClose asChild><Button type="button" variant="outline">Cancelar</Button></DialogClose>
                             <Button type="submit">Salvar</Button>
@@ -195,5 +204,3 @@ export function TemplateLibraryManager() {
         </Card>
     );
 }
-
-    

@@ -20,11 +20,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Badge } from '../ui/badge';
+import { extractFileId } from '@/lib/utils';
 
 
 const templateSchema = z.object({
   name: z.string().min(3, 'O nome do documento é obrigatório.'),
-  templateId: z.string().min(10, 'O ID do Google Drive é obrigatório.'),
+  templateId: z.string().min(10, 'O ID ou Link do Google Drive é obrigatório.'),
   destination: z.string().min(1, 'A pasta de destino é obrigatória.'),
 });
 
@@ -42,6 +43,7 @@ const CLIENT_FOLDER_STRUCTURE = [
 function TemplateFormDialog({ onSave, template }: { onSave: (templates: ClientKitTemplate[]) => Promise<void>, template?: ClientKitTemplate | null }) {
     const [open, setOpen] = React.useState(false);
     const { firestore } = useFirebase();
+    const { toast } = useToast();
     const settingsRef = useMemoFirebase(() => firestore ? doc(firestore, 'system_settings', 'client_kit') : null, [firestore]);
     const { data: settingsData } = useDoc<{ templates: ClientKitTemplate[] }>(settingsRef);
     const form = useForm<z.infer<typeof templateSchema>>({
@@ -56,13 +58,22 @@ function TemplateFormDialog({ onSave, template }: { onSave: (templates: ClientKi
     }, [open, template, form]);
     
     const onSubmit = async (values: z.infer<typeof templateSchema>) => {
+        // Limpa o link para salvar apenas o ID
+        const cleanId = extractFileId(values.templateId);
+        if (!cleanId) {
+            toast({ variant: 'destructive', title: 'ID Inválido', description: 'Não foi possível identificar o ID do documento no link fornecido.' });
+            return;
+        }
+
         const currentTemplates = settingsData?.templates || [];
         let newTemplates: ClientKitTemplate[];
 
+        const finalValues = { ...values, templateId: cleanId };
+
         if (template) { // Editing existing
-            newTemplates = currentTemplates.map(t => t.id === template.id ? { ...template, ...values } : t);
+            newTemplates = currentTemplates.map(t => t.id === template.id ? { ...template, ...finalValues } : t);
         } else { // Adding new
-            const newTemplate: ClientKitTemplate = { ...values, id: uuidv4() };
+            const newTemplate: ClientKitTemplate = { ...finalValues, id: uuidv4() };
             newTemplates = [...currentTemplates, newTemplate];
         }
         
@@ -86,7 +97,7 @@ function TemplateFormDialog({ onSave, template }: { onSave: (templates: ClientKi
                 <DialogHeader>
                     <DialogTitle>{template ? 'Editar Documento Modelo' : 'Adicionar Novo Documento Modelo'}</DialogTitle>
                     <DialogDescription>
-                        Preencha os dados do documento que fará parte do kit inicial do cliente.
+                        Preencha os dados do documento que fará parte do kit inicial do cliente. Você pode colar o link do Google Docs.
                     </DialogDescription>
                 </DialogHeader>
                 <Form {...form}>
@@ -107,8 +118,8 @@ function TemplateFormDialog({ onSave, template }: { onSave: (templates: ClientKi
                             name="templateId"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>ID do Arquivo no Google Drive</FormLabel>
-                                    <FormControl><Input placeholder="Cole o ID do arquivo modelo aqui" {...field} /></FormControl>
+                                    <FormLabel>Link ou ID do Arquivo no Drive</FormLabel>
+                                    <FormControl><Input placeholder="Cole o link do Google Docs aqui" {...field} /></FormControl>
                                     <FormMessage />
                                 </FormItem>
                             )}

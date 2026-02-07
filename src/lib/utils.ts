@@ -11,21 +11,23 @@ export function cn(...inputs: ClassValue[]) {
  */
 export function extractFileId(input: string): string {
   if (!input) return '';
+  const trimmed = input.trim();
   
-  // Caso o input seja uma URL de edição ou visualização
-  const match = input.match(/\/d\/([a-zA-Z0-9_-]+)/);
-  if (match && match[1]) {
-    return match[1];
+  // Se não contém barras ou igual, provavelmente já é o ID puro
+  if (!trimmed.includes('/') && !trimmed.includes('=')) return trimmed;
+  
+  const patterns = [
+    /\/d\/([a-zA-Z0-9_-]{25,})/,      // Formato padrão /d/ID/edit
+    /id=([a-zA-Z0-9_-]{25,})/,        // Formato query parameter id=ID
+    /folders\/([a-zA-Z0-9_-]{25,})/,  // Formato de pastas
+  ];
+
+  for (const pattern of patterns) {
+    const match = trimmed.match(pattern);
+    if (match && match[1]) return match[1];
   }
   
-  // Caso seja uma URL de download/export
-  const idOnlyMatch = input.match(/id=([a-zA-Z0-9_-]+)/);
-  if (idOnlyMatch && idOnlyMatch[1]) {
-    return idOnlyMatch[1];
-  }
-  
-  // Retorna o input limpo caso já seja o ID
-  return input.trim();
+  return trimmed;
 }
 
 /**
@@ -71,7 +73,7 @@ export function countBusinessDays(startDate: string, endDate: string): number {
   const start = new Date(startDate);
   const end = new Date(endDate);
   
-  if (isNaN(start.getTime()) || iNaN(end.getTime())) return 0;
+  if (isNaN(start.getTime()) || isNaN(end.getTime())) return 0;
   if (end < start) return 0;
 
   let count = 0;
