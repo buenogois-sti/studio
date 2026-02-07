@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -39,7 +38,9 @@ import {
   Lock,
   ExternalLink,
   Download,
-  Hash
+  Hash,
+  Mail,
+  Phone
 } from 'lucide-react';
 import { 
   DndContext, 
@@ -48,10 +49,8 @@ import {
   PointerSensor, 
   useSensor, 
   useSensors,
-  DragOverlay,
 } from '@dnd-kit/core';
 import { 
-  arrayMove, 
   SortableContext, 
   sortableKeyboardCoordinates, 
   verticalListSortingStrategy,
@@ -60,13 +59,12 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 
 import { useFirebase, useCollection, useMemoFirebase, useDoc } from '@/firebase';
-import { collection, query, orderBy, doc, deleteDoc, Timestamp, limit, updateDoc, where } from 'firebase/firestore';
+import { collection, query, orderBy, doc, Timestamp, limit, updateDoc, where } from 'firebase/firestore';
 import type { Lead, Client, Staff, LeadStatus, LeadPriority, UserProfile, OpposingParty, TimelineEvent } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -142,45 +140,6 @@ const leadFormSchema = z.object({
   description: z.string().optional(),
 });
 
-function KanbanColumn({ id, stage, leads, clientsMap, staffMap, onCardClick }: { id: string; stage: string; leads: Lead[]; clientsMap: Map<string, Client>; staffMap: Map<string, Staff>; onCardClick: (l: Lead) => void }) {
-  const { setNodeRef } = useSortable({ id });
-  const config = stageConfig[stage as LeadStatus];
-
-  return (
-    <div ref={setNodeRef} className="flex flex-col gap-4 min-w-[300px] w-full max-w-[320px] bg-white/[0.02] p-4 rounded-3xl border border-white/5">
-      <div className="flex items-center justify-between px-2 mb-2">
-        <div className="flex items-center gap-2">
-          <div className={cn("h-2.5 w-2.5 rounded-full shadow-lg", config.color.split(' ')[1])} />
-          <h3 className="text-xs font-black uppercase tracking-[0.2em] text-white">{config.label}</h3>
-        </div>
-        <Badge variant="secondary" className="bg-white/5 text-slate-400 text-[10px] font-black px-2 h-5">{leads.length}</Badge>
-      </div>
-      
-      <ScrollArea className="flex-1 h-full pr-3">
-        <div className="flex flex-col gap-3 pb-4">
-          <SortableContext items={leads.map(l => l.id)} strategy={verticalListSortingStrategy}>
-            {leads.map((lead: Lead) => (
-              <LeadCard 
-                key={lead.id} 
-                lead={lead} 
-                client={clientsMap.get(lead.clientId)} 
-                lawyer={staffMap.get(lead.lawyerId)}
-                onClick={() => onCardClick(lead)}
-              />
-            ))}
-          </SortableContext>
-          {leads.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-12 opacity-20 border-2 border-dashed border-white/5 rounded-2xl">
-              <Target className="h-8 w-8 mb-2" />
-              <p className="text-[10px] font-bold uppercase tracking-widest">Sem leads</p>
-            </div>
-          )}
-        </div>
-      </ScrollArea>
-    </div>
-  );
-}
-
 function LeadCard({ lead, client, lawyer, onClick }: { lead: Lead; client?: Client; lawyer?: Staff; onClick: () => void }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: lead.id });
   const style = { transform: CSS.Translate.toString(transform), transition };
@@ -251,6 +210,354 @@ function LeadCard({ lead, client, lawyer, onClick }: { lead: Lead; client?: Clie
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+function KanbanColumn({ id, stage, leads, clientsMap, staffMap, onCardClick }: { id: string; stage: string; leads: Lead[]; clientsMap: Map<string, Client>; staffMap: Map<string, Staff>; onCardClick: (l: Lead) => void }) {
+  const { setNodeRef } = useSortable({ id });
+  const config = stageConfig[stage as LeadStatus];
+
+  return (
+    <div ref={setNodeRef} className="flex flex-col gap-4 min-w-[300px] w-full max-w-[320px] bg-white/[0.02] p-4 rounded-3xl border border-white/5">
+      <div className="flex items-center justify-between px-2 mb-2">
+        <div className="flex items-center gap-2">
+          <div className={cn("h-2.5 w-2.5 rounded-full shadow-lg", config.color.split(' ')[1])} />
+          <h3 className="text-xs font-black uppercase tracking-[0.2em] text-white">{config.label}</h3>
+        </div>
+        <Badge variant="secondary" className="bg-white/5 text-slate-400 text-[10px] font-black px-2 h-5">{leads.length}</Badge>
+      </div>
+      
+      <ScrollArea className="flex-1 h-full pr-3">
+        <div className="flex flex-col gap-3 pb-4">
+          <SortableContext items={leads.map(l => l.id)} strategy={verticalListSortingStrategy}>
+            {leads.map((lead: Lead) => (
+              <LeadCard 
+                key={lead.id} 
+                lead={lead} 
+                client={clientsMap.get(lead.clientId)} 
+                lawyer={staffMap.get(lead.lawyerId)}
+                onClick={() => onCardClick(lead)}
+              />
+            ))}
+          </SortableContext>
+          {leads.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-12 opacity-20 border-2 border-dashed border-white/5 rounded-2xl">
+              <Target className="h-8 w-8 mb-2" />
+              <p className="text-[10px] font-bold uppercase tracking-widest">Sem leads</p>
+            </div>
+          )}
+        </div>
+      </ScrollArea>
+    </div>
+  );
+}
+
+function LeadDetailsSheet({ lead, client, open, onOpenChange, onConvert, isProcessing }: { lead: Lead | null; client?: Client; open: boolean; onOpenChange: (o: boolean) => void; onConvert: (id: string) => void; isProcessing: boolean }) {
+  const [activeTab, setActiveTab] = React.useState('burocracia');
+  const [files, setFiles] = React.useState<any[]>([]);
+  const [isUploading, setIsUploading] = React.useState(false);
+  const [isLoadingFiles, setIsLoadingFiles] = React.useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
+
+  const opposingForm = useForm<{ parties: OpposingParty[] }>({
+    defaultValues: { parties: lead?.opposingParties || [] }
+  });
+
+  const { fields, append, remove } = useFieldArray({
+    control: opposingForm.control,
+    name: 'parties'
+  });
+
+  const fetchFiles = React.useCallback(async () => {
+    if (!lead?.driveFolderId) {
+      setFiles([]);
+      return;
+    }
+    setIsLoadingFiles(true);
+    try {
+      const list = await listFiles(lead.driveFolderId);
+      setFiles(list || []);
+    } catch (e) {
+      console.error('[LeadFiles] Error:', e);
+    } finally {
+      setIsLoadingFiles(false);
+    }
+  }, [lead?.driveFolderId]);
+
+  React.useEffect(() => {
+    if (lead?.opposingParties) opposingForm.reset({ parties: lead.opposingParties });
+    if (open && activeTab === 'documentos') {
+      fetchFiles();
+    }
+  }, [lead, opposingForm, open, activeTab, fetchFiles]);
+
+  const toBase64 = (file: File) => new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => {
+      const result = reader.result as string;
+      const base64Content = result.split(',')[1];
+      if (base64Content) resolve(base64Content);
+      else reject(new Error("Falha ao converter arquivo."));
+    };
+    reader.onerror = error => reject(error);
+  });
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !lead) return;
+
+    setIsUploading(true);
+    try {
+      let folderId = lead.driveFolderId;
+      if (!folderId) {
+        const res = await syncLeadToDrive(lead.id);
+        if (res.success && res.id) {
+          folderId = res.id;
+        } else {
+          throw new Error(res.error || "Falha ao criar pasta de triagem.");
+        }
+      }
+
+      const base64 = await toBase64(file);
+      await uploadFile(folderId!, file.name, file.type || 'application/octet-stream', base64);
+      
+      toast({ title: "Arquivo anexado!", description: "A prova foi salva na pasta de triagem." });
+      fetchFiles();
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Erro no upload", description: err.message });
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleSaveParties = async () => {
+    if (!lead) return;
+    try {
+      await updateLeadOpposingParties(lead.id, opposingForm.getValues().parties);
+      toast({ title: 'Reclamadas Atualizadas!' });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Erro', description: e.message });
+    }
+  };
+
+  if (!lead) return null;
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="sm:max-w-4xl w-full p-0 flex flex-col bg-[#020617] border-white/10 text-white">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
+          <SheetHeader className="p-6 border-b border-white/5 bg-white/5">
+            <div className="flex items-center justify-between">
+              <div>
+                <Badge variant="outline" className={cn("text-[9px] font-black uppercase mb-2", stageConfig[lead.status as LeadStatus].color)}>Fase Atual: {stageConfig[lead.status as LeadStatus].label}</Badge>
+                <SheetTitle className="text-2xl font-black font-headline text-white">{lead.title}</SheetTitle>
+                <SheetDescription className="text-slate-400">Origem: {lead.captureSource} | Ref: #{lead.id.substring(0, 6)}</SheetDescription>
+              </div>
+              <div className="flex gap-2">
+                <Button 
+                  onClick={() => onConvert(lead.id)} 
+                  disabled={isProcessing || lead.status === 'DISTRIBUIDO'} 
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase tracking-widest text-[10px] h-12 px-8"
+                >
+                  {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ArrowRightLeft className="mr-2 h-4 w-4" />}
+                  Protocolar Processo
+                </Button>
+              </div>
+            </div>
+          </SheetHeader>
+
+          <div className="px-6 bg-white/5 border-b border-white/5">
+            <TabsList className="bg-transparent gap-8 h-14 p-0">
+              <TabsTrigger value="burocracia" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent text-slate-400 data-[state=active]:text-white font-black uppercase text-[10px] tracking-widest">Dados do Cliente</TabsTrigger>
+              <TabsTrigger value="reclamadas" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent text-slate-400 text-[10px] uppercase font-black tracking-widest">Polo Passivo (Réus)</TabsTrigger>
+              <TabsTrigger value="documentos" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent text-slate-400 text-[10px] uppercase font-black tracking-widest">Provas & Drive</TabsTrigger>
+              <TabsTrigger value="historico" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent text-slate-400 text-[10px] uppercase font-black tracking-widest">Timeline</TabsTrigger>
+            </TabsList>
+          </div>
+
+          <ScrollArea className="flex-1">
+            <div className="p-8 pb-32">
+              <TabsContent value="burocracia" className="m-0 space-y-8 animate-in fade-in duration-300">
+                <Alert className="bg-amber-500/10 border-amber-500/20 text-amber-400 p-6 rounded-3xl">
+                  <Info className="h-5 w-5" />
+                  <AlertTitle className="font-black uppercase tracking-tighter text-base">Requisito para Fase Contratual</AlertTitle>
+                  <AlertDescription className="text-xs font-medium mt-1">Para gerar a procuração e o contrato na fase seguinte, preencha obrigatoriamente o <strong>RG</strong>, <strong>CPF/CNPJ</strong> e <strong>Endereço Completo</strong> (com número e CEP) abaixo.</AlertDescription>
+                </Alert>
+                <ClientForm client={client} onSave={() => toast({ title: 'Cadastro Atualizado!' })} />
+              </TabsContent>
+
+              <TabsContent value="reclamadas" className="m-0 space-y-8 animate-in fade-in duration-300">
+                <div className="flex items-center justify-between border-b border-white/5 pb-4">
+                  <div>
+                    <h3 className="text-xl font-black font-headline text-white">Reclamadas (Polo Passivo)</h3>
+                    <p className="text-xs text-slate-500">Identifique todas as partes que figurarão no polo passivo da ação.</p>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => append({ name: '', document: '', email: '', phone: '', address: '', observation: '' })} className="font-bold border-primary/20 text-primary hover:bg-primary/10 rounded-xl">
+                    <PlusCircle className="h-4 w-4 mr-2" /> Adicionar Réu
+                  </Button>
+                </div>
+                
+                <div className="space-y-4">
+                  {fields.map((field, index) => (
+                    <Card key={field.id} className="bg-white/5 border-white/10 rounded-2xl overflow-hidden group/item">
+                      <CardContent className="p-6 space-y-6">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label className="text-[10px] uppercase font-black text-slate-500 tracking-widest">Razão Social / Nome Completo *</Label>
+                              <Input {...opposingForm.register(`parties.${index}.name`)} className="bg-black/40 border-white/10 h-11" placeholder="Nome oficial da empresa ou pessoa" />
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-[10px] uppercase font-black text-slate-500 tracking-widest">CNPJ / CPF</Label>
+                              <Input {...opposingForm.register(`parties.${index}.document`)} className="bg-black/40 border-white/10 h-11 font-mono" placeholder="00.000.000/0000-00" />
+                            </div>
+                          </div>
+                          <Button variant="ghost" size="icon" onClick={() => remove(index)} className="text-rose-500 hover:bg-rose-500/10 h-11 w-11 rounded-xl shrink-0"><Trash2 className="h-5 w-5" /></Button>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label className="text-[10px] uppercase font-black text-slate-500 tracking-widest">E-mail Jurídico / RH</Label>
+                            <div className="relative">
+                              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                              <Input {...opposingForm.register(`parties.${index}.email`)} className="bg-black/40 border-white/10 h-11 pl-10" placeholder="rh@empresa.com.br" />
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-[10px] uppercase font-black text-slate-500 tracking-widest">Telefone de Contato</Label>
+                            <div className="relative">
+                              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                              <Input {...opposingForm.register(`parties.${index}.phone`)} className="bg-black/40 border-white/10 h-11 pl-10" placeholder="(00) 0000-0000" />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-[10px] uppercase font-black text-slate-500 tracking-widest">Endereço Completo</Label>
+                          <div className="relative">
+                            <MapPin className="absolute left-3 top-3 h-4 w-4 text-slate-500" />
+                            <Textarea {...opposingForm.register(`parties.${index}.address`)} className="bg-black/40 border-white/10 min-h-[80px] pl-10 pt-2 resize-none" placeholder="Rua, número, bairro, cidade - UF, CEP" />
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-[10px] uppercase font-black text-slate-500 tracking-widest">Observações / Particularidades</Label>
+                          <Input {...opposingForm.register(`parties.${index}.observation`)} className="bg-black/40 border-white/10 h-11" placeholder="Ex: Faz parte do grupo econômico X..." />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                  
+                  {fields.length > 0 ? (
+                    <Button 
+                      onClick={handleSaveParties} 
+                      className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black uppercase text-[11px] h-12 shadow-xl shadow-blue-900/20"
+                    >
+                      Salvar Lista de Réus
+                    </Button>
+                  ) : (
+                    <div className="text-center py-20 bg-white/5 rounded-3xl border-2 border-dashed border-white/10 opacity-30">
+                      <Building className="h-12 w-12 mx-auto mb-4" />
+                      <p className="text-sm font-bold uppercase tracking-widest">Nenhuma reclamada cadastrada</p>
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+
+              <TabsContent value="documentos" className="m-0 space-y-8 animate-in fade-in duration-300">
+                <div className="text-center py-12 space-y-6">
+                  <div className="h-24 w-24 rounded-3xl bg-primary/10 border-2 border-primary/20 flex items-center justify-center mx-auto shadow-2xl">
+                    <FolderKanban className="h-12 w-12 text-primary" />
+                  </div>
+                  <div className="space-y-2">
+                    <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Repositório de Provas</h3>
+                    <p className="text-sm text-slate-400 max-w-sm mx-auto">Organize fotos, áudios e documentos enviados pelo cliente durante a triagem.</p>
+                  </div>
+                  
+                  <div className="flex flex-col gap-4 max-w-xs mx-auto">
+                    <input type="file" ref={fileInputRef} onChange={handleUpload} className="hidden" />
+                    <Button 
+                      variant="outline"
+                      disabled={isUploading}
+                      onClick={() => fileInputRef.current?.click()}
+                      className="border-primary text-white hover:bg-primary/10 h-14 px-10 rounded-2xl font-black uppercase text-xs tracking-widest gap-3 shadow-xl shadow-primary/5 transition-all active:scale-95"
+                    >
+                      {isUploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Plus className="h-5 w-5 text-primary" />}
+                      Enviar Prova
+                    </Button>
+                    {!lead.driveFolderId && (
+                      <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest">Pasta será gerada no primeiro upload</p>
+                    )}
+                  </div>
+                </div>
+
+                {lead.driveFolderId && (
+                  <div className="space-y-4 pt-8 border-t border-white/5 animate-in fade-in slide-in-from-top-4 duration-500">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                        <FolderOpen className="h-4 w-4 text-primary" /> Arquivos Sincronizados ({files.length})
+                      </h4>
+                      <Button variant="ghost" size="sm" className="h-8 text-[10px] font-bold text-emerald-400 gap-2" asChild>
+                        <a href={`https://drive.google.com/drive/folders/${lead.driveFolderId}`} target="_blank">
+                          <ExternalLink className="h-3 w-3" /> Ver no Drive
+                        </a>
+                      </Button>
+                    </div>
+
+                    <div className="grid gap-3">
+                      {isLoadingFiles ? (
+                        [...Array(2)].map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-xl bg-white/5" />)
+                      ) : files.length > 0 ? (
+                        files.map(file => (
+                          <div key={file.id} className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5 hover:border-primary/20 transition-all group">
+                            <div className="flex items-center gap-3 overflow-hidden">
+                              <div className="h-9 w-9 rounded-lg bg-black/40 flex items-center justify-center shrink-0">
+                                {file.iconLink ? <img src={file.iconLink} alt="" className="h-4 w-4" /> : <FileText className="h-4 w-4 text-blue-400" />}
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-sm font-bold text-slate-200 truncate group-hover:text-white transition-colors">{file.name}</p>
+                                <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest">{file.mimeType?.split('.').pop()}</p>
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-white/20 hover:text-primary transition-colors" asChild>
+                                <a href={file.webViewLink} target="_blank"><ExternalLink className="h-4 w-4" /></a>
+                              </Button>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center py-10 opacity-30 italic text-sm text-slate-500">Nenhum arquivo enviado ainda.</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="historico" className="m-0 space-y-6 animate-in fade-in duration-300">
+                <div className="relative space-y-6 before:absolute before:inset-0 before:ml-5 before:-translate-x-px before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-border/30 before:to-transparent">
+                  <div className="relative flex items-start gap-6 group">
+                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-[#0f172a] border-2 border-border/50 z-10 shadow-sm">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                    </div>
+                    <div className="flex-1 p-4 rounded-2xl bg-white/5 border border-white/5">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[9px] font-black uppercase text-primary tracking-widest">ENTRADA NO CRM</span>
+                        <span className="text-[10px] text-slate-500 font-bold">{format(lead.createdAt.toDate(), 'dd/MM/yy HH:mm')}</span>
+                      </div>
+                      <p className="text-sm text-slate-300 font-medium">Lead registrado via {lead.captureSource}.</p>
+                    </div>
+                  </div>
+                </div>
+              </TabsContent>
+            </div>
+          </ScrollArea>
+        </Tabs>
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -474,314 +781,5 @@ export default function LeadsPage() {
 
       <ClientCreationModal open={isClientModalOpen} onOpenChange={setIsClientModalOpen} onClientCreated={(c) => form.setValue('clientId', c.id)} />
     </div>
-  );
-}
-
-function LeadDetailsSheet({ lead, client, open, onOpenChange, onConvert, isProcessing }: { lead: Lead | null; client?: Client; open: boolean; onOpenChange: (o: boolean) => void; onConvert: (id: string) => void; isProcessing: boolean }) {
-  const [activeTab, setActiveTab] = React.useState('burocracia');
-  const [files, setFiles] = React.useState<any[]>([]);
-  const [isUploading, setIsUploading] = React.useState(false);
-  const [isLoadingFiles, setIsLoadingFiles] = React.useState(false);
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
-  const { toast } = useToast();
-
-  const opposingForm = useForm<{ parties: OpposingParty[] }>({
-    defaultValues: { parties: lead?.opposingParties || [] }
-  });
-
-  const { fields, append, remove } = useFieldArray({
-    control: opposingForm.control,
-    name: 'parties'
-  });
-
-  const fetchFiles = React.useCallback(async () => {
-    if (!lead?.driveFolderId) {
-      setFiles([]);
-      return;
-    }
-    setIsLoadingFiles(true);
-    try {
-      const list = await listFiles(lead.driveFolderId);
-      setFiles(list || []);
-    } catch (e) {
-      console.error('[LeadFiles] Error:', e);
-    } finally {
-      setIsLoadingFiles(false);
-    }
-  }, [lead?.driveFolderId]);
-
-  React.useEffect(() => {
-    if (lead?.opposingParties) opposingForm.reset({ parties: lead.opposingParties });
-    if (open && activeTab === 'documentos') {
-      fetchFiles();
-    }
-  }, [lead, opposingForm, open, activeTab, fetchFiles]);
-
-  const toBase64 = (file: File) => new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => {
-      const result = reader.result as string;
-      const base64Content = result.split(',')[1];
-      if (base64Content) resolve(base64Content);
-      else reject(new Error("Falha ao converter arquivo."));
-    };
-    reader.onerror = error => reject(error);
-  });
-
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !lead) return;
-
-    setIsUploading(true);
-    try {
-      let folderId = lead.driveFolderId;
-      if (!folderId) {
-        const res = await syncLeadToDrive(lead.id);
-        if (res.success && res.id) {
-          folderId = res.id;
-        } else {
-          throw new Error(res.error || "Falha ao criar pasta de triagem.");
-        }
-      }
-
-      const base64 = await toBase64(file);
-      await uploadFile(folderId!, file.name, file.type || 'application/octet-stream', base64);
-      
-      toast({ title: "Arquivo anexado!", description: "A prova foi salva na pasta de triagem." });
-      fetchFiles();
-    } catch (err: any) {
-      toast({ variant: "destructive", title: "Erro no upload", description: err.message });
-    } finally {
-      setIsUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
-  };
-
-  const handleSaveParties = async () => {
-    if (!lead) return;
-    try {
-      await updateLeadOpposingParties(lead.id, opposingForm.getValues().parties);
-      toast({ title: 'Reclamadas Atualizadas!' });
-    } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Erro', description: e.message });
-    }
-  };
-
-  if (!lead) return null;
-
-  return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="sm:max-w-4xl w-full p-0 flex flex-col bg-[#020617] border-white/10 text-white">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
-          <SheetHeader className="p-6 border-b border-white/5 bg-white/5">
-            <div className="flex items-center justify-between">
-              <div>
-                <Badge variant="outline" className={cn("text-[9px] font-black uppercase mb-2", stageConfig[lead.status as LeadStatus].color)}>Fase Atual: {stageConfig[lead.status as LeadStatus].label}</Badge>
-                <SheetTitle className="text-2xl font-black font-headline text-white">{lead.title}</SheetTitle>
-                <SheetDescription className="text-slate-400">Origem: {lead.captureSource} | Ref: #{lead.id.substring(0, 6)}</SheetDescription>
-              </div>
-              <div className="flex gap-2">
-                <Button 
-                  onClick={() => onConvert(lead.id)} 
-                  disabled={isProcessing || lead.status === 'DISTRIBUIDO'} 
-                  className="bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase tracking-widest text-[10px] h-12 px-8"
-                >
-                  {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ArrowRightLeft className="mr-2 h-4 w-4" />}
-                  Protocolar Processo
-                </Button>
-              </div>
-            </div>
-          </SheetHeader>
-
-          <div className="px-6 bg-white/5 border-b border-white/5">
-            <TabsList className="bg-transparent gap-8 h-14 p-0">
-              <TabsTrigger value="burocracia" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent text-slate-400 data-[state=active]:text-white font-black uppercase text-[10px] tracking-widest">Dados do Cliente</TabsTrigger>
-              <TabsTrigger value="reclamadas" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent text-slate-400 text-[10px] uppercase font-black tracking-widest">Polo Passivo (Réus)</TabsTrigger>
-              <TabsTrigger value="documentos" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent text-slate-400 text-[10px] uppercase font-black tracking-widest">Provas & Drive</TabsTrigger>
-              <TabsTrigger value="historico" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent text-slate-400 text-[10px] uppercase font-black tracking-widest">Timeline</TabsTrigger>
-            </TabsList>
-          </div>
-
-          <ScrollArea className="flex-1">
-            <div className="p-8 pb-32">
-              <TabsContent value="burocracia" className="m-0 space-y-8 animate-in fade-in duration-300">
-                <Alert className="bg-amber-500/10 border-amber-500/20 text-amber-400 p-6 rounded-3xl">
-                  <Info className="h-5 w-5" />
-                  <AlertTitle className="font-black uppercase tracking-tighter text-base">Requisito para Fase Contratual</AlertTitle>
-                  <AlertDescription className="text-xs font-medium mt-1">Para gerar a procuração e o contrato na fase seguinte, preencha obrigatoriamente o <strong>RG</strong>, <strong>CPF/CNPJ</strong> e <strong>Endereço Completo</strong> (com número e CEP) abaixo.</AlertDescription>
-                </Alert>
-                <ClientForm client={client} onSave={() => toast({ title: 'Cadastro Atualizado!' })} />
-              </TabsContent>
-
-              <TabsContent value="reclamadas" className="m-0 space-y-8 animate-in fade-in duration-300">
-                <div className="flex items-center justify-between border-b border-white/5 pb-4">
-                  <div>
-                    <h3 className="text-xl font-black font-headline text-white">Reclamadas (Polo Passivo)</h3>
-                    <p className="text-xs text-slate-500">Identifique todas as partes que figurarão no polo passivo da ação.</p>
-                  </div>
-                  <Button variant="outline" size="sm" onClick={() => append({ name: '', document: '', email: '', phone: '', address: '', observation: '' })} className="font-bold border-primary/20 text-primary hover:bg-primary/10 rounded-xl">
-                    <PlusCircle className="h-4 w-4 mr-2" /> Adicionar Réu
-                  </Button>
-                </div>
-                
-                <div className="space-y-4">
-                  {fields.map((field, index) => (
-                    <Card key={field.id} className="bg-white/5 border-white/10 rounded-2xl overflow-hidden group/item">
-                      <CardContent className="p-6 space-y-6">
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label className="text-[10px] uppercase font-black text-slate-500 tracking-widest">Razão Social / Nome Completo *</Label>
-                              <Input {...opposingForm.register(`parties.${index}.name`)} className="bg-black/40 border-white/10 h-11" placeholder="Nome oficial da empresa ou pessoa" />
-                            </div>
-                            <div className="space-y-2">
-                              <Label className="text-[10px] uppercase font-black text-slate-500 tracking-widest">CNPJ / CPF</Label>
-                              <Input {...opposingForm.register(`parties.${index}.document`)} className="bg-black/40 border-white/10 h-11 font-mono" placeholder="00.000.000/0000-00" />
-                            </div>
-                          </div>
-                          <Button variant="ghost" size="icon" onClick={() => remove(index)} className="text-rose-500 hover:bg-rose-500/10 h-11 w-11 rounded-xl shrink-0"><Trash2 className="h-5 w-5" /></Button>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label className="text-[10px] uppercase font-black text-slate-500 tracking-widest">E-mail Jurídico / RH</Label>
-                            <div className="relative">
-                              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-                              <Input {...opposingForm.register(`parties.${index}.email`)} className="bg-black/40 border-white/10 h-11 pl-10" placeholder="rh@empresa.com.br" />
-                            </div>
-                          </div>
-                          <div className="space-y-2">
-                            <Label className="text-[10px] uppercase font-black text-slate-500 tracking-widest">Telefone de Contato</Label>
-                            <div className="relative">
-                              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-                              <Input {...opposingForm.register(`parties.${index}.phone`)} className="bg-black/40 border-white/10 h-11 pl-10" placeholder="(00) 0000-0000" />
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label className="text-[10px] uppercase font-black text-slate-500 tracking-widest">Endereço Completo</Label>
-                          <div className="relative">
-                            <MapPin className="absolute left-3 top-3 h-4 w-4 text-slate-500" />
-                            <Textarea {...opposingForm.register(`parties.${index}.address`)} className="bg-black/40 border-white/10 min-h-[80px] pl-10 pt-2 resize-none" placeholder="Rua, número, bairro, cidade - UF, CEP" />
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label className="text-[10px] uppercase font-black text-slate-500 tracking-widest">Observações / Particularidades</Label>
-                          <Input {...opposingForm.register(`parties.${index}.observation`)} className="bg-black/40 border-white/10 h-11" placeholder="Ex: Grupo econômico X, sócio majoritário Y..." />
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                  
-                  {fields.length > 0 ? (
-                    <Button 
-                      onClick={handleSaveParties} 
-                      className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black uppercase text-[11px] h-12 shadow-xl shadow-blue-900/20"
-                    >
-                      Salvar Lista de Réus
-                    </Button>
-                  ) : (
-                    <div className="text-center py-20 bg-white/5 rounded-3xl border-2 border-dashed border-white/10 opacity-30">
-                      <Building className="h-12 w-12 mx-auto mb-4" />
-                      <p className="text-sm font-bold uppercase tracking-widest">Nenhuma reclamada cadastrada</p>
-                    </div>
-                  )}
-                </div>
-              </TabsContent>
-
-              <TabsContent value="documentos" className="m-0 space-y-8 animate-in fade-in duration-300">
-                <div className="text-center py-12 space-y-6">
-                  <div className="h-24 w-24 rounded-3xl bg-primary/10 border-2 border-primary/20 flex items-center justify-center mx-auto shadow-2xl">
-                    <FolderKanban className="h-12 w-12 text-primary" />
-                  </div>
-                  <div className="space-y-2">
-                    <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Repositório de Provas</h3>
-                    <p className="text-sm text-slate-400 max-w-sm mx-auto">Organize fotos, áudios e documentos enviados pelo cliente durante a triagem.</p>
-                  </div>
-                  
-                  <div className="flex flex-col gap-4 max-w-xs mx-auto">
-                    <input type="file" ref={fileInputRef} onChange={handleUpload} className="hidden" />
-                    <Button 
-                      variant="outline"
-                      disabled={isUploading}
-                      onClick={() => fileInputRef.current?.click()}
-                      className="border-primary text-white hover:bg-primary/10 h-14 px-10 rounded-2xl font-black uppercase text-xs tracking-widest gap-3 shadow-xl shadow-primary/5 transition-all active:scale-95"
-                    >
-                      {isUploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Plus className="h-5 w-5 text-primary" />}
-                      Enviar Prova
-                    </Button>
-                    {!lead.driveFolderId && (
-                      <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest">Pasta será gerada no primeiro upload</p>
-                    )}
-                  </div>
-                </div>
-
-                {lead.driveFolderId && (
-                  <div className="space-y-4 pt-8 border-t border-white/5 animate-in fade-in slide-in-from-top-4 duration-500">
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
-                        <FolderOpen className="h-4 w-4 text-primary" /> Arquivos Sincronizados ({files.length})
-                      </h4>
-                      <Button variant="ghost" size="sm" className="h-8 text-[10px] font-bold text-emerald-400 gap-2" asChild>
-                        <a href={`https://drive.google.com/drive/folders/${lead.driveFolderId}`} target="_blank">
-                          <ExternalLink className="h-3 w-3" /> Ver no Drive
-                        </a>
-                      </Button>
-                    </div>
-
-                    <div className="grid gap-3">
-                      {isLoadingFiles ? (
-                        [...Array(2)].map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-xl bg-white/5" />)
-                      ) : files.length > 0 ? (
-                        files.map(file => (
-                          <div key={file.id} className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5 hover:border-primary/20 transition-all group">
-                            <div className="flex items-center gap-3 overflow-hidden">
-                              <div className="h-9 w-9 rounded-lg bg-black/40 flex items-center justify-center shrink-0">
-                                {file.iconLink ? <img src={file.iconLink} alt="" className="h-4 w-4" /> : <FileText className="h-4 w-4 text-blue-400" />}
-                              </div>
-                              <div className="min-w-0">
-                                <p className="text-sm font-bold text-slate-200 truncate group-hover:text-white transition-colors">{file.name}</p>
-                                <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest">{file.mimeType?.split('.').pop()}</p>
-                              </div>
-                            </div>
-                            <div className="flex gap-2">
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-white/20 hover:text-primary transition-colors" asChild>
-                                <a href={file.webViewLink} target="_blank"><ExternalLink className="h-4 w-4" /></a>
-                              </Button>
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="text-center py-10 opacity-30 italic text-sm text-slate-500">Nenhum arquivo enviado ainda.</div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </TabsContent>
-
-              <TabsContent value="historico" className="m-0 space-y-6 animate-in fade-in duration-300">
-                <div className="relative space-y-6 before:absolute before:inset-0 before:ml-5 before:-translate-x-px before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-border/30 before:to-transparent">
-                  <div className="relative flex items-start gap-6 group">
-                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-[#0f172a] border-2 border-border/50 z-10 shadow-sm">
-                      <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                    </div>
-                    <div className="flex-1 p-4 rounded-2xl bg-white/5 border border-white/5">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-[9px] font-black uppercase text-primary tracking-widest">ENTRADA NO CRM</span>
-                        <span className="text-[10px] text-slate-500 font-bold">{format(lead.createdAt.toDate(), 'dd/MM/yy HH:mm')}</span>
-                      </div>
-                      <p className="text-sm text-slate-300 font-medium">Lead registrado via {lead.captureSource}.</p>
-                    </div>
-                  </div>
-                </div>
-              </TabsContent>
-            </div>
-          </ScrollArea>
-        </Tabs>
-      </SheetContent>
-    </Sheet>
   );
 }
