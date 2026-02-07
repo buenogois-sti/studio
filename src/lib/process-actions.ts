@@ -80,7 +80,7 @@ export async function searchProcesses(query: string): Promise<Process[]> {
             const matchesClient = (process.clientName || '').toLowerCase().includes(q);
             
             // Busca nos Réus (Polo Passivo)
-            const matchesOpposing = process.opposingParties?.some(party => 
+            const matchesOpposing = !!process.opposingParties?.some(party => 
                 party.name.toLowerCase().includes(q)
             );
 

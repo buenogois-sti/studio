@@ -140,6 +140,7 @@ export type NotificationMethod = 'whatsapp' | 'email' | 'phone' | 'personal' | '
 export type Hearing = {
   id: string;
   processId: string;
+  processName?: string;
   lawyerId: string;
   lawyerName?: string;
   createdById: string;

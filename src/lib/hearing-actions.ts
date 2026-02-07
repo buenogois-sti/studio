@@ -278,7 +278,7 @@ export async function processHearingReturn(hearingId: string, data: {
       id: uuidv4(),
       type: hearingData.type === 'PERICIA' ? 'pericia' : 'hearing',
       description: `RESULTADO DO ATO (${hearingData.type}): ${data.resultNotes}`,
-      date: Timestamp.now(),
+      date: Timestamp.now() as any,
       authorName: session.user.name || 'Advogado'
     };
     batch.update(processRef, {

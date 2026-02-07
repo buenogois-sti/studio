@@ -38,11 +38,18 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
-import type { Hearing } from '@/lib/types';
+import type { Hearing, HearingType } from '@/lib/types';
 import { processHearingReturn } from '@/lib/hearing-actions';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 const returnSchema = z.object({
   resultNotes: z.string().min(10, 'Descreva detalhadamente o que ocorreu no ato.'),
