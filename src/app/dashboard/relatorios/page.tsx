@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -22,7 +21,8 @@ import {
   XCircle,
   Sparkles,
   RefreshCw,
-  Loader2
+  Loader2,
+  CheckCircle2
 } from 'lucide-react';
 import { 
   Bar, 
@@ -78,6 +78,7 @@ export default function RelatoriosPage() {
     leads: [],
   });
 
+  // OTIMIZAÇÃO: Busca única (Single Fetch) em vez de onSnapshot para reduzir drasticamente leituras.
   const fetchData = React.useCallback(async (quiet = false) => {
     if (!firestore) return;
     if (!quiet) setIsLoading(true);
@@ -156,13 +157,13 @@ export default function RelatoriosPage() {
     return data.staff
       .filter(s => s.role === 'lawyer' || s.role === 'partner')
       .map(lawyer => {
-        const processes = data.processes.filter(p => p.leadLawyerId === lawyer.id).length;
+        const processesCount = data.processes.filter(p => p.leadLawyerId === lawyer.id).length;
         const pendingDeadlines = data.deadlines.filter(d => d.authorId === lawyer.id && d.status === 'PENDENTE').length;
         const upcomingHearings = data.hearings.filter(h => h.lawyerId === lawyer.id && h.status === 'PENDENTE').length;
         
         return {
           nome: `${lawyer.firstName} ${lawyer.lastName.charAt(0)}.`,
-          demandas: processes,
+          demandas: processesCount,
           prazos: pendingDeadlines,
           audiencias: upcomingHearings,
         };

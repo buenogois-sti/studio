@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { Form } from '@/components/ui/form';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection } from 'firebase/firestore';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 import type { Process, Staff } from '@/lib/types';
 import { useProcessForm, processSchema, type ProcessFormValues } from '@/hooks/use-process-form';

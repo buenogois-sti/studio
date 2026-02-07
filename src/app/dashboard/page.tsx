@@ -1,4 +1,3 @@
-
 'use client';
 import * as React from 'react';
 import {
@@ -130,22 +129,22 @@ export default function Dashboard() {
   const { firestore } = useFirebase();
   const { data: session, status } = useSession();
 
-  // OTIMIZAÇÃO: Consulta estritamente limitada a 50 itens para o Dashboard
+  // OTIMIZAÇÃO: Consulta estritamente limitada a 10 itens para o Dashboard (Redução drástica de leituras)
   const titlesQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     const startOfCurrentMonth = Timestamp.fromDate(startOfMonth(new Date()));
     return query(
       collection(firestore, 'financial_titles'),
       where('dueDate', '>=', startOfCurrentMonth),
-      limit(50)
+      limit(10)
     );
   }, [firestore]);
   const { data: titlesData, isLoading: isLoadingTitles } = useCollection<FinancialTitle>(titlesQuery);
 
-  const processesQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'processes'), orderBy('createdAt', 'desc'), limit(50)) : null), [firestore]);
+  const processesQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'processes'), orderBy('createdAt', 'desc'), limit(5)) : null), [firestore]);
   const { data: processesData, isLoading: isLoadingProcesses } = useCollection<Process>(processesQuery);
 
-  const clientsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'clients'), limit(20)) : null), [firestore]);
+  const clientsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'clients'), limit(5)) : null), [firestore]);
   const { data: clientsData, isLoading: isLoadingClients } = useCollection<Client>(clientsQuery);
 
   const hearingsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'hearings'), where('date', '>=', Timestamp.now()), orderBy('date', 'asc'), limit(5)) : null), [firestore]);

@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -112,6 +111,7 @@ export default function AudienciasPage() {
     const base = collection(firestore, 'hearings');
     const threeMonthsAgo = Timestamp.fromDate(subMonths(new Date(), 3));
 
+    // OTIMIZAÇÃO: Filtros mais restritos e limites menores para economizar leituras
     if (userProfile.role === 'admin' || userProfile.role === 'assistant') {
       if (selectedLawyerFilter !== 'all') {
         return query(base, where('lawyerId', '==', selectedLawyerFilter), where('date', '>=', threeMonthsAgo), orderBy('date', 'asc'), limit(100));
@@ -379,13 +379,13 @@ export default function AudienciasPage() {
                         {format(currentDate, 'MMMM yyyy', { locale: ptBR })}
                       </h2>
                       <div className="flex gap-3">
-                        <Button variant="outline" size="icon" className="h-10 w-10 rounded-xl bg-white/5 border-white/10" onClick={() => setCurrentDate(subMonths(currentDate, 1))}>
+                        <Button variant="outline" size="icon" className="h-10 w-10 rounded-xl bg-white/5 border-white/10" onClick={() => currentDate && setCurrentDate(subMonths(currentDate, 1))}>
                           <ChevronLeft className="h-5 w-5" />
                         </Button>
                         <Button variant="outline" size="sm" className="h-10 px-6 text-[10px] font-black uppercase rounded-xl border-white/10" onClick={() => setCurrentDate(new Date())}>
                           Hoje
                         </Button>
-                        <Button variant="outline" size="icon" className="h-10 w-10 rounded-xl bg-white/5 border-white/10" onClick={() => setCurrentDate(addMonths(currentDate, 1))}>
+                        <Button variant="outline" size="icon" className="h-10 w-10 rounded-xl bg-white/5 border-white/10" onClick={() => currentDate && setCurrentDate(addMonths(currentDate, 1))}>
                           <ChevronRight className="h-5 w-5" />
                         </Button>
                       </div>
