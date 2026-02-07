@@ -41,6 +41,10 @@ export type Client = {
   profession?: string;
   stateRegistration?: string;
   municipalRegistration?: string;
+  representativeName?: string;
+  representativeCpf?: string;
+  representativeRg?: string;
+  representativeRole?: string;
   phone?: string;
   mobile?: string;
   emergencyContact?: string;

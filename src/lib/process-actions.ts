@@ -150,8 +150,16 @@ export async function draftDocument(
         const staffAddr = staffData?.address ? `${staffData.address.street || ''}, nº ${staffData.address.number || 'S/N'}, ${staffData.address.neighborhood || ''}, ${staffData.address.city || ''}/${staffData.address.state || ''}` : '---';
         const clientFull = `${clientData.firstName} ${clientData.lastName || ''}`.trim();
 
-        // Tag Composta: Qualificação Completa
-        const clientQual = `${clientFull}, ${clientData.nationality || 'brasileiro(a)'}, ${clientData.civilStatus || 'solteiro(a)'}, ${clientData.profession || 'trabalhador(a)'}, portador(a) do RG nº ${clientData.rg || '---'} ${clientData.rgIssuer ? clientData.rgIssuer : ''}${clientData.rgIssuanceDate ? ', expedido em ' + format(new Date(clientData.rgIssuanceDate as any), "dd/MM/yyyy") : ''}, inscrito(a) no CPF sob o nº ${clientData.document || '---'}, residente e domiciliado(a) na ${clientAddr}.`;
+        // Tag Composta: Qualificação Completa (Lógica PF vs PJ)
+        let clientQual = '';
+        if (clientData.clientType === 'Pessoa Jurídica') {
+            clientQual = `${clientFull}, inscrita no CNPJ sob o nº ${clientData.document || '---'}, com sede na ${clientAddr}`;
+            if (clientData.representativeName) {
+                clientQual += `, neste ato representada por seu ${clientData.representativeRole || 'representante legal'}, ${clientData.representativeName}, portador do RG nº ${clientData.representativeRg || '---'} e CPF nº ${clientData.representativeCpf || '---'}`;
+            }
+        } else {
+            clientQual = `${clientFull}, ${clientData.nationality || 'brasileiro(a)'}, ${clientData.civilStatus || 'solteiro(a)'}, ${clientData.profession || 'trabalhador(a)'}, portador(a) do RG nº ${clientData.rg || '---'} ${clientData.rgIssuer ? clientData.rgIssuer : ''}${clientData.rgIssuanceDate ? ', expedido em ' + format(new Date(clientData.rgIssuanceDate as any), "dd/MM/yyyy") : ''}, inscrito(a) no CPF sob o nº ${clientData.document || '---'}, residente e domiciliado(a) na ${clientAddr}.`;
+        }
 
         const dataMap = {
             'CLIENTE_QUALIFICACAO_COMPLETA': clientQual,
@@ -165,15 +173,24 @@ export async function draftDocument(
             'CLIENTE_ESTADO_CIVIL': clientData.civilStatus || 'solteiro(a)',
             'CLIENTE_PROFISSAO': clientData.profession || 'ajudante geral',
             'CLIENTE_ENDERECO_COMPLETO': clientAddr,
+            'REPRESENTANTE_LEGAL_NOME': clientData.representativeName || '---',
+            'REPRESENTANTE_LEGAL_QUALIFICACAO': clientData.representativeName ? `${clientData.representativeName}, ${clientData.representativeRole || 'Representante'}` : '---',
             'PROCESSO_NUMERO_CNJ': processData.processNumber || 'Pendente',
+            'PROCESSO_NUMERO': processData.processNumber || 'Pendente',
             'PROCESSO_VARA': processData.courtBranch || '---',
             'PROCESSO_FORUM': processData.court || '---',
             'RECLAMADA_NOME': processData.opposingParties?.[0]?.name || '---',
             'RECLAMADA_LISTA_TODOS': processData.opposingParties?.map(p => p.name).join(', ') || '---',
             'ADVOGADO_LIDER_NOME': staffData ? `${staffData.firstName} ${staffData.lastName}` : '---',
             'ADVOGADO_LIDER_OAB': staffData?.oabNumber || '---',
+            'ADVOGADO_LIDER_NACIONALIDADE': staffData?.nationality || '---',
+            'ADVOGADO_LIDER_ESTADO_CIVIL': staffData?.civilStatus || '---',
             'ADVOGADO_LIDER_ENDERECO_PROFISSIONAL': staffAddr,
+            'ADVOGADO_LIDER_QUALIFICACAO_COMPLETA': staffData ? `${staffData.firstName} ${staffData.lastName}, advogado inscrito na OAB sob o nº ${staffData.oabNumber}, ${staffData.nationality || 'brasileiro'}, ${staffData.civilStatus || 'solteiro'}, com escritório profissional na ${staffAddr}` : '---',
             'ESCRITORIO_NOME': officeData?.officeName || 'Bueno Gois Advogados',
+            'ESCRITORIO_ENDERECO': officeData?.address || '---',
+            'ESCRITORIO_TELEFONE': officeData?.phone || '---',
+            'ESCRITORIO_EMAIL': officeData?.adminEmail || '---',
             'DATA_EXTENSO': format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR }),
             'DATA_HOJE': format(new Date(), "dd/MM/yyyy"),
         };

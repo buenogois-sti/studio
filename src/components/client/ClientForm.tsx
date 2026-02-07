@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/select"
 import { SheetFooter } from '@/components/ui/sheet';
 import { H2 } from '@/components/ui/typography';
-import { Loader2, Search, MapPin, Calendar, Building } from 'lucide-react';
+import { Loader2, Search, MapPin, Calendar, Building, User } from 'lucide-react';
 
 import { useFirebase } from '@/firebase';
 import { collection, serverTimestamp, Timestamp, doc, addDoc, updateDoc } from 'firebase/firestore';
@@ -48,6 +48,10 @@ const clientSchema = z.object({
   profession: z.string().optional().or(z.literal('')),
   stateRegistration: z.string().optional().or(z.literal('')),
   municipalRegistration: z.string().optional().or(z.literal('')),
+  representativeName: z.string().optional().or(z.literal('')),
+  representativeCpf: z.string().optional().or(z.literal('')),
+  representativeRg: z.string().optional().or(z.literal('')),
+  representativeRole: z.string().optional().or(z.literal('')),
   phone: z.string().optional().or(z.literal('')),
   mobile: z.string().optional().or(z.literal('')),
   emergencyContact: z.string().optional().or(z.literal('')),
@@ -104,6 +108,10 @@ export function ClientForm({
       profession: client?.profession ?? '',
       stateRegistration: client?.stateRegistration ?? '',
       municipalRegistration: client?.municipalRegistration ?? '',
+      representativeName: client?.representativeName ?? '',
+      representativeCpf: client?.representativeCpf ?? '',
+      representativeRg: client?.representativeRg ?? '',
+      representativeRole: client?.representativeRole ?? '',
       phone: client?.phone ?? '',
       mobile: client?.mobile ?? '',
       emergencyContact: client?.emergencyContact ?? '',
@@ -290,9 +298,9 @@ export function ClientForm({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="active">🟢 Ativo</SelectItem>
-                        <SelectItem value="lead">🟡 Consulta / Lead</SelectItem>
-                        <SelectItem value="inactive">⚪ Inativo</SelectItem>
+                        <SelectItem value="active">Ativo</SelectItem>
+                        <SelectItem value="lead">Lead</SelectItem>
+                        <SelectItem value="inactive">Inativo</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -528,6 +536,57 @@ export function ClientForm({
                 />
             </div>
           </section>
+
+          {isPJ && (
+            <section className="animate-in fade-in slide-in-from-top-2">
+              <div className="flex items-center gap-2 mb-2">
+                <User className="h-5 w-5 text-primary" />
+                <H2>Representante Legal (PJ)</H2>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 bg-muted/20 p-6 rounded-2xl border">
+                <FormField
+                  control={form.control}
+                  name="representativeName"
+                  render={({ field }) => (
+                    <FormItem className="md:col-span-2">
+                      <FormLabel>Nome Completo do Representante</FormLabel>
+                      <FormControl><Input placeholder="Ex: João da Silva" {...field} /></FormControl>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="representativeCpf"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>CPF do Representante</FormLabel>
+                      <FormControl><Input placeholder="000.000.000-00" {...field} /></FormControl>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="representativeRg"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>RG do Representante</FormLabel>
+                      <FormControl><Input placeholder="00.000.000-0" {...field} /></FormControl>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="representativeRole"
+                  render={({ field }) => (
+                    <FormItem className="md:col-span-2">
+                      <FormLabel>Cargo / Vínculo (Ex: Sócio Administrador)</FormLabel>
+                      <FormControl><Input placeholder="Ex: Sócio Administrador" {...field} /></FormControl>
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </section>
+          )}
 
           <section>
             <H2>Contato & Endereço</H2>
