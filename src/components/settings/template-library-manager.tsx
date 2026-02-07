@@ -50,7 +50,7 @@ function TemplateFormDialog({ template }: { template?: DocumentTemplate | null }
 
         const docId = template ? template.id : uuidv4();
         
-        // Mantemos o link completo ou ID conforme inserido, o motor draftDocument usará extractFileId
+        // Mantemos o link completo no banco conforme solicitado
         const docData = {
             ...values,
             id: docId,

@@ -40,10 +40,17 @@ async function replacePlaceholdersInDoc(docsApi: any, fileId: string, dataMap: R
     }));
 
     if (requests.length === 0) return;
+    
     try {
-        await docsApi.documents.batchUpdate({ documentId: fileId, requestBody: { requests } });
-    } catch (error) {
-        console.error('[replacePlaceholders] Error:', error);
+        console.log(`[DocsAutomation] Iniciando batchUpdate para o doc: ${fileId}`);
+        await docsApi.documents.batchUpdate({ 
+            documentId: fileId, 
+            requestBody: { requests } 
+        });
+        console.log(`[DocsAutomation] Sucesso na substituição de ${requests.length} tags.`);
+    } catch (error: any) {
+        console.error('[DocsAutomation] Erro crítico no Google Docs batchUpdate:', error.message);
+        throw new Error(`Falha técnica na edição do rascunho: ${error.message}`);
     }
 }
 
@@ -139,11 +146,15 @@ export async function draftDocument(
         if (!copiedFile.id) throw new Error("Falha ao criar cópia do modelo no Google Drive.");
 
         // Preparar dados para substituição (Tags)
-        const clientAddr = clientData.address ? `${clientData.address.street || ''}, nº ${clientData.address.number || 'S/N'}, ${clientData.address.neighborhood || ''}, ${clientData.address.city || ''}/${clientData.address.state || ''}` : '---';
+        const clientAddr = clientData.address ? `${clientData.address.street || ''}, nº ${clientData.address.number || 'S/N'}, ${clientData.address.neighborhood || ''}, ${clientData.address.city || ''}/${clientData.address.state || ''}, CEP: ${clientData.address.zipCode || '---'}` : '---';
         const staffAddr = staffData?.address ? `${staffData.address.street || ''}, nº ${staffData.address.number || 'S/N'}, ${staffData.address.neighborhood || ''}, ${staffData.address.city || ''}/${staffData.address.state || ''}` : '---';
         const clientFull = `${clientData.firstName} ${clientData.lastName || ''}`.trim();
 
+        // Tag Composta: Qualificação Completa
+        const clientQual = `${clientFull}, ${clientData.nationality || 'brasileiro(a)'}, ${clientData.civilStatus || 'solteiro(a)'}, ${clientData.profession || 'trabalhador(a)'}, portador(a) do RG nº ${clientData.rg || '---'} ${clientData.rgIssuer ? clientData.rgIssuer : ''}${clientData.rgIssuanceDate ? ', expedido em ' + format(new Date(clientData.rgIssuanceDate as any), "dd/MM/yyyy") : ''}, inscrito(a) no CPF sob o nº ${clientData.document || '---'}, residente e domiciliado(a) na ${clientAddr}.`;
+
         const dataMap = {
+            'CLIENTE_QUALIFICACAO_COMPLETA': clientQual,
             'CLIENTE_NOME_COMPLETO': clientFull,
             'RECLAMANTE_NOME': clientFull,
             'CLIENTE_CPF_CNPJ': clientData.document || '---',
@@ -175,7 +186,7 @@ export async function draftDocument(
             timeline: FieldValue.arrayUnion({
                 id: uuidv4(),
                 type: 'petition',
-                description: `DOCUMENTO GERADO: "${documentName}". Disponível no Drive.`,
+                description: `DOCUMENTO GERADO: "${documentName}". Disponível no Drive com qualificação completa.`,
                 date: Timestamp.now(),
                 authorName: session.user.name || 'Sistema'
             }),
