@@ -39,7 +39,7 @@ import Link from 'next/link';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { useFirebase, useCollection, useMemoFirebase, useDoc } from '@/firebase';
 import { collection, query, orderBy, limit, Timestamp, where, doc } from 'firebase/firestore';
-import type { Client, FinancialTitle, Process, Hearing, Log, UserProfile, StaffCredit } from '@/lib/types';
+import type { Client, FinancialTitle, Process, Hearing, Log, UserProfile, StaffCredit, LegalDeadline } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format, isBefore, startOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -123,7 +123,7 @@ function AIAdvisor({ stats, activities, isLoading, role }: { stats: any, activit
                             Solicite uma análise estratégica baseada nos dados do {role === 'admin' ? 'escritório' : 'seu perfil'}.
                         </p>
                         <Button onClick={handleAnalyze} disabled={isAnalyzing} className="bg-primary text-primary-foreground font-bold shadow-lg shadow-primary/20">
-                            {isAnalyzing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Sparkles className="h-4 w-4 mr-2" />}
+                            {isAnalyzing ? <Loader2 className="h-3 w-3 animate-spin mr-2" /> : <Sparkles className="h-3 w-3 mr-2" />}
                             Gerar Insights
                         </Button>
                     </div>
@@ -157,7 +157,7 @@ function AdminDashboard({ stats, isLoading, logsData, hearingsData, chartData }:
   );
 }
 
-function LawyerDashboard({ stats, isLoading, userId, hearingsData, deadlinesData }: any) {
+function LawyerDashboard({ stats, isLoading, hearingsData, deadlinesData }: any) {
   return (
     <div className="space-y-8">
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -191,7 +191,6 @@ function FinancialDashboard({ stats, isLoading, titlesData }: any) {
       <Card className="bg-[#0f172a] border-border/50">
         <CardHeader><CardTitle className="text-white font-headline">Lançamentos Críticos</CardTitle></CardHeader>
         <CardContent>
-          {/* Tabela simplificada de vencimentos */}
           <div className="space-y-4">
             {titlesData?.map((t: any) => (
               <div key={t.id} className="flex items-center justify-between p-3 rounded-lg bg-black/20 border border-white/5">
@@ -452,7 +451,7 @@ export default function Dashboard() {
       </div>
 
       {role === 'admin' && <AdminDashboard stats={stats} isLoading={isLoading} logsData={logsData?.map(l => l.description) || []} hearingsData={hearingsData} chartData={chartData} />}
-      {role === 'lawyer' && <LawyerDashboard stats={stats} isLoading={isLoading} userId={session?.user?.id} hearingsData={hearingsData} deadlinesData={deadlinesData} />}
+      {role === 'lawyer' && <LawyerDashboard stats={stats} isLoading={isLoading} hearingsData={hearingsData} deadlinesData={deadlinesData} />}
       {role === 'financial' && <FinancialDashboard stats={stats} isLoading={isLoading} titlesData={titlesData} />}
       {role === 'assistant' && <AssistantDashboard stats={stats} hearingsData={hearingsData} leadsData={[]} isLoading={isLoading} />}
     </div>
