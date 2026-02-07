@@ -19,7 +19,8 @@ import {
   ChevronLeft,
   ChevronRight,
   FolderKanban,
-  FolderOpen
+  FolderOpen,
+  UserMinus
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
@@ -37,7 +38,7 @@ import { ClientForm } from '@/components/client/ClientForm';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, doc, deleteDoc, query, limit, orderBy } from 'firebase/firestore';
+import { collection, doc, deleteDoc, query, limit, orderBy, updateDoc, serverTimestamp } from 'firebase/firestore';
 import type { Client, Process, ClientStatus } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/use-toast';
@@ -64,7 +65,9 @@ export default function ClientsPage() {
   const [selectedClientForDetails, setSelectedClientForDetails] = React.useState<Client | null>(null);
   const [editingClient, setEditingClient] = React.useState<Client | null>(null);
   const [clientToDelete, setClientToDelete] = React.useState<Client | null>(null);
+  const [clientToDeactivate, setClientToDeactivate] = React.useState<Client | null>(null);
   const [isDeleting, setIsDeleting] = React.useState(false);
+  const [isDeactivating, setIsDeactivating] = React.useState(false);
   const [isSyncing, setIsSyncing] = React.useState<string | null>(null);
   const [searchTerm, setSearchTerm] = React.useState(urlSearchTerm || '');
   const [searchResults, setSearchResults] = React.useState<Client[] | null>(null);
@@ -109,12 +112,18 @@ export default function ClientsPage() {
   }, [searchTerm, statusFilter]);
 
   const filteredClients = React.useMemo(() => {
+    // Por padrão, não mostramos inativos na lista de CRM a menos que o filtro peça
     let result = searchResults || clientsData || [];
+    
     if (statusFilter !== 'all') {
       result = result.filter(c => c.status === statusFilter);
+    } else if (!searchTerm) {
+      // Se não houver busca e o filtro for 'all', ocultamos os inativos da visualização principal
+      result = result.filter(c => c.status !== 'inactive');
     }
+    
     return result;
-  }, [clientsData, searchResults, statusFilter]);
+  }, [clientsData, searchResults, statusFilter, searchTerm]);
 
   const totalPages = Math.max(1, Math.ceil(filteredClients.length / ITEMS_PER_PAGE));
   const paginatedClients = React.useMemo(() => {
@@ -163,6 +172,25 @@ export default function ClientsPage() {
     } catch (error: any) {
         toast({ variant: 'destructive', title: 'Erro', description: error.message });
     } finally { setIsDeleting(false); }
+  };
+
+  const confirmDeactivate = async () => {
+    if (!firestore || !clientToDeactivate || isDeactivating) return;
+    setIsDeactivating(true);
+    try {
+        const clientRef = doc(firestore, 'clients', clientToDeactivate.id);
+        await updateDoc(clientRef, {
+            status: 'inactive',
+            updatedAt: serverTimestamp()
+        });
+        toast({ 
+            title: 'Cliente Desativado', 
+            description: `${clientToDeactivate.firstName} foi movido para o Arquivo Digital.` 
+        });
+        setClientToDeactivate(null);
+    } catch (error: any) {
+        toast({ variant: 'destructive', title: 'Erro', description: error.message });
+    } finally { setIsDeactivating(false); }
   };
 
   const handleSyncClient = async (client: Client) => {
@@ -237,6 +265,10 @@ export default function ClientsPage() {
                               <DropdownMenuContent align="end" className="w-56 bg-card border-border">
                                   <DropdownMenuItem onClick={() => handleViewDetails(client)} className="font-bold"><UserCheck className="mr-2 h-4 w-4 text-primary" /> Ficha Completa</DropdownMenuItem>
                                   <DropdownMenuItem onClick={() => handleEdit(client)}><Edit className="mr-2 h-4 w-4" /> Editar</DropdownMenuItem>
+                                  <DropdownMenuSeparator className="bg-white/10" />
+                                  <DropdownMenuItem onClick={() => setClientToDeactivate(client)} className="text-amber-400">
+                                    <UserMinus className="mr-2 h-4 w-4" /> Desativar Cadastro
+                                  </DropdownMenuItem>
                                   <DropdownMenuSeparator className="bg-white/10" />
                                   <DropdownMenuItem className="text-destructive font-bold" onClick={() => setClientToDelete(client)}><Trash2 className="mr-2 h-4 w-4" /> Excluir</DropdownMenuItem>
                               </DropdownMenuContent>
@@ -360,9 +392,43 @@ export default function ClientsPage() {
 
       <ClientDetailsSheet client={selectedClientForDetails} open={isDetailsOpen} onOpenChange={setIsDetailsOpen} />
 
+      {/* Alerta de Desativação */}
+      <AlertDialog open={!!clientToDeactivate} onOpenChange={(open) => !isDeactivating && !open && setClientToDeactivate(null)}>
+        <AlertDialogContent className="bg-[#0f172a] border-border">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-white flex items-center gap-2">
+              <UserMinus className="h-5 w-5 text-amber-400" />
+              Desativar Cliente?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-400">
+              Isso marcará <strong>{clientToDeactivate?.firstName} {clientToDeactivate?.lastName}</strong> como inativo. 
+              O registro será movido para o <strong>Arquivo Digital</strong> e não aparecerá mais nesta listagem.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-transparent border-border text-white hover:bg-white/5" disabled={isDeactivating}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeactivate} disabled={isDeactivating} className="bg-amber-600 text-white hover:bg-amber-700">
+              {isDeactivating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Confirmar Desativação'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Alerta de Exclusão */}
       <AlertDialog open={!!clientToDelete} onOpenChange={(open) => !isDeleting && !open && setClientToDelete(null)}>
-        <AlertDialogContent className="bg-[#0f172a] border-border"><AlertDialogHeader><AlertDialogTitle className="text-white">Excluir Cliente?</AlertDialogTitle><AlertDialogDescription className="text-slate-400">Isso removerá os dados de <strong>{clientToDelete?.firstName} {clientToDelete?.lastName}</strong> permanentemente.</AlertDialogDescription></AlertDialogHeader>
-          <AlertDialogFooter><AlertDialogCancel className="bg-transparent border-border text-white hover:bg-white/5" disabled={isDeleting}>Cancelar</AlertDialogCancel><AlertDialogAction onClick={confirmDelete} disabled={isDeleting} className="bg-destructive text-white hover:bg-destructive/90">{isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Confirmar Exclusão'}</AlertDialogAction></AlertDialogFooter>
+        <AlertDialogContent className="bg-[#0f172a] border-border">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-white">Excluir Cliente?</AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-400">
+              Isso removerá os dados de <strong>{clientToDelete?.firstName} {clientToDelete?.lastName}</strong> permanentemente de todo o sistema.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-transparent border-border text-white hover:bg-white/5" disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} disabled={isDeleting} className="bg-destructive text-white hover:bg-destructive/90">
+              {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Confirmar Exclusão'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </>
