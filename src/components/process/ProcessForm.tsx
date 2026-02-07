@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 import { Form } from '@/components/ui/form';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection } from 'firebase/firestore';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { Loader2 } from 'lucide-react';
 
 import type { Process, Staff } from '@/lib/types';
 import { useProcessForm, processSchema, type ProcessFormValues } from '@/hooks/use-process-form';
@@ -197,29 +197,38 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
           processId={process?.id}
         />
 
-        <div className={cn(
-          "flex-1 overflow-y-auto px-1 pb-28 transition-opacity duration-300",
-          isTransitioning ? "opacity-0" : "opacity-100"
-        )}>
-          <fieldset 
-            disabled={isSaving} 
-            className="animate-in fade-in slide-in-from-right-2 duration-300"
-            aria-busy={isSaving}
-            aria-live="polite"
-          >
-            {StepContent}
-          </fieldset>
+        <div className="relative flex-1 overflow-hidden">
+          {isTransitioning && (
+            <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-background/60 backdrop-blur-[2px] animate-in fade-in duration-200">
+              <Loader2 className="h-10 w-10 animate-spin text-primary" />
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground mt-4">Processando Etapa...</p>
+            </div>
+          )}
+          
+          <div className={cn(
+            "h-full overflow-y-auto px-1 pb-28 transition-all duration-300",
+            isTransitioning ? "opacity-0 scale-95 blur-sm" : "opacity-100 scale-100 blur-0"
+          )}>
+            <fieldset 
+              disabled={isSaving} 
+              className="animate-in fade-in slide-in-from-right-2 duration-300 h-full"
+              aria-busy={isSaving}
+              aria-live="polite"
+            >
+              {StepContent}
+            </fieldset>
 
-          <div className="sticky bottom-0 w-full border-t bg-background/95 backdrop-blur-sm z-50 shadow-lg">
-            <ProcessFormFooter
-              currentStep={currentStep}
-              totalSteps={STEPS.length}
-              isSaving={isSaving}
-              hasErrors={hasErrors}
-              onPrevious={() => handleStepChange('prev')}
-              onNext={() => handleStepChange('next')}
-              onSubmit={() => form.handleSubmit(onSubmit)()}
-            />
+            <div className="sticky bottom-0 w-full border-t bg-background/95 backdrop-blur-sm z-50 shadow-lg mt-auto">
+              <ProcessFormFooter
+                currentStep={currentStep}
+                totalSteps={STEPS.length}
+                isSaving={isSaving}
+                hasErrors={hasErrors}
+                onPrevious={() => handleStepChange('prev')}
+                onNext={() => handleStepChange('next')}
+                onSubmit={() => form.handleSubmit(onSubmit)()}
+              />
+            </div>
           </div>
         </div>
       </form>

@@ -19,6 +19,7 @@ export function ClientSearchInput({ onSelect, selectedClientId, onCreateNew }: C
   const [search, setSearch] = useState('');
   const [results, setResults] = useState<Client[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isInitialLoading, setIsInitialLoading] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -26,11 +27,15 @@ export function ClientSearchInput({ onSelect, selectedClientId, onCreateNew }: C
   // OTIMIZAÇÃO: Busca cliente selecionado apenas quando o ID muda
   useEffect(() => {
     if (selectedClientId) {
+      setIsInitialLoading(true);
       getClientById(selectedClientId).then((client) => {
         if (client) setSelectedClient(client);
-      }).catch(err => console.error('[ClientSearchInput] Erro ao carregar cliente:', err));
+      })
+      .catch(err => console.error('[ClientSearchInput] Erro ao carregar cliente:', err))
+      .finally(() => setIsInitialLoading(false));
     } else {
       setSelectedClient(null);
+      setIsInitialLoading(false);
     }
   }, [selectedClientId]);
 
@@ -155,8 +160,14 @@ export function ClientSearchInput({ onSelect, selectedClientId, onCreateNew }: C
             setTimeout(() => inputRef.current?.focus(), 50);
           }
         }}
+        disabled={isInitialLoading}
       >
-        {selectedClient ? (
+        {isInitialLoading ? (
+          <div className="flex items-center gap-2 w-full animate-pulse">
+            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+            <span className="text-muted-foreground italic text-xs">Carregando dados...</span>
+          </div>
+        ) : selectedClient ? (
           <div className="flex items-center gap-2 w-full animate-in fade-in duration-200">
             <User className="h-4 w-4 text-primary" />
             <span className="font-semibold">{selectedClient.firstName} {selectedClient.lastName}</span>
