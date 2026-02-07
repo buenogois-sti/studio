@@ -35,7 +35,7 @@ import { ClientForm } from '@/components/client/ClientForm';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, doc, deleteDoc, query, limit } from 'firebase/firestore';
+import { collection, doc, deleteDoc, query, limit, orderBy } from 'firebase/firestore';
 import type { Client, Process, ClientStatus } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/use-toast';
@@ -74,7 +74,8 @@ export default function ClientsPage() {
   const { firestore } = useFirebase();
   const { data: session, status } = useSession();
 
-  const clientsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'clients'), limit(100)) : null), [firestore]);
+  // OTIMIZAÇÃO: Limites estritos para evitar congelamento
+  const clientsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'clients'), orderBy('updatedAt', 'desc'), limit(100)) : null), [firestore]);
   const { data: clientsData, isLoading: isLoadingClients } = useCollection<Client>(clientsQuery);
   const clients = clientsData || [];
 
@@ -82,7 +83,6 @@ export default function ClientsPage() {
   const { data: processesData, isLoading: isLoadingProcesses } = useCollection<Process>(processesQuery);
   const processes = processesData || [];
 
-  // Busca inicial baseada na URL ou mudança de termo
   React.useEffect(() => {
     if (!searchTerm.trim()) {
       setSearchResults(null);

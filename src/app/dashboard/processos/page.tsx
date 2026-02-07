@@ -1,4 +1,3 @@
-
 'use client';
 import * as React from 'react';
 import {
@@ -46,7 +45,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, doc, deleteDoc, query, limit } from 'firebase/firestore';
+import { collection, doc, deleteDoc, query, limit, orderBy } from 'firebase/firestore';
 import type { Process, Client, Staff, Hearing, FinancialEvent } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/use-toast';
@@ -68,7 +67,7 @@ const STATUS_CONFIG = {
   'Arquivado': { label: 'Arquivado', color: 'bg-slate-500/10 text-slate-400 border-slate-500/20', icon: Archive },
 };
 
-const ITEMS_PER_PAGE = 5;
+const ITEMS_PER_PAGE = 8;
 
 export default function ProcessosPage() {
   const [isSheetOpen, setIsSheetOpen] = React.useState(false);
@@ -91,25 +90,25 @@ export default function ProcessosPage() {
   const searchParams = useSearchParams();
   const clientIdFilter = searchParams.get('clientId');
 
-  const processesQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'processes'), limit(100)) : null), [firestore]);
+  // OTIMIZAÇÃO: Limites estritos nas queries para evitar congelamento
+  const processesQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'processes'), orderBy('updatedAt', 'desc'), limit(100)) : null), [firestore]);
   const { data: processesData, isLoading: isLoadingProcesses } = useCollection<Process>(processesQuery);
 
-  const hearingsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'hearings') : null), [firestore]);
+  const hearingsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'hearings'), limit(100)) : null), [firestore]);
   const { data: hearingsData } = useCollection<Hearing>(hearingsQuery);
 
-  const clientsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'clients') : null), [firestore]);
+  const clientsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'clients'), limit(100)) : null), [firestore]);
   const { data: clientsData } = useCollection<Client>(clientsQuery);
 
-  const staffQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'staff') : null), [firestore]);
+  const staffQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'staff'), limit(50)) : null), [firestore]);
   const { data: staffData } = useCollection<Staff>(staffQuery);
 
-  const financialEventsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'financial_events') : null), [firestore]);
+  const financialEventsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'financial_events'), limit(100)) : null), [firestore]);
   const { data: financialEventsData } = useCollection<FinancialEvent>(financialEventsQuery);
   
   const clientsMap = React.useMemo(() => new Map(clientsData?.map(c => [c.id, c])), [clientsData]);
   const staffMap = React.useMemo(() => new Map(staffData?.map(s => [s.id, s])), [staffData]);
 
-  // KPIs de Processos
   const stats = React.useMemo(() => {
     if (!processesData) return { total: 0, active: 0, totalValue: 0, avgValue: 0 };
     const total = processesData.length;
@@ -119,7 +118,6 @@ export default function ProcessosPage() {
     return { total, active, totalValue, avgValue };
   }, [processesData]);
 
-  // Busca robusta com debounce
   React.useEffect(() => {
     if (!searchTerm.trim()) {
       setSearchResults(null);
@@ -170,10 +168,6 @@ export default function ProcessosPage() {
     return filteredProcesses.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
   }, [filteredProcesses, currentPage]);
 
-  React.useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, clientIdFilter]);
-
   const handleSyncProcess = React.useCallback(async (process: Process) => {
     if (isSyncing) return;
     setIsSyncing(process.id);
@@ -200,7 +194,7 @@ export default function ProcessosPage() {
           <div className="relative w-full max-sm:w-full max-w-sm">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input 
-              placeholder="Pesquisar por CNPJ, Cliente ou Réu..." 
+              placeholder="Pesquisar..." 
               className="pl-8 pr-8 bg-[#0f172a] border-border/50 text-white h-10" 
               value={searchTerm} 
               onChange={e => setSearchTerm(e.target.value)} 
@@ -213,7 +207,6 @@ export default function ProcessosPage() {
         </div>
       </div>
 
-      {/* KPI Bar - NEW */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card className="bg-[#0f172a] border-white/5">
           <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between">

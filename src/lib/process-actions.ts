@@ -9,31 +9,15 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/options';
 import { createNotification } from './notification-actions';
 
-async function serializeProcess(doc: adminFirestore.DocumentSnapshot): Promise<Process | null> {
+// Helper simplificado para evitar N+1 durante buscas em lote
+async function serializeProcessBasic(doc: adminFirestore.DocumentSnapshot): Promise<Process | null> {
     const data = doc.data();
     const id = doc.id;
+    if (!data) return null;
 
-    if (!data) {
-        return null;
-    }
-
-    let clientName = '';
-    if (data.clientId && firestoreAdmin) {
-        try {
-            const clientDoc = await firestoreAdmin.collection('clients').doc(data.clientId).get();
-            if (clientDoc.exists) {
-                const c = clientDoc.data();
-                clientName = `${c?.firstName || ''} ${c?.lastName || ''}`.trim();
-            }
-        } catch (e) {
-            console.warn(`Could not fetch client name for process ${id}`);
-        }
-    }
-    
     return {
         id,
         clientId: data.clientId,
-        clientName,
         name: data.name || '',
         processNumber: data.processNumber || '',
         court: data.court || '',
@@ -51,7 +35,6 @@ async function serializeProcess(doc: adminFirestore.DocumentSnapshot): Promise<P
     } as Process;
 }
 
-
 export async function searchProcesses(query: string): Promise<Process[]> {
     if (!query || query.length < 2) return [];
     
@@ -60,37 +43,34 @@ export async function searchProcesses(query: string): Promise<Process[]> {
     }
     
     try {
-        // Otimização: Buscamos os processos mais recentes para filtrar em memória,
-        // garantindo busca por réus e nomes parciais que o Firestore nativo não suporta bem em arrays.
-        const processesSnapshot = await firestoreAdmin.collection('processes').orderBy('updatedAt', 'desc').limit(300).get();
+        // Otimização: Buscamos apenas os 200 processos mais recentes para filtrar em memória
+        // Isso evita o crash do navegador e reduz custos drásticos.
+        const processesSnapshot = await firestoreAdmin.collection('processes')
+            .orderBy('updatedAt', 'desc')
+            .limit(200)
+            .get();
         
-        const allProcessesData = await Promise.all(
-            processesSnapshot.docs.map(doc => serializeProcess(doc))
-        );
+        const processes = processesSnapshot.docs.map(doc => {
+            const data = doc.data();
+            return { id: doc.id, ...data } as Process;
+        });
 
         const q = query.toLowerCase();
-        const filtered = allProcessesData.filter((process): process is Process => {
-            if (!process) return false;
-            
-            // Busca no Título e Número
+        const filtered = processes.filter(process => {
             const matchesBasic = process.name.toLowerCase().includes(q) || 
                                 (process.processNumber || '').includes(q);
             
-            // Busca no Nome do Cliente
-            const matchesClient = (process.clientName || '').toLowerCase().includes(q);
-            
-            // Busca nos Réus (Polo Passivo)
             const matchesOpposing = !!process.opposingParties?.some(party => 
                 party.name.toLowerCase().includes(q)
             );
 
-            return matchesBasic || matchesClient || matchesOpposing;
+            return matchesBasic || matchesOpposing;
         });
 
         return filtered.slice(0, 10);
     } catch (error) {
         console.error("Error searching processes:", error);
-        throw new Error('Ocorreu um erro ao buscar os processos.');
+        return [];
     }
 }
 
