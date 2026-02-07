@@ -30,7 +30,9 @@ import {
   Check,
   AlertTriangle,
   RefreshCw,
-  CalendarDays
+  CalendarDays,
+  Lock,
+  Unlock
 } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase, useDoc } from '@/firebase';
 import { collection, query, where, getDocs, getDoc, FieldValue, Timestamp, doc, deleteDoc, orderBy, limit } from 'firebase/firestore';
@@ -45,7 +47,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
 import { H1 } from '@/components/ui/typography';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { processRepasse, launchPayroll, deleteStaffCredit, updateStaffCredit, addManualStaffCredit, updateCreditForecast } from '@/lib/finance-actions';
+import { processRepasse, launchPayroll, deleteStaffCredit, updateStaffCredit, addManualStaffCredit, updateCreditForecast, requestCreditUnlock } from '@/lib/finance-actions';
 import {
   Dialog,
   DialogContent,
@@ -215,13 +217,6 @@ function PaymentHistory({ onShowVoucher }: { onShowVoucher: (t: FinancialTitle) 
       <Loader2 className="h-10 w-10 animate-spin text-primary" />
       <p className="text-sm text-muted-foreground mt-4">Carregando histórico...</p>
     </div>
-  );
-
-  if (error) return (
-    <Card className="bg-rose-500/5 border-rose-500/20 p-12 text-center flex flex-col items-center gap-4">
-      <AlertTriangle className="h-12 w-12 text-rose-500" />
-      <h3 className="text-xl font-bold text-white">Erro ao carregar histórico</h3>
-    </Card>
   );
 
   return (
@@ -490,7 +485,9 @@ function ManageCreditsDialog({ staff, open, onOpenChange, onUpdate, isAdmin }: {
 
 function LawyerWalletView({ staffId, staffName }: { staffId: string; staffName: string }) {
   const { firestore } = useFirebase();
+  const { toast } = useToast();
   const [filter, setFilter] = React.useState<'ALL' | 'DISPONIVEL' | 'RETIDO'>('ALL');
+  const [isRequesting, setIsRequesting] = React.useState<string | null>(null);
 
   const creditsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -504,6 +501,19 @@ function LawyerWalletView({ staffId, staffName }: { staffId: string; staffName: 
     if (filter === 'ALL') return credits.filter(c => c.status !== 'PAGO');
     return credits.filter(c => c.status === filter);
   }, [credits, filter]);
+
+  const handleRequestUnlock = async (credit: StaffCredit) => {
+    if (isRequesting) return;
+    setIsRequesting(credit.id);
+    try {
+      await requestCreditUnlock(staffId, credit.id, "Sinalização de recebimento pelo cliente (Alvará/Guia).");
+      toast({ title: 'Solicitação Enviada!', description: 'O financeiro foi notificado para validar o recebimento.' });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Erro na solicitação', description: e.message });
+    } finally {
+      setIsRequesting(null);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -533,6 +543,11 @@ function LawyerWalletView({ staffId, staffName }: { staffId: string; staffName: 
                           c.status === 'DISPONIVEL' ? "bg-emerald-500/20 text-emerald-400" : "bg-blue-500/20 text-blue-400"
                         )}>{c.status}</Badge>
                         <span className="text-[10px] text-muted-foreground font-bold tracking-widest">{c.date ? format(c.date.toDate(), 'dd/MM/yyyy') : 'N/A'}</span>
+                        {(c as any).unlockRequested && (
+                          <Badge variant="outline" className="text-[8px] font-black uppercase bg-amber-500/10 text-amber-400 border-amber-500/20 h-5">
+                            🔒 Desbloqueio Solicitado
+                          </Badge>
+                        )}
                         {c.paymentForecast && (
                           <Badge variant="secondary" className="text-[8px] font-black uppercase bg-primary/10 text-primary border-primary/20 gap-1 h-5">
                             <Clock className="h-2.5 w-2.5" /> Pagamento Previsto: {format(c.paymentForecast.toDate(), 'dd/MM/yyyy')}
@@ -542,8 +557,20 @@ function LawyerWalletView({ staffId, staffName }: { staffId: string; staffName: 
                       <p className="text-sm font-bold text-white truncate">{c.description}</p>
                       <p className="text-[9px] text-slate-500 uppercase font-black tracking-widest mt-1">{c.type}</p>
                     </div>
-                    <div className="text-right ml-6">
+                    <div className="text-right ml-6 flex flex-col items-end gap-2">
                       <span className="text-lg font-black text-white tabular-nums">{c.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                      {c.status === 'RETIDO' && !(c as any).unlockRequested && (
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-7 text-[9px] font-black uppercase text-amber-400 hover:bg-amber-500/10 gap-1"
+                          onClick={() => handleRequestUnlock(c)}
+                          disabled={isRequesting === c.id}
+                        >
+                          {isRequesting === c.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Unlock className="h-3 w-3" />}
+                          Sinalizar Recebimento
+                        </Button>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -600,7 +627,6 @@ export default function RepassesPage() {
         const paid = paidSnap.docs.reduce((sum, d) => sum + (d.data().value || 0), 0);
         setStats({ totalPending: pending, totalPaidMonth: paid, staffCount: staffSnap.size, totalRetained: retained });
       } else if (isLawyer) {
-        // Stats específicas do advogado
         const credSnap = await getDocs(collection(firestore, `staff/${userProfile.id}/credits`));
         let pending = 0; let retained = 0; let paid = 0;
         const startOfCurrentMonth = startOfMonth(new Date());
@@ -651,8 +677,8 @@ export default function RepassesPage() {
     <div className="flex flex-col gap-8 pb-10">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <H1 className="text-white">{isAdmin ? 'Repasses & Carteiras' : 'Minha Carteira Profissional'}</H1>
-          <p className="text-sm text-muted-foreground">{isAdmin ? 'Monitoramento de saldos profissionais e liquidação de honorários.' : 'Acompanhe seus créditos liberados e próximos recebimentos.'}</p>
+          <H1 className="text-white">{isAdmin ? 'Gestão de Carteiras & Repasses' : 'Minha Carteira Profissional'}</H1>
+          <p className="text-sm text-muted-foreground">{isAdmin ? 'Auditoria de saldos vinculados e controle de honorários da banca.' : 'Consulte seus honorários liberados, reembolsos e histórico de liquidações.'}</p>
         </div>
         <div className="flex items-center gap-2">
           {isAdmin && (
@@ -663,10 +689,10 @@ export default function RepassesPage() {
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="bg-emerald-500/5 border-emerald-500/20"><CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-emerald-400 tracking-widest">{isAdmin ? 'Total Liquidado (Mês)' : 'Total Recebido (Mês)'}</CardTitle></CardHeader><CardContent className="p-4 pt-0"><p className="text-2xl font-black text-white">{stats.totalPaidMonth.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p></CardContent></Card>
-        <Card className="bg-amber-500/5 border-amber-500/20"><CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-amber-400 tracking-widest">{isAdmin ? 'Saldos Liberados' : 'Seu Saldo Liberado'}</CardTitle></CardHeader><CardContent className="p-4 pt-0"><p className="text-2xl font-black text-white">{stats.totalPending.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p></CardContent></Card>
-        <Card className="bg-blue-500/5 border-blue-500/20"><CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-blue-400 tracking-widest">{isAdmin ? 'Honorários Retidos' : 'Seus Honorários Retidos'}</CardTitle></CardHeader><CardContent className="p-4 pt-0"><p className="text-2xl font-black text-white">{stats.totalRetained.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p></CardContent></Card>
-        {isAdmin && <Card className="bg-white/5 border-white/10"><CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Profissionais Ativos</CardTitle></CardHeader><CardContent className="p-4 pt-0"><p className="text-2xl font-black text-white">{stats.staffCount}</p></CardContent></Card>}
+        <Card className="bg-emerald-500/5 border-emerald-500/20"><CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-emerald-400 tracking-widest">{isAdmin ? 'Total Liquidado (Mês)' : 'Seu Recebido (Mês)'}</CardTitle></CardHeader><CardContent className="p-4 pt-0"><p className="text-2xl font-black text-white">{stats.totalPaidMonth.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p></CardContent></Card>
+        <Card className="bg-amber-500/5 border-amber-500/20"><CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-amber-400 tracking-widest">{isAdmin ? 'Saldos Liberados (Banca)' : 'Seu Saldo Liberado'}</CardTitle></CardHeader><CardContent className="p-4 pt-0"><p className="text-2xl font-black text-white">{stats.totalPending.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p></CardContent></Card>
+        <Card className="bg-blue-500/5 border-blue-500/20"><CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-blue-400 tracking-widest">{isAdmin ? 'Honorários Retidos (Futuro)' : 'Honorários Retidos'}</CardTitle></CardHeader><CardContent className="p-4 pt-0"><p className="text-2xl font-black text-white">{stats.totalRetained.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p></CardContent></Card>
+        <Card className="bg-white/5 border-white/10"><CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Ativos p/ Liquidação</CardTitle></CardHeader><CardContent className="p-4 pt-0"><p className="text-2xl font-black text-white">{isAdmin ? stats.staffCount : '1'}</p></CardContent></Card>
       </div>
 
       {isAdmin ? (
