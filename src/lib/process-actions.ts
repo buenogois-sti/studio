@@ -167,6 +167,10 @@ export async function draftDocument(
         let lawyerOAB = 'Pendente';
         let lawyerEmail = '';
         let lawyerWhatsapp = '';
+        let lawyerNationality = '';
+        let lawyerCivilStatus = '';
+        let lawyerAddress = '';
+
         if (processData.leadLawyerId) {
             const staffDoc = await firestoreAdmin.collection('staff').doc(processData.leadLawyerId).get();
             if (staffDoc.exists) {
@@ -175,6 +179,11 @@ export async function draftDocument(
                 lawyerOAB = staffData.oabNumber || 'Pendente';
                 lawyerEmail = staffData.email || '';
                 lawyerWhatsapp = staffData.whatsapp || '';
+                lawyerNationality = staffData.nationality || 'brasileiro(a)';
+                lawyerCivilStatus = staffData.civilStatus || 'solteiro(a)';
+                lawyerAddress = staffData.address 
+                    ? `${staffData.address.street || ''}, nº ${staffData.address.number || 'S/N'}, ${staffData.address.neighborhood || ''}, ${staffData.address.city || ''}/${staffData.address.state || ''}`
+                    : 'Endereço profissional não cadastrado';
             }
         }
 
@@ -192,15 +201,18 @@ export async function draftDocument(
 
         // 7. Inteligência: Preenchimento Automático de Dados (Data Merge Avançado)
         const clientAddress = clientData.address 
-            ? `${clientData.address.street || ''}, ${clientData.address.number || 'S/N'}, ${clientData.address.neighborhood || ''}, ${clientData.address.city || ''}/${clientData.address.state || ''}`
+            ? `${clientData.address.street || ''}, nº ${clientData.address.number || 'S/N'}, ${clientData.address.neighborhood || ''}, ${clientData.address.city || ''}/${clientData.address.state || ''}`
             : 'Endereço não informado';
 
         const clientFullName = `${clientData.firstName} ${clientData.lastName || ''}`.trim();
         const firstOpposingParty = processData.opposingParties?.[0]?.name || '---';
         const allOpposingParties = processData.opposingParties?.map(p => p.name).join(', ') || '---';
 
-        // Helper para qualificação completa
-        const qualification = `${clientFullName}, ${clientData.nationality || 'brasileiro(a)'}, ${clientData.civilStatus || 'solteiro(a)'}, ${clientData.profession || 'ajudante geral'}, portador(a) do RG nº ${clientData.rg || '---'} e do CPF nº ${clientData.document || '---'}, residente em ${clientAddress}`;
+        // Helper para qualificação completa do cliente
+        const qualification = `${clientFullName}, ${clientData.nationality || 'brasileiro(a)'}, ${clientData.civilStatus || 'solteiro(a)'}, ${clientData.profession || 'ajudante geral'}, portador(a) do RG nº ${clientData.rg || '---'}${clientData.rgIssuer ? ` ${clientData.rgIssuer}` : ''}, inscrito(a) no CPF/MF sob nº ${clientData.document || '---'}, residente e domiciliado em ${clientAddress}`;
+
+        // Helper para qualificação do advogado
+        const lawyerQualification = `${lawyerName}, advogado inscrito na OAB/${lawyerOAB}, ${lawyerNationality}, ${lawyerCivilStatus}, com escritório profissional situado à ${lawyerAddress}`;
 
         const dataMap = {
             // Tags de Cliente / Reclamante
@@ -210,6 +222,8 @@ export async function draftDocument(
             'CLIENTE_DOCUMENTO': clientData.document || '---',
             'CLIENTE_CPF_CNPJ': clientData.document || '---',
             'CLIENTE_RG': clientData.rg || '---',
+            'CLIENTE_RG_ORGAO': clientData.rgIssuer || '---',
+            'CLIENTE_RG_EXPEDICAO': clientData.rgIssuanceDate || '---',
             'CLIENTE_PIS': clientData.pis || '---',
             'CLIENTE_CTPS': clientData.ctps || '---',
             'CLIENTE_MAE': clientData.motherName || '---',
@@ -241,6 +255,10 @@ export async function draftDocument(
             'ADVOGADO_LIDER_OAB': lawyerOAB,
             'ADVOGADO_LIDER_EMAIL': lawyerEmail,
             'ADVOGADO_LIDER_WHATSAPP': lawyerWhatsapp,
+            'ADVOGADO_LIDER_NACIONALIDADE': lawyerNationality,
+            'ADVOGADO_LIDER_ESTADO_CIVIL': lawyerCivilStatus,
+            'ADVOGADO_LIDER_ENDERECO_PROFISSIONAL': lawyerAddress,
+            'ADVOGADO_LIDER_QUALIFICACAO_COMPLETA': lawyerQualification,
 
             // Tags de Escritório
             'ESCRITORIO_NOME': officeData?.officeName || 'Bueno Gois Advogados e Associados',

@@ -33,6 +33,8 @@ export type Client = {
   status?: ClientStatus;
   motherName?: string;
   rg?: string;
+  rgIssuer?: string;
+  rgIssuanceDate?: string;
   ctps?: string;
   pis?: string;
   nationality?: string;
@@ -285,6 +287,8 @@ export type Staff = {
   email: string;
   phone?: string;
   whatsapp?: string;
+  nationality?: string;
+  civilStatus?: string;
   address?: {
     street?: string;
     number?: string;

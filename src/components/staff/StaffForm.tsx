@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/select"
 import { SheetFooter } from '@/components/ui/sheet';
 import { H2 } from '@/components/ui/typography';
-import { Loader2, Search, DollarSign, Percent, Briefcase, MapPin } from 'lucide-react';
+import { Loader2, Search, DollarSign, Percent, Briefcase, MapPin, Globe, Heart } from 'lucide-react';
 
 import { useFirebase } from '@/firebase';
 import { collection, serverTimestamp, doc, addDoc, updateDoc } from 'firebase/firestore';
@@ -38,6 +38,8 @@ const staffSchema = z.object({
   email: z.string().email({ message: 'E-mail inválido.' }),
   phone: z.string().optional().or(z.literal('')),
   whatsapp: z.string().optional().or(z.literal('')),
+  nationality: z.string().optional().or(z.literal('')),
+  civilStatus: z.string().optional().or(z.literal('')),
   
   address_street: z.string().optional().or(z.literal('')),
   address_number: z.string().optional().or(z.literal('')),
@@ -129,6 +131,8 @@ export function StaffForm({
         email: staff.email,
         phone: staff.phone || '',
         whatsapp: staff.whatsapp || '',
+        nationality: staff.nationality || 'brasileiro(a)',
+        civilStatus: staff.civilStatus || 'solteiro(a)',
         address_street: staff.address?.street ?? '',
         address_number: staff.address?.number ?? '',
         address_complement: staff.address?.complement ?? '',
@@ -156,6 +160,8 @@ export function StaffForm({
         email: '',
         phone: '',
         whatsapp: '',
+        nationality: 'brasileiro(a)',
+        civilStatus: 'solteiro(a)',
         address_street: '',
         address_number: '',
         address_complement: '',
@@ -349,6 +355,30 @@ export function StaffForm({
                     <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">Sobrenome *</FormLabel>
                     <FormControl><Input className="h-11 bg-background" placeholder="Sobrenome completo" {...field} /></FormControl>
                     <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="nationality"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2">
+                      <Globe className="h-3.5 w-3.5" /> Nacionalidade
+                    </FormLabel>
+                    <FormControl><Input className="h-11 bg-background" placeholder="brasileiro(a)" {...field} /></FormControl>
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="civilStatus"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2">
+                      <Heart className="h-3.5 w-3.5" /> Estado Civil
+                    </FormLabel>
+                    <FormControl><Input className="h-11 bg-background" placeholder="solteiro(a)" {...field} /></FormControl>
                   </FormItem>
                 )}
               />

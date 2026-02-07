@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/select"
 import { SheetFooter } from '@/components/ui/sheet';
 import { H2 } from '@/components/ui/typography';
-import { Loader2, Search, MapPin } from 'lucide-react';
+import { Loader2, Search, MapPin, Calendar, Building } from 'lucide-react';
 
 import { useFirebase } from '@/firebase';
 import { collection, serverTimestamp, Timestamp, doc, addDoc, updateDoc } from 'firebase/firestore';
@@ -39,6 +39,8 @@ const clientSchema = z.object({
   document: z.string().min(11, { message: 'O documento deve ser um CPF ou CNPJ válido.' }),
   motherName: z.string().optional().or(z.literal('')),
   rg: z.string().optional().or(z.literal('')),
+  rgIssuer: z.string().optional().or(z.literal('')),
+  rgIssuanceDate: z.string().optional().or(z.literal('')),
   ctps: z.string().optional().or(z.literal('')),
   pis: z.string().optional().or(z.literal('')),
   nationality: z.string().optional().or(z.literal('')),
@@ -93,6 +95,8 @@ export function ClientForm({
       document: client?.document ?? '',
       motherName: client?.motherName ?? '',
       rg: client?.rg ?? '',
+      rgIssuer: client?.rgIssuer ?? '',
+      rgIssuanceDate: client?.rgIssuanceDate ?? '',
       ctps: client?.ctps ?? '',
       pis: client?.pis ?? '',
       nationality: client?.nationality ?? 'brasileiro(a)',
@@ -429,6 +433,32 @@ export function ClientForm({
                         <FormLabel>RG</FormLabel>
                         <FormControl>
                           <Input placeholder="00.000.000-0" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="rgIssuer"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex items-center gap-2"><Building className="h-3.5 w-3.5" /> Órgão Emissor</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Ex: SSP/SP" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="rgIssuanceDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex items-center gap-2"><Calendar className="h-3.5 w-3.5" /> Data Expedição</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>

@@ -745,15 +745,16 @@ function TagsDictionaryTab() {
   const { toast } = useToast();
   const sections = [
     {
-      title: "Padrão de Qualificação (Mandatos / Iniciais)",
+      title: "Padrão de Qualificação (Mandatos / Substabelecimentos)",
       items: [
         { tag: "{{CLIENTE_NOME_COMPLETO}}", desc: "Nome completo / Razão Social" },
-        { tag: "{{RECLAMANTE_NOME}}", desc: "Alias p/ peças trabalhistas (Ativo)" },
         { tag: "{{CLIENTE_CPF_CNPJ}}", desc: "CPF ou CNPJ formatado" },
         { tag: "{{CLIENTE_RG}}", desc: "Número do RG" },
+        { tag: "{{CLIENTE_RG_ORGAO}}", desc: "Órgão emissor do RG" },
+        { tag: "{{CLIENTE_RG_EXPEDICAO}}", desc: "Data de expedição do RG" },
         { tag: "{{CLIENTE_NACIONALIDADE}}", desc: "Ex: brasileiro(a)" },
-        { tag: "{{CLIENTE_ESTADO_CIVIL}}", desc: "Ex: solteiro(a), casado(a)" },
-        { tag: "{{CLIENTE_PROFISSAO}}", desc: "Ex: ajudante geral, motorista" },
+        { tag: "{{CLIENTE_ESTADO_CIVIL}}", desc: "Ex: solteiro(a), divorciado(a)" },
+        { tag: "{{CLIENTE_PROFISSAO}}", desc: "Ex: vigilante, ajudante geral" },
         { tag: "{{CLIENTE_QUALIFICACAO_COMPLETA}}", desc: "Bloco completo de dados do cliente." },
         { tag: "{{CLIENTE_ENDERECO_COMPLETO}}", desc: "Logradouro, nº, Bairro, Cidade/UF" },
       ]
@@ -764,19 +765,29 @@ function TagsDictionaryTab() {
         { tag: "{{PROCESSO_NUMERO_CNJ}}", desc: "Número oficial do processo" },
         { tag: "{{PROCESSO_VARA}}", desc: "Vara / Câmara (Ex: 6ª Vara do Trabalho)" },
         { tag: "{{PROCESSO_FORUM}}", desc: "Fórum / Comarca (Ex: São Bernardo do Campo)" },
+        { tag: "{{RECLAMANTE_NOME}}", desc: "Alias p/ peças trabalhistas (Ativo)" },
         { tag: "{{RECLAMADA_NOME}}", desc: "Primeiro Réu (Polo Passivo)" },
         { tag: "{{RECLAMADA_LISTA_TODOS}}", desc: "Todos os Réus (Lista separada por vírgula)" },
       ]
     },
     {
-      title: "Dados da Banca Bueno Gois",
+      title: "Dados do Advogado Líder (Substabelecente)",
       items: [
         { tag: "{{ADVOGADO_LIDER_NOME}}", desc: "Nome do advogado titular" },
-        { tag: "{{ADVOGADO_LIDER_OAB}}", desc: "Número da OAB do titular" },
-        { tag: "{{ADVOGADO_LIDER_EMAIL}}", desc: "Email corporativo do responsável" },
+        { tag: "{{ADVOGADO_LIDER_OAB}}", desc: "OAB do titular" },
+        { tag: "{{ADVOGADO_LIDER_NACIONALIDADE}}", desc: "Nacionalidade do advogado" },
+        { tag: "{{ADVOGADO_LIDER_ESTADO_CIVIL}}", desc: "Estado civil do advogado" },
+        { tag: "{{ADVOGADO_LIDER_ENDERECO_PROFISSIONAL}}", desc: "Endereço do escritório profissional" },
+        { tag: "{{ADVOGADO_LIDER_QUALIFICACAO_COMPLETA}}", desc: "Bloco de qualificação p/ substabelecimentos." },
+      ]
+    },
+    {
+      title: "Dados Institucionais Bueno Gois",
+      items: [
         { tag: "{{ESCRITORIO_NOME}}", desc: "Bueno Gois Advogados e Associados" },
         { tag: "{{ESCRITORIO_ENDERECO}}", desc: "Endereço da sede configurado" },
         { tag: "{{ESCRITORIO_TELEFONE}}", desc: "Telefone/PABX oficial" },
+        { tag: "{{ESCRITORIO_EMAIL}}", desc: "Email corporativo principal" },
       ]
     },
     {
