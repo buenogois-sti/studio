@@ -158,7 +158,7 @@ export async function draftDocument(
             }
         } else {
             const genderSuffix = clientData.civilStatus?.toLowerCase().endsWith('a') || clientData.nationality?.toLowerCase().endsWith('a') ? 'a' : '';
-            clientQual = `${clientFull}, ${clientData.nationality || 'brasileiro(a)'}, ${clientData.civilStatus || 'solteiro(a)'}, ${clientData.profession || 'trabalhador(a)'}, portador${genderSuffix} da Cédula de Identidade RG nº ${clientData.rg || '---'} ${clientData.rgIssuer ? clientData.rgIssuer : ''}${clientData.rgIssuanceDate ? ', expedida em ' + format(new Date(clientData.rgIssuanceDate as any), "dd/MM/yyyy") : ''}, inscrit${genderSuffix} no CPF sob o nº ${clientData.document || '---'}, residente e domiciliad${genderSuffix} na ${clientAddr}.`;
+            clientQual = `${clientFull}, ${clientData.nationality || 'brasileiro(a)'}, ${clientData.civilStatus || 'solteiro(a)'}, ${clientData.profession || 'trabalhador(a)'}, portador${genderSuffix} da Cédula de Identidade RG nº ${clientData.rg || '---'} ${clientData.rgIssuer ? clientData.rgIssuer : ''}${clientData.rgIssuanceDate ? ', expedida em ' + format(new Date(clientData.rgIssuanceDate as any), "dd/MM/yyyy") : ''}, inscrito(a)${genderSuffix} no CPF sob o nº ${clientData.document || '---'}, residente e domiciliado(a)${genderSuffix} na ${clientAddr}.`;
         }
 
         // Qualificação Advogado Líder (Para Substabelecimento)
