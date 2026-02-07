@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useEffect, useState, useMemo } from 'react';
@@ -294,13 +293,6 @@ export function LandingClient({ initialSettings, initialSeo }: { initialSettings
             >
               <Instagram className="h-6 w-6" />
             </Link>
-            <Button 
-              asChild 
-              variant="outline" 
-              className="hidden md:flex bg-transparent border-primary text-primary hover:bg-primary hover:text-primary-foreground transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-primary/50"
-            >
-              <Link href="/login">Área ADV</Link>
-            </Button>
           </div>
         </div>
       </header>
