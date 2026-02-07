@@ -31,7 +31,7 @@ async function ensureSubfolder(drive: any, parentId: string, folderName: string)
     return folder.data.id;
 }
 
-async function replacePlaceholdersInDoc(docsApi: any, fileId: string, dataMap: Record<string, string>, boldKeys: string[] = []) {
+async function replacePlaceholdersInDoc(docsApi: any, fileId: string, dataMap: Record<string, string>) {
     const requests = Object.entries(dataMap).map(([key, value]) => ({
         replaceAllText: {
             containsText: { text: `{{${key}}}`, matchCase: true },
@@ -42,38 +42,49 @@ async function replacePlaceholdersInDoc(docsApi: any, fileId: string, dataMap: R
     if (requests.length === 0) return;
     
     try {
-        console.log(`[DocsAutomation] Iniciando batchUpdate para o doc: ${fileId}`);
+        console.log(`[DocsAutomation] Iniciando substituição para o doc: ${fileId}`);
         await docsApi.documents.batchUpdate({ 
             documentId: fileId, 
             requestBody: { requests } 
         });
-        console.log(`[DocsAutomation] Sucesso na substituição de ${requests.length} tags.`);
     } catch (error: any) {
-        console.error('[DocsAutomation] Erro crítico no Google Docs batchUpdate:', error.message);
-        throw new Error(`Falha técnica na edição do rascunho: Certifique-se de que a "Google Docs API" está ATIVADA no Console do Google Cloud. Erro: ${error.message}`);
+        console.error('[DocsAutomation] Erro no Google Docs batchUpdate:', error.message);
+        throw new Error(`Falha na edição do rascunho: ${error.message}`);
     }
 }
 
+/**
+ * Aplica negrito a textos específicos dentro do documento.
+ * Utilizado para dar destaque a nomes, documentos e números de processo.
+ */
 async function applyBoldToTexts(docsApi: any, fileId: string, texts: string[]) {
     if (!texts || texts.length === 0) return;
+    
     try {
-        const doc = await docsApi.documents.get({ documentId: fileId });
-        const content = doc.data.body?.content || [];
+        // Precisamos obter o conteúdo atual para encontrar os índices de início e fim
+        const docRes = await docsApi.documents.get({ documentId: fileId });
+        const content = docRes.data.body?.content || [];
         const requests: any[] = [];
+
+        // Filtra textos nulos ou muito curtos
+        const targets = [...new Set(texts.filter(t => t && t.length > 2))];
 
         for (const structuralElement of content) {
             const paragraph = structuralElement.paragraph;
             if (!paragraph) continue;
+
             for (const elem of paragraph.elements || []) {
                 const textRun = elem.textRun;
-                if (!textRun || !elem.startIndex) continue;
-                const txt = textRun.content || '';
-                for (const target of texts) {
-                    if (!target) continue;
+                if (!textRun || !elem.startIndex || !textRun.content) continue;
+
+                const txt = textRun.content;
+                
+                targets.forEach(target => {
                     let idx = txt.indexOf(target);
                     while (idx !== -1) {
                         const start = elem.startIndex + idx;
                         const end = start + target.length;
+                        
                         requests.push({
                             updateTextStyle: {
                                 range: { startIndex: start, endIndex: end },
@@ -81,16 +92,22 @@ async function applyBoldToTexts(docsApi: any, fileId: string, texts: string[]) {
                                 fields: 'bold'
                             }
                         });
+                        
                         idx = txt.indexOf(target, idx + target.length);
                     }
-                }
+                });
             }
         }
 
-        if (requests.length === 0) return;
-        await docsApi.documents.batchUpdate({ documentId: fileId, requestBody: { requests } });
+        if (requests.length > 0) {
+            console.log(`[DocsAutomation] Aplicando negrito em ${requests.length} ocorrências.`);
+            await docsApi.documents.batchUpdate({ 
+                documentId: fileId, 
+                requestBody: { requests } 
+            });
+        }
     } catch (err: any) {
-        console.error('[DocsAutomation] Erro aplicando negrito:', err?.message || err);
+        console.error('[DocsAutomation] Erro ao aplicar negrito:', err?.message || err);
     }
 }
 
@@ -100,7 +117,6 @@ export async function searchProcesses(query: string): Promise<Process[]> {
     
     try {
         const q = query.trim().toLowerCase();
-        
         const snapshot = await firestoreAdmin.collection('processes')
             .orderBy('updatedAt', 'desc')
             .limit(150)
@@ -128,7 +144,7 @@ export async function draftDocument(
 ): Promise<{ success: boolean; url?: string; error?: string }> {
     if (!firestoreAdmin) throw new Error("Servidor indisponível.");
     const session = await getServerSession(authOptions);
-    if (!session) throw new Error("Não autorizado.");
+  if (!session) throw new Error("Não autorizado.");
 
     try {
         const [apiClients, processDoc, settingsDoc] = await Promise.all([
@@ -140,17 +156,12 @@ export async function draftDocument(
         if (!processDoc.exists) throw new Error("Processo não encontrado.");
         const processData = processDoc.data() as Process;
 
-        // Garante estrutura do Drive
         const syncResult = await syncProcessToDrive(processId);
-        if (!syncResult.success) {
-            throw new Error(`Falha ao organizar pastas do processo: ${syncResult.error}`);
-        }
+        if (!syncResult.success) throw new Error(`Falha ao organizar pastas: ${syncResult.error}`);
 
         const { drive, docs } = apiClients;
-        
-        const updatedProcessSnap = await firestoreAdmin.collection('processes').doc(processId).get();
-        const physicalFolderId = updatedProcessSnap.data()?.driveFolderId;
-        if (!physicalFolderId) throw new Error("Pasta do processo não disponível no Drive.");
+        const physicalFolderId = processData.driveFolderId;
+        if (!physicalFolderId) throw new Error("Pasta do processo não disponível.");
 
         const categoryMap: Record<string, string> = {
             'procuração': '02 - Contratos e Procurações',
@@ -179,17 +190,15 @@ export async function draftDocument(
         const newFileName = `${documentName} - ${processData.name}`;
         
         const copiedFile = await copyFile(cleanTemplateId, newFileName, targetFolderId);
+        if (!copiedFile.id) throw new Error("Falha ao criar cópia do modelo.");
 
-        if (!copiedFile.id) throw new Error("Falha ao criar cópia do modelo no Google Drive.");
-
-        // Formatação de Endereços
         const fmtAddr = (addr: any) => addr ? `${addr.street || ''}, nº ${addr.number || 'S/N'}${addr.complement ? ', ' + addr.complement : ''}, ${addr.neighborhood || ''}, CEP ${addr.zipCode || ''}, ${addr.city || ''}/${addr.state || ''}` : '---';
         
         const clientAddr = fmtAddr(clientData.address);
         const staffAddr = fmtAddr(staffData?.address);
         const clientFull = `${clientData.firstName} ${clientData.lastName || ''}`.trim();
 
-        // Tag Composta: Qualificação Completa (PF vs PJ)
+        // Qualificação Composta
         let clientQual = '';
         if (clientData.clientType === 'Pessoa Jurídica') {
             clientQual = `${clientFull}, inscrita no CNPJ sob o nº ${clientData.document || '---'}, com sede na ${clientAddr}`;
@@ -201,58 +210,46 @@ export async function draftDocument(
             clientQual = `${clientFull}, ${clientData.nationality || 'brasileiro(a)'}, ${clientData.civilStatus || 'solteiro(a)'}, ${clientData.profession || 'trabalhador(a)'}, portador${genderSuffix} da Cédula de Identidade RG nº ${clientData.rg || '---'} ${clientData.rgIssuer ? clientData.rgIssuer : ''}${clientData.rgIssuanceDate ? ', expedida em ' + format(new Date(clientData.rgIssuanceDate as any), "dd/MM/yyyy") : ''}, inscrito(a)${genderSuffix} no CPF sob o nº ${clientData.document || '---'}, residente e domiciliado(a)${genderSuffix} na ${clientAddr}.`;
         }
 
-        // Qualificação Advogado Líder (Para Substabelecimento)
         const staffFull = staffData ? `${staffData.firstName} ${staffData.lastName}` : '---';
         const lawyerQual = staffData ? `${staffFull.toUpperCase()}, advogado inscrito na OAB/${staffData.oabNumber?.includes('/') ? staffData.oabNumber : 'SP sob o nº ' + staffData.oabNumber}, ${staffData.nationality || 'brasileiro'}, ${staffData.civilStatus || 'divorciado'}, com escritório profissional situado à ${staffAddr}.` : '---';
 
-        const dataMap = {
+        const dataMap: Record<string, string> = {
             'CLIENTE_QUALIFICACAO_COMPLETA': clientQual,
             'CLIENTE_NOME_COMPLETO': clientFull,
             'RECLAMANTE_NOME': clientFull,
             'CLIENTE_CPF_CNPJ': clientData.document || '---',
             'CLIENTE_RG': clientData.rg || '---',
-            'CLIENTE_RG_ORGAO': clientData.rgIssuer || 'SSP/SP',
-            'CLIENTE_RG_EXPEDICAO': clientData.rgIssuanceDate ? format(new Date(clientData.rgIssuanceDate as any), "dd/MM/yyyy") : '---',
-            'CLIENTE_NACIONALIDADE': clientData.nationality || 'brasileiro(a)',
-            'CLIENTE_ESTADO_CIVIL': clientData.civilStatus || 'solteiro(a)',
-            'CLIENTE_PROFISSAO': clientData.profession || 'ajudante geral',
             'CLIENTE_ENDERECO_COMPLETO': clientAddr,
-            'REPRESENTANTE_LEGAL_NOME': clientData.representativeName || '---',
-            'REPRESENTANTE_LEGAL_QUALIFICACAO': clientData.representativeName ? `${clientData.representativeName}, ${clientData.representativeRole || 'Representante'}` : '---',
-            'PROCESSO_NUMERO_CNJ': processData.processNumber || 'Pendente',
             'PROCESSO_NUMERO': processData.processNumber || 'Pendente',
             'PROCESSO_VARA': processData.courtBranch || '---',
-            'PROCESSO_FORUM': processData.court || '---',
             'RECLAMADA_NOME': processData.opposingParties?.[0]?.name || '---',
-            'RECLAMADA_LISTA_TODOS': processData.opposingParties?.map(p => p.name).join(', ') || '---',
             'ADVOGADO_LIDER_NOME': staffFull,
             'ADVOGADO_LIDER_OAB': staffData?.oabNumber || '---',
-            'ADVOGADO_LIDER_NACIONALIDADE': staffData?.nationality || '---',
-            'ADVOGADO_LIDER_ESTADO_CIVIL': staffData?.civilStatus || '---',
-            'ADVOGADO_LIDER_ENDERECO_PROFISSIONAL': staffAddr,
             'ADVOGADO_LIDER_QUALIFICACAO_COMPLETA': lawyerQual,
             'ESCRITORIO_NOME': officeData?.officeName || 'Bueno Gois Advogados',
-            'ESCRITORIO_ENDERECO': officeData?.address || '---',
-            'ESCRITORIO_TELEFONE': officeData?.phone || '---',
-            'ESCRITORIO_EMAIL': officeData?.adminEmail || '---',
             'DATA_EXTENSO': format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR }),
             'DATA_HOJE': format(new Date(), "dd/MM/yyyy"),
         };
 
-        // Substitui placeholders e aplica negrito em partes importantes (ex.: nome do cliente / advogado)
-        const boldKeys = ['CLIENTE_NOME_COMPLETO'];
-        if (staffData) boldKeys.push('ADVOGADO_LIDER_NOME');
-        await replacePlaceholdersInDoc(docs, copiedFile.id, dataMap, boldKeys);
+        // 1. Realiza a substituição dos placeholders
+        await replacePlaceholdersInDoc(docs, copiedFile.id, dataMap);
 
-        // Após a substituição, aplica o estilo de negrito nos textos reais correspondentes
-        const boldTexts = boldKeys.map(k => dataMap[k as keyof typeof dataMap]).filter(Boolean);
-        await applyBoldToTexts(docs, copiedFile.id, boldTexts as string[]);
+        // 2. Aplica negrito em informações estratégicas (valores reais inseridos)
+        const boldTargets = [
+            clientFull,
+            clientData.document,
+            staffFull,
+            staffData?.oabNumber,
+            processData.processNumber
+        ].filter(Boolean) as string[];
+
+        await applyBoldToTexts(docs, copiedFile.id, boldTargets);
 
         await firestoreAdmin.collection('processes').doc(processId).update({
             timeline: FieldValue.arrayUnion({
                 id: uuidv4(),
                 type: 'petition',
-                description: `DOCUMENTO GERADO: "${documentName}". Disponível no Drive com qualificação completa.`,
+                description: `DOCUMENTO GERADO: "${documentName}". Destaques aplicados automaticamente.`,
                 date: Timestamp.now(),
                 authorName: session.user.name || 'Sistema'
             }),
@@ -262,6 +259,6 @@ export async function draftDocument(
         return { success: true, url: copiedFile.webViewLink! };
     } catch (error: any) {
         console.error("[draftDocument] Erro crítico:", error);
-        return { success: false, error: error.message || "Erro desconhecido ao gerar rascunho." };
+        return { success: false, error: error.message || "Erro desconhecido." };
     }
 }
