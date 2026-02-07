@@ -14,7 +14,9 @@ import {
   CalendarDays,
   Scale,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Calculator,
+  Zap
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -47,7 +49,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import type { Process, LegalDeadline } from '@/lib/types';
 import { createLegalDeadline, updateLegalDeadline } from '@/lib/deadline-actions';
-import { countBusinessDays, cn } from '@/lib/utils';
+import { countBusinessDays, addBusinessDays, addCalendarDays, cn } from '@/lib/utils';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 
@@ -86,6 +88,7 @@ const COMMON_DEADLINES = [
 export function LegalDeadlineDialog({ process, deadline, open, onOpenChange, onSuccess }: LegalDeadlineDialogProps) {
   const [isSaving, setIsSaving] = React.useState(false);
   const [customType, setCustomType] = React.useState(false);
+  const [calcDays, setCalcDays] = React.useState<number | "">("");
   const { toast } = useToast();
 
   const isEdit = !!deadline;
@@ -125,6 +128,7 @@ export function LegalDeadlineDialog({ process, deadline, open, onOpenChange, onS
         observations: '',
       });
       setCustomType(false);
+      setCalcDays("");
     }
   }, [deadline, open, form]);
 
@@ -140,6 +144,32 @@ export function LegalDeadlineDialog({ process, deadline, open, onOpenChange, onS
       return diff < 0 ? 0 : diff;
     } catch (e) { return 0; }
   }, [startDate, endDate]);
+
+  const handleApplyCalculation = () => {
+    if (calcDays === "" || !startDate) {
+      toast({
+        variant: 'destructive',
+        title: 'Dados incompletos',
+        description: 'Informe a quantidade de dias e a data de publicação.',
+      });
+      return;
+    }
+    
+    const start = new Date(startDate);
+    let result: Date;
+    
+    if (countingMethod === 'useful') {
+      result = addBusinessDays(start, Number(calcDays));
+    } else {
+      result = addCalendarDays(start, Number(calcDays));
+    }
+    
+    form.setValue('endDate', format(result, 'yyyy-MM-dd'), { shouldValidate: true, shouldDirty: true });
+    toast({
+      title: 'Vencimento Calculado',
+      description: `O prazo de ${calcDays} dias foi aplicado com sucesso.`,
+    });
+  };
 
   const onSubmit = async (values: z.infer<typeof deadlineSchema>) => {
     if (!process) return;
@@ -316,6 +346,33 @@ export function LegalDeadlineDialog({ process, deadline, open, onOpenChange, onS
                 </FormItem>
               )}
             />
+
+            <div className="p-6 rounded-2xl bg-primary/5 border-2 border-primary/20 space-y-4">
+              <div className="flex items-center gap-2 text-primary font-black uppercase text-[10px] tracking-[0.2em]">
+                <Calculator className="h-3.5 w-3.5" /> Calculadora de Vencimento
+              </div>
+              <div className="flex items-end gap-3">
+                <div className="flex-1 space-y-2">
+                  <Label className="text-[9px] font-black uppercase text-slate-500">Duração do Prazo (Dias)</Label>
+                  <Input 
+                    type="number" 
+                    placeholder="Ex: 5, 15, 30..." 
+                    className="h-11 bg-background border-border"
+                    value={calcDays}
+                    onChange={(e) => setCalcDays(e.target.value === "" ? "" : Number(e.target.value))}
+                  />
+                </div>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  className="h-11 px-6 border-primary/30 text-primary hover:bg-primary/10 font-black uppercase text-[10px]"
+                  onClick={handleApplyCalculation}
+                >
+                  <Zap className="h-3.5 w-3.5 mr-2" /> Aplicar Prazo
+                </Button>
+              </div>
+              <p className="text-[9px] text-slate-500 italic">O cálculo excluirá o dia da publicação e seguirá a metodologia acima.</p>
+            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField

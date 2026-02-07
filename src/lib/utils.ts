@@ -68,3 +68,33 @@ export function countBusinessDays(startDate: string, endDate: string): number {
 
   return count;
 }
+
+/**
+ * Adiciona dias úteis a uma data, seguindo a regra do CPC/CLT (exclui o dia da publicação).
+ */
+export function addBusinessDays(startDate: string | Date, days: number): Date {
+  const date = new Date(startDate);
+  if (isNaN(date.getTime())) return new Date();
+  
+  let remaining = days;
+  // A contagem começa no dia seguinte
+  while (remaining > 0) {
+    date.setDate(date.getDate() + 1);
+    const dayOfWeek = date.getDay();
+    // 0 = Domingo, 6 = Sábado
+    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+      remaining--;
+    }
+  }
+  return date;
+}
+
+/**
+ * Adiciona dias corridos a uma data.
+ */
+export function addCalendarDays(startDate: string | Date, days: number): Date {
+  const date = new Date(startDate);
+  if (isNaN(date.getTime())) return new Date();
+  date.setDate(date.getDate() + days);
+  return date;
+}
