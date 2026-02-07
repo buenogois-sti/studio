@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -36,6 +37,8 @@ import { LocationSearch } from '@/components/shared/LocationSearch';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { cn } from '@/lib/utils';
 
 const hearingSchema = z.object({
   lawyerId: z.string().min(1, 'Selecione o advogado que fará a audiência.'),
@@ -151,6 +154,7 @@ export function QuickHearingDialog({ process, open, onOpenChange, onSuccess }: Q
       
       await createHearing({
         ...values,
+        status: 'PENDENTE',
         processId: process.id,
         processName: process.name,
         hearingDate: hearingDateTime.toISOString(),

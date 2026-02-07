@@ -1,14 +1,17 @@
+
 'use server';
 
 import { firestoreAdmin } from '@/firebase/admin';
 import { getGoogleApiClientsForUser } from '@/lib/drive';
-import { add, formatISO } from 'date-fns';
+import { add, formatISO, format } from 'date-fns';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/options';
 import { createNotification } from './notification-actions';
 import type { HearingStatus, HearingType, NotificationMethod } from './types';
 import { summarizeAddress } from './utils';
 import { Timestamp, FieldValue } from 'firebase-admin/firestore';
+import { v4 as uuidv4 } from 'uuid';
+import { ptBR } from 'date-fns/locale';
 
 /**
  * Constrói a descrição detalhada para o Google Agenda seguindo o padrão Bueno Gois.

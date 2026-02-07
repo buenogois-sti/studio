@@ -29,7 +29,8 @@ import {
   Plus,
   Info,
   Check,
-  AlertTriangle
+  AlertTriangle,
+  RefreshCw
 } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, where, getDocs, getDoc, FieldValue, Timestamp, doc, deleteDoc, orderBy, limit } from 'firebase/firestore';
@@ -127,7 +128,7 @@ function StaffVoucherDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-4xl bg-white text-slate-900 p-0 overflow-hidden border-none shadow-none print:shadow-none">
-        <DialogHeader className="sr-only">
+        <DialogHeader className="p-6 pb-0 sr-only">
           <DialogTitle>Comprovante de Liquidação Profissional</DialogTitle>
           <DialogDescription>Extrato detalhado de pagamentos realizados ao colaborador.</DialogDescription>
         </DialogHeader>
@@ -198,7 +199,7 @@ function StaffVoucherDialog({
 }
 
 function PaymentHistory({ onShowVoucher }: { onShowVoucher: (t: FinancialTitle) => void }) {
-  const { firestore, userError } = useFirebase();
+  const { firestore } = useFirebase();
   const historyQuery = useMemoFirebase(() => (firestore ? query(
     collection(firestore, 'financial_titles'), 
     where('origin', '==', 'HONORARIOS_PAGOS'), 

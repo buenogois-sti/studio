@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -56,7 +57,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 const COLORS = ['#F5D030', '#3b82f6', '#10b981', '#f43f5e', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316'];
 
 export default function RelatoriosPage() {
-  const { firestore, areServicesAvailable } = useFirebase();
+  const { firestore } = useFirebase();
   const [isLoading, setIsLoading] = React.useState(true);
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -78,7 +79,6 @@ export default function RelatoriosPage() {
     leads: [],
   });
 
-  // OTIMIZAÇÃO: Busca única (Single Fetch) em vez de onSnapshot para reduzir drasticamente leituras.
   const fetchData = React.useCallback(async (quiet = false) => {
     if (!firestore) return;
     if (!quiet) setIsLoading(true);
@@ -126,10 +126,10 @@ export default function RelatoriosPage() {
   }, [firestore]);
 
   React.useEffect(() => {
-    if (areServicesAvailable) {
+    if (firestore) {
       fetchData();
     }
-  }, [areServicesAvailable, fetchData]);
+  }, [firestore, fetchData]);
 
   const deadlineStats = React.useMemo(() => {
     const now = startOfDay(new Date());
@@ -173,7 +173,7 @@ export default function RelatoriosPage() {
   }, [data]);
 
   const financialData = React.useMemo(() => {
-    const months = [];
+    const months: Array<{ month: string; key: string; receita: number; despesa: number }> = [];
     const now = new Date();
     for (let i = 5; i >= 0; i--) {
       const d = subMonths(now, i);

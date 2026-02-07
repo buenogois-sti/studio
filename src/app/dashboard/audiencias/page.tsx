@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -68,6 +69,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { HearingReturnDialog } from '@/components/process/HearingReturnDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const statusConfig: Record<HearingStatus, { label: string; icon: any; color: string }> = {
     PENDENTE: { label: 'Pendente', icon: Clock3, color: 'text-blue-500 bg-blue-500/10' },
@@ -111,7 +113,6 @@ export default function AudienciasPage() {
     const base = collection(firestore, 'hearings');
     const threeMonthsAgo = Timestamp.fromDate(subMonths(new Date(), 3));
 
-    // OTIMIZAÇÃO: Filtros mais restritos e limites menores para economizar leituras
     if (userProfile.role === 'admin' || userProfile.role === 'assistant') {
       if (selectedLawyerFilter !== 'all') {
         return query(base, where('lawyerId', '==', selectedLawyerFilter), where('date', '>=', threeMonthsAgo), orderBy('date', 'asc'), limit(100));

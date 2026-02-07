@@ -1,3 +1,4 @@
+
 'use server';
 
 import { firestoreAdmin } from '@/firebase/admin';
@@ -26,7 +27,13 @@ export async function createLead(data: {
 
   try {
     const leadRef = firestoreAdmin.collection('leads').doc();
-    const payload: Omit<Lead, 'id'> = {
+    
+    // Convert date string to Firestore Timestamp
+    const prescriptionDate = data.prescriptionDate 
+      ? Timestamp.fromDate(new Date(data.prescriptionDate))
+      : undefined;
+
+    const payload: any = {
       clientId: data.clientId,
       lawyerId: data.lawyerId,
       title: data.title,
@@ -34,12 +41,15 @@ export async function createLead(data: {
       priority: data.priority,
       captureSource: data.captureSource,
       isUrgent: data.isUrgent,
-      prescriptionDate: data.prescriptionDate ? Timestamp.fromDate(new Date(data.prescriptionDate)) : undefined,
       description: data.description || '',
       status: 'NOVO' as LeadStatus,
-      createdAt: Timestamp.now() as any,
-      updatedAt: Timestamp.now() as any,
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
     };
+
+    if (prescriptionDate) {
+      payload.prescriptionDate = prescriptionDate;
+    }
 
     await leadRef.set(payload);
 
@@ -89,11 +99,11 @@ export async function convertLeadToProcess(leadId: string) {
 
     const processRef = firestoreAdmin.collection('processes').doc();
     
-    const timelineEvent: TimelineEvent = {
+    const timelineEvent = {
       id: uuidv4(),
       type: 'system',
       description: `PROCESSO CRIADO: Convertido a partir do Lead #${leadId.substring(0, 6)}. Elaboração concluída por Dr(a). ${leadData.lawyerId}. Prioridade: ${leadData.priority}.`,
-      date: Timestamp.now() as any,
+      date: Timestamp.now(),
       authorName: session.user.name || 'Sistema'
     };
 
