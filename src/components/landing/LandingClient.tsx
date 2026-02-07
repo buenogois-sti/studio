@@ -581,11 +581,6 @@ export function LandingClient({ initialSettings, initialSeo }: { initialSettings
                     <Link href={`#${item.toLowerCase().replace(' ', '')}`}>{item}</Link>
                   </li>
                 ))}
-                <li className="pt-2">
-                  <Link href="/login" className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest bg-white/5 px-3 py-1.5 rounded-full hover:bg-primary hover:text-primary-foreground transition-all">
-                    <Lock className="h-3 w-3" /> Área Restrita
-                  </Link>
-                </li>
               </ul>
             </div>
 
@@ -615,7 +610,7 @@ export function LandingClient({ initialSettings, initialSeo }: { initialSettings
           </div>
 
           <div className="pt-12 border-t border-white/5 flex flex-col md:flex-row items-center justify-between gap-6 text-[10px] font-black uppercase tracking-widest text-slate-500">
-            <p>&copy; {new Date().getFullYear()} {currentSettings?.officeName || 'Bueno Gois Advogados e Associados'}. OAB/SP 00.000</p>
+            <p>&copy; {new Date().getFullYear()} {currentSettings?.officeName || 'Bueno Gois Advogados e Associados'} </p>
             <div className="flex gap-8">
               <Link href="#" className="hover:text-primary transition-colors">Termos de Uso</Link>
               <Link href="#" className="hover:text-primary transition-colors">Privacidade</Link>
@@ -628,9 +623,9 @@ export function LandingClient({ initialSettings, initialSeo }: { initialSettings
       <WhatsAppFloating
         phoneNumber="5511980590128"
         message="Olá! Vi o site da Bueno Gois Advogados e gostaria de saber mais sobre os serviços de advocacia trabalhista."
-        welcomeMessage="Olá! 👋 Sou da Bueno Gois Advogados. Como posso ajudar com seus direitos trabalhistas hoje?"
+        welcomeMessage="Olá! 👋 Sou da Bueno Gois Advogados. Como posso ajudar hoje?"
         userName="Bueno Gois Adv."
-        delay={3000}
+        delay={2500}
         autoHideDelay={10000}
       />
     </div>
