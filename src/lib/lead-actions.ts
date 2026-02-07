@@ -1,8 +1,7 @@
-
 'use server';
 
 import { firestoreAdmin } from '@/firebase/admin';
-import type { Lead, LeadStatus, LeadPriority, TimelineEvent, OpposingParty } from './types';
+import type { Lead, LeadStatus, LeadPriority, TimelineEvent, OpposingParty, Process } from './types';
 import { Timestamp, FieldValue } from 'firebase-admin/firestore';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/options';
@@ -10,6 +9,9 @@ import { createNotification } from './notification-actions';
 import { revalidatePath } from 'next/cache';
 import { v4 as uuidv4 } from 'uuid';
 
+/**
+ * Cria um novo lead na pauta de triagem.
+ */
 export async function createLead(data: {
   clientId: string;
   lawyerId: string;
@@ -70,6 +72,9 @@ export async function createLead(data: {
   }
 }
 
+/**
+ * Atualiza o status (fase) do lead no Kanban.
+ */
 export async function updateLeadStatus(id: string, status: LeadStatus) {
   if (!firestoreAdmin) throw new Error('Servidor indisponível.');
   try {
@@ -84,6 +89,9 @@ export async function updateLeadStatus(id: string, status: LeadStatus) {
   }
 }
 
+/**
+ * Atualiza a lista de reclamadas do lead.
+ */
 export async function updateLeadOpposingParties(id: string, parties: OpposingParty[]) {
   if (!firestoreAdmin) throw new Error('Servidor indisponível.');
   try {
@@ -97,29 +105,9 @@ export async function updateLeadOpposingParties(id: string, parties: OpposingPar
   }
 }
 
-export async function assignLeadToLawyer(leadId: string, lawyerId: string) {
-  if (!firestoreAdmin) throw new Error('Servidor indisponível.');
-  try {
-    await firestoreAdmin.collection('leads').doc(leadId).update({
-      lawyerId,
-      updatedAt: Timestamp.now()
-    });
-
-    await createNotification({
-      userId: lawyerId,
-      title: "Lead Encaminhado",
-      description: `Um novo lead foi atribuído à sua pauta de triagem.`,
-      type: 'info',
-      href: '/dashboard/leads'
-    });
-
-    revalidatePath('/dashboard/leads');
-    return { success: true };
-  } catch (error: any) {
-    throw new Error(error.message);
-  }
-}
-
+/**
+ * Converte um Lead aprovado em um Processo ativo, migrando todos os dados.
+ */
 export async function convertLeadToProcess(leadId: string) {
   if (!firestoreAdmin) throw new Error('Servidor indisponível.');
   const session = await getServerSession(authOptions);
@@ -133,22 +121,23 @@ export async function convertLeadToProcess(leadId: string) {
     const leadData = leadDoc.data() as Lead;
     if (leadData.status === 'DISTRIBUIDO') throw new Error('Este lead já foi convertido em processo.');
 
-    // Validar dados do cliente
-    const clientDoc = await firestoreAdmin.collection('clients').doc(leadData.clientId).get();
-    if (!clientDoc.exists) throw new Error('Cliente não encontrado.');
-    const clientData = clientDoc.data();
+    // 1. Validar e preparar dados do cliente
+    const clientRef = firestoreAdmin.collection('clients').doc(leadData.clientId);
+    const clientDoc = await clientRef.get();
+    if (!clientDoc.exists) throw new Error('Cliente vinculado não encontrado.');
 
+    // 2. Preparar payload do novo processo
     const processRef = firestoreAdmin.collection('processes').doc();
     
-    const timelineEvent = {
+    const timelineEvent: TimelineEvent = {
       id: uuidv4(),
       type: 'system',
-      description: `PROCESSO DISTRIBUÍDO: Convertido a partir do CRM (Lead #${leadId.substring(0, 6)}). Responsável: ${session.user.name}.`,
-      date: Timestamp.now(),
+      description: `PROCESSO DISTRIBUÍDO: Convertido a partir do CRM (Lead #${leadId.substring(0, 6)}). Responsável: ${session.user.name}. Reclamadas e dados migrados automaticamente.`,
+      date: Timestamp.now() as any,
       authorName: session.user.name || 'Sistema'
     };
 
-    const processPayload = {
+    const processPayload: Omit<Process, 'id'> = {
       clientId: leadData.clientId,
       name: leadData.title,
       legalArea: leadData.legalArea,
@@ -156,34 +145,62 @@ export async function convertLeadToProcess(leadId: string) {
       status: 'Ativo',
       leadLawyerId: leadData.lawyerId,
       opposingParties: leadData.opposingParties || [],
-      driveFolderId: leadData.driveFolderId || null,
+      driveFolderId: leadData.driveFolderId || '',
       timeline: [timelineEvent],
-      createdAt: Timestamp.now(),
-      updatedAt: Timestamp.now(),
+      createdAt: Timestamp.now() as any,
+      updatedAt: Timestamp.now() as any,
     };
 
     const batch = firestoreAdmin.batch();
-    batch.set(processRef, processPayload);
-    batch.update(leadRef, { status: 'DISTRIBUIDO', updatedAt: Timestamp.now() });
     
-    // Atualizar status do cliente para ativo
-    batch.update(clientDoc.ref, { status: 'active', updatedAt: Timestamp.now() });
+    // Criar o processo
+    batch.set(processRef, processPayload);
+    
+    // Marcar lead como distribuído
+    batch.update(leadRef, { 
+      status: 'DISTRIBUIDO', 
+      updatedAt: Timestamp.now() 
+    });
+    
+    // Garantir que o cliente esteja com status ativo
+    batch.update(clientRef, { 
+      status: 'active', 
+      updatedAt: Timestamp.now() 
+    });
 
     await batch.commit();
+
+    // Notificar o advogado responsável
+    if (leadData.lawyerId) {
+      await createNotification({
+        userId: leadData.lawyerId,
+        title: "Processo Protocolado",
+        description: `O lead "${leadData.title}" foi convertido em processo ativo.`,
+        type: 'success',
+        href: '/dashboard/processos'
+      });
+    }
 
     revalidatePath('/dashboard/processos');
     revalidatePath('/dashboard/leads');
     
     return { success: true, processId: processRef.id };
   } catch (error: any) {
-    throw new Error(error.message);
+    console.error('[convertLeadToProcess] Error:', error);
+    throw new Error(error.message || 'Falha ao converter lead em processo.');
   }
 }
 
+/**
+ * Exclui ou arquiva como abandonado.
+ */
 export async function deleteLead(id: string) {
   if (!firestoreAdmin) throw new Error('Servidor indisponível.');
   try {
-    await firestoreAdmin.collection('leads').doc(id).delete();
+    await firestoreAdmin.collection('leads').doc(id).update({
+      status: 'ABANDONADO',
+      updatedAt: Timestamp.now()
+    });
     revalidatePath('/dashboard/leads');
     return { success: true };
   } catch (error: any) {
