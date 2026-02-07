@@ -12,26 +12,30 @@ if (!admin.apps.length) {
     if (serviceAccountJson) {
       const serviceAccount = JSON.parse(serviceAccountJson);
       
+      console.log(`[Firebase Admin] 🔍 Tentando inicializar...`);
+      console.log(`[Firebase Admin] JSON Project ID: "${serviceAccount.project_id}"`);
+      console.log(`[Firebase Admin] Config Project ID: "${firebaseConfig.projectId}"`);
+
       // Validação Crítica de Project ID
       if (serviceAccount.project_id !== firebaseConfig.projectId) {
-        const error = `❌ PROJECT ID MISMATCH: O servidor está tentando usar o projeto '${serviceAccount.project_id}' mas o cliente espera '${firebaseConfig.projectId}'. Isso causará erro 400 (auth/invalid-custom-token) no login.`;
-        console.error('[Firebase Admin]', error);
-        // Não lançamos erro aqui para não quebrar o build, mas o erro de login será inevitável.
+        const errorMsg = `❌ PROJECT ID MISMATCH: O servidor está configurado para o projeto '${serviceAccount.project_id}' mas o cliente espera '${firebaseConfig.projectId}'. O login vai falhar.`;
+        console.error('[Firebase Admin]', errorMsg);
       }
 
       admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
       });
-      console.log(`[Firebase Admin] ✅ Inicializado com sucesso para o projeto: ${serviceAccount.project_id}`);
+      
+      console.log(`[Firebase Admin] ✅ Inicializado com sucesso para: ${serviceAccount.project_id}`);
       initialized = true;
     } else {
-      console.warn('[Firebase Admin] ⚠️ FIREBASE_SERVICE_ACCOUNT_JSON não configurado. Tentando ADC...');
+      console.warn('[Firebase Admin] ⚠️ FIREBASE_SERVICE_ACCOUNT_JSON não configurado no .env.local');
       admin.initializeApp();
       initialized = true;
     }
   } catch (error: any) {
     firebaseAdminInitializationError = error.message;
-    console.error('[Firebase Admin] ❌ Falha na inicialização do SDK Admin:', error.message);
+    console.error('[Firebase Admin] ❌ Erro fatal na inicialização:', error.message);
   }
 } else {
   initialized = true;

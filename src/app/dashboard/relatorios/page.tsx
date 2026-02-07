@@ -59,8 +59,6 @@ import { useSession } from 'next-auth/react';
 
 const COLORS = ['#F5D030', '#3b82f6', '#10b981', '#f43f5e', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316'];
 
-// --- SUB-COMPONENTES MEMOIZADOS PARA PERFORMANCE ---
-
 const AdminReports = React.memo(({ data }: { data: any }) => {
   if (!data) return null;
   return (
@@ -116,7 +114,7 @@ const AdminReports = React.memo(({ data }: { data: any }) => {
 AdminReports.displayName = 'AdminReports';
 
 const LawyerReports = React.memo(({ data }: { data: any }) => {
-  if (!data) return null;
+  if (!data || !data.personalFeesEvolution) return null;
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <Card className="bg-[#0f172a] border-white/5">
@@ -250,7 +248,7 @@ const FinancialEvolutionChart = React.memo(({ data }: { data: any[] }) => {
               formatter={(val: number) => val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
             />
             <Area type="monotone" dataKey="receita" name="Entradas" stroke="#10b981" fillOpacity={1} fill="url(#colorRec)" strokeWidth={3} />
-            <Area type="monotone" dataKey="receita" name="Saídas" stroke="#ef4444" fill="transparent" strokeWidth={2} strokeDasharray="5 5" />
+            <Area type="monotone" dataKey="despesa" name="Saídas" stroke="#ef4444" fill="transparent" strokeWidth={2} strokeDasharray="5 5" />
           </AreaChart>
         </ResponsiveContainer>
       </CardContent>
@@ -258,8 +256,6 @@ const FinancialEvolutionChart = React.memo(({ data }: { data: any[] }) => {
   );
 });
 FinancialEvolutionChart.displayName = 'FinancialEvolutionChart';
-
-// --- DATA PROCESSING HELPERS ---
 
 function financialBreackdown(titles: FinancialTitle[]) {
   const months: any[] = [];
@@ -312,8 +308,6 @@ function calculateOverdueRate(titles: FinancialTitle[]) {
   return total > 0 ? ((overdue / total) * 100).toFixed(1) : 0;
 }
 
-// --- MAIN PAGE ---
-
 export default function RelatoriosPage() {
   const { firestore } = useFirebase();
   const { data: session } = useSession();
@@ -333,32 +327,28 @@ export default function RelatoriosPage() {
     try {
       const sixMonthsAgo = Timestamp.fromDate(subMonths(new Date(), 6));
       
-      // 1. DADOS FINANCEIROS GLOBAIS (Apenas para Admin/Financeiro)
       let titles: FinancialTitle[] = [];
       if (role === 'admin' || role === 'financial') {
         const titlesSnap = await getDocs(query(collection(firestore, 'financial_titles'), where('dueDate', '>=', sixMonthsAgo), orderBy('dueDate', 'desc'), limit(300)));
         titles = titlesSnap.docs.map(d => ({ id: d.id, ...d.data() } as FinancialTitle));
       }
 
-      // 2. DADOS OPERACIONAIS (Escopo depende do Role)
-      let processesQueryBase = query(collection(firestore, 'processes'), where('createdAt', '>=', sixMonthsAgo));
-      if (role === 'lawyer') processesQueryBase = query(processesQueryBase, where('leadLawyerId', '==', session.user.id));
-      const processesSnap = await getDocs(processesQueryBase);
+      let processesQueryRef = query(collection(firestore, 'processes'), where('createdAt', '>=', sixMonthsAgo));
+      if (role === 'lawyer') processesQueryRef = query(processesQueryRef, where('leadLawyerId', '==', session.user.id));
+      const processesSnap = await getDocs(processesQueryRef);
       const processes = processesSnap.docs.map(d => ({ id: d.id, ...d.data() } as Process));
 
-      let deadlinesQueryBase = query(collection(firestore, 'deadlines'), where('endDate', '>=', sixMonthsAgo));
-      if (role === 'lawyer') deadlinesQueryBase = query(deadlinesQueryBase, where('authorId', '==', session.user.id));
-      const deadlinesSnap = await getDocs(deadlinesQueryBase);
+      let deadlinesQueryRef = query(collection(firestore, 'deadlines'), where('endDate', '>=', sixMonthsAgo));
+      if (role === 'lawyer') deadlinesQueryRef = query(deadlinesQueryRef, where('authorId', '==', session.user.id));
+      const deadlinesSnap = await getDocs(deadlinesQueryRef);
       const deadlines = deadlinesSnap.docs.map(d => ({ id: d.id, ...d.data() } as LegalDeadline));
 
-      let hearingsQueryBase = query(collection(firestore, 'hearings'), where('date', '>=', sixMonthsAgo));
-      if (role === 'lawyer') hearingsQueryBase = query(hearingsQueryBase, where('lawyerId', '==', session.user.id));
-      const hearingsSnap = await getDocs(hearingsQueryBase);
+      let hearingsQueryRef = query(collection(firestore, 'hearings'), where('date', '>=', sixMonthsAgo));
+      if (role === 'lawyer') hearingsQueryRef = query(hearingsQueryRef, where('lawyerId', '==', session.user.id));
+      const hearingsSnap = await getDocs(hearingsQueryRef);
       const hearings = hearingsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Hearing));
 
-      // 3. PROCESSAMENTO DOS DADOS PARA OS GRÁFICOS
       const financial = financialBreackdown(titles);
-      
       const leadCapture: any[] = [];
       const lawyerPerformance: any[] = [];
       const personalFeesEvolution: any[] = [];
@@ -372,10 +362,10 @@ export default function RelatoriosPage() {
 
         const staffSnap = await getDocs(collection(firestore, 'staff'));
         staffSnap.docs.forEach(s => {
-          const staff = s.data() as Staff;
-          if (staff.role === 'lawyer') {
+          const staffMember = s.data() as Staff;
+          if (staffMember.role === 'lawyer') {
             lawyerPerformance.push({
-              nome: `${staff.firstName} ${staff.lastName.charAt(0)}.`,
+              nome: `${staffMember.firstName} ${staffMember.lastName.charAt(0)}.`,
               demandas: processes.filter(p => p.leadLawyerId === s.id).length,
               prazos: deadlines.filter(d => d.authorId === s.id).length,
               audiencias: hearings.filter(h => h.lawyerId === s.id).length
@@ -431,17 +421,12 @@ export default function RelatoriosPage() {
       {error ? (
         <Alert variant="destructive" className="bg-rose-500/10 border-rose-500/20 text-rose-400">
           <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Erro ao carregar dados</AlertTitle>
+          <AlertTitle>Configuração Pendente (Índice Firestore)</AlertTitle>
           <AlertDescription className="text-xs mt-2 space-y-4">
-            <p>{error}</p>
-            {error.includes('index') && (
-              <div className="bg-black/20 p-4 rounded-lg space-y-2 border border-white/10">
-                <p>O Firebase está criando os índices necessários para este relatório. Isso pode levar alguns minutos.</p>
-                <Button variant="outline" size="sm" className="mt-2 text-[10px] uppercase font-bold" asChild>
-                  <a href="https://console.firebase.google.com" target="_blank">Ver Status no Console</a>
-                </Button>
-              </div>
-            )}
+            <p>O Firebase requer a criação de índices para gerar esses relatórios.</p>
+            <Button variant="outline" size="sm" className="mt-2 text-[10px] uppercase font-bold" asChild>
+              <a href="https://console.firebase.google.com" target="_blank">Abrir Console e Verificar</a>
+            </Button>
           </AlertDescription>
         </Alert>
       ) : reportData ? (

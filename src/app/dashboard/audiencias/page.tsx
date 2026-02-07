@@ -194,10 +194,6 @@ export default function AudienciasPage() {
           <AlertTitle>Configuração Necessária (Firestore Index)</AlertTitle>
           <AlertDescription className="text-xs mt-2 space-y-4">
             <p>O Firebase requer um índice composto para esta visualização filtrada.</p>
-            <div className="bg-black/20 p-4 rounded-lg space-y-2 border border-white/10 font-mono text-[10px]">
-              <p>Coleção: 'hearings'</p>
-              <p>Campos: 'lawyerId' (ASC) e 'date' (ASC)</p>
-            </div>
             <Button variant="outline" size="sm" className="mt-2 text-[10px] uppercase font-bold border-rose-500/30" asChild>
               <a href="https://console.firebase.google.com" target="_blank">Abrir Console Firebase</a>
             </Button>
@@ -312,7 +308,6 @@ export default function AudienciasPage() {
                                           {daily.map(h => {
                                               const p = processesMap.get(h.processId);
                                               const StatusIcon = statusConfig[h.status || 'PENDENTE'].icon;
-                                              const NotifIcon = h.notificationMethod ? notificationIconMap[h.notificationMethod] : HelpCircle;
                                               const isUpdating = isProcessing === h.id;
                                               
                                               return (
@@ -327,15 +322,6 @@ export default function AudienciasPage() {
                                                               <Badge variant="outline" className="text-[9px] font-black uppercase border-white/10 text-slate-400 flex items-center gap-1">
                                                                   <Users className="h-2.5 w-2.5" /> Dr(a). {h.lawyerName || 'Pendente'}
                                                               </Badge>
-                                                              {h.clientNotified ? (
-                                                                <Badge variant="outline" className="text-[9px] font-black uppercase border-emerald-500/20 text-emerald-400 bg-emerald-500/5 flex items-center gap-1">
-                                                                  <NotifIcon className="h-2.5 w-2.5" /> Cliente Avisado ({h.notificationMethod})
-                                                                </Badge>
-                                                              ) : (
-                                                                <Badge variant="outline" className="text-[9px] font-black uppercase border-rose-500/20 text-rose-400 bg-rose-500/5 flex items-center gap-1">
-                                                                  <AlertCircle className="h-2.5 w-2.5" /> Cliente ñ avisado
-                                                                </Badge>
-                                                              )}
                                                           </div>
                                                           <h4 className="font-black text-lg text-white truncate group-hover:text-primary transition-colors">{p?.name}</h4>
                                                           <p className="text-[10px] text-slate-500 font-mono mt-1 flex items-center gap-1.5"><MapPin className="h-3 w-3 text-primary shrink-0" /> {h.location}</p>
@@ -375,244 +361,198 @@ export default function AudienciasPage() {
             </TabsContent>
 
             <TabsContent value="calendar" className="animate-in fade-in duration-300">
-              {isLoading ? (
-                <div className="flex items-center justify-center py-32">
-                  <Loader2 className="h-12 w-12 animate-spin text-primary" />
-                </div>
-              ) : (
-                <div className="grid lg:grid-cols-12 gap-6">
-                  <Card className="lg:col-span-8 bg-[#0f172a] border-white/5 p-6 shadow-2xl">
-                    <div className="flex items-center justify-between mb-10">
-                      <h2 className="text-2xl font-black text-white uppercase tracking-tighter">
-                        {format(currentDate, 'MMMM yyyy', { locale: ptBR })}
-                      </h2>
-                      <div className="flex gap-3">
-                        <Button variant="outline" size="icon" className="h-10 w-10 rounded-xl bg-white/5 border-white/10" onClick={() => currentDate && setCurrentDate(subMonths(currentDate, 1))}>
-                          <ChevronLeft className="h-5 w-5" />
-                        </Button>
-                        <Button variant="outline" size="sm" className="h-10 px-6 text-[10px] font-black uppercase rounded-xl border-white/10" onClick={() => setCurrentDate(new Date())}>
-                          Hoje
-                        </Button>
-                        <Button variant="outline" size="icon" className="h-10 w-10 rounded-xl bg-white/5 border-white/10" onClick={() => currentDate && setCurrentDate(addMonths(currentDate, 1))}>
-                          <ChevronRight className="h-5 w-5" />
-                        </Button>
-                      </div>
+              <div className="grid lg:grid-cols-12 gap-6">
+                <Card className="lg:col-span-8 bg-[#0f172a] border-white/5 p-6 shadow-2xl">
+                  <div className="flex items-center justify-between mb-10">
+                    <h2 className="text-2xl font-black text-white uppercase tracking-tighter">
+                      {format(currentDate, 'MMMM yyyy', { locale: ptBR })}
+                    </h2>
+                    <div className="flex gap-3">
+                      <Button variant="outline" size="icon" className="h-10 w-10 rounded-xl bg-white/5 border-white/10" onClick={() => setCurrentDate(subMonths(currentDate, 1))}>
+                        <ChevronLeft className="h-5 w-5" />
+                      </Button>
+                      <Button variant="outline" size="sm" className="h-10 px-6 text-[10px] font-black uppercase rounded-xl border-white/10" onClick={() => setCurrentDate(new Date())}>
+                        Hoje
+                      </Button>
+                      <Button variant="outline" size="icon" className="h-10 w-10 rounded-xl bg-white/5 border-white/10" onClick={() => setCurrentDate(addMonths(currentDate, 1))}>
+                        <ChevronRight className="h-5 w-5" />
+                      </Button>
                     </div>
-
-                    <div className="grid grid-cols-7 gap-1">
-                      {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(d => (
-                        <div key={d} className="text-center text-[10px] font-black uppercase text-slate-500 pb-6 tracking-widest">{d}</div>
-                      ))}
-                      {monthDays.map((day, i) => {
-                        const dailyHearings = hearingsData?.filter(h => isSameDay(h.date.toDate(), day)) || [];
-                        const isSelected = selectedDay && isSameDay(day, selectedDay);
-                        const isTodayDay = isToday(day);
-                        const isCurrentMonth = isSameMonth(day, currentDate);
-
-                        return (
-                          <button
-                            key={i}
-                            onClick={() => setSelectedDay(day)}
-                            className={cn(
-                              "relative aspect-square p-2 flex flex-col items-center justify-start border border-white/5 transition-all group rounded-xl",
-                              !isCurrentMonth && "opacity-10",
-                              isSelected ? "bg-primary/10 border-primary/40 shadow-inner" : "hover:bg-white/5",
-                              isTodayDay && !isSelected && "bg-white/5 border-primary/20"
-                            )}
-                          >
-                            <span className={cn(
-                              "text-sm font-bold",
-                              isTodayDay ? "text-primary underline decoration-2 underline-offset-4" : "text-white/80",
-                              isSelected && "text-primary"
-                            )}>
-                              {format(day, 'd')}
-                            </span>
-                            
-                            <div className="mt-auto flex flex-wrap justify-center gap-1 pb-1">
-                              {dailyHearings.slice(0, 3).map(h => (
-                                <div key={h.id} className={cn(
-                                  "w-1.5 h-1.5 rounded-full",
-                                  h.status === 'REALIZADA' ? "bg-emerald-500" : 
-                                  h.status === 'CANCELADA' ? "bg-rose-500" : "bg-primary"
-                                )} />
-                              ))}
-                            </div>
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </Card>
-
-                  <div className="lg:col-span-4 space-y-4">
-                    <Card className="bg-[#0f172a] border-white/5 flex flex-col h-full min-h-[400px] shadow-2xl overflow-hidden">
-                      <CardHeader className="border-b border-white/5 pb-4 bg-white/5">
-                        <div className="flex items-center justify-between">
-                          <CardTitle className="text-xs font-black uppercase tracking-[0.2em] text-primary">
-                            {selectedDay ? format(selectedDay, "dd 'de' MMMM", { locale: ptBR }) : 'Selecione um dia'}
-                          </CardTitle>
-                          <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20 text-[10px] font-black">
-                            {hearingsForSelectedDay.length} Ato(s)
-                          </Badge>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="p-0 flex-1">
-                        <ScrollArea className="h-[550px]">
-                          <div className="p-4 space-y-4">
-                            {hearingsForSelectedDay.length > 0 ? (
-                              hearingsForSelectedDay.map(h => (
-                                <div key={h.id} className="p-5 rounded-2xl border border-white/5 bg-black/30 space-y-4 hover:border-primary/20 transition-all group">
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                      <Clock className="h-3.5 w-3.5 text-primary" />
-                                      <span className="text-xs font-black text-white">{format(h.date.toDate(), 'HH:mm')}</span>
-                                    </div>
-                                    <Badge variant="outline" className={cn("text-[8px] font-black uppercase tracking-widest px-2 h-5 border-none", statusConfig[h.status || 'PENDENTE'].color)}>
-                                      {h.status}
-                                    </Badge>
-                                  </div>
-                                  <div className="space-y-2">
-                                      <p className="text-xs font-black text-slate-200 leading-snug line-clamp-2">{processesMap.get(h.processId)?.name}</p>
-                                      <div className="flex flex-col gap-1.5">
-                                        <p className="text-[9px] text-primary font-black uppercase flex items-center gap-1.5"><Users className="h-3 w-3" /> Dr(a). {h.lawyerName || 'Pendente'}</p>
-                                        {h.clientNotified && (
-                                          <p className="text-[8px] text-emerald-500 font-bold uppercase flex items-center gap-1"><ShieldCheck className="h-2.5 w-2.5" /> Cliente Avisado</p>
-                                        )}
-                                      </div>
-                                  </div>
-                                  <div className="pt-2 border-t border-white/5">
-                                    <p className="text-[10px] text-slate-500 leading-relaxed flex items-start gap-1.5">
-                                      <MapPin className="h-3 w-3 text-primary shrink-0 mt-0.5" /> 
-                                      <span className="line-clamp-2">{h.location}</span>
-                                    </p>
-                                  </div>
-                                </div>
-                              ))
-                            ) : (
-                              <div className="flex flex-col items-center justify-center py-32 text-center opacity-20">
-                                <CalendarIcon className="h-12 w-12 mb-3" />
-                                <p className="text-[10px] font-black uppercase tracking-widest">Sem atos agendados</p>
-                              </div>
-                            )}
-                          </div>
-                        </ScrollArea>
-                      </CardContent>
-                    </Card>
                   </div>
+
+                  <div className="grid grid-cols-7 gap-1">
+                    {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(d => (
+                      <div key={d} className="text-center text-[10px] font-black uppercase text-slate-500 pb-6 tracking-widest">{d}</div>
+                    ))}
+                    {monthDays.map((day, i) => {
+                      const dailyHearings = hearingsData?.filter(h => isSameDay(h.date.toDate(), day)) || [];
+                      const isSelected = selectedDay && isSameDay(day, selectedDay);
+                      const isTodayDay = isToday(day);
+                      const isCurrentMonth = isSameMonth(day, currentDate);
+
+                      return (
+                        <button
+                          key={i}
+                          onClick={() => setSelectedDay(day)}
+                          className={cn(
+                            "relative aspect-square p-2 flex flex-col items-center justify-start border border-white/5 transition-all group rounded-xl",
+                            !isCurrentMonth && "opacity-10",
+                            isSelected ? "bg-primary/10 border-primary/40 shadow-inner" : "hover:bg-white/5",
+                            isTodayDay && !isSelected && "bg-white/5 border-primary/20"
+                          )}
+                        >
+                          <span className={cn(
+                            "text-sm font-bold",
+                            isTodayDay ? "text-primary underline decoration-2 underline-offset-4" : "text-white/80",
+                            isSelected && "text-primary"
+                          )}>
+                            {format(day, 'd')}
+                          </span>
+                          <div className="mt-auto flex flex-wrap justify-center gap-1 pb-1">
+                            {dailyHearings.slice(0, 3).map(h => (
+                              <div key={h.id} className={cn(
+                                "w-1.5 h-1.5 rounded-full",
+                                h.status === 'REALIZADA' ? "bg-emerald-500" : 
+                                h.status === 'CANCELADA' ? "bg-rose-500" : "bg-primary"
+                              )} />
+                            ))}
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </Card>
+
+                <div className="lg:col-span-4">
+                  <Card className="bg-[#0f172a] border-white/5 h-full shadow-2xl">
+                    <CardHeader className="border-b border-white/5 pb-4 bg-white/5 rounded-t-lg">
+                      <CardTitle className="text-xs font-black uppercase tracking-[0.2em] text-primary">
+                        {selectedDay ? format(selectedDay, "dd 'de' MMMM", { locale: ptBR }) : 'Selecione um dia'}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      <ScrollArea className="h-[550px]">
+                        <div className="p-4 space-y-4">
+                          {hearingsForSelectedDay.length > 0 ? (
+                            hearingsForSelectedDay.map(h => (
+                              <div key={h.id} className="p-5 rounded-2xl border border-white/5 bg-black/30 space-y-4 hover:border-primary/20 transition-all group">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <Clock className="h-3.5 w-3.5 text-primary" />
+                                    <span className="text-xs font-black text-white">{format(h.date.toDate(), 'HH:mm')}</span>
+                                  </div>
+                                  <Badge variant="outline" className={cn("text-[8px] font-black uppercase tracking-widest px-2 h-5 border-none", statusConfig[h.status || 'PENDENTE'].color)}>
+                                    {h.status}
+                                  </Badge>
+                                </div>
+                                <p className="text-xs font-black text-slate-200 leading-snug line-clamp-2">{processesMap.get(h.processId)?.name}</p>
+                                <div className="pt-2 border-t border-white/5">
+                                  <p className="text-[10px] text-slate-500 flex items-start gap-1.5">
+                                    <MapPin className="h-3 w-3 text-primary shrink-0 mt-0.5" /> 
+                                    <span className="line-clamp-2">{h.location}</span>
+                                  </p>
+                                </div>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="flex flex-col items-center justify-center py-32 text-center opacity-20">
+                              <CalendarIcon className="h-12 w-12 mb-3" />
+                              <p className="text-[10px] font-black uppercase tracking-widest">Sem atos agendados</p>
+                            </div>
+                          )}
+                        </div>
+                      </ScrollArea>
+                    </CardContent>
+                  </Card>
                 </div>
-              )}
+              </div>
             </TabsContent>
 
             <TabsContent value="history" className="animate-in fade-in duration-300">
                 <Card className="bg-[#0f172a] border-white/5 overflow-hidden shadow-2xl">
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm text-left">
-                        <thead className="bg-white/5 text-[10px] uppercase font-black tracking-[0.2em] text-slate-500 border-b border-white/5">
-                          <tr>
-                            <th className="px-6 py-5">Data/Hora</th>
-                            <th className="px-6 py-5">Processo / Advogado</th>
-                            <th className="px-6 py-5">Notificação</th>
-                            <th className="px-6 py-5">Status Final</th>
-                            <th className="px-6 py-5">Retorno Jurídico</th>
-                            <th className="px-6 py-5 text-right">Ação</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-white/5">
-                          {isLoading ? (
-                            Array.from({ length: 5 }).map((_, i) => (
-                              <tr key={i}><td colSpan={6} className="p-6"><Skeleton className="h-10 w-full" /></td></tr>
-                            ))
-                          ) : historyHearings.map(h => {
-                              const config = statusConfig[h.status];
-                              const StatusIcon = config.icon;
-                              const isPendingReturn = h.status === 'REALIZADA' && !h.hasFollowUp;
-                              const NotifIcon = h.notificationMethod ? notificationIconMap[h.notificationMethod] : HelpCircle;
-                              const process = processesMap.get(h.processId);
+                    <Table>
+                      <TableHeader className="bg-white/5 text-[10px] uppercase font-black tracking-[0.2em] text-slate-500 border-b border-white/5">
+                        <TableRow>
+                          <TableHead className="px-6 py-5">Data/Hora</TableHead>
+                          <TableHead className="px-6 py-5">Processo / Advogado</TableHead>
+                          <TableHead className="px-6 py-5">Status Final</TableHead>
+                          <TableHead className="px-6 py-5">Retorno Jurídico</TableHead>
+                          <TableHead className="px-6 py-5 text-right">Ações</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {isLoading ? (
+                          Array.from({ length: 5 }).map((_, i) => (
+                            <TableRow key={i}><TableCell colSpan={5} className="p-6"><Skeleton className="h-10 w-full" /></TableCell></TableRow>
+                          ))
+                        ) : historyHearings.map(h => {
+                            const config = statusConfig[h.status];
+                            const isPendingReturn = h.status === 'REALIZADA' && !h.hasFollowUp;
+                            const process = processesMap.get(h.processId);
 
-                              return (
-                                <tr key={h.id} className={cn("hover:bg-white/[0.02] transition-colors group", isPendingReturn && "bg-amber-500/[0.03]")}>
-                                    <td className="px-6 py-5 text-white font-black whitespace-nowrap">
-                                      {format(h.date.toDate(), 'dd/MM/yy HH:mm')}
-                                    </td>
-                                    <td className="px-6 py-5">
-                                      <div className="flex flex-col">
-                                        <span className="text-slate-300 font-bold group-hover:text-primary transition-colors truncate max-w-[200px]">
-                                          {process?.name}
-                                        </span>
-                                        <div className="flex items-center gap-2 mt-1">
-                                          <span className="text-[9px] text-slate-500 uppercase font-black">{h.type}</span>
-                                          <span className="text-[9px] text-primary/60 font-black uppercase">• {h.lawyerName || 'Pendente'}</span>
-                                        </div>
+                            return (
+                              <TableRow key={h.id} className={cn("hover:bg-white/[0.02] transition-colors group", isPendingReturn && "bg-amber-500/[0.03]")}>
+                                  <TableCell className="px-6 py-5 text-white font-black">
+                                    {format(h.date.toDate(), 'dd/MM/yy HH:mm')}
+                                  </TableCell>
+                                  <TableCell className="px-6 py-5">
+                                    <div className="flex flex-col">
+                                      <span className="text-slate-300 font-bold group-hover:text-primary transition-colors truncate max-w-[200px]">
+                                        {process?.name}
+                                      </span>
+                                      <span className="text-[9px] text-primary/60 font-black uppercase">{h.lawyerName || 'Pendente'}</span>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="px-6 py-5">
+                                    <Badge variant="outline" className={cn("gap-1.5 h-7 px-3 text-[10px] font-black uppercase tracking-widest", config.color)}>
+                                        {config.label}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="px-6 py-5">
+                                    {h.hasFollowUp ? (
+                                      <div className="flex items-center gap-2 text-emerald-500">
+                                        <CheckCircle2 className="h-4 w-4" />
+                                        <span className="text-[10px] font-black uppercase">Processado</span>
                                       </div>
-                                    </td>
-                                    <td className="px-6 py-5">
-                                      {h.clientNotified ? (
-                                        <div className="flex items-center gap-2 text-emerald-500">
-                                          <NotifIcon className="h-3.5 w-3.5" />
-                                          <span className="text-[9px] font-black uppercase">{h.notificationMethod}</span>
-                                        </div>
-                                      ) : (
-                                        <div className="flex items-center gap-2 text-rose-500/50">
-                                          <AlertCircle className="h-3.5 w-3.5" />
-                                          <span className="text-[9px] font-black uppercase"></span>
-                                        </div>
-                                      )}
-                                    </td>
-                                    <td className="px-6 py-5">
-                                      <Badge variant="outline" className={cn("gap-1.5 h-7 px-3 text-[9px] font-black uppercase tracking-widest", config.color)}>
-                                          <StatusIcon className="h-3 w-3" />
-                                          {config.label}
-                                      </Badge>
-                                    </td>
-                                    <td className="px-6 py-5">
-                                      {h.hasFollowUp ? (
-                                        <div className="flex items-center gap-2 text-emerald-500">
-                                          <CheckCircle2 className="h-4 w-4" />
-                                          <span className="text-[10px] font-black uppercase">Processado</span>
-                                        </div>
-                                      ) : h.status === 'REALIZADA' ? (
-                                        <div className="flex items-center gap-2 text-amber-500">
-                                          <AlertCircle className="h-4 w-4" />
-                                          <span className="text-[10px] font-black uppercase animate-pulse">Pendente</span>
-                                        </div>
-                                      ) : (
-                                        <span className="text-slate-600">---</span>
-                                      )}
-                                    </td>
-                                    <td className="px-6 py-5 text-right">
-                                      <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                          <Button variant="ghost" size="icon" className="text-white/20 hover:text-white rounded-full bg-white/5">
-                                            <MoreVertical className="h-4 w-4" />
-                                          </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end" className="bg-[#0f172a] border-white/10 w-56 p-1">
-                                          <DropdownMenuLabel className="text-[9px] font-black uppercase text-slate-500 tracking-widest px-2 py-1.5">Gerenciamento</DropdownMenuLabel>
-                                          {isPendingReturn && (
-                                            <DropdownMenuItem onClick={() => setReturnHearing(h)} className="font-bold gap-2 text-amber-400 focus:bg-amber-500/10">
-                                              <History className="h-4 w-4" /> Dar Retorno
-                                            </DropdownMenuItem>
-                                          )}
-                                          <DropdownMenuItem onClick={() => handleUpdateStatus(h, 'PENDENTE')} className="font-bold gap-2 text-blue-400 focus:bg-blue-500/10">
-                                            <RotateCcw className="h-4 w-4" /> Reativar Ato
+                                    ) : h.status === 'REALIZADA' ? (
+                                      <div className="flex items-center gap-2 text-amber-500">
+                                        <AlertCircle className="h-4 w-4" />
+                                        <span className="text-[10px] font-black uppercase animate-pulse">Pendente</span>
+                                      </div>
+                                    ) : (
+                                      <span className="text-slate-600">---</span>
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="px-6 py-5 text-right">
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger asChild>
+                                        <Button variant="ghost" size="icon" className="text-white/20 hover:text-white rounded-full bg-white/5">
+                                          <MoreVertical className="h-4 w-4" />
+                                        </Button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="end" className="bg-[#0f172a] border-white/10 w-56 p-1">
+                                        {isPendingReturn && (
+                                          <DropdownMenuItem onClick={() => setReturnHearing(h)} className="font-bold gap-2 text-amber-400 focus:bg-amber-500/10">
+                                            <History className="h-4 w-4" /> Dar Retorno
                                           </DropdownMenuItem>
-                                          <DropdownMenuSeparator className="bg-white/5" />
-                                          <DropdownMenuItem onClick={() => {
-                                            if (process) router.push(`/dashboard/processos?clientId=${process.clientId}`);
-                                          }} className="font-bold gap-2 text-white">
-                                            <Eye className="h-4 w-4 text-primary" /> Ver Processo
-                                          </DropdownMenuItem>
-                                          <DropdownMenuItem onClick={() => window.open(`https://wa.me/55${staffData?.find(s => s.id === h.lawyerId)?.whatsapp?.replace(/\D/g, '')}`, '_blank')} className="font-bold gap-2 text-emerald-400">
-                                            <MessageSquare className="h-4 w-4" /> Falar c/ Advogado
-                                          </DropdownMenuItem>
-                                        </DropdownMenuContent>
-                                      </DropdownMenu>
-                                    </td>
-                                </tr>
-                              );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
+                                        )}
+                                        <DropdownMenuItem onClick={() => handleUpdateStatus(h, 'PENDENTE')} className="font-bold gap-2 text-blue-400 focus:bg-blue-500/10">
+                                          <RotateCcw className="h-4 w-4" /> Reativar Ato
+                                        </DropdownMenuItem>
+                                        <DropdownMenuSeparator className="bg-white/5" />
+                                        <DropdownMenuItem onClick={() => {
+                                          if (process) router.push(`/dashboard/processos?clientId=${process.clientId}`);
+                                        }} className="font-bold gap-2 text-white">
+                                          <Eye className="h-4 w-4 text-primary" /> Ver Processo
+                                        </DropdownMenuItem>
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                  </TableCell>
+                              </TableRow>
+                            );
+                        })}
+                      </TableBody>
+                    </Table>
                 </Card>
             </TabsContent>
         </Tabs>
