@@ -318,7 +318,7 @@ export default function AudienciasPage() {
                                                           <div className="flex flex-wrap items-center gap-2 mb-2">
                                                               <Badge variant="outline" className="text-[9px] font-black uppercase border-primary/30 text-primary px-2">{h.type}</Badge>
                                                               <Badge variant="outline" className="text-[9px] font-black uppercase border-white/10 text-slate-400 flex items-center gap-1">
-                                                                  <Users className="h-2.5 w-2.5" /> Dr(a). {h.lawyerName || 'Não atribuído'}
+                                                                  <Users className="h-2.5 w-2.5" /> Dr(a). {h.lawyerName || 'Pendente'}
                                                               </Badge>
                                                               {h.clientNotified ? (
                                                                 <Badge variant="outline" className="text-[9px] font-black uppercase border-emerald-500/20 text-emerald-400 bg-emerald-500/5 flex items-center gap-1">
@@ -331,7 +331,7 @@ export default function AudienciasPage() {
                                                               )}
                                                           </div>
                                                           <h4 className="font-black text-lg text-white truncate group-hover:text-primary transition-colors">{p?.name}</h4>
-                                                          <p className="text-[10px] text-slate-500 font-mono mt-1 flex items-center gap-1.5"><MapPin className="h-3 w-3 text-primary" /> {h.location}</p>
+                                                          <p className="text-[10px] text-slate-500 font-mono mt-1 flex items-center gap-1.5"><MapPin className="h-3 w-3 text-primary shrink-0" /> {h.location}</p>
                                                       </div>
                                                       <div className="flex items-center gap-3">
                                                           <Badge variant="outline" className={cn("gap-1.5 h-8 px-4 text-[10px] font-black uppercase tracking-widest", statusConfig[h.status || 'PENDENTE'].color)}>
@@ -453,26 +453,31 @@ export default function AudienciasPage() {
                           <div className="p-4 space-y-4">
                             {hearingsForSelectedDay.length > 0 ? (
                               hearingsForSelectedDay.map(h => (
-                                <div key={h.id} className="p-4 rounded-2xl border border-white/5 bg-black/30 space-y-3 hover:border-primary/20 transition-all group">
+                                <div key={h.id} className="p-5 rounded-2xl border border-white/5 bg-black/30 space-y-4 hover:border-primary/20 transition-all group">
                                   <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
-                                      <Clock className="h-3 w-3 text-primary" />
+                                      <Clock className="h-3.5 w-3.5 text-primary" />
                                       <span className="text-xs font-black text-white">{format(h.date.toDate(), 'HH:mm')}</span>
                                     </div>
-                                    <Badge variant="outline" className={cn("text-[8px] font-black uppercase tracking-widest", statusConfig[h.status || 'PENDENTE'].color)}>
+                                    <Badge variant="outline" className={cn("text-[8px] font-black uppercase tracking-widest px-2 h-5 border-none", statusConfig[h.status || 'PENDENTE'].color)}>
                                       {h.status}
                                     </Badge>
                                   </div>
-                                  <div className="space-y-1">
-                                      <p className="text-xs font-black text-slate-200 leading-tight truncate">{processesMap.get(h.processId)?.name}</p>
-                                      <p className="text-[9px] text-primary font-bold uppercase flex items-center gap-1.5"><Users className="h-3 w-3" /> Dr(a). {h.lawyerName}</p>
-                                      {h.clientNotified && (
-                                        <p className="text-[8px] text-emerald-500 font-bold uppercase flex items-center gap-1"><ShieldCheck className="h-2.5 w-2.5" /> Cliente Avisado</p>
-                                      )}
+                                  <div className="space-y-2">
+                                      <p className="text-xs font-black text-slate-200 leading-snug line-clamp-2">{processesMap.get(h.processId)?.name}</p>
+                                      <div className="flex flex-col gap-1.5">
+                                        <p className="text-[9px] text-primary font-black uppercase flex items-center gap-1.5"><Users className="h-3 w-3" /> Dr(a). {h.lawyerName || 'Pendente'}</p>
+                                        {h.clientNotified && (
+                                          <p className="text-[8px] text-emerald-500 font-bold uppercase flex items-center gap-1"><ShieldCheck className="h-2.5 w-2.5" /> Cliente Avisado</p>
+                                        )}
+                                      </div>
                                   </div>
-                                  <p className="text-[10px] text-slate-500 truncate flex items-center gap-1.5">
-                                    <MapPin className="h-3 w-3 text-primary shrink-0" /> {h.location}
-                                  </p>
+                                  <div className="pt-2 border-t border-white/5">
+                                    <p className="text-[10px] text-slate-500 leading-relaxed flex items-start gap-1.5">
+                                      <MapPin className="h-3 w-3 text-primary shrink-0 mt-0.5" /> 
+                                      <span className="line-clamp-2">{h.location}</span>
+                                    </p>
+                                  </div>
                                 </div>
                               ))
                             ) : (
@@ -527,7 +532,7 @@ export default function AudienciasPage() {
                                         </span>
                                         <div className="flex items-center gap-2 mt-1">
                                           <span className="text-[9px] text-slate-500 uppercase font-black">{h.type}</span>
-                                          <span className="text-[9px] text-primary/60 font-black uppercase">• {h.lawyerName}</span>
+                                          <span className="text-[9px] text-primary/60 font-black uppercase">• {h.lawyerName || 'Pendente'}</span>
                                         </div>
                                       </div>
                                     </td>
