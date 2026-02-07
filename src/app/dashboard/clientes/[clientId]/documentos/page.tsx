@@ -3,7 +3,6 @@
 import * as React from 'react';
 import Link from 'next/link';
 import {
-  Upload,
   Trash2,
   Loader2,
   AlertCircle,
@@ -25,13 +24,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/use-toast';
 import { useFirebase, useDoc, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import type { Client } from '@/lib/types';
-import { listFiles, uploadFile, deleteFile, renameFile } from '@/lib/drive-actions';
+import { listFiles, deleteFile, renameFile } from '@/lib/drive-actions';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -105,93 +104,6 @@ function RenameFileDialog({ file, onRenameSuccess, open, onOpenChange }: { file:
                     <Button onClick={handleRename} disabled={!newName || isRenaming}>
                         {isRenaming ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FilePenLine className="mr-2 h-4 w-4" />}
                         {isRenaming ? 'Salvando...' : 'Salvar Novo Nome'}
-                    </Button>
-                </div>
-            </DialogContent>
-        </Dialog>
-    );
-}
-
-function UploadFileDialog({ folderId, onUploadSuccess }: { folderId: string; onUploadSuccess: () => void }) {
-    const [file, setFile] = React.useState<File | null>(null);
-    const [isUploading, setIsUploading] = React.useState(false);
-    const { toast } = useToast();
-    const [open, setOpen] = React.useState(false);
-
-    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        if (event.target.files) {
-            setFile(event.target.files[0]);
-        }
-    };
-
-    const toBase64 = (file: File) => new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = () => {
-            const result = reader.result as string;
-            const base64Content = result.split(',')[1];
-            if (base64Content) {
-                 resolve(base64Content);
-            } else {
-                 reject(new Error("Falha ao converter arquivo para Base64."));
-            }
-        };
-        reader.onerror = error => reject(error);
-    });
-
-    const handleUpload = async () => {
-        if (!file || !folderId) return;
-
-        setIsUploading(true);
-        try {
-            const fileContentBase64 = await toBase64(file);
-            await uploadFile(folderId, file.name, file.type, fileContentBase64);
-            
-            toast({
-                title: 'Upload Concluído',
-                description: `O arquivo "${file.name}" foi enviado com sucesso.`,
-            });
-            onUploadSuccess();
-            setFile(null);
-            setOpen(false);
-        } catch (error: any) {
-            console.error('Upload failed:', error);
-            toast({
-                variant: 'destructive',
-                title: 'Erro no Upload',
-                description: error.message || 'Não foi possível enviar o arquivo.',
-            });
-        } finally {
-            setIsUploading(false);
-        }
-    };
-
-    return (
-        <Dialog open={open} onOpenChange={(isOpen) => {
-            if (!isUploading) setOpen(isOpen);
-        }}>
-            <DialogTrigger asChild>
-                <Button>
-                    <Upload className="mr-2 h-4 w-4" />
-                    Enviar Arquivo
-                </Button>
-            </DialogTrigger>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Enviar Novo Arquivo</DialogTitle>
-                    <DialogDescription>
-                        Selecione um arquivo do seu computador para enviar para a pasta deste cliente no Google Drive.
-                    </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                    <Input type="file" onChange={handleFileChange} disabled={isUploading} />
-                    {file && <p className="text-sm text-muted-foreground">Arquivo selecionado: {file.name}</p>}
-                </div>
-                <div className="flex justify-end gap-2">
-                     <Button variant="outline" onClick={() => setOpen(false)} disabled={isUploading}>Cancelar</Button>
-                     <Button onClick={handleUpload} disabled={!file || isUploading}>
-                        {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
-                        {isUploading ? 'Enviando...' : 'Enviar'}
                     </Button>
                 </div>
             </DialogContent>
@@ -287,11 +199,6 @@ export default function ClientDocumentsPage({ params }: { params: { clientId: st
                     <h1 className="text-xl font-semibold font-headline">
                         Documentos de: {clientName}
                     </h1>
-                    <div className="ml-auto">
-                        {session && clientData.driveFolderId && (
-                           <UploadFileDialog folderId={clientData.driveFolderId} onUploadSuccess={fetchFiles} />
-                        )}
-                    </div>
                 </div>
 
                 <Card>
