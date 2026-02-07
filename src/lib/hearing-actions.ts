@@ -6,9 +6,8 @@ import { add, formatISO } from 'date-fns';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/options';
 import { createNotification } from './notification-actions';
-import type { HearingStatus, HearingType, TimelineEvent } from './types';
+import type { HearingStatus, HearingType, NotificationMethod } from './types';
 import { summarizeAddress } from './utils';
-import { v4 as uuidv4 } from 'uuid';
 import { Timestamp, FieldValue } from 'firebase-admin/firestore';
 
 /**
@@ -26,6 +25,8 @@ function buildCalendarDescription(data: {
   notes?: string;
   id: string;
   createdByName: string;
+  clientNotified?: boolean;
+  notificationMethod?: string;
 }) {
   const cleanPhone = data.clientPhone.replace(/\D/g, '');
   const whatsappLink = cleanPhone ? `https://wa.me/${cleanPhone.startsWith('55') ? cleanPhone : '55' + cleanPhone}` : 'Telefone não disponível';
@@ -53,6 +54,9 @@ function buildCalendarDescription(data: {
     `🚩 Status:`,
     `${data.status}`,
     ``,
+    `✅ Cliente Avisado? ${data.clientNotified ? 'SIM' : 'NÃO'}`,
+    `📢 Meio de Aviso: ${data.notificationMethod || 'Pendente'}`,
+    ``,
     `📝 Observações:`,
     `${data.notes || 'Nenhuma anotação no momento.'}`,
     ``,
@@ -64,7 +68,7 @@ function buildCalendarDescription(data: {
 export async function createHearing(data: {
   processId: string;
   processName: string;
-  lawyerId: string; // O advogado que fará a audiência
+  lawyerId: string;
   hearingDate: string;
   location: string;
   courtBranch?: string;
@@ -72,6 +76,8 @@ export async function createHearing(data: {
   status: HearingStatus;
   type: HearingType;
   notes?: string;
+  clientNotified?: boolean;
+  notificationMethod?: NotificationMethod;
 }) {
   if (!firestoreAdmin) {
     throw new Error('A conexão com o servidor de dados falhou.');
@@ -82,7 +88,11 @@ export async function createHearing(data: {
     throw new Error('Não autenticado.');
   }
 
-  const { processId, lawyerId, hearingDate, location, courtBranch, responsibleParty, status, type, notes } = data;
+  const { 
+    processId, lawyerId, hearingDate, location, 
+    courtBranch, responsibleParty, status, type, notes,
+    clientNotified, notificationMethod 
+  } = data;
 
   try {
     const processDoc = await firestoreAdmin.collection('processes').doc(processId).get();
@@ -106,7 +116,7 @@ export async function createHearing(data: {
     const lawyerData = lawyerDoc.data();
     const lawyerName = lawyerData ? `${lawyerData.firstName} ${lawyerData.lastName}` : 'Advogado';
 
-    const hearingRef = await firestoreAdmin.collection('hearings').add({
+    const hearingPayload = {
       processId,
       lawyerId,
       lawyerName,
@@ -119,12 +129,15 @@ export async function createHearing(data: {
       status: status || 'PENDENTE',
       type: type || 'OUTRA',
       notes: notes || '',
+      clientNotified: !!clientNotified,
+      notificationMethod: notificationMethod || null,
+      notificationDate: clientNotified ? FieldValue.serverTimestamp() : null,
       createdAt: FieldValue.serverTimestamp(),
-    });
+    };
 
-    // Sincronização com o Google Agenda do usuário LOGADO (quem está marcando)
-    // Nota: Para sincronizar na agenda do ADVOGADO alvo, precisaríamos de permissões delegadas complexas.
-    // Por enquanto, sincronizamos na agenda de quem marca para controle e o sistema notifica o alvo.
+    const hearingRef = await firestoreAdmin.collection('hearings').add(hearingPayload);
+
+    // Sincronização com o Google Agenda
     try {
       const { calendar } = await getGoogleApiClientsForUser();
       const startDateTime = new Date(hearingDate);
@@ -141,7 +154,9 @@ export async function createHearing(data: {
         status: status || 'PENDENTE',
         notes,
         id: hearingRef.id,
-        createdByName: session.user.name || 'Sistema'
+        createdByName: session.user.name || 'Sistema',
+        clientNotified: !!clientNotified,
+        notificationMethod: notificationMethod
       });
 
       const event = {
@@ -223,7 +238,65 @@ export async function updateHearingStatus(hearingId: string, status: HearingStat
     }
 }
 
-export async function syncHearings() {
-  // Função placeholder para gatilho de revalidação ou sync forçado
-  return { syncedCount: 0 };
+export async function processHearingReturn(hearingId: string, data: { resultNotes: string; nextStepType?: string; nextStepDeadline?: string }) {
+  if (!firestoreAdmin) throw new Error('Servidor indisponível.');
+  const session = await getServerSession(authOptions);
+  if (!session) throw new Error('Não autenticado.');
+
+  try {
+    const hearingRef = firestoreAdmin.collection('hearings').doc(hearingId);
+    const hearingSnap = await hearingRef.get();
+    const hearingData = hearingSnap.data();
+    
+    if (!hearingSnap.exists || !hearingData) throw new Error('Audiência não encontrada.');
+
+    const batch = firestoreAdmin.batch();
+
+    // 1. Atualizar status da audiência
+    batch.update(hearingRef, {
+      status: 'REALIZADA',
+      resultNotes: data.resultNotes,
+      hasFollowUp: true,
+      updatedAt: FieldValue.serverTimestamp()
+    });
+
+    // 2. Criar evento na timeline do processo
+    const processRef = firestoreAdmin.collection('processes').doc(hearingData.processId);
+    const timelineEvent = {
+      id: uuidv4(),
+      type: 'hearing',
+      description: `RESULTADO DA AUDIÊNCIA (${hearingData.type}): ${data.resultNotes}`,
+      date: Timestamp.now(),
+      authorName: session.user.name || 'Advogado'
+    };
+    batch.update(processRef, {
+      timeline: FieldValue.arrayUnion(timelineEvent),
+      updatedAt: FieldValue.serverTimestamp()
+    });
+
+    // 3. Agendar próximo passo no Google Tasks se houver prazo
+    if (data.nextStepType && data.nextStepDeadline) {
+      try {
+        const { tasks } = await getGoogleApiClientsForUser();
+        const taskDate = new Date(data.nextStepDeadline);
+        taskDate.setUTCHours(0, 0, 0, 0);
+
+        await tasks.tasks.insert({
+          tasklist: '@default',
+          requestBody: {
+            title: `📋 SEGUIMENTO: ${data.nextStepType} | ${hearingData.processName || 'Processo'}`,
+            notes: `Referente ao retorno da audiência realizada em ${format(hearingData.date.toDate(), 'dd/MM/yyyy')}.\nResultado: ${data.resultNotes}`,
+            due: taskDate.toISOString(),
+          }
+        });
+      } catch (e) {
+        console.warn('Google Tasks sync failed during hearing return:', e);
+      }
+    }
+
+    await batch.commit();
+    return { success: true };
+  } catch (error: any) {
+    throw new Error(error.message);
+  }
 }

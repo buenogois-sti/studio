@@ -135,6 +135,7 @@ export type Process = {
 
 export type HearingStatus = 'PENDENTE' | 'REALIZADA' | 'CANCELADA' | 'ADIADA';
 export type HearingType = 'CONCILIACAO' | 'INSTRUCAO' | 'UNA' | 'JULGAMENTO' | 'OUTRA';
+export type NotificationMethod = 'whatsapp' | 'email' | 'phone' | 'personal' | 'court' | 'other';
 
 export type Hearing = {
   id: string;
@@ -154,6 +155,10 @@ export type Hearing = {
   hasFollowUp?: boolean;
   googleCalendarEventId?: string;
   createdAt?: Timestamp;
+  // Campos de notificação do cliente
+  clientNotified?: boolean;
+  notificationMethod?: NotificationMethod;
+  notificationDate?: Timestamp;
 };
 
 export type LegalDeadlineStatus = 'PENDENTE' | 'CUMPRIDO' | 'PERDIDO' | 'CANCELADO';

@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -25,7 +24,12 @@ import {
   Users,
   User,
   Filter,
-  Activity
+  Activity,
+  MessageSquare,
+  ShieldCheck,
+  Smartphone,
+  Mail,
+  HelpCircle
 } from 'lucide-react';
 import { 
   format, 
@@ -72,6 +76,15 @@ const statusConfig: Record<HearingStatus, { label: string; icon: any; color: str
     ADIADA: { label: 'Adiada', icon: AlertTriangle, color: 'text-amber-500 bg-amber-500/10' },
 };
 
+const notificationIconMap = {
+  whatsapp: Smartphone,
+  email: Mail,
+  phone: User,
+  personal: Users,
+  court: Gavel,
+  other: HelpCircle,
+};
+
 export default function AudienciasPage() {
   const { firestore, isUserLoading, user } = useFirebase();
   const [refreshKey, setRefreshKey] = React.useState(0);
@@ -90,13 +103,11 @@ export default function AudienciasPage() {
 
   const staffQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'staff'), limit(50)) : null, [firestore]);
   const { data: staffData } = useCollection<Staff>(staffQuery);
-  const lawyers = staffData?.filter(s => s.role === 'lawyer' || s.role === 'partner') || [];
+  const lawyers = staffData?.filter(s => s.role === 'lawyer' || s.role === 'partner' || s.role === 'intern') || [];
 
   const hearingsQuery = useMemoFirebase(() => {
     if (!firestore || !userProfile) return null;
     const base = collection(firestore, 'hearings');
-    
-    // OTIMIZAÇÃO: Filtro de data para não carregar audiências muito antigas (limitado a 3 meses atrás)
     const threeMonthsAgo = Timestamp.fromDate(subMonths(new Date(), 3));
 
     if (userProfile.role === 'admin' || userProfile.role === 'assistant') {
@@ -281,6 +292,8 @@ export default function AudienciasPage() {
                                         {daily.map(h => {
                                             const p = processesMap.get(h.processId);
                                             const StatusIcon = statusConfig[h.status || 'PENDENTE'].icon;
+                                            const NotifIcon = h.notificationMethod ? notificationIconMap[h.notificationMethod] : HelpCircle;
+                                            
                                             return (
                                                 <div key={h.id} className="flex flex-col md:flex-row md:items-center gap-6 p-5 rounded-2xl border border-white/5 bg-black/20 hover:bg-black/40 hover:border-primary/20 transition-all duration-300 group">
                                                     <div className="flex items-center gap-3 min-w-[100px] border-r border-white/5 pr-4">
@@ -293,6 +306,15 @@ export default function AudienciasPage() {
                                                             <Badge variant="outline" className="text-[9px] font-black uppercase border-white/10 text-slate-400 flex items-center gap-1">
                                                                 <Users className="h-2.5 w-2.5" /> Dr(a). {h.lawyerName || 'Não atribuído'}
                                                             </Badge>
+                                                            {h.clientNotified ? (
+                                                              <Badge variant="outline" className="text-[9px] font-black uppercase border-emerald-500/20 text-emerald-400 bg-emerald-500/5 flex items-center gap-1">
+                                                                <NotifIcon className="h-2.5 w-2.5" /> Cliente Avisado ({h.notificationMethod})
+                                                              </Badge>
+                                                            ) : (
+                                                              <Badge variant="outline" className="text-[9px] font-black uppercase border-rose-500/20 text-rose-400 bg-rose-500/5 flex items-center gap-1">
+                                                                <AlertCircle className="h-2.5 w-2.5" /> Cliente ñ avisado
+                                                              </Badge>
+                                                            )}
                                                         </div>
                                                         <h4 className="font-black text-lg text-white truncate group-hover:text-primary transition-colors">{p?.name}</h4>
                                                         <p className="text-[10px] text-slate-500 font-mono mt-1 flex items-center gap-1.5"><MapPin className="h-3 w-3 text-primary" /> {h.location}</p>
@@ -424,6 +446,9 @@ export default function AudienciasPage() {
                                 <div className="space-y-1">
                                     <p className="text-xs font-black text-slate-200 leading-tight truncate">{processesMap.get(h.processId)?.name}</p>
                                     <p className="text-[9px] text-primary font-bold uppercase flex items-center gap-1.5"><Users className="h-3 w-3" /> Dr(a). {h.lawyerName}</p>
+                                    {h.clientNotified && (
+                                      <p className="text-[8px] text-emerald-500 font-bold uppercase flex items-center gap-1"><ShieldCheck className="h-2.5 w-2.5" /> Cliente Avisado</p>
+                                    )}
                                 </div>
                                 <p className="text-[10px] text-slate-500 truncate flex items-center gap-1.5">
                                   <MapPin className="h-3 w-3 text-primary shrink-0" /> {h.location}
@@ -452,6 +477,7 @@ export default function AudienciasPage() {
                           <tr>
                             <th className="px-6 py-5">Data/Hora</th>
                             <th className="px-6 py-5">Processo / Advogado</th>
+                            <th className="px-6 py-5">Notificação</th>
                             <th className="px-6 py-5">Status Final</th>
                             <th className="px-6 py-5">Retorno Jurídico</th>
                             <th className="px-6 py-5 text-right">Ação</th>
@@ -462,6 +488,7 @@ export default function AudienciasPage() {
                               const config = statusConfig[h.status];
                               const StatusIcon = config.icon;
                               const isPendingReturn = h.status === 'REALIZADA' && !h.hasFollowUp;
+                              const NotifIcon = h.notificationMethod ? notificationIconMap[h.notificationMethod] : HelpCircle;
 
                               return (
                                 <tr key={h.id} className={cn("hover:bg-white/[0.02] transition-colors group", isPendingReturn && "bg-amber-500/[0.03]")}>
@@ -478,6 +505,19 @@ export default function AudienciasPage() {
                                           <span className="text-[9px] text-primary/60 font-black uppercase">• {h.lawyerName}</span>
                                         </div>
                                       </div>
+                                    </td>
+                                    <td className="px-6 py-5">
+                                      {h.clientNotified ? (
+                                        <div className="flex items-center gap-2 text-emerald-500">
+                                          <NotifIcon className="h-3.5 w-3.5" />
+                                          <span className="text-[9px] font-black uppercase">{h.notificationMethod}</span>
+                                        </div>
+                                      ) : (
+                                        <div className="flex items-center gap-2 text-rose-500/50">
+                                          <AlertCircle className="h-3.5 w-3.5" />
+                                          <span className="text-[9px] font-black uppercase">Ñ avisado</span>
+                                        </div>
+                                      )}
                                     </td>
                                     <td className="px-6 py-5">
                                       <Badge variant="outline" className={cn("gap-1.5 h-7 px-3 text-[9px] font-black uppercase tracking-widest", config.color)}>
