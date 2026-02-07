@@ -102,9 +102,7 @@ import { ClientCreationModal } from '@/components/process/ClientCreationModal';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
-import { Separator } from '@/components/ui/separator';
 import { ClientForm } from '@/components/client/ClientForm';
-import { H2 } from '@/components/ui/typography';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
@@ -342,7 +340,7 @@ export default function LeadsPage() {
   );
 }
 
-function KanbanColumn({ id, stage, leads, clientsMap, staffMap, onCardClick }: any) {
+function KanbanColumn({ id, stage, leads, clientsMap, staffMap, onCardClick }: { id: string; stage: string; leads: Lead[]; clientsMap: Map<string, Client>; staffMap: Map<string, Staff>; onCardClick: (l: Lead) => void }) {
   const { setNodeRef } = useSortable({ id });
   const config = stageConfig[stage as LeadStatus];
 
@@ -381,7 +379,7 @@ function KanbanColumn({ id, stage, leads, clientsMap, staffMap, onCardClick }: a
   );
 }
 
-function LeadCard({ lead, client, lawyer, onClick }: any) {
+function LeadCard({ lead, client, lawyer, onClick }: { lead: Lead; client?: Client; lawyer?: Staff; onClick: () => void }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: lead.id });
   const style = { transform: CSS.Translate.toString(transform), transition };
   const priority = priorityConfig[lead.priority as LeadPriority];
@@ -437,7 +435,7 @@ function LeadCard({ lead, client, lawyer, onClick }: any) {
   );
 }
 
-function LeadDetailsSheet({ lead, client, open, onOpenChange, onConvert, isProcessing }: any) {
+function LeadDetailsSheet({ lead, client, open, onOpenChange, onConvert, isProcessing }: { lead: Lead | null; client?: Client; open: boolean; onOpenChange: (o: boolean) => void; onConvert: (id: string) => void; isProcessing: boolean }) {
   const [activeTab, setActiveTab] = React.useState('burocracia');
   const { toast } = useToast();
 
@@ -469,142 +467,142 @@ function LeadDetailsSheet({ lead, client, open, onOpenChange, onConvert, isProce
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="sm:max-w-4xl w-full p-0 flex flex-col bg-[#020617] border-white/10 text-white">
-        <SheetHeader className="p-6 border-b border-white/5 bg-white/5">
-          <div className="flex items-center justify-between">
-            <div>
-              <Badge variant="outline" className={cn("text-[9px] font-black uppercase mb-2", stageConfig[lead.status as LeadStatus].color)}>Fase Atual: {stageConfig[lead.status as LeadStatus].label}</Badge>
-              <SheetTitle className="text-2xl font-black font-headline text-white">{lead.title}</SheetTitle>
-              <SheetDescription className="text-slate-400">Origem: {lead.captureSource} | Ref: #{lead.id.substring(0, 6)}</SheetDescription>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
+          <SheetHeader className="p-6 border-b border-white/5 bg-white/5">
+            <div className="flex items-center justify-between">
+              <div>
+                <Badge variant="outline" className={cn("text-[9px] font-black uppercase mb-2", stageConfig[lead.status].color)}>Fase Atual: {stageConfig[lead.status].label}</Badge>
+                <SheetTitle className="text-2xl font-black font-headline text-white">{lead.title}</SheetTitle>
+                <SheetDescription className="text-slate-400">Origem: {lead.captureSource} | Ref: #{lead.id.substring(0, 6)}</SheetDescription>
+              </div>
+              <div className="flex gap-2">
+                <Button 
+                  onClick={() => onConvert(lead.id)} 
+                  disabled={isProcessing || lead.status === 'DISTRIBUIDO'} 
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase tracking-widest text-[10px] h-12 px-8"
+                >
+                  {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ArrowRightLeft className="mr-2 h-4 w-4" />}
+                  Protocolar Processo
+                </Button>
+              </div>
             </div>
-            <div className="flex gap-2">
-              <Button 
-                onClick={() => onConvert(lead.id)} 
-                disabled={isProcessing || lead.status === 'DISTRIBUIDO'} 
-                className="bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase tracking-widest text-[10px] h-12 px-8"
-              >
-                {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ArrowRightLeft className="mr-2 h-4 w-4" />}
-                Protocolar Processo
-              </Button>
-            </div>
-          </div>
-        </SheetHeader>
+          </SheetHeader>
 
-        <div className="px-6 bg-white/5 border-b border-white/5">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <div className="px-6 bg-white/5 border-b border-white/5">
             <TabsList className="bg-transparent gap-8 h-14 p-0">
               <TabsTrigger value="burocracia" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent text-slate-400 data-[state=active]:text-white font-black uppercase text-[10px] tracking-widest">Dados do Cliente</TabsTrigger>
               <TabsTrigger value="reclamadas" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent text-slate-400 data-[state=active]:text-white font-black uppercase text-[10px] tracking-widest">Polo Passivo (Réus)</TabsTrigger>
               <TabsTrigger value="documentos" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent text-slate-400 data-[state=active]:text-white font-black uppercase text-[10px] tracking-widest">Provas & Drive</TabsTrigger>
               <TabsTrigger value="historico" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent text-slate-400 data-[state=active]:text-white font-black uppercase text-[10px] tracking-widest">Timeline</TabsTrigger>
             </TabsList>
-          </Tabs>
-        </div>
+          </div>
 
-        <ScrollArea className="flex-1">
-          <div className="p-8 pb-32">
-            <TabsContent value="burocracia" className="m-0 space-y-8 animate-in fade-in duration-300">
-              <Alert className="bg-amber-500/10 border-amber-500/20 text-amber-400 p-6 rounded-3xl">
-                <Info className="h-5 w-5" />
-                <AlertTitle className="font-black uppercase tracking-tighter text-base">Complemento de Cadastro</AlertTitle>
-                <AlertDescription className="text-xs font-medium mt-1">Para gerar a procuração e o contrato na fase seguinte, preencha o RG, CPF e Endereço completo abaixo.</AlertDescription>
-              </Alert>
-              <ClientForm client={client} onSave={() => toast({ title: 'Cadastro Atualizado!' })} />
-            </TabsContent>
+          <ScrollArea className="flex-1">
+            <div className="p-8 pb-32">
+              <TabsContent value="burocracia" className="m-0 space-y-8 animate-in fade-in duration-300">
+                <Alert className="bg-amber-500/10 border-amber-500/20 text-amber-400 p-6 rounded-3xl">
+                  <Info className="h-5 w-5" />
+                  <AlertTitle className="font-black uppercase tracking-tighter text-base">Complemento de Cadastro</AlertTitle>
+                  <AlertDescription className="text-xs font-medium mt-1">Para gerar a procuração e o contrato na fase seguinte, preencha o RG, CPF e Endereço completo abaixo.</AlertDescription>
+                </Alert>
+                <ClientForm client={client} onSave={() => toast({ title: 'Cadastro Atualizado!' })} />
+              </TabsContent>
 
-            <TabsContent value="reclamadas" className="m-0 space-y-8 animate-in fade-in duration-300">
-              <div className="flex items-center justify-between border-b border-white/5 pb-4">
-                <div>
-                  <h3 className="text-xl font-black font-headline text-white">Reclamadas (Polo Passivo)</h3>
-                  <p className="text-xs text-slate-500">Identifique todas as partes que figurarão no polo passivo da ação.</p>
-                </div>
-                <Button variant="outline" size="sm" onClick={() => append({ name: '', email: '', phone: '' })} className="font-bold border-primary/20 text-primary hover:bg-primary/10 rounded-xl">
-                  <PlusCircle className="h-4 w-4 mr-2" /> Adicionar Réu
-                </Button>
-              </div>
-              
-              <div className="space-y-4">
-                {fields.map((field, index) => (
-                  <Card key={field.id} className="bg-white/5 border-white/10 rounded-2xl overflow-hidden group/item">
-                    <CardContent className="p-6 grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
-                      <div className="md:col-span-5 space-y-2">
-                        <Label className="text-[10px] uppercase font-black text-slate-500 tracking-widest">Razão Social / Nome Fantasia *</Label>
-                        <Input {...opposingForm.register(`parties.${index}.name`)} className="bg-black/40 border-white/10 h-11" placeholder="Nome oficial da empresa" />
-                      </div>
-                      <div className="md:col-span-4 space-y-2">
-                        <Label className="text-[10px] uppercase font-black text-slate-500 tracking-widest">E-mail Jurídico / RH</Label>
-                        <Input {...opposingForm.register(`parties.${index}.email`)} className="bg-black/40 border-white/10 h-11" placeholder="rh@empresa.com.br" />
-                      </div>
-                      <div className="md:col-span-2 space-y-2">
-                        <Label className="text-[10px] uppercase font-black text-slate-500 tracking-widest">Telefone</Label>
-                        <Input {...opposingForm.register(`parties.${index}.phone`)} className="bg-black/40 border-white/10 h-11" placeholder="(00) 0000-0000" />
-                      </div>
-                      <div className="md:col-span-1 flex justify-end">
-                        <Button variant="ghost" size="icon" onClick={() => remove(index)} className="text-rose-500 hover:bg-rose-500/10 h-11 w-11 rounded-xl"><Trash2 className="h-5 w-5" /></Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-                
-                {fields.length > 0 ? (
-                  <Button 
-                    onClick={handleSaveParties} 
-                    className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black uppercase text-[11px] h-12 shadow-xl shadow-blue-900/20"
-                  >
-                    Salvar Lista de Réus
-                  </Button>
-                ) : (
-                  <div className="text-center py-20 bg-white/5 rounded-3xl border-2 border-dashed border-white/10 opacity-30">
-                    <Building className="h-12 w-12 mx-auto mb-4" />
-                    <p className="text-sm font-bold uppercase tracking-widest">Nenhuma reclamada cadastrada</p>
+              <TabsContent value="reclamadas" className="m-0 space-y-8 animate-in fade-in duration-300">
+                <div className="flex items-center justify-between border-b border-white/5 pb-4">
+                  <div>
+                    <h3 className="text-xl font-black font-headline text-white">Reclamadas (Polo Passivo)</h3>
+                    <p className="text-xs text-slate-500">Identifique todas as partes que figurarão no polo passivo da ação.</p>
                   </div>
-                )}
-              </div>
-            </TabsContent>
-
-            <TabsContent value="documentos" className="m-0 space-y-8 animate-in fade-in duration-300">
-              <div className="text-center py-20 space-y-6">
-                <div className="h-24 w-24 rounded-3xl bg-primary/10 border-2 border-primary/20 flex items-center justify-center mx-auto shadow-2xl">
-                  <FolderKanban className="h-12 w-12 text-primary" />
-                </div>
-                <div className="space-y-2">
-                  <h3 className="text-xl font-black text-white uppercase tracking-tighter">Repositório de Provas</h3>
-                  <p className="text-sm text-slate-400 max-w-sm mx-auto">Organize fotos, áudios e documentos enviados pelo cliente durante a triagem.</p>
-                </div>
-                <div className="flex flex-col gap-3 max-w-xs mx-auto">
-                  <Button className="bg-white/5 hover:bg-white/10 text-white font-bold h-12 gap-2 rounded-xl">
-                    <Plus className="h-4 w-4" /> Enviar Prova
+                  <Button variant="outline" size="sm" onClick={() => append({ name: '', email: '', phone: '' })} className="font-bold border-primary/20 text-primary hover:bg-primary/10 rounded-xl">
+                    <PlusCircle className="h-4 w-4 mr-2" /> Adicionar Réu
                   </Button>
-                  {lead.driveFolderId ? (
-                    <Button variant="outline" className="border-emerald-500/20 text-emerald-400 h-12 rounded-xl" asChild>
-                      <a href={`https://drive.google.com/drive/folders/${lead.driveFolderId}`} target="_blank">
-                        <FolderOpen className="h-4 w-4 mr-2" /> Acessar Pasta de Triagem
-                      </a>
+                </div>
+                
+                <div className="space-y-4">
+                  {fields.map((field, index) => (
+                    <Card key={field.id} className="bg-white/5 border-white/10 rounded-2xl overflow-hidden group/item">
+                      <CardContent className="p-6 grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
+                        <div className="md:col-span-5 space-y-2">
+                          <Label className="text-[10px] uppercase font-black text-slate-500 tracking-widest">Razão Social / Nome Fantasia *</Label>
+                          <Input {...opposingForm.register(`parties.${index}.name`)} className="bg-black/40 border-white/10 h-11" placeholder="Nome oficial da empresa" />
+                        </div>
+                        <div className="md:col-span-4 space-y-2">
+                          <Label className="text-[10px] uppercase font-black text-slate-500 tracking-widest">E-mail Jurídico / RH</Label>
+                          <Input {...opposingForm.register(`parties.${index}.email`)} className="bg-black/40 border-white/10 h-11" placeholder="rh@empresa.com.br" />
+                        </div>
+                        <div className="md:col-span-2 space-y-2">
+                          <Label className="text-[10px] uppercase font-black text-slate-500 tracking-widest">Telefone</Label>
+                          <Input {...opposingForm.register(`parties.${index}.phone`)} className="bg-black/40 border-white/10 h-11" placeholder="(00) 0000-0000" />
+                        </div>
+                        <div className="md:col-span-1 flex justify-end">
+                          <Button variant="ghost" size="icon" onClick={() => remove(index)} className="text-rose-500 hover:bg-rose-500/10 h-11 w-11 rounded-xl"><Trash2 className="h-5 w-5" /></Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                  
+                  {fields.length > 0 ? (
+                    <Button 
+                      onClick={handleSaveParties} 
+                      className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black uppercase text-[11px] h-12 shadow-xl shadow-blue-900/20"
+                    >
+                      Salvar Lista de Réus
                     </Button>
                   ) : (
-                    <p className="text-[10px] text-slate-500 uppercase font-black">Pasta será gerada no protocolo</p>
+                    <div className="text-center py-20 bg-white/5 rounded-3xl border-2 border-dashed border-white/10 opacity-30">
+                      <Building className="h-12 w-12 mx-auto mb-4" />
+                      <p className="text-sm font-bold uppercase tracking-widest">Nenhuma reclamada cadastrada</p>
+                    </div>
                   )}
                 </div>
-              </div>
-            </TabsContent>
+              </TabsContent>
 
-            <TabsContent value="historico" className="m-0 space-y-6 animate-in fade-in duration-300">
-              <div className="relative space-y-6 before:absolute before:inset-0 before:ml-5 before:-translate-x-px before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-border/30 before:to-transparent">
-                <div className="relative flex items-start gap-6 group">
-                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-[#0f172a] border-2 border-border/50 z-10 shadow-sm">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+              <TabsContent value="documentos" className="m-0 space-y-8 animate-in fade-in duration-300">
+                <div className="text-center py-20 space-y-6">
+                  <div className="h-24 w-24 rounded-3xl bg-primary/10 border-2 border-primary/20 flex items-center justify-center mx-auto shadow-2xl">
+                    <FolderKanban className="h-12 w-12 text-primary" />
                   </div>
-                  <div className="flex-1 p-4 rounded-2xl bg-white/5 border border-white/5">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[9px] font-black uppercase text-primary tracking-widest">ENTRADA NO CRM</span>
-                      <span className="text-[10px] text-slate-500 font-bold">{format(lead.createdAt.toDate(), 'dd/MM/yy HH:mm')}</span>
-                    </div>
-                    <p className="text-sm text-slate-300 font-medium">Lead registrado via {lead.captureSource}.</p>
+                  <div className="space-y-2">
+                    <h3 className="text-xl font-black text-white uppercase tracking-tighter">Repositório de Provas</h3>
+                    <p className="text-sm text-slate-400 max-w-sm mx-auto">Organize fotos, áudios e documentos enviados pelo cliente durante a triagem.</p>
+                  </div>
+                  <div className="flex flex-col gap-3 max-w-xs mx-auto">
+                    <Button className="bg-white/5 hover:bg-white/10 text-white font-bold h-12 gap-2 rounded-xl">
+                      <Plus className="h-4 w-4" /> Enviar Prova
+                    </Button>
+                    {lead.driveFolderId ? (
+                      <Button variant="outline" className="border-emerald-500/20 text-emerald-400 h-12 rounded-xl" asChild>
+                        <a href={`https://drive.google.com/drive/folders/${lead.driveFolderId}`} target="_blank">
+                          <FolderOpen className="h-4 w-4 mr-2" /> Acessar Pasta de Triagem
+                        </a>
+                      </Button>
+                    ) : (
+                      <p className="text-[10px] text-slate-500 uppercase font-black">Pasta será gerada no protocolo</p>
+                    )}
                   </div>
                 </div>
-              </div>
-            </TabsContent>
-          </div>
-        </ScrollArea>
+              </TabsContent>
+
+              <TabsContent value="historico" className="m-0 space-y-6 animate-in fade-in duration-300">
+                <div className="relative space-y-6 before:absolute before:inset-0 before:ml-5 before:-translate-x-px before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-border/30 before:to-transparent">
+                  <div className="relative flex items-start gap-6 group">
+                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-[#0f172a] border-2 border-border/50 z-10 shadow-sm">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                    </div>
+                    <div className="flex-1 p-4 rounded-2xl bg-white/5 border border-white/5">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[9px] font-black uppercase text-primary tracking-widest">ENTRADA NO CRM</span>
+                        <span className="text-[10px] text-slate-500 font-bold">{format(lead.createdAt.toDate(), 'dd/MM/yy HH:mm')}</span>
+                      </div>
+                      <p className="text-sm text-slate-300 font-medium">Lead registrado via {lead.captureSource}.</p>
+                    </div>
+                  </div>
+                </div>
+              </TabsContent>
+            </div>
+          </ScrollArea>
+        </Tabs>
       </SheetContent>
     </Sheet>
   );
