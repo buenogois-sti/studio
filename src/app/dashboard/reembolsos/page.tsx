@@ -21,7 +21,8 @@ import {
   AlertCircle,
   Info,
   Gavel,
-  FolderKanban
+  FolderKanban,
+  RefreshCw
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { z } from 'zod';
@@ -60,8 +61,8 @@ const reimbursementFormSchema = z.object({
 
 const statusConfig: Record<ReimbursementStatus, { label: string; color: string; icon: any }> = {
   SOLICITADO: { label: 'Solicitado', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20', icon: Clock },
-  APROVADO: { label: 'Aprovado', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20', icon: CheckCircle2 },
-  REEMBOLSADO: { label: 'Pago', color: 'bg-purple-500/10 text-purple-400 border-purple-500/20', icon: DollarSign },
+  APROVADO: { label: 'Pendente de Pagto', color: 'bg-amber-500/10 text-amber-400 border-amber-500/20', icon: Clock },
+  REEMBOLSADO: { label: 'Pago', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20', icon: DollarSign },
   NEGADO: { label: 'Negado', color: 'bg-rose-500/10 text-rose-400 border-rose-500/20', icon: XCircle },
 };
 
@@ -516,7 +517,9 @@ export default function ReembolsosPage() {
             isLoading={isLoading} 
             canManage={false} 
             currentUserId={currentUserId}
+            onUpdateStatus={handleStatusUpdate}
             onDelete={handleDelete}
+            updatingId={isUpdating}
           />
         </TabsContent>
 
@@ -634,6 +637,20 @@ function ReimbursementTable({
                 </TableCell>
                 <TableCell className="text-right px-6">
                   <div className="flex justify-end gap-2">
+                    {/* Solicitar Reanálise para Pedidos Negados */}
+                    {!canManage && r.status === 'NEGADO' && r.userId === currentUserId && (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="h-8 text-[10px] font-black uppercase border-blue-500/30 text-blue-400 hover:bg-blue-500/10"
+                        onClick={() => onUpdateStatus?.(r.id, 'SOLICITADO')}
+                        disabled={isProcessing}
+                      >
+                        {isProcessing ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <RefreshCw className="h-3 w-3 mr-1" />}
+                        Reanálise
+                      </Button>
+                    )}
+
                     {canManage && r.status === 'SOLICITADO' && (
                       <>
                         <Button 
@@ -667,7 +684,7 @@ function ReimbursementTable({
                         disabled={isProcessing}
                       >
                         {isProcessing ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
-                        Pagar
+                        Confirmar Pagto
                       </Button>
                     )}
                     <DropdownMenu>
