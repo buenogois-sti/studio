@@ -1,9 +1,8 @@
 'use server';
 import { firestoreAdmin } from '@/firebase/admin';
 import type { Process, DocumentTemplate, TimelineEvent, Client, Staff } from './types';
-import { copyFile, createFolder, listFiles } from './drive-actions';
+import { copyFile } from './drive-actions';
 import { syncProcessToDrive, getGoogleApiClientsForUser } from './drive';
-import { revalidatePath } from 'next/cache';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/options';
 import { createNotification } from './notification-actions';
@@ -141,12 +140,12 @@ export async function draftDocument(
         
         const processData = processDoc.data() as Process;
 
-        // 1. Garante que o processo tenha pasta no Drive (idempotente)
+        // 1. Garante a pasta física no Drive do processo (dentro do cliente)
         await syncProcessToDrive(processId);
         const updatedDoc = await processRef.get();
         const finalProcessData = updatedDoc.data() as Process;
 
-        if (!finalProcessData.driveFolderId) throw new Error("Não foi possível localizar a pasta do processo.");
+        if (!finalProcessData.driveFolderId) throw new Error("Não foi possível localizar a pasta física do processo.");
 
         // 2. Define a subpasta de destino baseada na categoria do modelo
         let targetFolderName = '01 - Petições';
@@ -163,21 +162,18 @@ export async function draftDocument(
 
         const targetFolderId = await ensureSubfolder(drive, finalProcessData.driveFolderId, targetFolderName);
 
-        // 3. Busca os dados do cliente e do escritório para o preenchimento
+        // 3. Busca os dados para preenchimento
         const clientDoc = await firestoreAdmin.collection('clients').doc(finalProcessData.clientId).get();
         const clientData = clientDoc.data() as Client;
 
         const settingsDoc = await firestoreAdmin.collection('system_settings').doc('general').get();
         const officeData = settingsDoc.exists ? settingsDoc.data() : null;
 
-        // 4. Busca dados do advogado líder
         let lawyerName = 'Advogado Responsável';
         let lawyerOAB = 'Pendente';
-        let lawyerEmail = '';
-        let lawyerWhatsapp = '';
-        let lawyerNationality = '';
-        let lawyerCivilStatus = '';
-        let lawyerAddress = '';
+        let lawyerNationality = 'brasileiro(a)';
+        let lawyerCivilStatus = 'solteiro(a)';
+        let lawyerAddress = 'Rua Marechal Deodoro, 1594 - Sala 2, SBC/SP';
 
         if (finalProcessData.leadLawyerId) {
             const staffDoc = await firestoreAdmin.collection('staff').doc(finalProcessData.leadLawyerId).get();
@@ -185,21 +181,17 @@ export async function draftDocument(
                 const staffData = staffDoc.data() as Staff;
                 lawyerName = `${staffData.firstName} ${staffData.lastName}`;
                 lawyerOAB = staffData.oabNumber || 'Pendente';
-                lawyerEmail = staffData.email || '';
-                lawyerWhatsapp = staffData.whatsapp || '';
                 lawyerNationality = staffData.nationality || 'brasileiro(a)';
                 lawyerCivilStatus = staffData.civilStatus || 'solteiro(a)';
-                lawyerAddress = staffData.address 
-                    ? `${staffData.address.street || ''}, nº ${staffData.address.number || 'S/N'}, ${staffData.address.neighborhood || ''}, ${staffData.address.city || ''}/${staffData.address.state || ''}`
-                    : 'Endereço profissional não cadastrado';
+                if (staffData.address) {
+                    lawyerAddress = `${staffData.address.street || ''}, nº ${staffData.address.number || 'S/N'}, ${staffData.address.neighborhood || ''}, ${staffData.address.city || ''}/${staffData.address.state || ''}`;
+                }
             }
         }
 
-        // 5. Sanitiza o ID do modelo
         const cleanTemplateId = extractFileId(templateId);
         if (!cleanTemplateId) throw new Error("ID do modelo inválido.");
 
-        // 6. Copia o arquivo para a subpasta
         const newFileName = `${documentName} - ${finalProcessData.name}`;
         const copiedFile = await copyFile(cleanTemplateId, newFileName, targetFolderId);
 
@@ -207,73 +199,43 @@ export async function draftDocument(
             throw new Error("Falha ao copiar o arquivo no Google Drive.");
         }
 
-        // 7. Inteligência: Preenchimento Automático de Dados
+        // 4. Mapeamento de Tags
         const clientAddress = clientData.address 
             ? `${clientData.address.street || ''}, nº ${clientData.address.number || 'S/N'}, ${clientData.address.neighborhood || ''}, ${clientData.address.city || ''}/${clientData.address.state || ''}`
             : 'Endereço não informado';
 
         const clientFullName = `${clientData.firstName} ${clientData.lastName || ''}`.trim();
         const firstOpposingParty = finalProcessData.opposingParties?.[0]?.name || '---';
-        const allOpposingParties = finalProcessData.opposingParties?.map(p => p.name).join(', ') || '---';
-
+        
         const qualification = `${clientFullName}, ${clientData.nationality || 'brasileiro(a)'}, ${clientData.civilStatus || 'solteiro(a)'}, ${clientData.profession || 'ajudante geral'}, portador(a) do RG nº ${clientData.rg || '---'}${clientData.rgIssuer ? ` ${clientData.rgIssuer}` : ''}, inscrito(a) no CPF/MF sob nº ${clientData.document || '---'}, residente e domiciliado em ${clientAddress}`;
-
-        const lawyerQualification = `${lawyerName}, advogado inscrito na OAB/${lawyerOAB}, ${lawyerNationality}, ${lawyerCivilStatus}, com escritório profissional situado à ${lawyerAddress}`;
 
         const dataMap = {
             'CLIENTE_NOME_COMPLETO': clientFullName,
             'RECLAMANTE_NOME': clientFullName,
-            'CLIENTE_PRIMEIRO_NOME': clientData.firstName || '',
-            'CLIENTE_DOCUMENTO': clientData.document || '---',
             'CLIENTE_CPF_CNPJ': clientData.document || '---',
             'CLIENTE_RG': clientData.rg || '---',
-            'CLIENTE_RG_ORGAO': clientData.rgIssuer || '---',
-            'CLIENTE_RG_EXPEDICAO': clientData.rgIssuanceDate || '---',
-            'CLIENTE_PIS': clientData.pis || '---',
-            'CLIENTE_CTPS': clientData.ctps || '---',
-            'CLIENTE_MAE': clientData.motherName || '---',
-            'CLIENTE_EMAIL': clientData.email || '---',
-            'CLIENTE_WHATSAPP': clientData.mobile || '---',
-            'CLIENTE_ENDERECO_COMPLETO': clientAddress,
-            'CLIENTE_CIDADE': clientData.address?.city || '---',
-            'CLIENTE_BAIRRO': clientData.address?.neighborhood || '---',
             'CLIENTE_NACIONALIDADE': clientData.nationality || 'brasileiro(a)',
             'CLIENTE_ESTADO_CIVIL': clientData.civilStatus || 'solteiro(a)',
             'CLIENTE_PROFISSAO': clientData.profession || 'ajudante geral',
             'CLIENTE_QUALIFICACAO_COMPLETA': qualification,
-            'PROCESSO_TITULO': finalProcessData.name || '',
+            'CLIENTE_ENDERECO_COMPLETO': clientAddress,
             'PROCESSO_NUMERO_CNJ': finalProcessData.processNumber || 'Pendente',
-            'PROCESSO_AREA': finalProcessData.legalArea || '---',
-            'PROCESSO_FORUM': finalProcessData.court || '---',
             'PROCESSO_VARA': finalProcessData.courtBranch || '---',
-            'PROCESSO_VALOR': (finalProcessData.caseValue || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
-            'REU_NOME': firstOpposingParty,
+            'PROCESSO_FORUM': finalProcessData.court || '---',
             'RECLAMADA_NOME': firstOpposingParty,
-            'RECLAMADA_LISTA_TODOS': allOpposingParties,
             'ADVOGADO_LIDER_NOME': lawyerName,
             'ADVOGADO_LIDER_OAB': lawyerOAB,
-            'ADVOGADO_LIDER_EMAIL': lawyerEmail,
-            'ADVOGADO_LIDER_WHATSAPP': lawyerWhatsapp,
-            'ADVOGADO_LIDER_NACIONALIDADE': lawyerNationality,
-            'ADVOGADO_LIDER_ESTADO_CIVIL': lawyerCivilStatus,
-            'ADVOGADO_LIDER_ENDERECO_PROFISSIONAL': lawyerAddress,
-            'ADVOGADO_LIDER_QUALIFICACAO_COMPLETA': lawyerQualification,
             'ESCRITORIO_NOME': officeData?.officeName || 'Bueno Gois Advogados e Associados',
-            'ESCRITORIO_ENDERECO': officeData?.address || 'Rua Marechal Deodoro, 1594 - Sala 2, SBC/SP',
-            'ESCRITORIO_TELEFONE': officeData?.phone || '(11) 2897-5218',
-            'ESCRITORIO_EMAIL': officeData?.adminEmail || 'contato@buenogoisadvogado.com.br',
-            'ESCRITORIO_INSTAGRAM': officeData?.instagram || '',
             'DATA_EXTENSO': format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR }),
             'DATA_HOJE': format(new Date(), "dd/MM/yyyy"),
         };
 
         await replacePlaceholdersInDoc(docs, copiedFile.id, dataMap);
 
-        // 8. Registra na timeline do processo
         const timelineEvent: TimelineEvent = {
             id: uuidv4(),
             type: 'petition',
-            description: `DOCUMENTO AUTOMATIZADO: "${documentName}" gerado com sucesso. Dados vinculados ao modelo.`,
+            description: `DOCUMENTO GERADO: "${documentName}" a partir de modelo automatizado.`,
             date: Timestamp.now() as any,
             authorName: session.user.name || 'Sistema'
         };
@@ -283,19 +245,15 @@ export async function draftDocument(
             updatedAt: FieldValue.serverTimestamp()
         });
 
-        // 9. Notifica o usuário
         await createNotification({
             userId: session.user.id,
-            title: "Documento Pronto!",
-            description: `O rascunho "${documentName}" está disponível para edição.`,
+            title: "Rascunho Gerado",
+            description: `O documento "${documentName}" está pronto na pasta do processo.`,
             type: 'success',
             href: copiedFile.webViewLink
         });
 
-        return { 
-            success: true, 
-            url: copiedFile.webViewLink 
-        };
+        return { success: true, url: copiedFile.webViewLink };
 
     } catch (error: any) {
         console.error("Error drafting document:", error);
