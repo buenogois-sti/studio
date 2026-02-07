@@ -1,7 +1,8 @@
+
 'use server';
 
 import { firestoreAdmin } from '@/firebase/admin';
-import type { Lead, LeadStatus, LeadPriority, TimelineEvent } from './types';
+import type { Lead, LeadStatus, LeadPriority, TimelineEvent, OpposingParty } from './types';
 import { Timestamp, FieldValue } from 'firebase-admin/firestore';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/options';
@@ -27,7 +28,6 @@ export async function createLead(data: {
   try {
     const leadRef = firestoreAdmin.collection('leads').doc();
     
-    // Convert date string to Firestore Timestamp
     const prescriptionDate = data.prescriptionDate 
       ? Timestamp.fromDate(new Date(data.prescriptionDate))
       : undefined;
@@ -42,6 +42,7 @@ export async function createLead(data: {
       isUrgent: data.isUrgent,
       description: data.description || '',
       status: 'NOVO' as LeadStatus,
+      opposingParties: [],
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
     };
@@ -83,13 +84,22 @@ export async function updateLeadStatus(id: string, status: LeadStatus) {
   }
 }
 
+export async function updateLeadOpposingParties(id: string, parties: OpposingParty[]) {
+  if (!firestoreAdmin) throw new Error('Servidor indisponível.');
+  try {
+    await firestoreAdmin.collection('leads').doc(id).update({
+      opposingParties: parties,
+      updatedAt: Timestamp.now()
+    });
+    return { success: true };
+  } catch (error: any) {
+    throw new Error(error.message);
+  }
+}
+
 export async function assignLeadToLawyer(leadId: string, lawyerId: string) {
   if (!firestoreAdmin) throw new Error('Servidor indisponível.');
   try {
-    const lawyerDoc = await firestoreAdmin.collection('staff').doc(lawyerId).get();
-    if (!lawyerDoc.exists) throw new Error('Advogado não encontrado.');
-    const lawyerData = lawyerDoc.data();
-
     await firestoreAdmin.collection('leads').doc(leadId).update({
       lawyerId,
       updatedAt: Timestamp.now()
@@ -121,28 +131,19 @@ export async function convertLeadToProcess(leadId: string) {
     if (!leadDoc.exists) throw new Error('Lead não encontrado.');
     
     const leadData = leadDoc.data() as Lead;
-    if (leadData.status === 'CONVERTIDO') throw new Error('Este lead já foi convertido em processo.');
+    if (leadData.status === 'DISTRIBUIDO') throw new Error('Este lead já foi convertido em processo.');
 
-    // Validar se o cliente tem os dados mínimos
+    // Validar dados do cliente
     const clientDoc = await firestoreAdmin.collection('clients').doc(leadData.clientId).get();
+    if (!clientDoc.exists) throw new Error('Cliente não encontrado.');
     const clientData = clientDoc.data();
-    
-    const requiredFields = ['document', 'rg', 'address'];
-    const missing = requiredFields.filter(f => !clientData?.[f]);
-    
-    if (missing.length > 0 && leadData.priority === 'CRITICA') {
-        // Permitir conversão crítica mesmo sem dados, mas avisar
-        console.warn('Converting critical lead with missing data:', missing);
-    } else if (missing.length > 0) {
-        throw new Error(`Complete o cadastro do cliente antes da conversão. Faltando: ${missing.join(', ')}`);
-    }
 
     const processRef = firestoreAdmin.collection('processes').doc();
     
     const timelineEvent = {
       id: uuidv4(),
       type: 'system',
-      description: `PROCESSO CRIADO: Convertido a partir do Lead #${leadId.substring(0, 6)}. Elaboração concluída por Dr(a). ${leadData.lawyerId}. Prioridade: ${leadData.priority}.`,
+      description: `PROCESSO DISTRIBUÍDO: Convertido a partir do CRM (Lead #${leadId.substring(0, 6)}). Responsável: ${session.user.name}.`,
       date: Timestamp.now(),
       authorName: session.user.name || 'Sistema'
     };
@@ -154,8 +155,8 @@ export async function convertLeadToProcess(leadId: string) {
       description: leadData.description || '',
       status: 'Ativo',
       leadLawyerId: leadData.lawyerId,
-      teamParticipants: [],
-      opposingParties: [],
+      opposingParties: leadData.opposingParties || [],
+      driveFolderId: leadData.driveFolderId || null,
       timeline: [timelineEvent],
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
@@ -163,8 +164,11 @@ export async function convertLeadToProcess(leadId: string) {
 
     const batch = firestoreAdmin.batch();
     batch.set(processRef, processPayload);
-    batch.update(leadRef, { status: 'CONVERTIDO', updatedAt: Timestamp.now() });
+    batch.update(leadRef, { status: 'DISTRIBUIDO', updatedAt: Timestamp.now() });
     
+    // Atualizar status do cliente para ativo
+    batch.update(clientDoc.ref, { status: 'active', updatedAt: Timestamp.now() });
+
     await batch.commit();
 
     revalidatePath('/dashboard/processos');

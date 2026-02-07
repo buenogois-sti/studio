@@ -1,3 +1,4 @@
+
 import type { Timestamp } from 'firebase/firestore';
 
 export type UserRole = 'admin' | 'lawyer' | 'financial' | 'assistant';
@@ -92,7 +93,7 @@ export type TeamParticipant = {
   percentage: number;
 };
 
-export type LeadStatus = 'NOVO' | 'ENTREVISTA' | 'DOCUMENTACAO' | 'CONTRATUAL' | 'PRONTO' | 'CONVERTIDO' | 'REPROVADO';
+export type LeadStatus = 'NOVO' | 'ENTREVISTA' | 'DOCUMENTACAO' | 'CONTRATUAL' | 'PRONTO' | 'DISTRIBUIDO' | 'ABANDONADO';
 export type LeadPriority = 'BAIXA' | 'MEDIA' | 'ALTA' | 'CRITICA';
 
 export type Lead = {
@@ -109,6 +110,7 @@ export type Lead = {
   prescriptionDate?: Timestamp;
   description?: string;
   driveFolderId?: string;
+  opposingParties?: OpposingParty[];
   createdAt: Timestamp;
   updatedAt: Timestamp;
 };
