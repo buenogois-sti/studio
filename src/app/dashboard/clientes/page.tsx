@@ -75,14 +75,12 @@ export default function ClientsPage() {
   const { firestore } = useFirebase();
   const { data: session, status } = useSession();
 
-  // Queries básicas com limite fixo para evitar sobrecarga inicial
   const clientsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'clients'), orderBy('updatedAt', 'desc'), limit(100)) : null), [firestore]);
   const { data: clientsData, isLoading: isLoadingClients } = useCollection<Client>(clientsQuery);
   
   const processesQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'processes'), limit(200)) : null), [firestore]);
   const { data: processesData, isLoading: isLoadingProcesses } = useCollection<Process>(processesQuery);
 
-  // Busca com debounce
   React.useEffect(() => {
     if (!searchTerm.trim()) {
       setSearchResults(null);
@@ -105,12 +103,10 @@ export default function ClientsPage() {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // Reset da página ao filtrar
   React.useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, statusFilter]);
 
-  // Filtro base
   const filteredClients = React.useMemo(() => {
     let result = searchResults || clientsData || [];
     if (statusFilter !== 'all') {
@@ -119,18 +115,15 @@ export default function ClientsPage() {
     return result;
   }, [clientsData, searchResults, statusFilter]);
 
-  // Paginação
   const totalPages = Math.max(1, Math.ceil(filteredClients.length / ITEMS_PER_PAGE));
   const paginatedClients = React.useMemo(() => {
     return filteredClients.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
   }, [filteredClients, currentPage]);
 
-  // OTIMIZAÇÃO CRÍTICA: Cálculo de mapas APENAS para os itens visíveis
   const processesByClientMap = React.useMemo(() => {
     const map = new Map<string, number>();
     if (!processesData) return map;
     
-    // Filtramos os processos apenas dos clientes que estão na página atual
     const visibleClientIds = new Set(paginatedClients.map(c => c.id));
     processesData.forEach(p => {
       if (visibleClientIds.has(p.clientId)) {
@@ -175,10 +168,14 @@ export default function ClientsPage() {
     if (!session || isSyncing) return;
     setIsSyncing(client.id);
     try {
-        await syncClientToDrive(client.id, `${client.firstName} ${client.lastName}`);
-        toast({ title: "Sincronização Concluída!" });
+        const result = await syncClientToDrive(client.id, `${client.firstName} ${client.lastName}`);
+        if (result.success) {
+          toast({ title: "Sincronização Concluída!" });
+        } else {
+          toast({ variant: 'destructive', title: 'Erro na Sincronização', description: result.error || 'Falha desconhecida.' });
+        }
     } catch (error: any) {
-        toast({ variant: 'destructive', title: 'Erro na Sincronização', description: error.message });
+        toast({ variant: 'destructive', title: 'Erro na Sincronização', description: error.message || 'Erro de conexão.' });
     } finally { setIsSyncing(null); }
   };
 

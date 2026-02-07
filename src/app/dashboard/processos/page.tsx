@@ -91,7 +91,6 @@ export default function ProcessosPage() {
   const searchParams = useSearchParams();
   const clientIdFilter = searchParams.get('clientId');
 
-  // OTIMIZAÇÃO: Limites estritos nas queries para evitar congelamento
   const processesQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'processes'), orderBy('updatedAt', 'desc'), limit(100)) : null), [firestore]);
   const { data: processesData, isLoading: isLoadingProcesses } = useCollection<Process>(processesQuery);
 
@@ -173,10 +172,14 @@ export default function ProcessosPage() {
     if (isSyncing) return;
     setIsSyncing(process.id);
     try {
-      await syncProcessToDrive(process.id);
-      toast({ title: 'Sincronização Concluída!' });
+      const result = await syncProcessToDrive(process.id);
+      if (result.success) {
+        toast({ title: 'Sincronização Concluída!' });
+      } else {
+        toast({ variant: 'destructive', title: 'Erro na Sincronização', description: result.error || 'Falha desconhecida.' });
+      }
     } catch (error: any) {
-      toast({ variant: 'destructive', title: 'Erro na Sincronização', description: error.message });
+      toast({ variant: 'destructive', title: 'Erro na Sincronização', description: error.message || 'Erro de conexão.' });
     } finally {
       setIsSyncing(null);
     }

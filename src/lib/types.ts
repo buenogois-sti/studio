@@ -1,4 +1,3 @@
-'use client';
 import type { Timestamp } from 'firebase/firestore';
 
 export type UserRole = 'admin' | 'lawyer' | 'financial' | 'assistant';
@@ -353,7 +352,6 @@ export type DocumentTemplate = {
   updatedAt?: Timestamp;
 };
 
-// CHECKLIST TYPES
 export type ChecklistItemType = 'YES_NO' | 'YES_NO_MAYBE' | 'TEXT' | 'NUMBER';
 
 export type ChecklistItem = {
@@ -361,7 +359,7 @@ export type ChecklistItem = {
   label: string;
   type: ChecklistItemType;
   required: boolean;
-  options?: string[]; // Para tipos customizados se necessário no futuro
+  options?: string[];
 };
 
 export type ChecklistTemplate = {
@@ -382,7 +380,7 @@ export type ChecklistExecution = {
   templateTitle: string;
   userId: string;
   userName: string;
-  answers: Record<string, any>; // Key: itemId, Value: answer
+  answers: Record<string, any>;
   status: 'COMPLETED' | 'DRAFT';
   executedAt: Timestamp;
   observations?: string;
