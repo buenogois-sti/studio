@@ -42,7 +42,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
-import { useDoc, useFirebase, useMemoFirebase, useCollection } from '@/firebase';
+import { useDoc, useFirebase, useMemoFirebase, useCollection, updateDocumentNonBlocking } from '@/firebase';
 import { doc, collection, setDoc } from 'firebase/firestore';
 import type { UserProfile, UserRole, UserRoleInfo, SEOSettings } from '@/lib/types';
 import { ClientKitManager } from '@/components/settings/client-kit-manager';
@@ -833,7 +833,7 @@ export default function ConfiguracoesPage() {
     officeName: 'Bueno Gois Advogados e Associados',
     adminEmail: 'contato@buenogoisadvogado.com.br',
     address: 'Rua Marechal Deodoro, 1594 - Sala 2, São Bernardo do Campo / SP',
-    phone: '(11) 98059-0128',
+    phone: '(11) 2897-5218',
     instagram: ''
   });
 
@@ -843,7 +843,7 @@ export default function ConfiguracoesPage() {
         officeName: generalSettings.officeName || 'Bueno Gois Advogados e Associados',
         adminEmail: generalSettings.adminEmail || 'contato@buenogoisadvogado.com.br',
         address: generalSettings.address || 'Rua Marechal Deodoro, 1594 - Sala 2, São Bernardo do Campo / SP',
-        phone: generalSettings.phone || '(11) 98059-0128',
+        phone: generalSettings.phone || '(11) 2897-5218',
         instagram: generalSettings.instagram || ''
       });
     }

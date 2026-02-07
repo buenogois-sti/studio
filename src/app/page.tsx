@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Metadata } from 'next';
 import { firestoreAdmin } from '@/firebase/admin';
@@ -68,7 +67,7 @@ export default async function Page() {
     "name": "Bueno Gois Advogados e Associados",
     "description": initialSeo?.description || "Escritório de advocacia especializado em Direito do Trabalho em SBC.",
     "url": "https://buenogoisadvogado.com.br",
-    "telephone": "+5511980590128",
+    "telephone": "+551128975218",
     "address": {
       "@type": "PostalAddress",
       "streetAddress": "Rua Marechal Deodoro, 1594 - Sala 2",

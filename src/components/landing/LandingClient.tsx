@@ -365,7 +365,7 @@ export function LandingClient({ initialSettings, initialSeo }: { initialSettings
                   >
                     <Link href={whatsappUrl} target="_blank">
                       <Phone className="mr-3 h-5 w-5 group-hover:rotate-12 transition-transform" />
-                      (11) 98059-0128
+                      (11) 2897-5218
                     </Link>
                   </Button>
                 </div>
@@ -519,7 +519,8 @@ export function LandingClient({ initialSettings, initialSeo }: { initialSettings
                 <h3 className="font-headline text-3xl font-bold">Contato Direto</h3>
                 <div className="space-y-6">
                   <div className="flex items-start gap-4"><MapPin className="w-6 h-6 text-primary shrink-0" /><p className="text-lg">Rua Marechal Deodoro, 1594 - SBC/SP</p></div>
-                  <div className="flex items-start gap-4"><Phone className="w-6 h-6 text-primary shrink-0" /><p className="text-lg">(11) 98059-0128</p></div>
+                  <div className="flex items-start gap-4"><Phone className="w-6 h-6 text-primary shrink-0" /><p className="text-lg">(11) 2897-5218</p></div>
+                  <div className="flex items-start gap-4"><MessageCircle className="w-6 h-6 text-primary shrink-0" /><p className="text-lg">(11) 98059-0128 | (11) 96085-6744</p></div>
                 </div>
                 <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-6 shadow-xl shadow-primary/20" asChild>
                   <Link href={whatsappUrl} target="_blank">Falar no WhatsApp</Link>
@@ -598,7 +599,11 @@ export function LandingClient({ initialSettings, initialSeo }: { initialSettings
                 </div>
                 <div className="flex items-center gap-3">
                   <Phone className="h-5 w-5 text-primary shrink-0" />
-                  <p className="font-bold text-white">{currentSettings?.phone || '(11) 98059-0128'}</p>
+                  <p className="font-bold text-white">(11) 2897-5218</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <MessageCircle className="h-5 w-5 text-primary shrink-0" />
+                  <p className="font-bold text-white text-xs">011 9 8059-0128 | 011 96085-6744</p>
                 </div>
                 <div className="pt-4">
                   <Badge variant="outline" className="border-emerald-500/20 text-emerald-400 bg-emerald-500/5 text-[9px] font-black uppercase py-1 px-3">
