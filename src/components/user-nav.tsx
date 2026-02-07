@@ -54,7 +54,7 @@ export function UserNav() {
   };
 
   if (status === 'loading' || isUserProfileLoading) {
-    return <Skeleton className="h-9 w-9 rounded-full" />;
+    return <Skeleton className="h-11 w-11 rounded-full" />;
   }
   
   if (!session || !session.user || !userProfile) {
@@ -65,8 +65,8 @@ export function UserNav() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="relative h-9 w-9 rounded-full flex items-center justify-center bg-muted overflow-hidden">
-          <User className="h-5 w-5 text-muted-foreground" />
+        <Button variant="ghost" className="relative h-11 w-11 rounded-full flex items-center justify-center bg-muted overflow-hidden hover:bg-muted/80 transition-all">
+          <User className="h-6 w-6 text-muted-foreground" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-64" align="end" forceMount>
