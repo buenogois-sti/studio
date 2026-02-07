@@ -1,6 +1,6 @@
 'use server';
 import { firestoreAdmin } from '@/firebase/admin';
-import type { Process, DocumentTemplate, TimelineEvent, Client } from './types';
+import type { Process, DocumentTemplate, TimelineEvent, Client, Staff } from './types';
 import { copyFile, createFolder } from './drive-actions';
 import { syncProcessToDrive, getGoogleApiClientsForUser } from './drive';
 import { revalidatePath } from 'next/cache';
@@ -162,11 +162,23 @@ export async function draftDocument(
         const settingsDoc = await firestoreAdmin.collection('system_settings').doc('general').get();
         const officeData = settingsDoc.exists ? settingsDoc.data() : null;
 
-        // 4. Sanitiza o ID do modelo
+        // 4. Busca dados do advogado líder
+        let lawyerName = 'Advogado Responsável';
+        let lawyerOAB = 'Pendente';
+        if (processData.leadLawyerId) {
+            const staffDoc = await firestoreAdmin.collection('staff').doc(processData.leadLawyerId).get();
+            if (staffDoc.exists) {
+                const staffData = staffDoc.data() as Staff;
+                lawyerName = `${staffData.firstName} ${staffData.lastName}`;
+                lawyerOAB = staffData.oabNumber || 'Pendente';
+            }
+        }
+
+        // 5. Sanitiza o ID do modelo
         const cleanTemplateId = extractFileId(templateId);
         if (!cleanTemplateId) throw new Error("ID do modelo inválido.");
 
-        // 5. Copia o arquivo para a subpasta
+        // 6. Copia o arquivo para a subpasta
         const newFileName = `${documentName} - ${processData.name}`;
         const copiedFile = await copyFile(cleanTemplateId, newFileName, targetFolderId);
 
@@ -174,7 +186,7 @@ export async function draftDocument(
             throw new Error("Falha ao copiar o arquivo no Google Drive.");
         }
 
-        // 6. Inteligência: Preenchimento Automático de Dados (Data Merge Avançado)
+        // 7. Inteligência: Preenchimento Automático de Dados (Data Merge Avançado)
         const clientAddress = clientData.address 
             ? `${clientData.address.street || ''}, ${clientData.address.number || 'S/N'}, ${clientData.address.neighborhood || ''}, ${clientData.address.city || ''}/${clientData.address.state || ''}`
             : 'Endereço não informado';
@@ -194,6 +206,9 @@ export async function draftDocument(
             'CLIENTE_ENDERECO_COMPLETO': clientAddress,
             'CLIENTE_CIDADE': clientData.address?.city || '---',
             'CLIENTE_BAIRRO': clientData.address?.neighborhood || '---',
+            'CLIENTE_NACIONALIDADE': clientData.nationality || 'brasileiro(a)',
+            'CLIENTE_ESTADO_CIVIL': clientData.civilStatus || 'solteiro(a)',
+            'CLIENTE_PROFISSAO': clientData.profession || 'ajudante geral',
             
             // Tags de Processo
             'PROCESSO_TITULO': processData.name || '',
@@ -204,6 +219,10 @@ export async function draftDocument(
             'PROCESSO_VALOR': (processData.caseValue || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
             'REU_NOME': processData.opposingParties?.[0]?.name || 'Parte contrária não identificada',
             
+            // Tags de Advogado
+            'ADVOGADO_LIDER_NOME': lawyerName,
+            'ADVOGADO_LIDER_OAB': lawyerOAB,
+
             // Tags de Escritório
             'ESCRITORIO_NOME': officeData?.officeName || 'Bueno Gois Advogados e Associados',
             'ESCRITORIO_ENDERECO': officeData?.address || 'Rua Marechal Deodoro, 1594 - Sala 2, SBC/SP',
@@ -215,7 +234,7 @@ export async function draftDocument(
 
         await replacePlaceholdersInDoc(docs, copiedFile.id, dataMap);
 
-        // 7. Registra na timeline do processo
+        // 8. Registra na timeline do processo
         const timelineEvent: TimelineEvent = {
             id: uuidv4(),
             type: 'petition',
@@ -229,7 +248,7 @@ export async function draftDocument(
             updatedAt: FieldValue.serverTimestamp()
         });
 
-        // 8. Notifica o usuário
+        // 9. Notifica o usuário
         await createNotification({
             userId: session.user.id,
             title: "Documento Pronto!",

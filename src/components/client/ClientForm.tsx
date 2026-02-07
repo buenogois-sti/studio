@@ -23,11 +23,11 @@ import {
 } from "@/components/ui/select"
 import { SheetFooter } from '@/components/ui/sheet';
 import { H2 } from '@/components/ui/typography';
-import { Loader2, Search, MapPin, CheckCircle2 } from 'lucide-react';
+import { Loader2, Search, MapPin } from 'lucide-react';
 
 import { useFirebase } from '@/firebase';
 import { collection, serverTimestamp, Timestamp, doc, addDoc, updateDoc } from 'firebase/firestore';
-import type { Client, ClientStatus } from '@/lib/types';
+import type { Client } from '@/lib/types';
 import { useToast } from '@/components/ui/use-toast';
 
 const clientSchema = z.object({
@@ -41,6 +41,9 @@ const clientSchema = z.object({
   rg: z.string().optional().or(z.literal('')),
   ctps: z.string().optional().or(z.literal('')),
   pis: z.string().optional().or(z.literal('')),
+  nationality: z.string().optional().or(z.literal('')),
+  civilStatus: z.string().optional().or(z.literal('')),
+  profession: z.string().optional().or(z.literal('')),
   stateRegistration: z.string().optional().or(z.literal('')),
   municipalRegistration: z.string().optional().or(z.literal('')),
   phone: z.string().optional().or(z.literal('')),
@@ -92,6 +95,9 @@ export function ClientForm({
       rg: client?.rg ?? '',
       ctps: client?.ctps ?? '',
       pis: client?.pis ?? '',
+      nationality: client?.nationality ?? 'brasileiro(a)',
+      civilStatus: client?.civilStatus ?? 'solteiro(a)',
+      profession: client?.profession ?? '',
       stateRegistration: client?.stateRegistration ?? '',
       municipalRegistration: client?.municipalRegistration ?? '',
       phone: client?.phone ?? '',
@@ -380,7 +386,7 @@ export function ClientForm({
                     control={form.control}
                     name="motherName"
                     render={({ field }) => (
-                      <FormItem className="md:col-span-2">
+                      <FormItem>
                         <FormLabel>Nome da Mãe</FormLabel>
                         <FormControl>
                           <Input placeholder="Nome completo da mãe" {...field} />
@@ -397,6 +403,45 @@ export function ClientForm({
                         <FormLabel>RG</FormLabel>
                         <FormControl>
                           <Input placeholder="00.000.000-0" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="nationality"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Nacionalidade</FormLabel>
+                        <FormControl>
+                          <Input placeholder="brasileiro(a)" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="civilStatus"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Estado Civil</FormLabel>
+                        <FormControl>
+                          <Input placeholder="solteiro(a)" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="profession"
+                    render={({ field }) => (
+                      <FormItem className="md:col-span-2">
+                        <FormLabel>Profissão</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Ex: ajudante geral" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>

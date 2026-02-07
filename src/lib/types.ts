@@ -35,6 +35,9 @@ export type Client = {
   rg?: string;
   ctps?: string;
   pis?: string;
+  nationality?: string;
+  civilStatus?: string;
+  profession?: string;
   stateRegistration?: string;
   municipalRegistration?: string;
   phone?: string;

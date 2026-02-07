@@ -746,36 +746,40 @@ function TagsDictionaryTab() {
       title: "Tags de Qualificação do Cliente",
       items: [
         { tag: "{{CLIENTE_NOME_COMPLETO}}", desc: "Nome completo ou Razão Social" },
-        { tag: "{{CLIENTE_PRIMEIRO_NOME}}", desc: "Apenas o primeiro nome (ideal para saudações)" },
+        { tag: "{{CLIENTE_PRIMEIRO_NOME}}", desc: "Apenas o primeiro nome" },
         { tag: "{{CLIENTE_CPF_CNPJ}}", desc: "CPF ou CNPJ formatado" },
         { tag: "{{CLIENTE_RG}}", desc: "Número do RG" },
-        { tag: "{{CLIENTE_PIS}}", desc: "Número do PIS/PASEP" },
-        { tag: "{{CLIENTE_CTPS}}", desc: "Número da Carteira de Trabalho" },
-        { tag: "{{CLIENTE_MAE}}", desc: "Nome da mãe (se cadastrado)" },
+        { tag: "{{CLIENTE_NACIONALIDADE}}", desc: "Ex: brasileiro(a)" },
+        { tag: "{{CLIENTE_ESTADO_CIVIL}}", desc: "Ex: solteiro(a), casado(a)" },
+        { tag: "{{CLIENTE_PROFISSAO}}", desc: "Ex: ajudante geral, motorista" },
         { tag: "{{CLIENTE_ENDERECO_COMPLETO}}", desc: "Logradouro, nº, Bairro, Cidade/UF" },
-        { tag: "{{CLIENTE_CIDADE}}", desc: "Cidade do endereço" },
         { tag: "{{CLIENTE_WHATSAPP}}", desc: "Número de celular/whatsapp" },
+      ]
+    },
+    {
+      title: "Tags de Advogado & Equipe",
+      items: [
+        { tag: "{{ADVOGADO_LIDER_NOME}}", desc: "Nome do advogado responsável" },
+        { tag: "{{ADVOGADO_LIDER_OAB}}", desc: "Número da OAB do responsável" },
       ]
     },
     {
       title: "Tags do Processo / Ação",
       items: [
-        { tag: "{{PROCESSO_NUMERO_CNJ}}", desc: "Número oficial CNJ (ex: 0000000-00...)" },
-        { tag: "{{PROCESSO_TITULO}}", desc: "Nome dado ao processo no sistema" },
-        { tag: "{{PROCESSO_AREA}}", desc: "Área jurídica (Trabalhista, Cível, etc)" },
-        { tag: "{{PROCESSO_VARA}}", desc: "Vara ou Câmara designada (ex: 2ª Vara do Trabalho)" },
-        { tag: "{{PROCESSO_FORUM}}", desc: "Fórum ou Comarca" },
-        { tag: "{{PROCESSO_VALOR}}", desc: "Valor da causa formatado em R$" },
-        { tag: "{{REU_NOME}}", desc: "Nome do primeiro réu/parte contrária" },
+        { tag: "{{PROCESSO_NUMERO_CNJ}}", desc: "Número oficial CNJ" },
+        { tag: "{{PROCESSO_TITULO}}", desc: "Nome do processo no sistema" },
+        { tag: "{{PROCESSO_AREA}}", desc: "Área jurídica (Ex: Trabalhista)" },
+        { tag: "{{PROCESSO_VALOR}}", desc: "Valor da causa formatado" },
+        { tag: "{{REU_NOME}}", desc: "Nome da parte contrária" },
       ]
     },
     {
       title: "Tags do Escritório & Data",
       items: [
-        { tag: "{{ESCRITORIO_NOME}}", desc: "Nome da banca configurado na aba Geral" },
-        { tag: "{{ESCRITORIO_ENDERECO}}", desc: "Endereço da sede configurado na aba Geral" },
-        { tag: "{{DATA_EXTENSO}}", desc: "Data de hoje (ex: 15 de maio de 2024)" },
-        { tag: "{{DATA_HOJE}}", desc: "Data de hoje curta (ex: 15/05/2024)" },
+        { tag: "{{ESCRITORIO_NOME}}", desc: "Nome configurado na aba Geral" },
+        { tag: "{{ESCRITORIO_ENDERECO}}", desc: "Endereço configurado na aba Geral" },
+        { tag: "{{DATA_EXTENSO}}", desc: "Ex: 15 de maio de 2024" },
+        { tag: "{{DATA_HOJE}}", desc: "Ex: 15/05/2024" },
       ]
     }
   ];
@@ -836,7 +840,7 @@ function TagsDictionaryTab() {
         <CardFooter className="bg-white/5 p-6 border-t border-white/5 flex items-center gap-3">
           <div className="h-5 w-5 text-blue-400 shrink-0"><Info className="h-full w-full" /></div>
           <p className="text-xs text-slate-400 leading-relaxed italic">
-            Dica: Ao colar as tags no Google Docs, certifique-se de que não há espaços extras entre as chaves. Exemplo correto: <code className="text-primary font-bold">{"{{"}CLIENTE_NOME_COMPLETO{"}}"}</code>.
+            Dica: Ao colar as tags no Google Docs, certifique-se de que não há espaços extras entre as chaves.
           </p>
         </CardFooter>
       </Card>
