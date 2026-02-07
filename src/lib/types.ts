@@ -168,6 +168,9 @@ export type Hearing = {
   clientNotified?: boolean;
   notificationMethod?: NotificationMethod;
   notificationDate?: Timestamp;
+  // Novos campos de reagendamento
+  rescheduledToId?: string;
+  rescheduleReason?: string;
 };
 
 export type LegalDeadlineStatus = 'PENDENTE' | 'CUMPRIDO' | 'PERDIDO' | 'CANCELADO';

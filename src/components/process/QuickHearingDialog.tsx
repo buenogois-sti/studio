@@ -106,6 +106,16 @@ export function QuickHearingDialog({ process, open, onOpenChange, onSuccess }: Q
     }
   }, [process, open, lawyers.length, firestore, form]);
 
+  /**
+   * CORREÇÃO DE FUSO HORÁRIO:
+   * Converte a string YYYY-MM-DD para um objeto Date local
+   * para evitar que o dia 09 vire dia 08 devido ao fuso UTC.
+   */
+  const getLocalDate = (dateStr: string) => {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  };
+
   const generateWhatsAppLink = () => {
     if (!clientData?.mobile) {
       toast({ variant: 'destructive', title: 'WhatsApp indisponível', description: 'O cliente não possui celular cadastrado.' });
@@ -115,7 +125,10 @@ export function QuickHearingDialog({ process, open, onOpenChange, onSuccess }: Q
     const time = form.getValues('time');
     const type = form.getValues('type');
     const loc = form.getValues('location');
-    const dateFmt = format(new Date(date), "dd/MM (EEEE)", { locale: ptBR });
+    
+    // Usa a função de correção para formatar a data corretamente
+    const dateObj = getLocalDate(date);
+    const dateFmt = format(dateObj, "dd/MM (EEEE)", { locale: ptBR });
     
     const message = `Olá, ${clientData.firstName}! Sou do escritório Bueno Gois Advogados.\n\nInformamos que sua audiência de *${type}* foi agendada:\n📅 Data: *${dateFmt}*\n🕘 Horário: *${time}*\n📍 Local: *${loc}*\n\nProcesso: ${process?.processNumber || 'N/A'}\n\nFavor confirmar o recebimento desta mensagem.`.trim();
     
@@ -134,7 +147,9 @@ export function QuickHearingDialog({ process, open, onOpenChange, onSuccess }: Q
     const date = form.getValues('date');
     const time = form.getValues('time');
     const type = form.getValues('type');
-    const dateFmt = format(new Date(date), "dd/MM/yyyy", { locale: ptBR });
+    
+    const dateObj = getLocalDate(date);
+    const dateFmt = format(dateObj, "dd/MM/yyyy", { locale: ptBR });
     
     const subject = `Agendamento de Audiência - ${process?.name}`;
     const body = `Prezado(a) ${clientData.firstName},\n\nComunicamos o agendamento de audiência para o seu processo:\n\nTipo: ${type}\nData: ${dateFmt}\nHorário: ${time}\nLocal: ${form.getValues('location')}\n\nAtenciosamente,\nEquipe Bueno Gois Advogados.`;

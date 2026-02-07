@@ -220,16 +220,27 @@ export async function updateHearingStatus(hearingId: string, status: HearingStat
         if (hearing?.googleCalendarEventId) {
             try {
                 const { calendar } = await getGoogleApiClientsForUser();
-                const prefix = status === 'REALIZADA' ? '✅ ' : status === 'CANCELADA' ? '❌ ' : status === 'ADIADA' ? '⏳ ' : '';
-                const typeLabel = hearing.type === 'PERICIA' ? 'Perícia' : 'Audiência';
                 
-                await calendar.events.patch({
+                // Se for adiada ou cancelada, removemos do calendário para limpar a pauta conforme solicitado
+                if (status === 'ADIADA' || status === 'CANCELADA') {
+                  await calendar.events.delete({
                     calendarId: 'primary',
                     eventId: hearing.googleCalendarEventId,
-                    requestBody: {
-                        summary: `${prefix}${typeLabel} [${hearing.type}] | ${hearing.responsibleParty}`,
-                    }
-                });
+                  });
+                  await hearingRef.update({ googleCalendarEventId: FieldValue.delete() });
+                } else {
+                  // Apenas atualiza o prefixo para REALIZADA
+                  const prefix = status === 'REALIZADA' ? '✅ ' : '';
+                  const typeLabel = hearing.type === 'PERICIA' ? 'Perícia' : 'Audiência';
+                  
+                  await calendar.events.patch({
+                      calendarId: 'primary',
+                      eventId: hearing.googleCalendarEventId,
+                      requestBody: {
+                          summary: `${prefix}${typeLabel} [${hearing.type}] | ${hearing.responsibleParty}`,
+                      }
+                  });
+                }
             } catch (calendarError: any) {
                 console.warn("Could not update calendar event status:", calendarError.message);
             }
@@ -250,6 +261,7 @@ export async function processHearingReturn(hearingId: string, data: {
   newHearingType?: HearingType;
   newHearingDate?: string;
   newHearingTime?: string;
+  dateNotSet?: boolean;
 }) {
   if (!firestoreAdmin) throw new Error('Servidor indisponível.');
   const session = await getServerSession(authOptions);
@@ -264,7 +276,7 @@ export async function processHearingReturn(hearingId: string, data: {
 
     const batch = firestoreAdmin.batch();
 
-    // 1. Atualizar status do ato atual
+    // 1. Atualizar status do ato atual para REALIZADA
     batch.update(hearingRef, {
       status: 'REALIZADA',
       resultNotes: data.resultNotes,
@@ -277,7 +289,7 @@ export async function processHearingReturn(hearingId: string, data: {
     const timelineEvent: TimelineEvent = {
       id: uuidv4(),
       type: hearingData.type === 'PERICIA' ? 'pericia' : 'hearing',
-      description: `RESULTADO DO ATO (${hearingData.type}): ${data.resultNotes}`,
+      description: `RESULTADO DO ATO (${hearingData.type}): ${data.resultNotes}${data.dateNotSet ? " | NOTA: Nova data não designada em ata, consultar autos posteriormente." : ""}`,
       date: Timestamp.now() as any,
       authorName: session.user.name || 'Advogado'
     };
@@ -308,9 +320,8 @@ export async function processHearingReturn(hearingId: string, data: {
       }
     }
 
-    // 3.2. Agendar nova data (se designada em ata)
-    if (data.scheduleNewHearing && data.newHearingDate && data.newHearingTime) {
-      // Criar nova audiência/perícia via createHearing logic
+    // 3.2. Agendar nova data (se designada em ata e data selecionada)
+    if (data.scheduleNewHearing && !data.dateNotSet && data.newHearingDate && data.newHearingTime) {
       await createHearing({
         processId: hearingData.processId,
         processName: hearingData.processName,
