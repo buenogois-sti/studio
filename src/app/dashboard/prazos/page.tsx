@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -73,7 +74,6 @@ export default function PrazosPage() {
     if (!firestore || !userProfile) return null;
     const base = collection(firestore, 'deadlines');
     
-    // Regra: Advogado vê os dele. Admin/Secretaria vê de todos.
     if (userProfile.role === 'lawyer') {
       return query(base, where('authorId', '==', userProfile.id), orderBy('endDate', 'asc'));
     }
@@ -108,6 +108,7 @@ export default function PrazosPage() {
   }, [filteredDeadlines]);
 
   const handleUpdateStatus = async (id: string, status: LegalDeadlineStatus) => {
+    if (isProcessing) return;
     setIsProcessing(id);
     try {
       await updateDeadlineStatus(id, status);
@@ -121,11 +122,14 @@ export default function PrazosPage() {
 
   const handleDelete = async (id: string) => {
     if (!confirm('Tem certeza que deseja remover este prazo da agenda?')) return;
+    setIsProcessing(id);
     try {
       await deleteLegalDeadline(id);
       toast({ title: 'Prazo removido.' });
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Erro', description: error.message });
+    } finally {
+      setIsProcessing(null);
     }
   };
 
@@ -228,9 +232,12 @@ export default function PrazosPage() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="pendentes" className="space-y-4">
+        <TabsContent value="pendentes" className="space-y-4 min-h-[400px]">
           {isLoading ? (
-            Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-32 w-full bg-card/50 rounded-2xl" />)
+            <div className="flex flex-col items-center justify-center py-32 space-y-4">
+              <Loader2 className="h-12 w-12 animate-spin text-primary" />
+              <p className="text-sm font-black uppercase tracking-widest text-muted-foreground">Sincronizando Agenda...</p>
+            </div>
           ) : pendentes.length > 0 ? (
             pendentes.map(d => (
               <DeadlineCard 
@@ -303,12 +310,14 @@ export default function PrazosPage() {
                           <Badge variant="outline" className={cn(
                             "text-[9px] font-black uppercase",
                             d.status === 'PENDENTE' ? "text-amber-400 border-amber-500/30 bg-amber-500/5" : "text-emerald-400 border-emerald-500/30 bg-emerald-500/5"
-                          )}>{d.status}</Badge>
+                          )}>
+                            {isProcessing === d.id ? <Loader2 className="h-3 w-3 animate-spin" /> : d.status}
+                          </Badge>
                         </td>
                         <td className="px-6 py-4 text-right">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground group-hover:text-white">
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground group-hover:text-white" disabled={isProcessing === d.id}>
                                 {isProcessing === d.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreVertical className="h-4 w-4" />}
                               </Button>
                             </DropdownMenuTrigger>
@@ -338,7 +347,7 @@ export default function PrazosPage() {
 
                               <DropdownMenuSeparator className="bg-white/10" />
                               <DropdownMenuItem className="text-rose-500 gap-2 cursor-pointer focus:bg-rose-500/10" onClick={() => handleDelete(d.id)}>
-                                <X className="h-4 w-4" /> <span className="font-bold">Excluir</span>
+                                <X className="h-4 w-4" /> <span className="font-bold">Excluir Prazo</span>
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -407,7 +416,6 @@ function DeadlineCard({
     )}>
       <CardContent className="p-5">
         <div className="flex flex-col lg:flex-row gap-6">
-          {/* Data Section */}
           <div className="flex gap-4 min-w-[280px]">
             <div className={cn(
               "h-14 w-14 rounded-2xl flex flex-col items-center justify-center border-2 shrink-0 transition-transform group-hover:scale-105",
@@ -439,7 +447,6 @@ function DeadlineCard({
             </div>
           </div>
 
-          {/* Progress & Countdown Section */}
           <div className="flex-1 flex flex-col justify-center space-y-3">
             {!isFulfilled && (
               <>
@@ -467,7 +474,6 @@ function DeadlineCard({
             )}
           </div>
 
-          {/* Actions Section */}
           <div className="flex items-center gap-2 justify-end lg:ml-4">
             {isFulfilled ? (
               <Button 
@@ -494,7 +500,7 @@ function DeadlineCard({
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-white hover:bg-white/5 rounded-xl"><MoreVertical className="h-4 w-4" /></Button>
+                <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-white hover:bg-white/5 rounded-xl" disabled={isProcessing}><MoreVertical className="h-4 w-4" /></Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="bg-card border-border w-56 p-1 shadow-2xl">
                 <DropdownMenuLabel className="text-[9px] font-black uppercase text-muted-foreground px-2 py-1.5 tracking-widest">Gerenciamento</DropdownMenuLabel>

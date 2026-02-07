@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -93,6 +94,7 @@ export default function AudienciasPage() {
   const [selectedDay, setSelectedDay] = React.useState<Date | null>(new Date());
   const [selectedLawyerFilter, setSelectedLawyerFilter] = React.useState<string>('all');
   const [returnHearing, setReturnHearing] = React.useState<Hearing | null>(null);
+  const [isProcessing, setIsProcessing] = React.useState<string | null>(null);
   const { toast } = useToast();
 
   const userProfileRef = useMemoFirebase(
@@ -127,18 +129,22 @@ export default function AudienciasPage() {
   const processesMap = React.useMemo(() => new Map(processesData?.map(p => [p.id, p])), [processesData]);
 
   const handleUpdateStatus = React.useCallback(async (hearing: Hearing, status: HearingStatus) => {
+      if (isProcessing) return;
       if (status === 'REALIZADA' && !hearing.hasFollowUp) {
           setReturnHearing(hearing);
           return;
       }
+      setIsProcessing(hearing.id);
       try {
           await updateHearingStatus(hearing.id, status);
           toast({ title: 'Status atualizado!', description: 'A alteração foi sincronizada com a pauta.' });
           setRefreshKey(prev => prev + 1);
       } catch (e: any) {
           toast({ variant: 'destructive', title: 'Erro', description: e.message });
+      } finally {
+          setIsProcessing(null);
       }
-  }, [toast]);
+  }, [toast, isProcessing]);
 
   const weekDays = React.useMemo(() => {
     const days = [];
@@ -207,7 +213,7 @@ export default function AudienciasPage() {
                 {(userProfile?.role === 'admin' || userProfile?.role === 'assistant') && (
                   <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 animate-in fade-in">
                     <Filter className="h-3.5 w-3.5 text-primary" />
-                    <Select value={selectedLawyerFilter} onValueChange={setSelectedLawyerFilter}>
+                    <Select value={selectedLawyerFilter} onValueChange={setSelectedLawyerFilter} disabled={isLoading}>
                       <SelectTrigger className="border-none bg-transparent h-7 text-xs font-bold w-[180px] focus:ring-0 shadow-none">
                         <SelectValue placeholder="Filtrar Advogado..." />
                       </SelectTrigger>
@@ -229,7 +235,7 @@ export default function AudienciasPage() {
                     disabled={isLoading}
                 >
                     <RefreshCw className={cn("h-4 w-4 mr-2", isLoading && "animate-spin")} />
-                    Atualizar Pauta
+                    {isLoading ? 'Sincronizando...' : 'Atualizar Pauta'}
                 </Button>
             </div>
         </div>
@@ -269,204 +275,218 @@ export default function AudienciasPage() {
                 </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="list" className="animate-in fade-in duration-300">
-                <Card className="bg-[#0f172a] border-white/5 overflow-hidden shadow-2xl">
-                    <div className="divide-y divide-white/5">
-                        {weekDays.map(day => {
-                            const daily = hearingsData?.filter(h => isSameDay(h.date.toDate(), day) && h.status === 'PENDENTE') || [];
-                            if (daily.length === 0) return null;
+            <TabsContent value="list" className="animate-in fade-in duration-300 min-h-[400px]">
+                {isLoading ? (
+                  <div className="flex flex-col items-center justify-center py-32 space-y-4">
+                    <Loader2 className="h-12 w-12 animate-spin text-primary" />
+                    <p className="text-sm font-black uppercase tracking-widest text-muted-foreground">Buscando pauta...</p>
+                  </div>
+                ) : (
+                  <Card className="bg-[#0f172a] border-white/5 overflow-hidden shadow-2xl">
+                      <div className="divide-y divide-white/5">
+                          {weekDays.map(day => {
+                              const daily = hearingsData?.filter(h => isSameDay(h.date.toDate(), day) && h.status === 'PENDENTE') || [];
+                              if (daily.length === 0) return null;
 
-                            return (
-                                <div key={day.toISOString()} className="p-6">
-                                    <div className="flex items-center gap-4 mb-6">
-                                        <div className="flex flex-col items-center justify-center w-14 h-14 rounded-2xl border-2 border-primary/20 bg-primary/5">
-                                            <span className="text-[10px] font-black uppercase text-primary">{format(day, 'MMM', { locale: ptBR })}</span>
-                                            <span className="text-2xl font-black text-white">{format(day, 'dd')}</span>
-                                        </div>
-                                        <div>
-                                            <h3 className="text-lg font-black text-white capitalize">{isToday(day) ? 'Hoje' : format(day, "EEEE", { locale: ptBR })}</h3>
-                                            <p className="text-xs text-slate-400 font-medium">{format(day, "d 'de' MMMM", { locale: ptBR })}</p>
-                                        </div>
-                                    </div>
-                                    <div className="grid gap-4">
-                                        {daily.map(h => {
-                                            const p = processesMap.get(h.processId);
-                                            const StatusIcon = statusConfig[h.status || 'PENDENTE'].icon;
-                                            const NotifIcon = h.notificationMethod ? notificationIconMap[h.notificationMethod] : HelpCircle;
-                                            
-                                            return (
-                                                <div key={h.id} className="flex flex-col md:flex-row md:items-center gap-6 p-5 rounded-2xl border border-white/5 bg-black/20 hover:bg-black/40 hover:border-primary/20 transition-all duration-300 group">
-                                                    <div className="flex items-center gap-3 min-w-[100px] border-r border-white/5 pr-4">
-                                                        <Clock className="h-4 w-4 text-primary" />
-                                                        <span className="text-base font-black text-white tabular-nums">{format(h.date.toDate(), 'HH:mm')}</span>
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="flex flex-wrap items-center gap-2 mb-2">
-                                                            <Badge variant="outline" className="text-[9px] font-black uppercase border-primary/30 text-primary px-2">{h.type}</Badge>
-                                                            <Badge variant="outline" className="text-[9px] font-black uppercase border-white/10 text-slate-400 flex items-center gap-1">
-                                                                <Users className="h-2.5 w-2.5" /> Dr(a). {h.lawyerName || 'Não atribuído'}
-                                                            </Badge>
-                                                            {h.clientNotified ? (
-                                                              <Badge variant="outline" className="text-[9px] font-black uppercase border-emerald-500/20 text-emerald-400 bg-emerald-500/5 flex items-center gap-1">
-                                                                <NotifIcon className="h-2.5 w-2.5" /> Cliente Avisado ({h.notificationMethod})
+                              return (
+                                  <div key={day.toISOString()} className="p-6">
+                                      <div className="flex items-center gap-4 mb-6">
+                                          <div className="flex flex-col items-center justify-center w-14 h-14 rounded-2xl border-2 border-primary/20 bg-primary/5">
+                                              <span className="text-[10px] font-black uppercase text-primary">{format(day, 'MMM', { locale: ptBR })}</span>
+                                              <span className="text-2xl font-black text-white">{format(day, 'dd')}</span>
+                                          </div>
+                                          <div>
+                                              <h3 className="text-lg font-black text-white capitalize">{isToday(day) ? 'Hoje' : format(day, "EEEE", { locale: ptBR })}</h3>
+                                              <p className="text-xs text-slate-400 font-medium">{format(day, "d 'de' MMMM", { locale: ptBR })}</p>
+                                          </div>
+                                      </div>
+                                      <div className="grid gap-4">
+                                          {daily.map(h => {
+                                              const p = processesMap.get(h.processId);
+                                              const StatusIcon = statusConfig[h.status || 'PENDENTE'].icon;
+                                              const NotifIcon = h.notificationMethod ? notificationIconMap[h.notificationMethod] : HelpCircle;
+                                              const isUpdating = isProcessing === h.id;
+                                              
+                                              return (
+                                                  <div key={h.id} className="flex flex-col md:flex-row md:items-center gap-6 p-5 rounded-2xl border border-white/5 bg-black/20 hover:bg-black/40 hover:border-primary/20 transition-all duration-300 group">
+                                                      <div className="flex items-center gap-3 min-w-[100px] border-r border-white/5 pr-4">
+                                                          <Clock className="h-4 w-4 text-primary" />
+                                                          <span className="text-base font-black text-white tabular-nums">{format(h.date.toDate(), 'HH:mm')}</span>
+                                                      </div>
+                                                      <div className="flex-1 min-w-0">
+                                                          <div className="flex flex-wrap items-center gap-2 mb-2">
+                                                              <Badge variant="outline" className="text-[9px] font-black uppercase border-primary/30 text-primary px-2">{h.type}</Badge>
+                                                              <Badge variant="outline" className="text-[9px] font-black uppercase border-white/10 text-slate-400 flex items-center gap-1">
+                                                                  <Users className="h-2.5 w-2.5" /> Dr(a). {h.lawyerName || 'Não atribuído'}
                                                               </Badge>
-                                                            ) : (
-                                                              <Badge variant="outline" className="text-[9px] font-black uppercase border-rose-500/20 text-rose-400 bg-rose-500/5 flex items-center gap-1">
-                                                                <AlertCircle className="h-2.5 w-2.5" /> Cliente ñ avisado
-                                                              </Badge>
-                                                            )}
-                                                        </div>
-                                                        <h4 className="font-black text-lg text-white truncate group-hover:text-primary transition-colors">{p?.name}</h4>
-                                                        <p className="text-[10px] text-slate-500 font-mono mt-1 flex items-center gap-1.5"><MapPin className="h-3 w-3 text-primary" /> {h.location}</p>
-                                                    </div>
-                                                    <div className="flex items-center gap-3">
-                                                        <Badge variant="outline" className={cn("gap-1.5 h-8 px-4 text-[10px] font-black uppercase tracking-widest", statusConfig[h.status || 'PENDENTE'].color)}>
-                                                            <StatusIcon className="h-3.5 w-3.5" />
-                                                            {statusConfig[h.status || 'PENDENTE'].label}
-                                                        </Badge>
-                                                        <DropdownMenu>
-                                                            <DropdownMenuTrigger asChild>
-                                                                <Button variant="ghost" size="icon" className="text-white/30 hover:text-white rounded-xl h-10 w-10"><MoreVertical className="h-5 w-5" /></Button>
-                                                            </DropdownMenuTrigger>
-                                                            <DropdownMenuContent align="end" className="bg-[#0f172a] border-white/10 w-56 p-1">
-                                                                <DropdownMenuItem onClick={() => handleUpdateStatus(h, 'REALIZADA')} className="font-bold gap-2 text-white hover:bg-emerald-500/10">
-                                                                    <ArrowRightCircle className="h-4 w-4 text-emerald-500" /> Marcar Realizada
-                                                                </DropdownMenuItem>
-                                                                <DropdownMenuItem onClick={() => handleUpdateStatus(h, 'ADIADA')} className="font-bold gap-2 text-white">
-                                                                    <Clock3 className="h-4 w-4 text-amber-500" /> Adiar Audiência
-                                                                </DropdownMenuItem>
-                                                                <DropdownMenuItem className="text-rose-500 font-bold gap-2" onClick={() => handleUpdateStatus(h, 'CANCELADA')}>
-                                                                    <XCircle className="h-4 w-4" /> Cancelar
-                                                                </DropdownMenuItem>
-                                                            </DropdownMenuContent>
-                                                        </DropdownMenu>
-                                                    </div>
-                                                </div>
-                                            )
-                                        })}
-                                    </div>
-                                </div>
-                            )
-                        })}
-                    </div>
-                </Card>
+                                                              {h.clientNotified ? (
+                                                                <Badge variant="outline" className="text-[9px] font-black uppercase border-emerald-500/20 text-emerald-400 bg-emerald-500/5 flex items-center gap-1">
+                                                                  <NotifIcon className="h-2.5 w-2.5" /> Cliente Avisado ({h.notificationMethod})
+                                                                </Badge>
+                                                              ) : (
+                                                                <Badge variant="outline" className="text-[9px] font-black uppercase border-rose-500/20 text-rose-400 bg-rose-500/5 flex items-center gap-1">
+                                                                  <AlertCircle className="h-2.5 w-2.5" /> Cliente ñ avisado
+                                                                </Badge>
+                                                              )}
+                                                          </div>
+                                                          <h4 className="font-black text-lg text-white truncate group-hover:text-primary transition-colors">{p?.name}</h4>
+                                                          <p className="text-[10px] text-slate-500 font-mono mt-1 flex items-center gap-1.5"><MapPin className="h-3 w-3 text-primary" /> {h.location}</p>
+                                                      </div>
+                                                      <div className="flex items-center gap-3">
+                                                          <Badge variant="outline" className={cn("gap-1.5 h-8 px-4 text-[10px] font-black uppercase tracking-widest", statusConfig[h.status || 'PENDENTE'].color)}>
+                                                              {isUpdating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <StatusIcon className="h-3.5 w-3.5" />}
+                                                              {statusConfig[h.status || 'PENDENTE'].label}
+                                                          </Badge>
+                                                          <DropdownMenu>
+                                                              <DropdownMenuTrigger asChild>
+                                                                  <Button variant="ghost" size="icon" className="text-white/30 hover:text-white rounded-xl h-10 w-10" disabled={isUpdating}><MoreVertical className="h-5 w-5" /></Button>
+                                                              </DropdownMenuTrigger>
+                                                              <DropdownMenuContent align="end" className="bg-[#0f172a] border-white/10 w-56 p-1">
+                                                                  <DropdownMenuItem onClick={() => handleUpdateStatus(h, 'REALIZADA')} className="font-bold gap-2 text-white hover:bg-emerald-500/10">
+                                                                      <ArrowRightCircle className="h-4 w-4 text-emerald-500" /> Marcar Realizada
+                                                                  </DropdownMenuItem>
+                                                                  <DropdownMenuItem onClick={() => handleUpdateStatus(h, 'ADIADA')} className="font-bold gap-2 text-white">
+                                                                      <Clock3 className="h-4 w-4 text-amber-500" /> Adiar Audiência
+                                                                  </DropdownMenuItem>
+                                                                  <DropdownMenuItem className="text-rose-500 font-bold gap-2" onClick={() => handleUpdateStatus(h, 'CANCELADA')}>
+                                                                      <XCircle className="h-4 w-4" /> Cancelar
+                                                                  </DropdownMenuItem>
+                                                              </DropdownMenuContent>
+                                                          </DropdownMenu>
+                                                      </div>
+                                                  </div>
+                                              )
+                                          })}
+                                      </div>
+                                  </div>
+                              )
+                          })}
+                      </div>
+                  </Card>
+                )}
             </TabsContent>
 
             <TabsContent value="calendar" className="animate-in fade-in duration-300">
-              <div className="grid lg:grid-cols-12 gap-6">
-                <Card className="lg:col-span-8 bg-[#0f172a] border-white/5 p-6 shadow-2xl">
-                  <div className="flex items-center justify-between mb-10">
-                    <h2 className="text-2xl font-black text-white uppercase tracking-tighter">
-                      {format(currentDate, 'MMMM yyyy', { locale: ptBR })}
-                    </h2>
-                    <div className="flex gap-3">
-                      <Button variant="outline" size="icon" className="h-10 w-10 rounded-xl bg-white/5 border-white/10" onClick={() => setCurrentDate(subMonths(currentDate, 1))}>
-                        <ChevronLeft className="h-5 w-5" />
-                      </Button>
-                      <Button variant="outline" size="sm" className="h-10 px-6 text-[10px] font-black uppercase rounded-xl border-white/10" onClick={() => setCurrentDate(new Date())}>
-                        Hoje
-                      </Button>
-                      <Button variant="outline" size="icon" className="h-10 w-10 rounded-xl bg-white/5 border-white/10" onClick={() => setCurrentDate(addMonths(currentDate, 1))}>
-                        <ChevronRight className="h-5 w-5" />
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-7 gap-1">
-                    {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(d => (
-                      <div key={d} className="text-center text-[10px] font-black uppercase text-slate-500 pb-6 tracking-widest">{d}</div>
-                    ))}
-                    {monthDays.map((day, i) => {
-                      const dailyHearings = hearingsData?.filter(h => isSameDay(h.date.toDate(), day)) || [];
-                      const isSelected = selectedDay && isSameDay(day, selectedDay);
-                      const isTodayDay = isToday(day);
-                      const isCurrentMonth = isSameMonth(day, currentDate);
-
-                      return (
-                        <button
-                          key={i}
-                          onClick={() => setSelectedDay(day)}
-                          className={cn(
-                            "relative aspect-square p-2 flex flex-col items-center justify-start border border-white/5 transition-all group rounded-xl",
-                            !isCurrentMonth && "opacity-10",
-                            isSelected ? "bg-primary/10 border-primary/40 shadow-inner" : "hover:bg-white/5",
-                            isTodayDay && !isSelected && "bg-white/5 border-primary/20"
-                          )}
-                        >
-                          <span className={cn(
-                            "text-sm font-bold",
-                            isTodayDay ? "text-primary underline decoration-2 underline-offset-4" : "text-white/80",
-                            isSelected && "text-primary"
-                          )}>
-                            {format(day, 'd')}
-                          </span>
-                          
-                          <div className="mt-auto flex flex-wrap justify-center gap-1 pb-1">
-                            {dailyHearings.slice(0, 3).map(h => (
-                              <div key={h.id} className={cn(
-                                "w-1.5 h-1.5 rounded-full",
-                                h.status === 'REALIZADA' ? "bg-emerald-500" : 
-                                h.status === 'CANCELADA' ? "bg-rose-500" : "bg-primary"
-                              )} />
-                            ))}
-                          </div>
-                        </button>
-                      )
-                    })}
-                  </div>
-                </Card>
-
-                <div className="lg:col-span-4 space-y-4">
-                  <Card className="bg-[#0f172a] border-white/5 flex flex-col h-full min-h-[400px] shadow-2xl overflow-hidden">
-                    <CardHeader className="border-b border-white/5 pb-4 bg-white/5">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-xs font-black uppercase tracking-[0.2em] text-primary">
-                          {selectedDay ? format(selectedDay, "dd 'de' MMMM", { locale: ptBR }) : 'Selecione um dia'}
-                        </CardTitle>
-                        <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20 text-[10px] font-black">
-                          {hearingsForSelectedDay.length} Ato(s)
-                        </Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="p-0 flex-1">
-                      <ScrollArea className="h-[550px]">
-                        <div className="p-4 space-y-4">
-                          {hearingsForSelectedDay.length > 0 ? (
-                            hearingsForSelectedDay.map(h => (
-                              <div key={h.id} className="p-4 rounded-2xl border border-white/5 bg-black/30 space-y-3 hover:border-primary/20 transition-all group">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-2">
-                                    <Clock className="h-3 w-3 text-primary" />
-                                    <span className="text-xs font-black text-white">{format(h.date.toDate(), 'HH:mm')}</span>
-                                  </div>
-                                  <Badge variant="outline" className={cn("text-[8px] font-black uppercase tracking-widest", statusConfig[h.status || 'PENDENTE'].color)}>
-                                    {h.status}
-                                  </Badge>
-                                </div>
-                                <div className="space-y-1">
-                                    <p className="text-xs font-black text-slate-200 leading-tight truncate">{processesMap.get(h.processId)?.name}</p>
-                                    <p className="text-[9px] text-primary font-bold uppercase flex items-center gap-1.5"><Users className="h-3 w-3" /> Dr(a). {h.lawyerName}</p>
-                                    {h.clientNotified && (
-                                      <p className="text-[8px] text-emerald-500 font-bold uppercase flex items-center gap-1"><ShieldCheck className="h-2.5 w-2.5" /> Cliente Avisado</p>
-                                    )}
-                                </div>
-                                <p className="text-[10px] text-slate-500 truncate flex items-center gap-1.5">
-                                  <MapPin className="h-3 w-3 text-primary shrink-0" /> {h.location}
-                                </p>
-                              </div>
-                            ))
-                          ) : (
-                            <div className="flex flex-col items-center justify-center py-32 text-center opacity-20">
-                              <CalendarIcon className="h-12 w-12 mb-3" />
-                              <p className="text-[10px] font-black uppercase tracking-widest">Sem atos agendados</p>
-                            </div>
-                          )}
-                        </div>
-                      </ScrollArea>
-                    </CardContent>
-                  </Card>
+              {isLoading ? (
+                <div className="flex items-center justify-center py-32">
+                  <Loader2 className="h-12 w-12 animate-spin text-primary" />
                 </div>
-              </div>
+              ) : (
+                <div className="grid lg:grid-cols-12 gap-6">
+                  <Card className="lg:col-span-8 bg-[#0f172a] border-white/5 p-6 shadow-2xl">
+                    <div className="flex items-center justify-between mb-10">
+                      <h2 className="text-2xl font-black text-white uppercase tracking-tighter">
+                        {format(currentDate, 'MMMM yyyy', { locale: ptBR })}
+                      </h2>
+                      <div className="flex gap-3">
+                        <Button variant="outline" size="icon" className="h-10 w-10 rounded-xl bg-white/5 border-white/10" onClick={() => setCurrentDate(subMonths(currentDate, 1))}>
+                          <ChevronLeft className="h-5 w-5" />
+                        </Button>
+                        <Button variant="outline" size="sm" className="h-10 px-6 text-[10px] font-black uppercase rounded-xl border-white/10" onClick={() => setCurrentDate(new Date())}>
+                          Hoje
+                        </Button>
+                        <Button variant="outline" size="icon" className="h-10 w-10 rounded-xl bg-white/5 border-white/10" onClick={() => setCurrentDate(addMonths(currentDate, 1))}>
+                          <ChevronRight className="h-5 w-5" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-7 gap-1">
+                      {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(d => (
+                        <div key={d} className="text-center text-[10px] font-black uppercase text-slate-500 pb-6 tracking-widest">{d}</div>
+                      ))}
+                      {monthDays.map((day, i) => {
+                        const dailyHearings = hearingsData?.filter(h => isSameDay(h.date.toDate(), day)) || [];
+                        const isSelected = selectedDay && isSameDay(day, selectedDay);
+                        const isTodayDay = isToday(day);
+                        const isCurrentMonth = isSameMonth(day, currentDate);
+
+                        return (
+                          <button
+                            key={i}
+                            onClick={() => setSelectedDay(day)}
+                            className={cn(
+                              "relative aspect-square p-2 flex flex-col items-center justify-start border border-white/5 transition-all group rounded-xl",
+                              !isCurrentMonth && "opacity-10",
+                              isSelected ? "bg-primary/10 border-primary/40 shadow-inner" : "hover:bg-white/5",
+                              isTodayDay && !isSelected && "bg-white/5 border-primary/20"
+                            )}
+                          >
+                            <span className={cn(
+                              "text-sm font-bold",
+                              isTodayDay ? "text-primary underline decoration-2 underline-offset-4" : "text-white/80",
+                              isSelected && "text-primary"
+                            )}>
+                              {format(day, 'd')}
+                            </span>
+                            
+                            <div className="mt-auto flex flex-wrap justify-center gap-1 pb-1">
+                              {dailyHearings.slice(0, 3).map(h => (
+                                <div key={h.id} className={cn(
+                                  "w-1.5 h-1.5 rounded-full",
+                                  h.status === 'REALIZADA' ? "bg-emerald-500" : 
+                                  h.status === 'CANCELADA' ? "bg-rose-500" : "bg-primary"
+                                )} />
+                              ))}
+                            </div>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </Card>
+
+                  <div className="lg:col-span-4 space-y-4">
+                    <Card className="bg-[#0f172a] border-white/5 flex flex-col h-full min-h-[400px] shadow-2xl overflow-hidden">
+                      <CardHeader className="border-b border-white/5 pb-4 bg-white/5">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="text-xs font-black uppercase tracking-[0.2em] text-primary">
+                            {selectedDay ? format(selectedDay, "dd 'de' MMMM", { locale: ptBR }) : 'Selecione um dia'}
+                          </CardTitle>
+                          <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20 text-[10px] font-black">
+                            {hearingsForSelectedDay.length} Ato(s)
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="p-0 flex-1">
+                        <ScrollArea className="h-[550px]">
+                          <div className="p-4 space-y-4">
+                            {hearingsForSelectedDay.length > 0 ? (
+                              hearingsForSelectedDay.map(h => (
+                                <div key={h.id} className="p-4 rounded-2xl border border-white/5 bg-black/30 space-y-3 hover:border-primary/20 transition-all group">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                      <Clock className="h-3 w-3 text-primary" />
+                                      <span className="text-xs font-black text-white">{format(h.date.toDate(), 'HH:mm')}</span>
+                                    </div>
+                                    <Badge variant="outline" className={cn("text-[8px] font-black uppercase tracking-widest", statusConfig[h.status || 'PENDENTE'].color)}>
+                                      {h.status}
+                                    </Badge>
+                                  </div>
+                                  <div className="space-y-1">
+                                      <p className="text-xs font-black text-slate-200 leading-tight truncate">{processesMap.get(h.processId)?.name}</p>
+                                      <p className="text-[9px] text-primary font-bold uppercase flex items-center gap-1.5"><Users className="h-3 w-3" /> Dr(a). {h.lawyerName}</p>
+                                      {h.clientNotified && (
+                                        <p className="text-[8px] text-emerald-500 font-bold uppercase flex items-center gap-1"><ShieldCheck className="h-2.5 w-2.5" /> Cliente Avisado</p>
+                                      )}
+                                  </div>
+                                  <p className="text-[10px] text-slate-500 truncate flex items-center gap-1.5">
+                                    <MapPin className="h-3 w-3 text-primary shrink-0" /> {h.location}
+                                  </p>
+                                </div>
+                              ))
+                            ) : (
+                              <div className="flex flex-col items-center justify-center py-32 text-center opacity-20">
+                                <CalendarIcon className="h-12 w-12 mb-3" />
+                                <p className="text-[10px] font-black uppercase tracking-widest">Sem atos agendados</p>
+                              </div>
+                            )}
+                          </div>
+                        </ScrollArea>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+              )}
             </TabsContent>
 
             <TabsContent value="history" className="animate-in fade-in duration-300">
@@ -484,7 +504,11 @@ export default function AudienciasPage() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-white/5">
-                          {historyHearings.map(h => {
+                          {isLoading ? (
+                            Array.from({ length: 5 }).map((_, i) => (
+                              <tr key={i}><td colSpan={6} className="p-6"><Skeleton className="h-10 w-full" /></td></tr>
+                            ))
+                          ) : historyHearings.map(h => {
                               const config = statusConfig[h.status];
                               const StatusIcon = config.icon;
                               const isPendingReturn = h.status === 'REALIZADA' && !h.hasFollowUp;
@@ -515,7 +539,7 @@ export default function AudienciasPage() {
                                       ) : (
                                         <div className="flex items-center gap-2 text-rose-500/50">
                                           <AlertCircle className="h-3.5 w-3.5" />
-                                          <span className="text-[9px] font-black uppercase">Ñ avisado</span>
+                                          <span className="text-[9px] font-black uppercase"></span>
                                         </div>
                                       )}
                                     </td>

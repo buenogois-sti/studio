@@ -1,3 +1,4 @@
+
 'use client';
 import * as React from 'react';
 import {
@@ -144,7 +145,7 @@ export default function ClientsPage() {
   const handleViewDetails = React.useCallback((client: Client) => { setSelectedClientForDetails(client); setIsDetailsOpen(true); }, []);
 
   const confirmDelete = async () => {
-    if (!firestore || !clientToDelete) return;
+    if (!firestore || !clientToDelete || isDeleting) return;
     setIsDeleting(true);
     try {
         await deleteDoc(doc(firestore, 'clients', clientToDelete.id));
@@ -156,7 +157,7 @@ export default function ClientsPage() {
   };
 
   const handleSyncClient = async (client: Client) => {
-    if (!session) return;
+    if (!session || isSyncing) return;
     setIsSyncing(client.id);
     try {
         await syncClientToDrive(client.id, `${client.firstName} ${client.lastName}`);
@@ -179,7 +180,8 @@ export default function ClientsPage() {
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative w-full max-sm:w-full max-w-sm">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Pesquisar..." className="pl-8 pr-8 bg-[#0f172a] border-border/50 text-white h-10" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+              <Input placeholder="Pesquisar..." className="pl-8 pr-8 bg-[#0f172a] border-border/50 text-white h-10" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} disabled={isSearching} />
+              {isSearching && <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-primary" />}
             </div>
             <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as any)}>
               <TabsList className="h-10 bg-[#0f172a] border-border/50">
@@ -187,22 +189,24 @@ export default function ClientsPage() {
                 <TabsTrigger value="table" className="px-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><List className="h-4 w-4" /></TabsTrigger>
               </TabsList>
             </Tabs>
-            <Button size="sm" onClick={handleAddNew} className="bg-primary text-primary-foreground h-10 px-6 font-bold"><PlusCircle className="mr-2 h-4 w-4" /> Novo</Button>
+            <Button size="sm" onClick={handleAddNew} className="bg-primary text-primary-foreground h-10 px-6 font-bold" disabled={isLoading}><PlusCircle className="mr-2 h-4 w-4" /> Novo</Button>
           </div>
         </div>
 
         {isLoading && !paginatedClients.length ? (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-64 w-full bg-card/50" />)}
+          <div className="flex flex-col items-center justify-center py-32 space-y-4">
+            <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            <p className="text-sm font-black uppercase tracking-widest text-muted-foreground">Carregando base de clientes...</p>
           </div>
         ) : paginatedClients.length > 0 ? (
           <>
             {viewMode === 'grid' ? (
-              <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6">
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {paginatedClients.map((client) => {
                   const processesCount = processesByClientMap.get(client.id) || 0;
                   const integrity = clientIntegrityMap.get(client.id) || 0;
                   const statusInfo = STATUS_CONFIG[client.status || 'active'];
+                  const syncing = isSyncing === client.id;
                   return (
                     <Card key={client.id} className="relative flex flex-col group hover:shadow-xl transition-all duration-300 overflow-hidden bg-[#0f172a] border-border/50">
                       <div className="absolute top-0 left-0 w-full h-1 bg-muted">
@@ -216,7 +220,7 @@ export default function ClientsPage() {
                                 <p className="text-xs text-muted-foreground font-mono">{client.document}</p>
                             </div>
                             <DropdownMenu>
-                              <DropdownMenuTrigger asChild><Button size="icon" variant="ghost" className="h-8 w-8 text-white/50"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                              <DropdownMenuTrigger asChild><Button size="icon" variant="ghost" className="h-8 w-8 text-white/50" disabled={syncing}><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
                               <DropdownMenuContent align="end" className="w-56 bg-card border-border">
                                   <DropdownMenuItem onClick={() => handleViewDetails(client)} className="font-bold"><UserCheck className="mr-2 h-4 w-4 text-primary" /> Ficha Completa</DropdownMenuItem>
                                   <DropdownMenuItem onClick={() => handleEdit(client)}><Edit className="mr-2 h-4 w-4" /> Editar</DropdownMenuItem>
@@ -228,10 +232,10 @@ export default function ClientsPage() {
                       </CardHeader>
                       <CardContent className="flex-grow space-y-4 pt-0 text-slate-300">
                         <div className="flex items-center gap-2">
-                          <Button variant="outline" size="sm" className="flex-1 h-8 text-[11px] border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/10" asChild disabled={!client.mobile}>
+                          <Button variant="outline" size="sm" className="flex-1 h-8 text-[11px] border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/10" asChild disabled={!client.mobile || syncing}>
                             <a href={`https://wa.me/${client.mobile?.replace(/\D/g, '')}`} target="_blank"><MessageSquare className="h-3.5 w-3.5 mr-2" /> WhatsApp</a>
                           </Button>
-                          <Button variant="outline" size="sm" className="flex-1 h-8 text-[11px] border-blue-500/20 text-blue-400 hover:bg-blue-500/10" asChild disabled={!client.email}>
+                          <Button variant="outline" size="sm" className="flex-1 h-8 text-[11px] border-blue-500/20 text-blue-400 hover:bg-blue-500/10" asChild disabled={!client.email || syncing}>
                             <a href={`mailto:${client.email}`}><Mail className="h-3.5 w-3.5 mr-2" /> E-mail</a>
                           </Button>
                         </div>
@@ -248,8 +252,8 @@ export default function ClientsPage() {
                               <CheckCircle2 className="h-3 w-3" /> Drive OK
                             </a>
                           ) : (
-                            <Button variant="ghost" size="sm" className="h-6 text-[9px] font-bold uppercase text-amber-400 p-0 px-2" onClick={() => handleSyncClient(client)} disabled={isSyncing === client.id}>
-                              {isSyncing === client.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Info className="h-3 w-3 mr-1" />} Pendente Drive
+                            <Button variant="ghost" size="sm" className="h-6 text-[9px] font-bold uppercase text-amber-400 p-0 px-2" onClick={() => handleSyncClient(client)} disabled={syncing}>
+                              {syncing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Info className="h-3 w-3 mr-1" />} {syncing ? 'Sincronizando' : 'Pendente Drive'}
                             </Button>
                           )}
                       </CardFooter>
@@ -290,7 +294,7 @@ export default function ClientsPage() {
                     setCurrentPage(prev => Math.max(prev - 1, 1));
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }} 
-                  disabled={currentPage === 1} 
+                  disabled={currentPage === 1 || isLoading} 
                   className="bg-[#0f172a] border-border/50 text-white hover:bg-primary/10 hover:text-primary transition-all px-4"
                 >
                   <ChevronLeft className="h-4 w-4 mr-2" /> Anterior
@@ -308,7 +312,7 @@ export default function ClientsPage() {
                     setCurrentPage(prev => Math.min(prev + 1, totalPages));
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }} 
-                  disabled={currentPage === totalPages} 
+                  disabled={currentPage === totalPages || isLoading} 
                   className="bg-[#0f172a] border-border/50 text-white hover:bg-primary/10 hover:text-primary transition-all px-4"
                 >
                   Próxima <ChevronRight className="h-4 w-4 ml-2" />

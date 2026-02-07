@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -131,21 +132,21 @@ function NewReimbursementDialog({
     }).format(value || 0);
   };
 
-  const onSubmit = async (values: z.infer<typeof reimbursementFormSchema>) => {
+  const onSubmit = async (data: z.infer<typeof reimbursementFormSchema>) => {
     setIsSaving(true);
     try {
       if (!currentUserId) {
         throw new Error('Usuário não autenticado. Faça login novamente.');
       }
       let userName = currentUserName || 'Usuário';
-      if (canManage && values.userId && values.userId !== currentUserId) {
-        const selectedUser = users?.find(u => u.id === values.userId);
+      if (canManage && data.userId && data.userId !== currentUserId) {
+        const selectedUser = users?.find(u => u.id === data.userId);
         if (selectedUser) userName = `${selectedUser.firstName} ${selectedUser.lastName}`;
       }
 
       await createReimbursement({
-        ...values,
-        userId: values.userId || currentUserId || '',
+        ...data,
+        userId: data.userId || currentUserId || '',
         userName,
         processId: selectedProcess?.id,
         processName: selectedProcess?.name,
@@ -305,10 +306,10 @@ function NewReimbursementDialog({
               />
             </div>
             <DialogFooter className="pt-4">
-              <DialogClose asChild><Button variant="outline" className="text-slate-400 hover:text-white border-white/10" type="button">Cancelar</Button></DialogClose>
+              <DialogClose asChild><Button variant="outline" className="text-slate-400 hover:text-white border-white/10" type="button" disabled={isSaving}>Cancelar</Button></DialogClose>
               <Button type="submit" disabled={isSaving} className="bg-primary text-primary-foreground font-bold">
                 {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                Enviar Pedido
+                {isSaving ? 'Enviando...' : 'Enviar Pedido'}
               </Button>
             </DialogFooter>
           </form>
@@ -374,6 +375,7 @@ export default function ReembolsosPage() {
   }, [allData, searchTerm]);
 
   const handleStatusUpdate = async (id: string, status: ReimbursementStatus) => {
+    if (isUpdating) return;
     setIsUpdating(id);
     try {
       await updateReimbursementStatus(id, status);
@@ -555,8 +557,8 @@ function ReimbursementTable({
 }) {
   if (isLoading) {
     return (
-      <div className="space-y-4">
-        {[...Array(3)].map((_, i) => <Skeleton className="h-16 w-full bg-white/5 rounded-xl" key={i} />)}
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
       </div>
     );
   }
@@ -588,6 +590,7 @@ function ReimbursementTable({
           {data.map((r) => {
             const config = statusConfig[r.status];
             const StatusIcon = config.icon;
+            const isProcessing = updatingId === r.id;
             
             return (
               <TableRow key={r.id} className="border-white/5 hover:bg-white/5 transition-colors">
@@ -625,7 +628,7 @@ function ReimbursementTable({
                 </TableCell>
                 <TableCell className="text-center">
                   <Badge variant="outline" className={cn("gap-1.5 h-7 px-2.5 text-[10px] font-black uppercase tracking-widest", config.color)}>
-                    <StatusIcon className="h-3 w-3" />
+                    {isProcessing ? <Loader2 className="h-3 w-3 animate-spin" /> : <StatusIcon className="h-3 w-3" />}
                     {config.label}
                   </Badge>
                 </TableCell>
@@ -638,7 +641,7 @@ function ReimbursementTable({
                           size="icon" 
                           className="h-8 w-8 text-emerald-500 hover:bg-emerald-500/10"
                           onClick={() => onUpdateStatus?.(r.id, 'APROVADO')}
-                          disabled={updatingId === r.id}
+                          disabled={isProcessing}
                           title="Aprovar"
                         >
                           <Check className="h-4 w-4" />
@@ -648,7 +651,7 @@ function ReimbursementTable({
                           size="icon" 
                           className="h-8 w-8 text-rose-500 hover:bg-rose-500/10"
                           onClick={() => onUpdateStatus?.(r.id, 'NEGADO')}
-                          disabled={updatingId === r.id}
+                          disabled={isProcessing}
                           title="Recusar"
                         >
                           <X className="h-4 w-4" />
@@ -661,14 +664,15 @@ function ReimbursementTable({
                         size="sm" 
                         className="h-8 text-[10px] font-black uppercase bg-primary text-primary-foreground hover:bg-primary/90"
                         onClick={() => onUpdateStatus?.(r.id, 'REEMBOLSADO')}
-                        disabled={updatingId === r.id}
+                        disabled={isProcessing}
                       >
+                        {isProcessing ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
                         Pagar
                       </Button>
                     )}
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-white/50"><MoreVertical className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-white/50" disabled={isProcessing}><MoreVertical className="h-4 w-4" /></Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="bg-[#0f172a] border-white/10 text-white">
                         <DropdownMenuLabel className="text-white">Opções</DropdownMenuLabel>

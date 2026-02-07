@@ -1,3 +1,4 @@
+
 'use client';
 import * as React from 'react';
 import {
@@ -141,6 +142,7 @@ export default function ProcessosPage() {
   }, [searchTerm, clientIdFilter]);
 
   const handleSyncProcess = React.useCallback(async (process: Process) => {
+    if (isSyncing) return;
     setIsSyncing(process.id);
     try {
       await syncProcessToDrive(process.id);
@@ -150,7 +152,7 @@ export default function ProcessosPage() {
     } finally {
       setIsSyncing(null);
     }
-  }, [toast]);
+  }, [toast, isSyncing]);
 
   const isLoading = isUserLoading || isLoadingProcesses;
 
@@ -166,15 +168,18 @@ export default function ProcessosPage() {
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input placeholder="Pesquisar por CNPJ ou Título..." className="pl-8 pr-8 bg-[#0f172a] border-border/50 text-white h-10" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
           </div>
-          <Button size="sm" className="bg-primary text-primary-foreground h-10 px-6 font-bold" onClick={() => { setEditingProcess(null); setIsSheetOpen(true); }}>
+          <Button size="sm" className="bg-primary text-primary-foreground h-10 px-6 font-bold" onClick={() => { setEditingProcess(null); setIsSheetOpen(true); }} disabled={isLoading}>
               <PlusCircle className="mr-2 h-4 w-4" /> Novo Processo
           </Button>
         </div>
       </div>
 
-      <div className="grid gap-4">
+      <div className="grid gap-4 min-h-[400px]">
         {isLoading && !paginatedProcesses.length ? (
-          Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-48 w-full bg-card/50 rounded-2xl" />)
+          <div className="flex flex-col items-center justify-center py-32 space-y-4">
+            <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            <p className="text-sm font-black uppercase tracking-widest text-muted-foreground">Carregando processos...</p>
+          </div>
         ) : paginatedProcesses.length > 0 ? (
           paginatedProcesses.map((p) => {
             const client = clientsMap.get(p.clientId);
@@ -303,7 +308,7 @@ export default function ProcessosPage() {
                         className="flex items-center gap-3 p-2 rounded-xl hover:bg-rose-500/10 transition-all group/link"
                       >
                         <div className="h-9 w-9 rounded-lg bg-rose-500/10 flex items-center justify-center shrink-0">
-                          <Timer className="h-4 w-4 text-rose-400 group-hover/link:scale-110 transition-transform" />
+                          <Timer className="h-4 w-4 text-rose-400" />
                         </div>
                         <div className="min-w-0">
                           <p className="text-[9px] font-black uppercase text-muted-foreground tracking-tighter">Obrigações</p>
@@ -351,7 +356,8 @@ export default function ProcessosPage() {
                           </a>
                         ) : (
                           <Button variant="ghost" size="sm" className="h-7 text-[9px] font-black uppercase text-amber-400 px-3 bg-amber-500/5 hover:bg-amber-500/10 border border-amber-500/20 rounded-full" onClick={() => handleSyncProcess(p)} disabled={isSyncing === p.id}>
-                            {isSyncing === p.id ? <Loader2 className="h-3 w-3 animate-spin mr-1.5" /> : <RefreshCw className="h-3 w-3 mr-1.5" />} Gerar Pasta no Drive
+                            {isSyncing === p.id ? <Loader2 className="h-3 w-3 animate-spin mr-1.5" /> : <RefreshCw className="h-3 w-3 mr-1.5" />} 
+                            {isSyncing === p.id ? 'Sincronizando...' : 'Gerar Pasta no Drive'}
                           </Button>
                         )}
                         {p.courtWebsite && (
@@ -386,7 +392,7 @@ export default function ProcessosPage() {
                 setCurrentPage(prev => Math.max(prev - 1, 1));
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }} 
-              disabled={currentPage === 1} 
+              disabled={currentPage === 1 || isLoading} 
               className="bg-[#0f172a] border-border/50 text-white hover:bg-primary/10 hover:text-primary transition-all px-4"
             >
               <ChevronLeft className="h-4 w-4 mr-2" /> Anterior
@@ -404,7 +410,7 @@ export default function ProcessosPage() {
                 setCurrentPage(prev => Math.min(prev + 1, totalPages));
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }} 
-              disabled={currentPage === totalPages} 
+              disabled={currentPage === totalPages || isLoading} 
               className="bg-[#0f172a] border-border/50 text-white hover:bg-primary/10 hover:text-primary transition-all px-4"
             >
               Próxima <ChevronRight className="h-4 w-4 ml-2" />

@@ -88,7 +88,7 @@ const roleLabels: Record<string, string> = {
 
 function RepasseValue({ staffId }: { staffId: string }) {
   const { firestore } = useFirebase();
-  const [val, setVal] = React.useState(0);
+  const [val, setVal] = React.useState<number | null>(null);
 
   React.useEffect(() => {
     if (!firestore) return;
@@ -99,6 +99,8 @@ function RepasseValue({ staffId }: { staffId: string }) {
       setVal(total);
     }).catch(() => setVal(0));
   }, [firestore, staffId]);
+
+  if (val === null) return <Loader2 className="h-3 w-3 animate-spin text-muted-foreground ml-auto" />;
 
   return <span className={cn("text-sm font-black", val > 0 ? "text-emerald-400" : "text-slate-500")}>
     {val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
@@ -206,31 +208,19 @@ function PaymentHistory({ onShowVoucher }: { onShowVoucher: (t: FinancialTitle) 
   
   const { data: history, isLoading, error } = useCollection<FinancialTitle>(historyQuery);
 
-  if (userError) {
-    return (
-      <Card className="bg-rose-500/5 border-rose-500/20 p-8 text-center">
-        <AlertTriangle className="h-10 w-10 text-rose-500 mx-auto mb-4" />
-        <h3 className="text-white font-bold mb-2">Erro de Autenticação</h3>
-        <p className="text-xs text-slate-400">Verifique a sincronização com seu projeto Firebase no servidor.</p>
-      </Card>
-    );
-  }
+  if (isLoading) return (
+    <div className="flex flex-col items-center justify-center py-20">
+      <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      <p className="text-sm text-muted-foreground mt-4">Carregando histórico...</p>
+    </div>
+  );
 
-  if (isLoading) return <div className="space-y-4">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-16 w-full bg-white/5 rounded-xl" />)}</div>;
-
-  if (error) {
-    return (
-      <Card className="bg-rose-500/5 border-rose-500/20 p-12 text-center flex flex-col items-center gap-4">
-        <AlertTriangle className="h-12 w-12 text-rose-500" />
-        <div className="space-y-2">
-          <h3 className="text-xl font-bold text-white">Índice Requerido</h3>
-          <p className="text-sm text-slate-400 max-w-sm">
-            Para ver o histórico, o Firebase exige um índice composto para os campos 'origin' e 'paymentDate'.
-          </p>
-        </div>
-      </Card>
-    );
-  }
+  if (error) return (
+    <Card className="bg-rose-500/5 border-rose-500/20 p-12 text-center flex flex-col items-center gap-4">
+      <AlertTriangle className="h-12 w-12 text-rose-500" />
+      <h3 className="text-xl font-bold text-white">Erro ao carregar histórico</h3>
+    </Card>
+  );
 
   return (
     <Card className="bg-[#0f172a] border-white/5 overflow-hidden">
@@ -259,6 +249,7 @@ function PayoutList({ filterRole, onRefresh, onPaid }: { filterRole?: string; on
   const [isRepasseOpen, setIsRepasseOpen] = React.useState(false);
   const [isManageOpen, setIsManageOpen] = React.useState(false);
   const [searchTerm, setSearchTerm] = React.useState('');
+  const [isCheckingCredits, setIsCheckingCredits] = React.useState<string | null>(null);
 
   const staffQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'staff') : null), [firestore]);
   const { data: staffData, isLoading: isLoadingStaff } = useCollection<Staff>(staffQuery);
@@ -275,13 +266,23 @@ function PayoutList({ filterRole, onRefresh, onPaid }: { filterRole?: string; on
   }, [staffData, filterRole, searchTerm]);
 
   const handleOpenRepasse = async (member: Staff) => {
-    if (!firestore) return;
-    const creditsRef = collection(firestore, `staff/${member.id}/credits`);
-    const q = query(creditsRef, where('status', '==', 'DISPONIVEL'));
-    const snapshot = await getDocs(q);
-    const credits = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    if (credits.length === 0) { alert("Nenhum crédito disponível para saque neste momento."); return; }
-    setStaffCredits(credits); setSelectedStaff(member); setIsRepasseOpen(true);
+    if (!firestore || isCheckingCredits) return;
+    setIsCheckingCredits(member.id);
+    try {
+      const creditsRef = collection(firestore, `staff/${member.id}/credits`);
+      const q = query(creditsRef, where('status', '==', 'DISPONIVEL'));
+      const snapshot = await getDocs(q);
+      const credits = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      if (credits.length === 0) { 
+        alert("Nenhum crédito disponível para saque neste momento."); 
+        return; 
+      }
+      setStaffCredits(credits); 
+      setSelectedStaff(member); 
+      setIsRepasseOpen(true);
+    } finally {
+      setIsCheckingCredits(null);
+    }
   };
 
   const handleOpenManage = (member: Staff) => { setSelectedStaff(member); setIsManageOpen(true); };
@@ -296,7 +297,12 @@ function PayoutList({ filterRole, onRefresh, onPaid }: { filterRole?: string; on
                 <TableCell><div className="flex items-center gap-3"><div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">{member.firstName.charAt(0)}{member.lastName.charAt(0)}</div><span className="font-bold text-white">{member.firstName} {member.lastName}</span></div></TableCell>
                 <TableCell><Badge variant="outline" className="text-[10px] uppercase border-white/10 text-slate-400">{roleLabels[member.role] || member.role}</Badge></TableCell>
                 <TableCell className="text-right"><RepasseValue staffId={member.id} /></TableCell>
-                <TableCell className="text-right"><div className="flex justify-end gap-2"><Button variant="ghost" size="sm" className="h-8 text-[10px] font-black uppercase text-blue-400 hover:bg-blue-500/10" onClick={() => handleOpenManage(member)}>Gerenciar</Button><Button variant="ghost" size="sm" className="h-8 text-[10px] font-black uppercase text-emerald-400 hover:bg-emerald-500/10" onClick={() => handleOpenRepasse(member)}>Quitar Saldo</Button></div></TableCell>
+                <TableCell className="text-right"><div className="flex justify-end gap-2">
+                  <Button variant="ghost" size="sm" className="h-8 text-[10px] font-black uppercase text-blue-400 hover:bg-blue-500/10" onClick={() => handleOpenManage(member)}>Gerenciar</Button>
+                  <Button variant="ghost" size="sm" className="h-8 text-[10px] font-black uppercase text-emerald-400 hover:bg-emerald-500/10" onClick={() => handleOpenRepasse(member)} disabled={isCheckingCredits === member.id}>
+                    {isCheckingCredits === member.id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Quitar Saldo'}
+                  </Button>
+                </div></TableCell>
               </TableRow>
             ))}</TableBody>
         </Table>
@@ -313,7 +319,7 @@ function RepassePaymentDialog({ staff, credits, open, onOpenChange, onPaid }: { 
   const totalValue = React.useMemo(() => credits.reduce((sum, c) => sum + c.value, 0), [credits]);
   
   const handlePay = async () => {
-    if (!staff) return;
+    if (!staff || isProcessing) return;
     setIsProcessing(true);
     try {
       await processRepasse(staff.id, credits.map(c => c.id), totalValue);
@@ -338,7 +344,7 @@ function RepassePaymentDialog({ staff, credits, open, onOpenChange, onPaid }: { 
           </div>
           <div className="flex items-start gap-4 p-5 rounded-2xl bg-blue-500/5 border border-blue-500/20 text-[11px] text-blue-400/80 leading-relaxed"><div className="h-6 w-6 rounded-full bg-blue-500/10 flex items-center justify-center shrink-0"><Info className="h-3.5 w-3.5" /></div><p>Esta operação registrará uma saída de caixa oficial no financeiro central do escritório e gerará um aviso de liquidação para o profissional.</p></div>
         </div>
-        <DialogFooter className="bg-black/20 p-6 border-t border-white/5 gap-3"><DialogClose asChild><Button variant="ghost" className="text-slate-400 hover:text-white font-bold h-14 px-8 text-xs uppercase tracking-widest">Cancelar</Button></DialogClose><Button className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase tracking-widest text-[11px] h-14 shadow-xl shadow-emerald-900/20 group" onClick={handlePay} disabled={isProcessing}>{isProcessing ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <CheckCircle2 className="mr-2 h-5 w-5" />}Confirmar Pagamento e Emitir</Button></DialogFooter>
+        <DialogFooter className="bg-black/20 p-6 border-t border-white/5 gap-3"><DialogClose asChild><Button variant="ghost" className="text-slate-400 hover:text-white font-bold h-14 px-8 text-xs uppercase tracking-widest" disabled={isProcessing}>Cancelar</Button></DialogClose><Button className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase tracking-widest text-[11px] h-14 shadow-xl shadow-emerald-900/20 group" onClick={handlePay} disabled={isProcessing}>{isProcessing ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <CheckCircle2 className="mr-2 h-5 w-5" />}{isProcessing ? 'Processando...' : 'Confirmar Pagamento e Emitir'}</Button></DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -371,25 +377,13 @@ function ManageCreditsDialog({ staff, open, onOpenChange, onUpdate }: { staff: S
     try { await deleteStaffCredit(staff.id, id); toast({ title: 'Lançamento excluído' }); onUpdate(); } catch (e: any) { toast({ variant: 'destructive', title: 'Erro', description: e.message }); } finally { setIsProcessing(null); }
   };
 
-  const handleEditSubmit = async (values: any) => {
-    if (!staff || !editingCredit) return;
-    setIsProcessing(editingCredit.id);
-    try { await updateStaffCredit(staff.id, editingCredit.id, values); toast({ title: 'Lançamento atualizado' }); setEditingCredit(null); onUpdate(); } catch (e: any) { toast({ variant: 'destructive', title: 'Erro', description: e.message }); } finally { setIsProcessing(null); }
-  };
-
-  const handleManualAdd = async (values: any) => {
-    if (!staff) return;
-    setIsProcessing('adding');
-    try { await addManualStaffCredit(staff.id, values); toast({ title: 'Crédito manual adicionado' }); setIsAdding(false); onUpdate(); } catch (e: any) { toast({ variant: 'destructive', title: 'Erro', description: e.message }); } finally { setIsProcessing(null); }
-  };
-
   if (!staff) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-4xl bg-[#020617] border-white/10 p-0 overflow-hidden h-[85vh] flex flex-col">
-        <DialogHeader className="p-6 border-b border-white/5 bg-white/5"><div className="flex items-center justify-between"><div className="flex items-center gap-4"><div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-black text-lg">{staff.firstName.charAt(0)}{staff.lastName.charAt(0)}</div><div><DialogTitle className="text-xl font-black text-white">{staff.firstName} {staff.lastName}</DialogTitle><DialogDescription className="text-slate-400">Auditoria e gestão de lançamentos pendentes</DialogDescription></div></div><Button size="sm" onClick={() => setIsAdding(true)} className="gap-2"><Plus className="h-4 w-4" /> Novo Lançamento</Button></div></DialogHeader>
-        <div className="flex-1 overflow-hidden flex flex-col"><div className="p-4 bg-black/20 flex items-center gap-2"><Button variant={filter === 'ALL' ? 'default' : 'ghost'} size="sm" onClick={() => setFilter('ALL')} className="text-[10px] uppercase font-black h-8">Todos Pendentes</Button><Button variant={filter === 'DISPONIVEL' ? 'default' : 'ghost'} size="sm" onClick={() => setFilter('DISPONIVEL')} className="text-[10px] uppercase font-black h-8 text-emerald-400">Disponíveis</Button><Button variant={filter === 'RETIDO' ? 'default' : 'ghost'} size="sm" onClick={() => setFilter('RETIDO')} className="text-[10px] uppercase font-black h-8 text-blue-400">Retidos</Button></div><ScrollArea className="flex-1"><div className="p-6">{isLoading ? (<div className="space-y-4">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-16 w-full bg-white/5 rounded-xl" />)}</div>) : filteredCredits.length > 0 ? (<div className="space-y-3">{filteredCredits.map(c => (<div key={c.id} className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5 group hover:border-white/20 transition-all"><div className="flex-1 min-w-0 mr-4"><div className="flex items-center gap-2 mb-1"><Badge variant="outline" className={cn("text-[8px] font-black uppercase px-1.5 h-4 border-none", c.status === 'DISPONIVEL' ? "bg-emerald-500/20 text-emerald-400" : "bg-blue-500/20 text-blue-400")}>{c.status}</Badge><span className="text-[10px] text-muted-foreground font-medium">{c.date ? format(c.date.toDate(), 'dd/MM/yyyy') : 'N/A'}</span></div><p className="text-sm font-bold text-white truncate">{c.description}</p><p className="text-[10px] text-slate-500 uppercase font-bold">{c.type}</p></div><div className="flex items-center gap-6"><span className="text-sm font-black text-white tabular-nums">{c.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span><div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"><Button variant="ghost" size="icon" className="h-8 w-8 text-blue-400" onClick={() => setEditingCredit(c)}><Edit className="h-4 w-4" /></Button><Button variant="ghost" size="icon" className="h-8 w-8 text-rose-500" onClick={() => handleDelete(c.id)} disabled={isProcessing === c.id}>{isProcessing === c.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}</Button></div></div></div>))}</div>) : (<div className="text-center py-20 opacity-30"><FileText className="h-12 w-12 mx-auto mb-2" /><p className="text-sm font-bold uppercase">Nenhum lançamento encontrado</p></div>)}</div></ScrollArea></div>
+        <DialogHeader className="p-6 border-b border-white/5 bg-white/5"><div className="flex items-center justify-between"><div className="flex items-center gap-4"><div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-black text-lg">{staff.firstName.charAt(0)}{staff.lastName.charAt(0)}</div><div><DialogTitle className="text-xl font-black text-white">{staff.firstName} {staff.lastName}</DialogTitle><DialogDescription className="text-slate-400">Auditoria e gestão de lançamentos pendentes</DialogDescription></div></div><Button size="sm" onClick={() => setIsAdding(true)} className="gap-2" disabled={isLoading}><Plus className="h-4 w-4" /> Novo Lançamento</Button></div></DialogHeader>
+        <div className="flex-1 overflow-hidden flex flex-col"><div className="p-4 bg-black/20 flex items-center gap-2"><Button variant={filter === 'ALL' ? 'default' : 'ghost'} size="sm" onClick={() => setFilter('ALL')} className="text-[10px] uppercase font-black h-8">Todos Pendentes</Button><Button variant={filter === 'DISPONIVEL' ? 'default' : 'ghost'} size="sm" onClick={() => setFilter('DISPONIVEL')} className="text-[10px] uppercase font-black h-8 text-emerald-400">Disponíveis</Button><Button variant={filter === 'RETIDO' ? 'default' : 'ghost'} size="sm" onClick={() => setFilter('RETIDO')} className="text-[10px] uppercase font-black h-8 text-blue-400">Retidos</Button></div><ScrollArea className="flex-1"><div className="p-6">{isLoading ? (<div className="flex flex-col items-center justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>) : filteredCredits.length > 0 ? (<div className="space-y-3">{filteredCredits.map(c => (<div key={c.id} className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5 group hover:border-white/20 transition-all"><div className="flex-1 min-w-0 mr-4"><div className="flex items-center gap-2 mb-1"><Badge variant="outline" className={cn("text-[8px] font-black uppercase px-1.5 h-4 border-none", c.status === 'DISPONIVEL' ? "bg-emerald-500/20 text-emerald-400" : "bg-blue-500/20 text-blue-400")}>{c.status}</Badge><span className="text-[10px] text-muted-foreground font-medium">{c.date ? format(c.date.toDate(), 'dd/MM/yyyy') : 'N/A'}</span></div><p className="text-sm font-bold text-white truncate">{c.description}</p><p className="text-[10px] text-slate-500 uppercase font-bold">{c.type}</p></div><div className="flex items-center gap-6"><span className="text-sm font-black text-white tabular-nums">{c.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span><div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"><Button variant="ghost" size="icon" className="h-8 w-8 text-blue-400" onClick={() => setEditingCredit(c)} disabled={!!isProcessing}><Edit className="h-4 w-4" /></Button><Button variant="ghost" size="icon" className="h-8 w-8 text-rose-500" onClick={() => handleDelete(c.id)} disabled={isProcessing === c.id}>{isProcessing === c.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}</Button></div></div></div>))}</div>) : (<div className="text-center py-20 opacity-30"><FileText className="h-12 w-12 mx-auto mb-2" /><p className="text-sm font-bold uppercase">Nenhum lançamento encontrado</p></div>)}</div></ScrollArea></div>
         <DialogFooter className="p-6 border-t border-white/5 bg-black/20"><DialogClose asChild><Button variant="ghost">Fechar Painel</Button></DialogClose></DialogFooter>
       </DialogContent>
     </Dialog>
@@ -459,7 +453,7 @@ export default function RepassesPage() {
         <div><H1 className="text-white">Gestão de Repasses & Folha</H1><p className="text-sm text-muted-foreground">Controle central de salários, honorários e pagamentos externos.</p></div>
         <div className="flex items-center gap-2">
           <Button variant="outline" className="border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/5 h-10" onClick={handleLaunchPayroll} disabled={isLaunching}>{isLaunching ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Zap className="mr-2 h-4 w-4" />}Rodar Folha Mensal</Button>
-          <Button variant="outline" className="border-primary/20 text-primary hover:bg-primary/5 h-10" onClick={() => setRefreshKey(k => k + 1)}><TrendingUp className="mr-2 h-4 w-4" />Recarregar Saldos</Button>
+          <Button variant="outline" className="border-primary/20 text-primary hover:bg-primary/5 h-10" onClick={() => setRefreshKey(k => k + 1)} disabled={isLaunching}><RefreshCw className={cn("mr-2 h-4 w-4", isLaunching && "animate-spin")} />Recarregar Saldos</Button>
         </div>
       </div>
       

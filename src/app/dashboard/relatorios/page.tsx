@@ -21,7 +21,8 @@ import {
   Activity,
   XCircle,
   Sparkles,
-  RefreshCw
+  RefreshCw,
+  Loader2
 } from 'lucide-react';
 import { 
   Bar, 
@@ -57,6 +58,7 @@ const COLORS = ['#F5D030', '#3b82f6', '#10b981', '#f43f5e', '#8b5cf6', '#ec4899'
 export default function RelatoriosPage() {
   const { firestore, areServicesAvailable } = useFirebase();
   const [isLoading, setIsLoading] = React.useState(true);
+  const [isRefreshing, setIsRefreshing] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [data, setData] = React.useState<{
     clients: Client[];
@@ -76,15 +78,16 @@ export default function RelatoriosPage() {
     leads: [],
   });
 
-  const fetchData = React.useCallback(async () => {
+  const fetchData = React.useCallback(async (quiet = false) => {
     if (!firestore) return;
-    setIsLoading(true);
+    if (!quiet) setIsLoading(true);
+    else setIsRefreshing(true);
+    
     setError(null);
 
     try {
       const sixMonthsAgo = Timestamp.fromDate(subMonths(new Date(), 6));
 
-      // Carregamento único em vez de onSnapshot para economizar leituras (getDocs)
       const [
         clientsSnap,
         processesSnap,
@@ -117,6 +120,7 @@ export default function RelatoriosPage() {
       setError(e.message);
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
   }, [firestore]);
 
@@ -126,7 +130,6 @@ export default function RelatoriosPage() {
     }
   }, [areServicesAvailable, fetchData]);
 
-  // Cálculos derivados (Memoized para evitar re-processamento)
   const deadlineStats = React.useMemo(() => {
     const now = startOfDay(new Date());
     return data.deadlines.reduce((acc, d) => {
@@ -205,7 +208,7 @@ export default function RelatoriosPage() {
           <AlertTitle>Erro ao carregar dados de BI</AlertTitle>
           <AlertDescription className="text-xs mt-2 space-y-4">
             <p>{error}</p>
-            <Button onClick={fetchData} variant="outline" size="sm" className="h-8 text-[10px] font-black uppercase">
+            <Button onClick={() => fetchData()} variant="outline" size="sm" className="h-8 text-[10px] font-black uppercase">
               Tentar novamente
             </Button>
           </AlertDescription>
@@ -216,14 +219,14 @@ export default function RelatoriosPage() {
 
   if (isLoading) {
     return (
-      <div className="p-8 space-y-8">
-        <Skeleton className="h-10 w-64 bg-white/5" />
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-24 w-full bg-white/5" />)}
+      <div className="flex flex-col items-center justify-center min-h-[80vh] text-center space-y-4">
+        <div className="relative">
+          <div className="h-24 w-24 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
+          <PieChartIcon className="h-10 w-10 text-primary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Skeleton className="h-[400px] w-full bg-white/5" />
-          <Skeleton className="h-[400px] w-full bg-white/5" />
+        <div className="space-y-1">
+          <h2 className="text-xl font-black text-white uppercase tracking-tighter">Compilando Inteligência</h2>
+          <p className="text-sm text-slate-400">Processando métricas operacionais e financeiras...</p>
         </div>
       </div>
     );
@@ -237,8 +240,15 @@ export default function RelatoriosPage() {
           <p className="text-sm text-slate-400 mt-1">Dados processados em {format(new Date(), 'HH:mm')}.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={fetchData} className="text-muted-foreground hover:text-white h-10">
-            <RefreshCw className="mr-2 h-4 w-4" /> Atualizar BI
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => fetchData(true)} 
+            disabled={isRefreshing}
+            className="text-muted-foreground hover:text-white h-10"
+          >
+            {isRefreshing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+            Atualizar BI
           </Button>
           <Button variant="outline" size="sm" onClick={() => window.print()} className="bg-[#0f172a] border-white/10 text-white font-bold h-10">
             <Download className="mr-2 h-4 w-4" /> Exportar Relatório
