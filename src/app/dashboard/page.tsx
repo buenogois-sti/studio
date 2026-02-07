@@ -197,7 +197,7 @@ function FinancialDashboard({ stats, isLoading, titlesData }: any) {
               <div key={t.id} className="flex items-center justify-between p-3 rounded-lg bg-black/20 border border-white/5">
                 <div className="flex flex-col">
                   <span className="text-xs font-bold text-white">{t.description}</span>
-                  <span className="text-[10px] text-slate-500">Vencimento: {format(t.dueDate.toDate(), 'dd/MM/yy')}</span>
+                  <span className="text-[10px] text-slate-500">Vencimento: {t.dueDate?.toDate ? format(t.dueDate.toDate(), 'dd/MM/yy') : 'N/A'}</span>
                 </div>
                 <span className="text-sm font-black text-white">{t.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
               </div>
@@ -247,7 +247,7 @@ function StatCard({ title, value, icon: Icon, currency, suffix, color }: any) {
       </CardHeader>
       <CardContent>
         <div className={cn("text-2xl font-black text-white", color)}>
-          {currency ? value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : `${value}${suffix || ''}`}
+          {currency ? (value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : `${value || 0}${suffix || ''}`}
         </div>
       </CardContent>
     </Card>
@@ -270,18 +270,23 @@ function UpcomingActsCard({ data, isLoading, title = "Próximos Atos" }: any) {
           </div>
         ) : (
           <div className="space-y-6 text-slate-300">
-            {data?.map((h: any) => (
-              <div key={h.id} className="flex items-start gap-4 p-3 rounded-xl hover:bg-white/5 transition-colors group">
-                <div className="flex flex-col items-center justify-center p-2 bg-black/40 rounded-xl w-12 h-12 border border-white/5 shrink-0 group-hover:border-primary/30 transition-all">
-                  <span className="text-[10px] font-black uppercase text-primary leading-none">{format(h.date.toDate(), 'MMM', { locale: ptBR })}</span>
-                  <span className="text-lg font-black text-white leading-none">{format(h.date.toDate(), 'dd')}</span>
+            {data?.map((h: any) => {
+              const hDate = h.date?.toDate ? h.date.toDate() : null;
+              if (!hDate) return null;
+              
+              return (
+                <div key={h.id} className="flex items-start gap-4 p-3 rounded-xl hover:bg-white/5 transition-colors group">
+                  <div className="flex flex-col items-center justify-center p-2 bg-black/40 rounded-xl w-12 h-12 border border-white/5 shrink-0 group-hover:border-primary/30 transition-all">
+                    <span className="text-[10px] font-black uppercase text-primary leading-none">{format(hDate, 'MMM', { locale: ptBR })}</span>
+                    <span className="text-lg font-black text-white leading-none">{format(hDate, 'dd')}</span>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-bold text-sm truncate text-white">Audiência {h.type}</p>
+                    <p className="text-[10px] text-muted-foreground uppercase flex items-center gap-1"><Users className="h-2.5 w-2.5" /> {h.lawyerName}</p>
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <p className="font-bold text-sm truncate text-white">Audiência {h.type}</p>
-                  <p className="text-[10px] text-muted-foreground uppercase flex items-center gap-1"><Users className="h-2.5 w-2.5" /> {h.lawyerName}</p>
-                </div>
-              </div>
-            ))}
+              );
+            })}
             {data?.length === 0 && <p className="text-xs italic text-muted-foreground text-center py-10 opacity-30">Sem atos agendados.</p>}
           </div>
         )}
@@ -295,18 +300,23 @@ function PersonalDeadlinesCard({ data, isLoading }: any) {
     <Card className="bg-[#0f172a] border-border/50 shadow-none">
       <CardHeader><CardTitle className="text-white font-headline">Prazos Fatais</CardTitle></CardHeader>
       <CardContent className="space-y-3">
-        {isLoading ? <Skeleton className="h-32 w-full" /> : data?.map((d: any) => (
-          <div key={d.id} className="flex items-center justify-between p-4 rounded-xl bg-rose-500/[0.03] border border-rose-500/20 group hover:bg-rose-500/5 transition-all">
-            <div className="flex items-center gap-3">
-              <div className="h-8 w-8 rounded-lg bg-rose-500/10 flex items-center justify-center text-rose-500"><Timer className="h-4 w-4" /></div>
-              <div>
-                <p className="text-sm font-bold text-white">{d.type}</p>
-                <p className="text-[10px] text-rose-400 font-bold uppercase tracking-widest">Vence em: {format(d.endDate.toDate(), 'dd/MM/yyyy')}</p>
+        {isLoading ? <Skeleton className="h-32 w-full" /> : data?.map((d: any) => {
+          const endDate = d.endDate?.toDate ? d.endDate.toDate() : null;
+          if (!endDate) return null;
+
+          return (
+            <div key={d.id} className="flex items-center justify-between p-4 rounded-xl bg-rose-500/[0.03] border border-rose-500/20 group hover:bg-rose-500/5 transition-all">
+              <div className="flex items-center gap-3">
+                <div className="h-8 w-8 rounded-lg bg-rose-500/10 flex items-center justify-center text-rose-500"><Timer className="h-4 w-4" /></div>
+                <div>
+                  <p className="text-sm font-bold text-white">{d.type}</p>
+                  <p className="text-[10px] text-rose-400 font-bold uppercase tracking-widest">Vence em: {format(endDate, 'dd/MM/yyyy')}</p>
+                </div>
               </div>
+              <Button size="sm" variant="ghost" className="text-[10px] font-black uppercase text-rose-400" asChild><Link href="/dashboard/prazos">Ver Guia</Link></Button>
             </div>
-            <Button size="sm" variant="ghost" className="text-[10px] font-black uppercase text-rose-400" asChild><Link href="/dashboard/prazos">Ver Guia</Link></Button>
-          </div>
-        ))}
+          );
+        })}
         {data?.length === 0 && <p className="text-center py-10 text-xs text-slate-500 italic">Nenhum prazo pendente.</p>}
       </CardContent>
     </Card>
@@ -396,9 +406,11 @@ export default function Dashboard() {
 
     if (role === 'admin' || role === 'financial') {
       titlesData?.forEach(t => {
+        const dueDate = t.dueDate instanceof Timestamp ? t.dueDate.toDate() : (t.dueDate ? new Date(t.dueDate as any) : null);
+        
         if (t.type === 'RECEITA') {
           if (t.status === 'PAGO') s.totalRevenue += t.value;
-          else if (isBefore(t.dueDate instanceof Timestamp ? t.dueDate.toDate() : new Date(t.dueDate), now)) s.totalOverdue += t.value;
+          else if (dueDate && isBefore(dueDate, now)) s.totalOverdue += t.value;
           else s.pendingReceivables += t.value;
         } else if (t.type === 'DESPESA' && t.status === 'PENDENTE') {
           s.totalExpenses += t.value;
@@ -407,7 +419,7 @@ export default function Dashboard() {
     }
 
     if (role === 'lawyer') {
-      creditsData?.forEach(c => s.personalFees += c.value);
+      creditsData?.forEach(c => s.personalFees += (c.value || 0));
       s.personalDeadlines = deadlinesData?.length || 0;
     }
 
@@ -425,7 +437,7 @@ export default function Dashboard() {
       months.push({ month: d.toLocaleString('pt-BR', { month: 'short' }), key: `${d.getFullYear()}-${d.getMonth()}`, newCases: 0 });
     }
     processesData?.forEach(p => {
-      const date = p.createdAt?.toDate();
+      const date = p.createdAt?.toDate ? p.createdAt.toDate() : null;
       if (date) {
         const key = `${date.getFullYear()}-${date.getMonth()}`;
         const m = months.find(m => m.key === key);

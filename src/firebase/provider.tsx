@@ -60,12 +60,10 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
     userError: null,
   });
   
-  // Ref para evitar logins repetidos com o mesmo token
   const lastTokenRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (sessionStatus === 'authenticated' && session?.customToken && auth) {
-      // Só tenta o login se o token for diferente do último processado com sucesso
       if (lastTokenRef.current === session.customToken && auth.currentUser) {
         return;
       }
@@ -80,12 +78,10 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
         const clientProject = auth.app.options.projectId;
         const expectedProject = 'studio-7080106838-23904';
         
-        // Decodificar token para ver o projeto real para o qual foi emitido
         let tokenAudience = 'unknown';
         try {
           const parts = session.customToken!.split('.');
           if (parts.length > 1) {
-            // No browser, usamos atob para decodificar o payload do JWT
             const payload = JSON.parse(atob(parts[1]));
             tokenAudience = payload.aud || 'not found in payload';
           }
@@ -96,13 +92,12 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
           message: error.message,
           clientProject,
           tokenAudience,
-          expectedProject
+          expectedProject,
+          fullError: error
         });
 
-        // NOTA: Para Custom Tokens, a audiência (aud) é geralmente a URL do Identity Toolkit.
-        // O erro 400 real acontece se a chave de serviço no servidor pertencer a um projeto diferente da chave de API no cliente.
-        if (tokenAudience !== "https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit") {
-           console.warn(`[Firebase Auth] ⚠️ Token Audience incomum: "${tokenAudience}". Verifique se o FIREBASE_SERVICE_ACCOUNT_JSON no seu .env.local pertence ao projeto correto.`);
+        if (errorCode === 'auth/invalid-custom-token' || errorCode === 'auth/argument-error') {
+           console.warn(`[Firebase Auth] ⚠️ ERRO CRÍTICO: O token gerado no servidor não é compatível com o cliente. Verifique se o FIREBASE_SERVICE_ACCOUNT_JSON no seu .env.local pertence EXATAMENTE ao projeto "${expectedProject}".`);
         }
         
         setUserAuthState((state) => ({ ...state, userError: error, isUserLoading: false }));
