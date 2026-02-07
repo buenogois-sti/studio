@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
@@ -38,6 +37,7 @@ import {
 } from "@/components/ui/carousel";
 import { useFirebase, useDoc, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
+import Head from 'next/head';
 
 function LandingLogo({ className }: { className?: string }) {
     return (
@@ -260,8 +260,48 @@ export default function LandingPage() {
   const { data: settings } = useDoc<any>(settingsRef);
   const instagramUrl = settings?.instagram;
 
+  const seoRef = useMemoFirebase(() => firestore ? doc(firestore, 'system_settings', 'seo') : null, [firestore]);
+  const { data: seo } = useDoc<any>(seoRef);
+
+  // SEO Fallbacks
+  const metaTitle = seo?.title || "Bueno Gois Advogados | Advocacia Trabalhista em São Bernardo do Campo";
+  const metaDesc = seo?.description || "Escritório de advocacia especializado em direitos do trabalhador, rescisões, horas extras e assédio moral. Atendimento humano e estratégico em SBC.";
+  const metaKeywords = seo?.keywords || "advogado trabalhista, sbc, são bernardo do campo, rescisão, horas extras, direito do trabalho";
+
+  // Structured Data (JSON-LD) for better Google integration
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@type": "LegalService",
+    "name": "Bueno Gois Advogados e Associados",
+    "description": metaDesc,
+    "url": "https://buenogoisadvogado.com.br",
+    "telephone": "+5511980590128",
+    "address": {
+      "@type": "PostalAddress",
+      "streetAddress": "Rua Marechal Deodoro, 1594 - Sala 2",
+      "addressLocality": "São Bernardo do Campo",
+      "addressRegion": "SP",
+      "postalCode": "09715-070",
+      "addressCountry": "BR"
+    },
+    "geo": {
+      "@type": "GeoCoordinates",
+      "latitude": -23.6936,
+      "longitude": -46.5556
+    }
+  };
+
   return (
     <div className="bg-background text-foreground font-body overflow-x-hidden antialiased">
+      {/* SEO Head Tags - Dynamic Injected for CSR context */}
+      <title>{metaTitle}</title>
+      <meta name="description" content={metaDesc} />
+      <meta name="keywords" content={metaKeywords} />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+      />
+
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 z-40 transition-all duration-300"
         style={{
@@ -280,7 +320,7 @@ export default function LandingPage() {
               </Link>
             ))}
             {instagramUrl && (
-              <Link href={instagramUrl} target="_blank" className="hover:text-primary transition-all duration-300 hover:scale-110">
+              <Link href={instagramUrl} target="_blank" className="hover:text-primary transition-all duration-300 hover:scale-110" aria-label="Siga-nos no Instagram">
                 <Instagram className="h-5 w-5" />
               </Link>
             )}
@@ -309,7 +349,7 @@ export default function LandingPage() {
                       <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-primary/5 rounded-3xl blur-3xl" />
                       <img
                         src="/lawyer-portrait.png"
-                        alt="Advogado Bueno Gois"
+                        alt="Dr. Alan Bueno De Gois - Advogado Trabalhista Especialista em SBC"
                         width={500}
                         height={600}
                         className="relative object-contain object-bottom filter drop-shadow-[0_35px_60px_rgba(245,208,48,0.3)]"
@@ -365,7 +405,7 @@ export default function LandingPage() {
 
                 <div className="flex flex-wrap items-center gap-6 pt-8 text-sm text-white/80">
                   <div className="flex items-center gap-2"><MapPin className="h-4 w-4 text-primary" /><span>Rua Marechal Deodoro, 1594 - SBC/SP</span></div>
-                  <div className="flex items-center gap-2"><Clock className="h-4 w-4 text-primary" /><span>Atendimento Jurídico</span></div>
+                  <div className="flex items-center gap-2"><Clock className="h-4 w-4 text-primary" /><span>Atendimento Jurídico Especializado</span></div>
                 </div>
               </AnimatedSection>
             </div>
@@ -380,9 +420,9 @@ export default function LandingPage() {
                 <Target className="w-4 h-4 text-primary" />
                 <span className="text-sm font-semibold text-primary">Especialidades</span>
               </div>
-              <h2 className="font-headline text-4xl md:text-5xl font-bold text-gray-900 mb-6">Principais Serviços</h2>
+              <h2 className="font-headline text-4xl md:text-5xl font-bold text-gray-900 mb-6">Principais Serviços Jurídicos</h2>
               <div className="w-24 h-1.5 bg-primary mx-auto mb-6 rounded-full" />
-              <p className="text-xl text-gray-600 max-w-3xl mx-auto">Proteção integral para os seus direitos trabalhistas.</p>
+              <p className="text-xl text-gray-600 max-w-3xl mx-auto">Proteção integral para os seus direitos trabalhistas com foco em resultados.</p>
             </AnimatedSection>
             
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -390,7 +430,7 @@ export default function LandingPage() {
                 const Icon = service.icon;
                 return (
                   <AnimatedSection key={index} delay={index * 100}>
-                    <Card className="group relative bg-white border-2 border-gray-150 p-8 flex flex-col h-full hover:border-primary/40 transition-all duration-300 hover:shadow-2xl cursor-pointer">
+                    <Card className="group relative bg-white border-2 border-gray-150 p-8 flex flex-col h-full hover:border-primary/40 transition-all duration-300 hover:shadow-2xl cursor-pointer shadow-sm">
                       <div className="w-16 h-16 rounded-xl bg-primary/10 flex items-center justify-center mb-6 group-hover:bg-primary transition-all duration-300">
                         <Icon className="w-8 h-8 text-primary group-hover:text-primary-foreground transition-colors" />
                       </div>
@@ -412,7 +452,7 @@ export default function LandingPage() {
             <div className="grid lg:grid-cols-2 gap-16 items-center">
               <div className="space-y-8">
                 <AnimatedSection>
-                  <h2 className="font-headline text-4xl md:text-5xl font-bold text-gray-900">Bueno Gois Advogados<br /><span className="text-primary">Excelência Jurídica</span></h2>
+                  <h2 className="font-headline text-4xl md:text-5xl font-bold text-gray-900">Bueno Gois Advogados<br /><span className="text-primary">Excelência Jurídica em SBC</span></h2>
                 </AnimatedSection>
                 <AnimatedSection delay={100}>
                   <div className="pl-6 border-l-4 border-primary bg-primary/5 p-6 rounded-r-xl">
@@ -420,14 +460,14 @@ export default function LandingPage() {
                     <p className="text-gray-700 text-sm font-medium uppercase tracking-wider">Justiça para o trabalhador acima de tudo.</p>
                   </div>
                 </AnimatedSection>
-                <p className="text-lg text-gray-600 leading-relaxed text-justify">Somos um escritório com foco exclusivo na defesa do trabalhador, aliando tecnologia e experiência para garantir resultados sólidos.</p>
+                <p className="text-lg text-gray-600 leading-relaxed text-justify">Somos um escritório com foco exclusivo na defesa do trabalhador, aliando tecnologia e experiência para garantir resultados sólidos e proteção aos seus direitos fundamentais.</p>
                 <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-7 px-8 rounded-xl shadow-lg transition-all hover:scale-105" asChild>
                   <Link href={whatsappUrl} target="_blank"><MessageCircle className="mr-3 h-5 w-5" /> Fale com um Especialista</Link>
                 </Button>
               </div>
               <AnimatedSection delay={150}>
                 <div className="relative h-[550px] w-full rounded-3xl overflow-hidden shadow-2xl border-8 border-white">
-                  <img src="/lawyer-action.jpg" alt="Equipe Bueno Gois" className="w-full h-full object-cover" loading="lazy" />
+                  <img src="/lawyer-action.jpg" alt="Equipe Bueno Gois Advogados em Atendimento" className="w-full h-full object-cover" loading="lazy" />
                   <div className="absolute inset-0 bg-gradient-to-t from-[#152c4b]/80 to-transparent" />
                 </div>
               </AnimatedSection>
@@ -442,9 +482,9 @@ export default function LandingPage() {
                 <Star className="w-4 h-4 text-primary" />
                 <span className="text-sm font-semibold text-primary">Voz do Cliente</span>
               </div>
-              <h2 className="font-headline text-4xl md:text-5xl font-bold text-white mb-6">Histórias Reais</h2>
+              <h2 className="font-headline text-4xl md:text-5xl font-bold text-white mb-6">Histórias de Sucesso</h2>
               <div className="w-24 h-1.5 bg-primary mx-auto mb-6 rounded-full" />
-              <p className="text-xl text-slate-400 max-w-3xl mx-auto">O que dizem aqueles que recuperaram seus direitos conosco.</p>
+              <p className="text-xl text-slate-400 max-w-3xl mx-auto">O que dizem aqueles que recuperaram seus direitos e dignidade conosco.</p>
             </AnimatedSection>
 
             <AnimatedSection delay={200} className="relative px-12">
@@ -498,10 +538,18 @@ export default function LandingPage() {
           <div className="container mx-auto px-4 relative z-10">
             <div className="max-w-6xl mx-auto bg-gray-50 rounded-3xl shadow-2xl overflow-hidden grid lg:grid-cols-3">
               <div className="lg:col-span-2 h-[500px]">
-                <iframe width="100%" height="100%" frameBorder="0" src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3644.684!2d-46.5556!3d-23.6936!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x94ce4278d2c00001%3A0xa1b2c3d4e5f6!2sRua%20Marechal%20Deodoro%2C%201594%20-%20Sala%202%2C%20S%C3%A3o%20Bernardo%20do%20Campo%20-%20SP%2C%2009715-070!5e0!3m2!1spt-BR!2sbr!4v1701890000000" loading="lazy" className="grayscale hover:grayscale-0 transition-all duration-700" />
+                <iframe 
+                  width="100%" 
+                  height="100%" 
+                  frameBorder="0" 
+                  title="Mapa de Localização Bueno Gois"
+                  src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3644.684!2d-46.5556!3d-23.6936!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x94ce4278d2c00001%3A0xa1b2c3d4e5f6!2sRua%20Marechal%20Deodoro%2C%201594%20-%20Sala%202%2C%20S%C3%A3o%20Bernardo%20do%20Campo%20-%20SP%2C%2009715-070!5e0!3m2!1spt-BR!2sbr!4v1701890000000" 
+                  loading="lazy" 
+                  className="grayscale hover:grayscale-0 transition-all duration-700" 
+                />
               </div>
               <div className="p-12 bg-[#152c4b] text-white flex flex-col justify-center space-y-8">
-                <h3 className="font-headline text-3xl font-bold">Contato</h3>
+                <h3 className="font-headline text-3xl font-bold">Contato Direto</h3>
                 <div className="space-y-6">
                   <div className="flex items-start gap-4"><MapPin className="w-6 h-6 text-primary shrink-0" /><p className="text-lg">Rua Marechal Deodoro, 1594 - SBC/SP</p></div>
                   <div className="flex items-start gap-4"><Phone className="w-6 h-6 text-primary shrink-0" /><p className="text-lg">(11) 98059-0128</p></div>
@@ -515,25 +563,26 @@ export default function LandingPage() {
         </section>
       </main>
 
-      <footer className="py-12 bg-[#0b1324] text-white/60 text-center text-sm">
+      <footer className="py-12 bg-[#0b1324] text-white/60 text-center text-sm border-t border-white/5">
         <div className="flex justify-center gap-6 mb-6">
           {instagramUrl && (
             <Link 
               href={instagramUrl} 
               target="_blank" 
               className="h-10 w-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-primary hover:text-primary-foreground transition-all duration-300"
+              aria-label="Instagram"
             >
               <Instagram className="h-5 w-5" />
             </Link>
           )}
         </div>
-        <p>&copy; {new Date().getFullYear()} Bueno Gois Advogados e Associados. Todos os direitos reservados.</p>
+        <p>&copy; {new Date().getFullYear()} Bueno Gois Advogados e Associados. Todos os direitos reservados. Advocacia Especializada em São Bernardo do Campo.</p>
       </footer>
 
       <WhatsAppFloating
         phoneNumber="5511980590128"
         message="Olá! Vi o site da Bueno Gois Advogados e gostaria de saber mais sobre os serviços de advocacia trabalhista."
-        welcomeMessage="Olá! 👋 Sou da Bueno Gois Advogados. Como posso ajudar com seus direitos trabalhistas?"
+        welcomeMessage="Olá! 👋 Sou da Bueno Gois Advogados. Como posso ajudar com seus direitos trabalhistas hoje?"
         userName="Bueno Gois Adv."
         delay={3000}
         autoHideDelay={10000}

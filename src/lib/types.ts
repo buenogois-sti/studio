@@ -380,3 +380,12 @@ export type ChecklistExecution = {
   executedAt: Timestamp;
   observations?: string;
 };
+
+export type SEOSettings = {
+  title: string;
+  description: string;
+  keywords: string;
+  googleAnalyticsId?: string;
+  facebookPixelId?: string;
+  canonicalUrl?: string;
+};

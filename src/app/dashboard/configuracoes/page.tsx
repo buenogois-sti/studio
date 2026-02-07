@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -8,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/tabs";
 import {
   Palette,
   Users,
@@ -35,14 +34,19 @@ import {
   DollarSign,
   Percent,
   Info,
-  Instagram
+  Instagram,
+  Globe,
+  TrendingUp,
+  BarChart3,
+  MousePointer2,
+  Tag
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
 import { useDoc, useFirebase, useMemoFirebase, useCollection } from '@/firebase';
 import { doc, collection, setDoc } from 'firebase/firestore';
-import type { UserProfile, UserRole, UserRoleInfo } from '@/lib/types';
+import type { UserProfile, UserRole, UserRoleInfo, SEOSettings } from '@/lib/types';
 import { ClientKitManager } from '@/components/settings/client-kit-manager';
 import { AppearanceTab } from '@/components/settings/appearance-tab';
 import { TemplateLibraryManager } from '@/components/settings/template-library-manager';
@@ -59,6 +63,7 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { initializeAdminDriveStructure } from '@/lib/admin-drive-actions';
 import { cn } from '@/lib/utils';
+import { Textarea } from '@/components/ui/textarea';
 
 const roleSchema = z.object({
   email: z.string().email('Formato de email inválido.'),
@@ -594,6 +599,147 @@ function FinancialTab() {
   );
 }
 
+function SEOTab() {
+  const { firestore, isUserLoading } = useFirebase();
+  const { toast } = useToast();
+  const [isSaving, setIsSaving] = useState(false);
+
+  const seoRef = useMemoFirebase(() => firestore ? doc(firestore, 'system_settings', 'seo') : null, [firestore]);
+  const { data: seoData, isLoading: isLoadingSEO } = useDoc<SEOSettings>(seoRef);
+
+  const [form, setForm] = useState<SEOSettings>({
+    title: '',
+    description: '',
+    keywords: '',
+    googleAnalyticsId: '',
+    facebookPixelId: '',
+    canonicalUrl: ''
+  });
+
+  useEffect(() => {
+    if (seoData) {
+      setForm({
+        title: seoData.title || '',
+        description: seoData.description || '',
+        keywords: seoData.keywords || '',
+        googleAnalyticsId: seoData.googleAnalyticsId || '',
+        facebookPixelId: seoData.facebookPixelId || '',
+        canonicalUrl: seoData.canonicalUrl || ''
+      });
+    }
+  }, [seoData]);
+
+  const handleSave = async () => {
+    if (!seoRef) return;
+    setIsSaving(true);
+    try {
+      await setDoc(seoRef, form, { merge: true });
+      toast({ title: 'SEO Atualizado!', description: 'As configurações de busca foram salvas.' });
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Erro ao salvar', description: error.message });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (isUserLoading || isLoadingSEO) {
+    return <Skeleton className="h-96 w-full bg-[#0f172a]" />;
+  }
+
+  return (
+    <div className="space-y-6">
+      <Card className="bg-[#0f172a] border-white/5 overflow-hidden">
+        <CardHeader className="bg-white/5 border-b border-white/5 p-6">
+          <div className="flex items-center gap-2 text-primary mb-1">
+            <Globe className="h-5 w-5" />
+            <CardTitle className="text-white">Otimização para Buscas (SEO)</CardTitle>
+          </div>
+          <CardDescription className="text-slate-400">Gerencie como o site da Bueno Gois aparece no Google e em outras ferramentas.</CardDescription>
+        </CardHeader>
+        <CardContent className="p-8 space-y-8">
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
+                <Tag className="h-3 w-3" /> Meta Title (Título da Aba)
+              </Label>
+              <Input 
+                value={form.title} 
+                onChange={e => setForm({...form, title: e.target.value})}
+                placeholder="Ex: Bueno Gois Advogados | Advocacia Trabalhista em São Bernardo do Campo"
+                className="bg-black/40 border-white/10 h-11 text-white" 
+              />
+              <p className="text-[10px] text-muted-foreground italic">Recomendado: Até 60 caracteres.</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
+                <FileText className="h-3 w-3" /> Meta Description (Resumo no Google)
+              </Label>
+              <Textarea 
+                value={form.description} 
+                onChange={e => setForm({...form, description: e.target.value})}
+                placeholder="Descreva os serviços do escritório de forma atrativa para cliques..."
+                className="bg-black/40 border-white/10 min-h-[100px] text-white" 
+              />
+              <p className="text-[10px] text-muted-foreground italic">Recomendado: 150 a 160 caracteres.</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
+                <Search className="h-3 w-3" /> Keywords (Palavras-chave)
+              </Label>
+              <Input 
+                value={form.keywords} 
+                onChange={e => setForm({...form, keywords: e.target.value})}
+                placeholder="advogado trabalhista, sbc, direitos do trabalhador, rescisão"
+                className="bg-black/40 border-white/10 h-11 text-white" 
+              />
+            </div>
+          </div>
+
+          <Separator className="bg-white/5" />
+
+          <div className="space-y-6">
+            <div className="flex items-center gap-2 text-emerald-400">
+              <BarChart3 className="h-4 w-4" />
+              <h4 className="text-xs font-black uppercase tracking-widest">Rastreamento & Analytics</h4>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Google Analytics ID (G-XXXXXXX)</Label>
+                <Input 
+                  value={form.googleAnalyticsId} 
+                  onChange={e => setForm({...form, googleAnalyticsId: e.target.value})}
+                  className="bg-black/40 border-white/10 h-11 text-white" 
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Facebook Pixel ID</Label>
+                <Input 
+                  value={form.facebookPixelId} 
+                  onChange={e => setForm({...form, facebookPixelId: e.target.value})}
+                  className="bg-black/40 border-white/10 h-11 text-white" 
+                />
+              </div>
+            </div>
+          </div>
+        </CardContent>
+        <CardFooter className="bg-white/5 p-6 border-t border-white/5">
+          <Button 
+            onClick={handleSave}
+            disabled={isSaving}
+            className="bg-primary text-primary-foreground font-black px-8 h-11 uppercase text-[11px] tracking-widest shadow-xl shadow-primary/20"
+          >
+            {isSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+            Publicar Configurações SEO
+          </Button>
+        </CardFooter>
+      </Card>
+    </div>
+  );
+}
+
 function LicenseTab() {
     return (
         <div className="space-y-6">
@@ -730,6 +876,7 @@ export default function ConfiguracoesPage() {
       <Tabs defaultValue="usuarios" className="w-full">
         <TabsList className="bg-[#0f172a] p-1 border border-white/5 mb-8 h-12 flex overflow-x-auto no-scrollbar justify-start">
           <TabsTrigger value="geral" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold px-6 h-10 shrink-0">Geral</TabsTrigger>
+          <TabsTrigger value="seo" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold px-6 h-10 shrink-0">SEO & Analytics</TabsTrigger>
           <TabsTrigger value="integracoes" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold px-6 h-10 shrink-0">Integrações</TabsTrigger>
           <TabsTrigger value="usuarios" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold px-6 h-10 shrink-0">Usuários</TabsTrigger>
           <TabsTrigger value="financeiro" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold px-6 h-10 shrink-0">Financeiro</TabsTrigger>
@@ -806,6 +953,10 @@ export default function ConfiguracoesPage() {
               </Button>
             </CardFooter>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="seo" className="animate-in fade-in duration-300">
+          <SEOTab />
         </TabsContent>
 
         <TabsContent value="integracoes" className="animate-in fade-in duration-300">
