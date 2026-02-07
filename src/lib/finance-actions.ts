@@ -1,6 +1,7 @@
+
 'use server';
 import { firestoreAdmin } from '@/firebase/admin';
-import type { FinancialTitle, Process, FinancialEvent, Staff, StaffCredit } from './types';
+import type { FinancialTitle, Process, FinancialEvent, Staff, StaffCredit, TimelineEvent } from './types';
 import { FieldValue } from 'firebase-admin/firestore';
 import { Timestamp } from 'firebase/firestore';
 import { addMonths, format, startOfMonth } from 'date-fns';
@@ -8,6 +9,7 @@ import { ptBR } from 'date-fns/locale';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/options';
 import { createNotification } from './notification-actions';
+import { v4 as uuidv4 } from 'uuid';
 
 interface CreateEventData {
   processId: string;
@@ -82,7 +84,6 @@ export async function createFinancialEventAndTitles(data: CreateEventData) {
   }
 
   // REGRA DE NEGÓCIO DE REPASSE (HONORÁRIOS SOBRE HONORÁRIOS)
-  // Apenas se for ACORDO, SENTENCA ou CONTRATO (verbas de êxito/contratuais)
   const isRevenueSubjectToCommission = ['ACORDO', 'SENTENCA', 'EXECUCAO', 'CONTRATO'].includes(type);
 
   if (leadLawyerId && isRevenueSubjectToCommission) {
@@ -93,12 +94,9 @@ export async function createFinancialEventAndTitles(data: CreateEventData) {
 
       if (rem) {
         let lawyerValue = 0;
-        
-        // O escritório cobra 30% do cliente (padrão Bueno Gois)
         const officeFeeTotal = totalValue * 0.3;
 
         if ((rem.type === 'SUCUMBENCIA' || rem.type === 'QUOTA_LITIS') && rem.lawyerPercentage) {
-          // O advogado recebe X% dos 30% do escritório
           lawyerValue = officeFeeTotal * (rem.lawyerPercentage / 100);
         }
 
@@ -109,7 +107,7 @@ export async function createFinancialEventAndTitles(data: CreateEventData) {
             processId,
             description: `Part. Honorários (${rem.type}): ${description}`,
             value: lawyerValue,
-            status: 'RETIDO', // Fica retido até o título ser pago
+            status: 'RETIDO',
             date: Timestamp.now() as any,
             financialEventId: eventRef.id
           };
@@ -163,7 +161,6 @@ export async function updateFinancialTitleStatus(titleId: string, status: 'PAGO'
         if (status === 'PAGO') {
             updateData.paymentDate = FieldValue.serverTimestamp();
             
-            // Se o título está vinculado a um evento financeiro, LIBERA os créditos dos advogados
             if (titleData.financialEventId) {
                 const staffSnapshot = await firestoreAdmin.collection('staff').get();
                 for (const staffDoc of staffSnapshot.docs) {
@@ -177,8 +174,7 @@ export async function updateFinancialTitleStatus(titleId: string, status: 'PAGO'
                     }
                 }
             }
-        } else if (status === 'PENDENTE') {
-            // LÓGICA DE ESTORNO: Volta créditos de DISPONIVEL para RETIDO
+        } else {
             updateData.paymentDate = FieldValue.delete();
 
             if (titleData.financialEventId) {
@@ -194,8 +190,6 @@ export async function updateFinancialTitleStatus(titleId: string, status: 'PAGO'
                     }
                 }
             }
-        } else {
-            updateData.paymentDate = FieldValue.delete();
         }
 
         await titleRef.update(updateData);
@@ -203,6 +197,59 @@ export async function updateFinancialTitleStatus(titleId: string, status: 'PAGO'
     } catch (error: any) {
         throw new Error(error.message || 'Falha ao atualizar status.');
     }
+}
+
+/**
+ * Rotina de Inadimplência: Registra o atraso no processo e notifica interessados.
+ */
+export async function processLatePaymentRoutine(titleId: string) {
+  if (!firestoreAdmin) throw new Error("Servidor indisponível.");
+  const session = await getServerSession(authOptions);
+  if (!session) throw new Error("Não autorizado.");
+
+  try {
+    const titleRef = firestoreAdmin.collection('financial_titles').doc(titleId);
+    const titleSnap = await titleRef.get();
+    const title = titleSnap.data() as FinancialTitle;
+
+    if (!title || !title.processId) throw new Error("Título ou processo não localizado.");
+
+    const processRef = firestoreAdmin.collection('processes').doc(title.processId);
+    
+    // 1. Atualizar status do título para ATRASADO explicitamente
+    await titleRef.update({ status: 'ATRASADO', updatedAt: FieldValue.serverTimestamp() });
+
+    // 2. Registrar na timeline do processo
+    const timelineEvent: TimelineEvent = {
+      id: uuidv4(),
+      type: 'note',
+      description: `⚠️ ALERTA FINANCEIRO: Inadimplência detectada para o lançamento "${title.description}". Vencimento original: ${format(title.dueDate instanceof Timestamp ? title.dueDate.toDate() : new Date(title.dueDate), 'dd/MM/yyyy')}. Valor: ${title.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}. Rotina administrativa de cobrança iniciada.`,
+      date: Timestamp.now() as any,
+      authorName: session.user.name || 'Setor Financeiro'
+    };
+
+    await processRef.update({
+      timeline: FieldValue.arrayUnion(timelineEvent),
+      updatedAt: FieldValue.serverTimestamp()
+    });
+
+    // 3. Notificar o advogado responsável
+    const processSnap = await processRef.get();
+    const processData = processSnap.data() as Process;
+    if (processData.leadLawyerId) {
+      await createNotification({
+        userId: processData.leadLawyerId,
+        title: "Inadimplência no Processo",
+        description: `O pagamento do título "${title.description}" está vencido no processo ${processData.name}. Verifique a necessidade de execução.`,
+        type: 'error',
+        href: `/dashboard/financeiro`
+      });
+    }
+
+    return { success: true };
+  } catch (error: any) {
+    throw new Error(error.message);
+  }
 }
 
 export async function processRepasse(staffId: string, creditIds: string[], totalValue: number) {
@@ -215,7 +262,6 @@ export async function processRepasse(staffId: string, creditIds: string[], total
   const staffDoc = await staffRef.get();
   const staffData = staffDoc.data() as Staff;
 
-  // 1. Marcar créditos como pagos
   for (const id of creditIds) {
     const creditRef = staffRef.collection('credits').doc(id);
     batch.update(creditRef, { 
@@ -225,7 +271,6 @@ export async function processRepasse(staffId: string, creditIds: string[], total
     });
   }
 
-  // 2. Lançar despesa no financeiro
   const titleRef = firestoreAdmin.collection('financial_titles').doc();
   const newTitle: Omit<FinancialTitle, 'id'> = {
     description: `Repasse Consolidado: ${staffData.firstName} ${staffData.lastName}`,
@@ -242,7 +287,6 @@ export async function processRepasse(staffId: string, creditIds: string[], total
   try {
     await batch.commit();
     
-    // Notificar o profissional
     await createNotification({
       userId: staffId,
       title: "Repasse Recebido",
@@ -296,10 +340,7 @@ export async function launchPayroll() {
   for (const doc of staffSnap.docs) {
     const data = doc.data() as Staff;
     
-    // Regra: Apenas se tiver remuneração fixa configurada
     if (data.remuneration?.type === 'FIXO_MENSAL' && data.remuneration.fixedMonthlyValue) {
-      
-      // Checar se já foi rodado este mês para este colaborador (Evitar duplicidade)
       const existingRef = await doc.ref.collection('credits')
         .where('monthKey', '==', currentMonthKey)
         .where('type', '==', 'SALARIO')

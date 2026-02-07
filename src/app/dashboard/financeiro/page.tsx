@@ -35,7 +35,12 @@ import {
   Info,
   ChevronDown,
   ChevronUp,
-  LayoutList
+  LayoutList,
+  AlertTriangle,
+  Flame,
+  MessageSquare,
+  Gavel,
+  History
 } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, Timestamp, query, orderBy, deleteDoc, doc, getDocs, where, limit } from 'firebase/firestore';
@@ -59,10 +64,10 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { format, isBefore } from 'date-fns';
+import { format, isBefore, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { createFinancialTitle, updateFinancialTitleStatus } from '@/lib/finance-actions';
+import { createFinancialTitle, updateFinancialTitleStatus, processLatePaymentRoutine } from '@/lib/finance-actions';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -97,7 +102,7 @@ const titleFormSchema = z.object({
   ]),
   value: z.coerce.number().positive('Valor deve ser positivo'),
   dueDate: z.string().min(1, 'Data de vencimento obrigatória'),
-  status: z.enum(['PENDENTE', 'PAGO']).default('PENDENTE'),
+  status: z.enum(['PENDENTE', 'PAGO', 'ATRASADO']).default('PENDENTE'),
   processId: z.string().optional(),
 });
 
@@ -612,6 +617,7 @@ export default function FinanceiroPage() {
   const groupedReceitas = React.useMemo(() => {
     if (!titlesData) return [];
     const q = searchTerm.toLowerCase();
+    const now = startOfDay(new Date());
     
     const filtered = titlesData.filter(t => 
       t.type === 'RECEITA' && (
@@ -620,7 +626,7 @@ export default function FinanceiroPage() {
       )
     );
 
-    const groups: Record<string, { process?: Process, titles: FinancialTitle[], total: number, paid: number, pending: number }> = {};
+    const groups: Record<string, { process?: Process, titles: FinancialTitle[], total: number, paid: number, pending: number, hasOverdue: boolean }> = {};
     
     filtered.forEach(t => {
       const key = t.processId || 'standalone';
@@ -630,9 +636,14 @@ export default function FinanceiroPage() {
           titles: [], 
           total: 0, 
           paid: 0,
-          pending: 0
+          pending: 0,
+          hasOverdue: false
         };
       }
+      
+      const isOverdue = t.status !== 'PAGO' && isBefore(t.dueDate instanceof Timestamp ? t.dueDate.toDate() : new Date(t.dueDate), now);
+      if (isOverdue) groups[key].hasOverdue = true;
+
       groups[key].titles.push(t);
       groups[key].total += t.value;
       if (t.status === 'PAGO') groups[key].paid += t.value;
@@ -640,6 +651,8 @@ export default function FinanceiroPage() {
     });
     
     return Object.entries(groups).sort((a, b) => {
+      if (a[1].hasOverdue && !b[1].hasOverdue) return -1;
+      if (!a[1].hasOverdue && b[1].hasOverdue) return 1;
       if (a[0] === 'standalone') return 1;
       if (b[0] === 'standalone') return -1;
       return (b[1].titles[0]?.dueDate as any)?.seconds - (a[1].titles[0]?.dueDate as any)?.seconds;
@@ -654,6 +667,19 @@ export default function FinanceiroPage() {
       setRefreshKey(k => k + 1);
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Erro', description: e.message });
+    } finally {
+      setIsProcessing(null);
+    }
+  };
+
+  const handleRunLateRoutine = async (title: FinancialTitle) => {
+    setIsProcessing(title.id);
+    try {
+      await processLatePaymentRoutine(title.id);
+      toast({ title: 'Rotina de Inadimplência Iniciada!', description: 'O atraso foi registrado no processo e o advogado notificado.' });
+      setRefreshKey(k => k + 1);
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Erro na Rotina', description: e.message });
     } finally {
       setIsProcessing(null);
     }
@@ -732,7 +758,10 @@ export default function FinanceiroPage() {
           {isLoading ? (
             Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-32 w-full bg-[#0f172a] rounded-2xl" />)
           ) : groupedReceitas.map(([key, group]) => (
-            <Card key={key} className="bg-[#0f172a] border-white/5 overflow-hidden group/card hover:border-primary/20 transition-all duration-300">
+            <Card key={key} className={cn(
+              "bg-[#0f172a] border-white/5 overflow-hidden group/card hover:border-primary/20 transition-all duration-300",
+              group.hasOverdue && "border-rose-500/30 shadow-[0_0_30px_rgba(244,63,94,0.05)]"
+            )}>
               <div 
                 className="p-5 flex items-center justify-between cursor-pointer"
                 onClick={() => toggleGroup(key)}
@@ -740,14 +769,21 @@ export default function FinanceiroPage() {
                 <div className="flex items-center gap-4">
                   <div className={cn(
                     "h-12 w-12 rounded-xl flex items-center justify-center shrink-0 border transition-all",
-                    group.pending > 0 ? "bg-amber-500/10 border-amber-500/20 text-amber-400" : "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+                    group.hasOverdue ? "bg-rose-500/10 border-rose-500/30 text-rose-500 animate-pulse" :
+                    group.pending > 0 ? "bg-amber-500/10 border-amber-500/20 text-amber-400" : 
+                    "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
                   )}>
-                    {group.process ? <FolderKanban className="h-6 w-6" /> : <LayoutList className="h-6 w-6" />}
+                    {group.hasOverdue ? <AlertTriangle className="h-6 w-6" /> : group.process ? <FolderKanban className="h-6 w-6" /> : <LayoutList className="h-6 w-6" />}
                   </div>
                   <div>
-                    <h3 className="font-bold text-white text-base leading-tight">
-                      {group.process ? group.process.name : 'Lançamentos Avulsos'}
-                    </h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-bold text-white text-base leading-tight">
+                        {group.process ? group.process.name : 'Lançamentos Avulsos'}
+                      </h3>
+                      {group.hasOverdue && (
+                        <Badge className="bg-rose-600 text-white font-black text-[8px] uppercase tracking-widest h-4">🚨 Inadimplência</Badge>
+                      )}
+                    </div>
                     <div className="flex items-center gap-3 mt-1">
                       <span className="text-[10px] font-black uppercase text-slate-500 tracking-widest">{group.titles.length} Títulos vinculados</span>
                       {group.process?.processNumber && <span className="text-[10px] font-mono text-primary/60">{group.process.processNumber}</span>}
@@ -787,60 +823,95 @@ export default function FinanceiroPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {group.titles.map(t => (
-                        <TableRow key={t.id} className="border-white/5 hover:bg-white/5 transition-colors">
-                          <TableCell className="px-6">
-                            <span className="font-bold text-slate-200 text-xs">{t.description}</span>
-                          </TableCell>
-                          <TableCell className="text-[10px] text-slate-400 font-mono">
-                            {format(t.dueDate instanceof Timestamp ? t.dueDate.toDate() : new Date(t.dueDate), 'dd/MM/yyyy')}
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <Badge variant="outline" className={cn(
-                              "text-[8px] font-black uppercase h-5 px-2 border-none",
-                              t.status === 'PAGO' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'
-                            )}>
-                              {t.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right font-black text-white text-xs tabular-nums">
-                            {formatCurrency(t.value)}
-                          </TableCell>
-                          <TableCell className="text-right px-6">
-                            <div className="flex justify-end gap-2">
-                              {t.status === 'PAGO' && (
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
-                                  className="h-7 w-7 text-primary hover:bg-primary/10 rounded-full"
-                                  onClick={() => { setSelectedReceiptTitle(t); setIsReceiptOpen(true); }}
-                                  title="Emitir Recibo"
-                                >
-                                  <Receipt className="h-3.5 w-3.5" />
-                                </Button>
-                              )}
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-white/30 hover:text-white rounded-full">
-                                    <MoreVertical className="h-3.5 w-3.5" />
+                      {group.titles.map(t => {
+                        const isOverdue = t.status !== 'PAGO' && isBefore(t.dueDate instanceof Timestamp ? t.dueDate.toDate() : new Date(t.dueDate), startOfDay(new Date()));
+                        return (
+                          <TableRow key={t.id} className={cn(
+                            "border-white/5 hover:bg-white/5 transition-colors",
+                            isOverdue && "bg-rose-500/[0.03]"
+                          )}>
+                            <TableCell className="px-6">
+                              <span className={cn("font-bold text-xs", isOverdue ? "text-rose-400" : "text-slate-200")}>{t.description}</span>
+                            </TableCell>
+                            <TableCell className={cn("text-[10px] font-mono", isOverdue ? "text-rose-500 font-black" : "text-slate-400")}>
+                              {format(t.dueDate instanceof Timestamp ? t.dueDate.toDate() : new Date(t.dueDate), 'dd/MM/yyyy')}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Badge variant="outline" className={cn(
+                                "text-[8px] font-black uppercase h-5 px-2 border-none",
+                                t.status === 'PAGO' ? 'bg-emerald-500/20 text-emerald-400' : 
+                                isOverdue ? 'bg-rose-500/20 text-rose-500' : 'bg-amber-500/20 text-amber-400'
+                              )}>
+                                {isOverdue ? 'VENCIDO' : t.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right font-black text-white text-xs tabular-nums">
+                              {formatCurrency(t.value)}
+                            </TableCell>
+                            <TableCell className="text-right px-6">
+                              <div className="flex justify-end gap-2">
+                                {isOverdue && (
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button variant="ghost" size="icon" className="h-7 w-7 text-rose-500 hover:bg-rose-500/10 rounded-full animate-pulse">
+                                        <Flame className="h-3.5 w-3.5" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="bg-card border-border shadow-2xl p-1 w-64">
+                                      <DropdownMenuLabel className="text-[9px] font-black uppercase text-rose-500 px-2 py-1.5 tracking-widest">Rotina de Inadimplência</DropdownMenuLabel>
+                                      <DropdownMenuItem onClick={() => handleRunLateRoutine(t)} className="gap-2 cursor-pointer focus:bg-rose-500/10">
+                                        <History className="h-4 w-4 text-rose-500" /> <span className="font-bold">Registrar no Processo</span>
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem 
+                                        onClick={() => {
+                                          const phone = clientsMap.get(t.clientId || '')?.mobile?.replace(/\D/g, '');
+                                          if (phone) window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(`Olá! Notamos um atraso no pagamento da parcela "${t.description}". Poderia nos enviar o comprovante?`)}`, '_blank');
+                                        }} 
+                                        className="gap-2 cursor-pointer focus:bg-emerald-500/10"
+                                      >
+                                        <MessageSquare className="h-4 w-4 text-emerald-500" /> <span className="font-bold">Notificar Cliente</span>
+                                      </DropdownMenuItem>
+                                      <DropdownMenuSeparator className="bg-white/5" />
+                                      <DropdownMenuItem onClick={() => {}} className="gap-2 cursor-pointer focus:bg-primary/10">
+                                        <Gavel className="h-4 w-4 text-primary" /> <span className="font-bold">Iniciar Execução</span>
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                )}
+                                {t.status === 'PAGO' && (
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="h-7 w-7 text-primary hover:bg-primary/10 rounded-full"
+                                    onClick={() => { setSelectedReceiptTitle(t); setIsReceiptOpen(true); }}
+                                    title="Emitir Recibo"
+                                  >
+                                    <Receipt className="h-3.5 w-3.5" />
                                   </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="bg-card border-border shadow-2xl p-1">
-                                  {t.status === 'PENDENTE' ? (
-                                    <DropdownMenuItem onClick={() => handleUpdateStatus(t.id, 'PAGO')} className="gap-2 cursor-pointer focus:bg-emerald-500/10">
-                                      <Check className="h-4 w-4 text-emerald-500" /> <span className="font-bold">Marcar Recebido</span>
-                                    </DropdownMenuItem>
-                                  ) : (
-                                    <DropdownMenuItem onClick={() => handleUpdateStatus(t.id, 'PENDENTE')} className="gap-2 cursor-pointer focus:bg-amber-500/10">
-                                      <RefreshCw className="h-4 w-4 text-amber-500" /> <span className="font-bold text-amber-500">Estornar</span>
-                                    </DropdownMenuItem>
-                                  )}
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                                )}
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-white/30 hover:text-white rounded-full">
+                                      <MoreVertical className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="bg-card border-border shadow-2xl p-1">
+                                    {t.status !== 'PAGO' ? (
+                                      <DropdownMenuItem onClick={() => handleUpdateStatus(t.id, 'PAGO')} className="gap-2 cursor-pointer focus:bg-emerald-500/10">
+                                        <Check className="h-4 w-4 text-emerald-500" /> <span className="font-bold">Marcar Recebido</span>
+                                      </DropdownMenuItem>
+                                    ) : (
+                                      <DropdownMenuItem onClick={() => handleUpdateStatus(t.id, 'PENDENTE')} className="gap-2 cursor-pointer focus:bg-amber-500/10">
+                                        <RefreshCw className="h-4 w-4 text-amber-500" /> <span className="font-bold text-amber-500">Estornar</span>
+                                      </DropdownMenuItem>
+                                    )}
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
@@ -894,7 +965,7 @@ export default function FinanceiroPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="bg-card border-border p-1">
-                          {t.status === 'PENDENTE' ? (
+                          {t.status !== 'PAGO' ? (
                             <DropdownMenuItem onClick={() => handleUpdateStatus(t.id, 'PAGO')} className="gap-2 cursor-pointer focus:bg-emerald-500/10">
                               <Check className="mr-2 h-4 w-4 text-emerald-500" /> <span className="font-bold">Confirmar Saída</span>
                             </DropdownMenuItem>
