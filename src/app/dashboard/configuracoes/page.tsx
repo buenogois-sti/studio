@@ -30,7 +30,10 @@ import {
   ShieldAlert,
   Search,
   CheckCircle2,
-  Clock
+  Clock,
+  Scale,
+  DollarSign,
+  Percent
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -59,6 +62,8 @@ const roleSchema = z.object({
   email: z.string().email('Formato de email inválido.'),
   role: z.enum(['admin', 'lawyer', 'financial', 'assistant'], { required_error: 'Selecione um perfil.' }),
 });
+
+const Separator = ({ className }: { className?: string }) => <div className={cn("h-px w-full bg-border", className)} />;
 
 function InviteUserDialog({ onInvite, userToEdit }: { onInvite: () => void, userToEdit: (UserRoleInfo | UserProfile) | null }) {
     const [open, setOpen] = React.useState(false);
