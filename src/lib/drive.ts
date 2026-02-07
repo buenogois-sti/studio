@@ -15,22 +15,22 @@ const CLIENT_FOLDER_STRUCTURE: Record<string, string[]> = {
     '01 - Cadastro e Documentos Pessoais',
     '02 - Contratos e Procurações',
     '03 - Processos',
-    '04 - Andamentos e Prazos',
-    '05 - Provas e Documentos Processuais',
-    '06 - Financeiro',
-    '07 - Comunicações e Atendimentos',
-    '08 - Modelos e Documentos Gerados'
+    '04 - Financeiro',
+    '05 - Comunicações e Atendimentos',
+    
   ]
 };
 
 const PROCESS_FOLDER_STRUCTURE: Record<string, string[]> = {
   'level1': [
     '01 - Petições',
+    '04 - Andamentos e Prazos',
     '02 - Decisões e Sentenças',
-    '03 - Recursos',
-    '04 - Atas e Audiências',
-    '05 - Execução',
-    '06 - Encerramento'
+    '03 - Provas e Documentos Processuais',
+    '04 - Recursos',
+    '05 - Atas e Audiências',
+    '06 - Execução',
+    '07 - Encerramento'
   ]
 };
 
