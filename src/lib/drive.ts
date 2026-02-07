@@ -9,9 +9,9 @@ import type { Session } from 'next-auth';
 import type { Client, Process } from './types';
 import { revalidatePath } from 'next/cache';
 
-// IDs de pastas raiz no Drive da Bueno Gois
-const ROOT_CLIENTS_FOLDER_ID = '1DVI828qlM7SoN4-FJsGj9wwmxcOEjh6l';
-const ROOT_PROCESSES_FOLDER_ID = '1V6xGiXQnapkA4y4m3on1s5zZTYqMPkhH';
+// Nomes das pastas raiz para autodescoberta
+const CLIENTS_ROOT_NAME = '00 - CLIENTES';
+const PROCESSES_ROOT_NAME = '00 - PROCESSOS';
 
 const CLIENT_FOLDER_STRUCTURE = [
   '01 - Cadastro e Documentos Pessoais',
@@ -59,6 +59,40 @@ export async function getGoogleApiClientsForUser(): Promise<GoogleApiClients> {
         tasks: google.tasks({ version: 'v1', auth }),
         docs: google.docs({ version: 'v1', auth }),
     };
+}
+
+/**
+ * Busca ou cria uma pasta na raiz do Drive.
+ */
+async function getOrCreateRootFolder(drive: drive_v3.Drive, name: string): Promise<string> {
+    try {
+        const res = await drive.files.list({
+            q: `mimeType='application/vnd.google-apps.folder' and name='${name}' and 'root' in parents and trashed=false`,
+            fields: 'files(id)',
+            pageSize: 1,
+            supportsAllDrives: true,
+            includeItemsFromAllDrives: true,
+        });
+
+        if (res.data.files && res.data.files.length > 0) {
+            return res.data.files[0].id!;
+        }
+
+        const newFolder = await drive.files.create({
+            requestBody: {
+                name,
+                mimeType: 'application/vnd.google-apps.folder',
+                parents: ['root'],
+            },
+            fields: 'id',
+            supportsAllDrives: true,
+        });
+
+        return newFolder.data.id!;
+    } catch (error: any) {
+        console.error(`[DriveRoot] Erro ao gerenciar pasta raiz "${name}":`, error.message);
+        throw new Error(`Falha ao acessar ou criar a pasta raiz "${name}" no seu Drive.`);
+    }
 }
 
 /**
@@ -122,8 +156,10 @@ export async function syncClientToDrive(clientId: string, clientName: string): P
         const clientData = { id: clientDoc.id, ...clientDoc.data() } as Client;
         const clientDocument = clientData.document || 'SEM-CPF-CNPJ';
 
+        const rootClientsId = await getOrCreateRootFolder(drive, CLIENTS_ROOT_NAME);
+
         const mainFolderName = `${clientName} - ${clientDocument}`;
-        const mainFolderId = await ensureFolder(drive, ROOT_CLIENTS_FOLDER_ID, mainFolderName);
+        const mainFolderId = await ensureFolder(drive, rootClientsId, mainFolderName);
 
         for (const name of CLIENT_FOLDER_STRUCTURE) {
             await ensureFolder(drive, mainFolderId, name);
@@ -180,7 +216,9 @@ export async function syncProcessToDrive(processId: string): Promise<{ success: 
             await ensureFolder(drive, physicalProcessFolderId, name);
         }
 
-        const areaFolderId = await ensureFolder(drive, ROOT_PROCESSES_FOLDER_ID, processData.legalArea);
+        const rootProcessesId = await getOrCreateRootFolder(drive, PROCESSES_ROOT_NAME);
+        const areaFolderId = await ensureFolder(drive, rootProcessesId, processData.legalArea);
+        
         let shortcutId = await findItemByName(drive, areaFolderId, processFolderName, 'application/vnd.google-apps.shortcut');
         
         if (!shortcutId) {

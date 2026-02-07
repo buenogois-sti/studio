@@ -105,13 +105,17 @@ export async function draftDocument(
         const processData = processDoc.data() as Process;
 
         // Garante estrutura do Drive
-        await syncProcessToDrive(processId);
+        const syncResult = await syncProcessToDrive(processId);
+        if (!syncResult.success) {
+            throw new Error(`Falha ao organizar pastas do processo: ${syncResult.error}`);
+        }
+
         const { drive, docs } = apiClients;
         
         // Re-fetch para pegar driveFolderId atualizado
         const updatedProcess = await firestoreAdmin.collection('processes').doc(processId).get();
         const physicalFolderId = updatedProcess.data()?.driveFolderId;
-        if (!physicalFolderId) throw new Error("Pasta do processo não disponível.");
+        if (!physicalFolderId) throw new Error("Pasta do processo não disponível no Drive.");
 
         // Define subpasta baseada em heurística de categoria
         const categoryMap: Record<string, string> = {
@@ -139,10 +143,13 @@ export async function draftDocument(
 
         const cleanTemplateId = extractFileId(templateId);
         const newFileName = `${documentName} - ${processData.name}`;
+        
+        // Copiar o modelo para a pasta do processo
         const copiedFile = await copyFile(cleanTemplateId, newFileName, targetFolderId);
 
-        if (!copiedFile.id) throw new Error("Falha ao criar arquivo no Drive.");
+        if (!copiedFile.id) throw new Error("Falha ao criar cópia do modelo no Google Drive.");
 
+        // Preparar dados para substituição
         const clientAddr = clientData.address ? `${clientData.address.street || ''}, nº ${clientData.address.number || 'S/N'}, ${clientData.address.neighborhood || ''}, ${clientData.address.city || ''}/${clientData.address.state || ''}` : '---';
         const staffAddr = staffData?.address ? `${staffData.address.street || ''}, nº ${staffData.address.number || 'S/N'}, ${staffData.address.neighborhood || ''}, ${staffData.address.city || ''}/${staffData.address.state || ''}` : '---';
         const clientFull = `${clientData.firstName} ${clientData.lastName || ''}`.trim();
@@ -170,6 +177,7 @@ export async function draftDocument(
 
         await replacePlaceholdersInDoc(docs, copiedFile.id, dataMap);
 
+        // Registrar na linha do tempo
         await firestoreAdmin.collection('processes').doc(processId).update({
             timeline: FieldValue.arrayUnion({
                 id: uuidv4(),
@@ -183,7 +191,7 @@ export async function draftDocument(
 
         return { success: true, url: copiedFile.webViewLink! };
     } catch (error: any) {
-        console.error("[draftDocument] Error:", error);
-        return { success: false, error: error.message };
+        console.error("[draftDocument] Erro crítico:", error);
+        return { success: false, error: error.message || "Erro desconhecido ao gerar rascunho." };
     }
 }
