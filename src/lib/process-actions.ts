@@ -31,7 +31,7 @@ async function ensureSubfolder(drive: any, parentId: string, folderName: string)
     return folder.data.id;
 }
 
-async function replacePlaceholdersInDoc(docsApi: any, fileId: string, dataMap: Record<string, string>) {
+async function replacePlaceholdersInDoc(docsApi: any, fileId: string, dataMap: Record<string, string>, boldKeys: string[] = []) {
     const requests = Object.entries(dataMap).map(([key, value]) => ({
         replaceAllText: {
             containsText: { text: `{{${key}}}`, matchCase: true },
@@ -51,6 +51,46 @@ async function replacePlaceholdersInDoc(docsApi: any, fileId: string, dataMap: R
     } catch (error: any) {
         console.error('[DocsAutomation] Erro crítico no Google Docs batchUpdate:', error.message);
         throw new Error(`Falha técnica na edição do rascunho: Certifique-se de que a "Google Docs API" está ATIVADA no Console do Google Cloud. Erro: ${error.message}`);
+    }
+}
+
+async function applyBoldToTexts(docsApi: any, fileId: string, texts: string[]) {
+    if (!texts || texts.length === 0) return;
+    try {
+        const doc = await docsApi.documents.get({ documentId: fileId });
+        const content = doc.data.body?.content || [];
+        const requests: any[] = [];
+
+        for (const structuralElement of content) {
+            const paragraph = structuralElement.paragraph;
+            if (!paragraph) continue;
+            for (const elem of paragraph.elements || []) {
+                const textRun = elem.textRun;
+                if (!textRun || !elem.startIndex) continue;
+                const txt = textRun.content || '';
+                for (const target of texts) {
+                    if (!target) continue;
+                    let idx = txt.indexOf(target);
+                    while (idx !== -1) {
+                        const start = elem.startIndex + idx;
+                        const end = start + target.length;
+                        requests.push({
+                            updateTextStyle: {
+                                range: { startIndex: start, endIndex: end },
+                                textStyle: { bold: true },
+                                fields: 'bold'
+                            }
+                        });
+                        idx = txt.indexOf(target, idx + target.length);
+                    }
+                }
+            }
+        }
+
+        if (requests.length === 0) return;
+        await docsApi.documents.batchUpdate({ documentId: fileId, requestBody: { requests } });
+    } catch (err: any) {
+        console.error('[DocsAutomation] Erro aplicando negrito:', err?.message || err);
     }
 }
 
@@ -199,7 +239,14 @@ export async function draftDocument(
             'DATA_HOJE': format(new Date(), "dd/MM/yyyy"),
         };
 
-        await replacePlaceholdersInDoc(docs, copiedFile.id, dataMap);
+        // Substitui placeholders e aplica negrito em partes importantes (ex.: nome do cliente / advogado)
+        const boldKeys = ['CLIENTE_NOME_COMPLETO'];
+        if (staffData) boldKeys.push('ADVOGADO_LIDER_NOME');
+        await replacePlaceholdersInDoc(docs, copiedFile.id, dataMap, boldKeys);
+
+        // Após a substituição, aplica o estilo de negrito nos textos reais correspondentes
+        const boldTexts = boldKeys.map(k => dataMap[k as keyof typeof dataMap]).filter(Boolean);
+        await applyBoldToTexts(docs, copiedFile.id, boldTexts as string[]);
 
         await firestoreAdmin.collection('processes').doc(processId).update({
             timeline: FieldValue.arrayUnion({
