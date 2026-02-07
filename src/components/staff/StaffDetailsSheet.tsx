@@ -42,8 +42,8 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { Badge } from '../ui/badge';
-import { useFirebase, useCollection, useMemoFirebase, useDoc } from '@/firebase';
-import { collection, query, orderBy, limit, where, doc } from 'firebase/firestore';
+import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
+import { collection, query, orderBy, limit, where } from 'firebase/firestore';
 import { Skeleton } from '../ui/skeleton';
 
 interface StaffDetailsSheetProps {
@@ -296,6 +296,21 @@ export function StaffDetailsSheet({ staff, processes, open, onOpenChange }: Staf
                       <InfoRow icon={AtSign} label="E-mail" value={staff.email} actionType="email" className="col-span-full" />
                       <InfoRow icon={Smartphone} label="WhatsApp" value={staff.whatsapp} actionType="whatsapp" />
                       <InfoRow icon={Phone} label="Telefone" value={staff.phone} actionType="phone" />
+                  </div>
+                </section>
+
+                <section>
+                  <div className="flex items-center gap-2 mb-4">
+                      <div className="h-8 w-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                          <CreditCard className="h-4 w-4 text-emerald-500" />
+                      </div>
+                      <h3 className="font-black text-xs uppercase tracking-widest text-muted-foreground">Dados Bancários para Repasse</h3>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 bg-white/5 p-6 rounded-2xl border border-white/10">
+                      <InfoRow icon={CreditCard} label="Banco" value={staff.bankInfo?.bankName} actionType="copy" />
+                      <InfoRow icon={Hash} label="Agência" value={staff.bankInfo?.agency} actionType="copy" />
+                      <InfoRow icon={Hash} label="Conta" value={staff.bankInfo?.account} actionType="copy" />
+                      <InfoRow icon={Smartphone} label="Chave PIX" value={staff.bankInfo?.pixKey} actionType="copy" className="col-span-full" />
                   </div>
                 </section>
               </TabsContent>
