@@ -1,39 +1,28 @@
 'use server';
 import { firestoreAdmin } from '@/firebase/admin';
-import type { Process } from './types';
+import type { Process, DocumentTemplate, TimelineEvent } from './types';
 import type { firestore as adminFirestore } from 'firebase-admin';
-import { copyFile } from './drive-actions';
-import { syncProcessToDrive } from './drive';
+import { copyFile, createFolder } from './drive-actions';
+import { syncProcessToDrive, getGoogleApiClientsForUser } from './drive';
 import { revalidatePath } from 'next/cache';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/options';
 import { createNotification } from './notification-actions';
 import { extractFileId } from './utils';
+import { Timestamp, FieldValue } from 'firebase-admin/firestore';
+import { v4 as uuidv4 } from 'uuid';
 
-// Helper simplificado para evitar N+1 durante buscas em lote
-async function serializeProcessBasic(doc: adminFirestore.DocumentSnapshot): Promise<Process | null> {
-    const data = doc.data();
-    const id = doc.id;
-    if (!data) return null;
-
-    return {
-        id,
-        clientId: data.clientId,
-        name: data.name || '',
-        processNumber: data.processNumber || '',
-        court: data.court || '',
-        courtBranch: data.courtBranch || '',
-        caseValue: data.caseValue || 0,
-        opposingParties: data.opposingParties || [],
-        description: data.description || '',
-        status: data.status || 'Ativo',
-        legalArea: data.legalArea || '',
-        responsibleStaffIds: data.responsibleStaffIds || [],
-        driveFolderId: data.driveFolderId,
-        timeline: data.timeline || [],
-        createdAt: data.createdAt,
-        updatedAt: data.updatedAt,
-    } as Process;
+/**
+ * Busca uma subpasta específica por nome dentro de uma pasta pai.
+ */
+async function findSubfolder(drive: any, parentId: string, folderName: string): Promise<string | null> {
+    const res = await drive.files.list({
+        q: `'${parentId}' in parents and name = '${folderName}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
+        fields: 'files(id)',
+        supportsAllDrives: true,
+        includeItemsFromAllDrives: true,
+    });
+    return res.data.files?.[0]?.id || null;
 }
 
 export async function searchProcesses(query: string): Promise<Process[]> {
@@ -44,8 +33,6 @@ export async function searchProcesses(query: string): Promise<Process[]> {
     }
     
     try {
-        // Otimização: Buscamos apenas os 200 processos mais recentes para filtrar em memória
-        // Isso evita o crash do navegador e reduz custos drásticos.
         const processesSnapshot = await firestoreAdmin.collection('processes')
             .orderBy('updatedAt', 'desc')
             .limit(200)
@@ -88,57 +75,97 @@ export async function archiveProcess(processId: string): Promise<{ success: bool
     }
 }
 
-export async function draftDocument(processId: string, templateInput: string, fileName: string): Promise<{ success: boolean; url?: string; error?: string }> {
+/**
+ * Gera um rascunho de documento a partir de um modelo, organizando-o na subpasta correta do processo.
+ */
+export async function draftDocument(
+    processId: string, 
+    templateId: string, 
+    documentName: string,
+    category: string
+): Promise<{ success: boolean; url?: string; error?: string }> {
     if (!firestoreAdmin) throw new Error("Servidor indisponível.");
     const session = await getServerSession(authOptions);
+    if (!session) throw new Error("Não autorizado.");
 
     try {
+        const { drive } = await getGoogleApiClientsForUser();
         const processRef = firestoreAdmin.collection('processes').doc(processId);
         const processDoc = await processRef.get();
         if (!processDoc.exists) throw new Error("Processo não encontrado.");
         
         const processData = processDoc.data() as Process;
 
+        // 1. Garante que o processo tenha pasta no Drive
         if (!processData.driveFolderId) {
             await syncProcessToDrive(processId);
             const updatedDoc = await processRef.get();
-            const updatedData = updatedDoc.data() as Process;
-            if (!updatedData.driveFolderId) throw new Error("Falha ao sincronizar pasta do processo no Drive.");
-            processData.driveFolderId = updatedData.driveFolderId;
+            processData.driveFolderId = (updatedDoc.data() as Process).driveFolderId;
         }
 
-        // Sanitiza o ID do modelo (aceita link ou ID direto)
-        const templateFileId = extractFileId(templateInput);
-        if (!templateFileId) throw new Error("ID do modelo inválido ou não informado.");
+        if (!processData.driveFolderId) throw new Error("Não foi possível localizar a pasta do processo.");
 
-        const newFileName = `${fileName} - ${processData.name}`;
+        // 2. Define a subpasta de destino baseada na categoria do modelo
+        let targetFolderName = '01 - Petições'; // Default
+        if (category.toLowerCase().includes('procuração') || category.toLowerCase().includes('contrato')) {
+            // Em processos, procurações costumam ir em Petições ou pasta de Entrada. 
+            // Mas no Bueno Gois, seguimos a estrutura do Drive.
+            targetFolderName = '01 - Petições';
+        } else if (category.toLowerCase().includes('ata') || category.toLowerCase().includes('audiência')) {
+            targetFolderName = '04 - Atas e Audiências';
+        } else if (category.toLowerCase().includes('recurso')) {
+            targetFolderName = '03 - Recursos';
+        }
+
+        let targetFolderId = await findSubfolder(drive, processData.driveFolderId, targetFolderName);
         
-        try {
-            const copiedFile = await copyFile(templateFileId, newFileName, processData.driveFolderId);
-
-            if (session?.user?.id) {
-              await createNotification({
-                userId: session.user.id,
-                title: "Rascunho Gerado",
-                description: `O documento "${fileName}" foi criado para o processo ${processData.name}.`,
-                type: 'success',
-                href: copiedFile.webViewLink || '#'
-              });
-            }
-
-            return { 
-                success: true, 
-                url: copiedFile.webViewLink || undefined 
-            };
-        } catch (copyErr: any) {
-            // Se o erro for 404, damos uma instrução clara sobre compartilhamento
-            if (copyErr.message.includes('File not found')) {
-                throw new Error(`Arquivo não encontrado ou sem permissão. Certifique-se de compartilhar o modelo com o e-mail: studio-7080106838-23904@studio-7080106838-23904.iam.gserviceaccount.com`);
-            }
-            throw copyErr;
+        // Se a pasta não existir por algum motivo, cria agora
+        if (!targetFolderId) {
+            const folder = await createFolder(processData.driveFolderId, targetFolderName);
+            targetFolderId = folder.id!;
         }
+
+        // 3. Sanitiza o ID do modelo
+        const cleanTemplateId = extractFileId(templateId);
+        if (!cleanTemplateId) throw new Error("ID do modelo inválido.");
+
+        // 4. Copia o arquivo para a subpasta
+        const newFileName = `${documentName} - ${processData.name}`;
+        const copiedFile = await copyFile(cleanTemplateId, newFileName, targetFolderId);
+
+        // 5. Registra na timeline do processo
+        const timelineEvent: TimelineEvent = {
+            id: uuidv4(),
+            type: 'petition',
+            description: `DOCUMENTO GERADO: Rascunho de "${documentName}" criado na pasta "${targetFolderName}".`,
+            date: Timestamp.now() as any,
+            authorName: session.user.name || 'Sistema'
+        };
+
+        await processRef.update({
+            timeline: FieldValue.arrayUnion(timelineEvent),
+            updatedAt: FieldValue.serverTimestamp()
+        });
+
+        // 6. Notifica o usuário
+        await createNotification({
+            userId: session.user.id,
+            title: "Rascunho Pronto",
+            description: `O documento "${documentName}" foi gerado e está pronto para edição.`,
+            type: 'success',
+            href: copiedFile.webViewLink || '#'
+        });
+
+        return { 
+            success: true, 
+            url: copiedFile.webViewLink || undefined 
+        };
+
     } catch (error: any) {
         console.error("Error drafting document:", error);
-        return { success: false, error: error.message };
+        if (error.message.includes('File not found')) {
+            throw new Error(`Modelo não encontrado. Certifique-se de compartilhar o arquivo original com o e-mail: studio-7080106838-23904@studio-7080106838-23904.iam.gserviceaccount.com`);
+        }
+        return { success: false, error: error.message || 'Erro interno ao gerar rascunho.' };
     }
 }
