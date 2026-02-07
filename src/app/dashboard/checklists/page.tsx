@@ -25,7 +25,8 @@ import {
   AlertTriangle,
   MessageSquare,
   FolderKanban,
-  ExternalLink
+  ExternalLink,
+  Calculator
 } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy, limit, Timestamp } from 'firebase/firestore';
@@ -88,7 +89,9 @@ export default function ChecklistsPage() {
   const [searchTerm, setSearchTerm] = React.useState('');
   const [isEditorOpen, setIsEditorOpen] = React.useState(false);
   const [isExecutorOpen, setIsExecutorOpen] = React.useState(false);
+  const [isDetailsOpen, setIsDetailsOpen] = React.useState(false);
   const [selectedTemplate, setSelectedTemplate] = React.useState<ChecklistTemplate | null>(null);
+  const [selectedExecution, setSelectedExecution] = React.useState<ChecklistExecution | null>(null);
   
   const isAdmin = session?.user?.role === 'admin';
 
@@ -123,7 +126,7 @@ export default function ChecklistsPage() {
         </div>
         <div className="flex items-center gap-3">
           {isAdmin && (
-            <Button onClick={() => { setSelectedTemplate(null); setIsEditorOpen(true); }} className="bg-primary text-primary-foreground font-bold h-10 px-6">
+            <Button onClick={() => { setSelectedTemplate(null); setIsEditorOpen(true); }} className="bg-primary text-primary-foreground font-black h-10 px-6">
               <Plus className="mr-2 h-4 w-4" /> Novo Modelo
             </Button>
           )}
@@ -251,7 +254,17 @@ export default function ChecklistsPage() {
                       <Badge className="bg-emerald-500/20 text-emerald-400 border-none text-[9px] font-black tracking-widest px-2 h-6">CONCLUÍDO</Badge>
                     </TableCell>
                     <TableCell className="text-right px-6">
-                      <Button variant="ghost" size="icon" className="text-white/30 hover:text-white rounded-full bg-white/5 h-8 w-8"><Info className="h-4 w-4" /></Button>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="text-white/30 hover:text-primary hover:bg-primary/10 rounded-full h-8 w-8 transition-colors"
+                        onClick={() => {
+                          setSelectedExecution(exec);
+                          setIsDetailsOpen(true);
+                        }}
+                      >
+                        <Info className="h-4 w-4" />
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -274,6 +287,13 @@ export default function ChecklistsPage() {
         open={isExecutorOpen} 
         onOpenChange={setIsExecutorOpen} 
         template={selectedTemplate}
+      />
+
+      <ChecklistDetailsDialog
+        open={isDetailsOpen}
+        onOpenChange={setIsDetailsOpen}
+        execution={selectedExecution}
+        templates={templates || []}
       />
     </div>
   );
@@ -716,6 +736,143 @@ function ChecklistExecutorDialog({ open, onOpenChange, template }: { open: boole
             {isSaving ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <CheckCircle2 className="mr-2 h-5 w-5" />}
             Finalizar e Transmitir Relatório
           </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ChecklistDetailsDialog({ 
+  open, 
+  onOpenChange, 
+  execution, 
+  templates 
+}: { 
+  open: boolean; 
+  onOpenChange: (o: boolean) => void; 
+  execution: ChecklistExecution | null;
+  templates: ChecklistTemplate[];
+}) {
+  if (!execution) return null;
+
+  const template = templates.find(t => t.id === execution.templateId);
+  const items = template?.items || [];
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-3xl bg-[#020617] border-white/10 text-white max-h-[90vh] flex flex-col p-0 shadow-2xl">
+        <DialogHeader className="p-6 border-b border-white/5 bg-primary/5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="h-14 w-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0 shadow-inner">
+                <CheckCircle2 className="h-7 w-7 text-emerald-500" />
+              </div>
+              <div>
+                <DialogTitle className="text-xl font-black font-headline text-white leading-tight">Relatório de Execução</DialogTitle>
+                <DialogDescription className="text-slate-400 mt-1">{execution.templateTitle}</DialogDescription>
+              </div>
+            </div>
+            <Button variant="outline" size="icon" onClick={() => window.print()} className="h-10 w-10 border-white/10">
+              <Printer className="h-4 w-4" />
+            </Button>
+          </div>
+        </DialogHeader>
+
+        <ScrollArea className="flex-1 p-6">
+          <div className="space-y-10 pb-10" id="checklist-print-area">
+            {/* Metadados da Execução */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-1">
+                <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Responsável</Label>
+                <p className="text-sm font-bold text-white flex items-center gap-2">
+                  <User className="h-3.5 w-3.5 text-primary" /> {execution.userName}
+                </p>
+              </div>
+              <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-1">
+                <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Data e Hora</Label>
+                <p className="text-sm font-bold text-white flex items-center gap-2">
+                  <Clock className="h-3.5 w-3.5 text-primary" /> {format(execution.executedAt.toDate(), 'dd/MM/yyyy HH:mm')}
+                </p>
+              </div>
+              {execution.processName && (
+                <div className="p-4 rounded-2xl bg-primary/5 border border-primary/20 space-y-1 col-span-full">
+                  <Label className="text-[10px] font-black uppercase text-primary tracking-widest">Vínculo Processual</Label>
+                  <p className="text-sm font-black text-white flex items-center gap-2">
+                    <FolderKanban className="h-4 w-4 text-primary" /> {execution.processName}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <Separator className="bg-white/5" />
+
+            {/* Respostas Detalhadas */}
+            <div className="space-y-6">
+              <h3 className="text-sm font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                <ListChecks className="h-4 w-4 text-primary" /> Verificações Realizadas
+              </h3>
+              
+              <div className="grid gap-4">
+                {items.length > 0 ? items.map((item, idx) => {
+                  const answer = execution.answers[item.id];
+                  return (
+                    <div key={item.id} className="p-5 rounded-2xl bg-black/40 border border-white/5 flex gap-5 items-start">
+                      <div className="h-8 w-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-[10px] font-black text-slate-500 shrink-0">
+                        {idx + 1}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-slate-300 mb-3">{item.label}</p>
+                        
+                        <div className="flex items-center gap-3">
+                          {item.type === 'YES_NO' || item.type === 'YES_NO_MAYBE' ? (
+                            <Badge className={cn(
+                              "text-[10px] font-black uppercase tracking-widest px-3 h-7 border-none",
+                              answer === 'SIM' ? "bg-emerald-500/20 text-emerald-400" :
+                              answer === 'NAO' ? "bg-rose-500/20 text-rose-400" :
+                              "bg-amber-500/20 text-amber-400"
+                            )}>
+                              {answer || 'NÃO RESPONDIDO'}
+                            </Badge>
+                          ) : item.type === 'NUMBER' ? (
+                            <div className="flex items-center gap-2 bg-blue-500/10 border border-blue-500/20 px-3 py-1.5 rounded-xl">
+                              <Calculator className="h-3 w-3 text-blue-400" />
+                              <span className="text-sm font-black text-white">{answer}</span>
+                            </div>
+                          ) : (
+                            <div className="w-full p-4 rounded-xl bg-white/5 border border-white/10 text-sm text-slate-200 leading-relaxed italic">
+                              "{answer || 'Nenhuma resposta inserida.'}"
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }) : (
+                  <div className="py-10 text-center border-2 border-dashed border-white/5 rounded-3xl opacity-30">
+                    <p className="text-xs font-bold uppercase">A estrutura deste checklist não está mais disponível.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {execution.observations && (
+              <>
+                <Separator className="bg-white/5" />
+                <div className="space-y-3">
+                  <h3 className="text-sm font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                    <MessageSquare className="h-4 w-4 text-primary" /> Observações do Relatório
+                  </h3>
+                  <div className="p-6 rounded-2xl bg-white/5 border border-white/10 text-sm text-slate-200 leading-relaxed italic">
+                    {execution.observations}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </ScrollArea>
+
+        <DialogFooter className="p-6 border-t border-white/5 bg-white/5">
+          <DialogClose asChild><Button variant="ghost" className="w-full text-slate-400 font-bold uppercase text-[10px] tracking-widest">Fechar Relatório</Button></DialogClose>
         </DialogFooter>
       </DialogContent>
     </Dialog>
