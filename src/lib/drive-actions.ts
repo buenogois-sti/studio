@@ -3,6 +3,9 @@
 import { drive_v3 } from 'googleapis';
 import { getGoogleApiClientsForUser } from './drive';
 
+/**
+ * Lista arquivos de uma pasta, incluindo suporte a Drives Compartilhados.
+ */
 export async function listFiles(folderId: string): Promise<drive_v3.Schema$File[]> {
     try {
         const { drive } = await getGoogleApiClientsForUser();
@@ -11,14 +14,18 @@ export async function listFiles(folderId: string): Promise<drive_v3.Schema$File[
             fields: 'files(id, name, mimeType, webViewLink, iconLink, createdTime)',
             supportsAllDrives: true,
             includeItemsFromAllDrives: true,
+            orderBy: 'folder,name',
         });
         return res.data.files || [];
     } catch (error: any) {
-        console.error('Error listing files from Google Drive:', error);
-        throw new Error(error.message || 'Ocorreu um erro desconhecido ao listar os arquivos do Google Drive.');
+        console.error('[DriveAction] Erro ao listar arquivos:', error.message);
+        throw new Error('Não foi possível carregar os arquivos do Drive.');
     }
 }
 
+/**
+ * Faz upload de um arquivo Base64 para uma pasta específica.
+ */
 export async function uploadFile(
     folderId: string,
     fileName: string,
@@ -36,6 +43,7 @@ export async function uploadFile(
             name: fileName,
             parents: [folderId],
         };
+        
         const file = await drive.files.create({
             requestBody: fileMetadata,
             media: media,
@@ -43,18 +51,18 @@ export async function uploadFile(
             supportsAllDrives: true,
         });
         
-        if (!file.data) {
-            throw new Error('A API do Google não retornou dados do arquivo após o upload.');
-        }
+        if (!file.data) throw new Error('A API não retornou dados após o upload.');
 
         return file.data;
     } catch (error: any) {
-        console.error('Error uploading file to Google Drive:', error);
-        throw new Error(error.message || 'Ocorreu um erro desconhecido ao fazer upload do arquivo para o Google Drive.');
+        console.error('[DriveAction] Erro no upload:', error.message);
+        throw new Error(`Falha ao enviar arquivo: ${error.message}`);
     }
 }
 
-
+/**
+ * Exclui um arquivo permanentemente.
+ */
 export async function deleteFile(fileId: string): Promise<void> {
     try {
         const { drive } = await getGoogleApiClientsForUser();
@@ -63,42 +71,41 @@ export async function deleteFile(fileId: string): Promise<void> {
             supportsAllDrives: true,
         });
     } catch (error: any) {
-        console.error('Error deleting file from Google Drive:', error);
-        throw new Error(error.message || 'Ocorreu um erro desconhecido ao excluir o arquivo do Google Drive.');
+        console.error('[DriveAction] Erro ao excluir:', error.message);
+        throw new Error('Não foi possível remover o item do Drive.');
     }
 }
 
-
+/**
+ * Renomeia um arquivo ou pasta.
+ */
 export async function renameFile(fileId: string, newName: string): Promise<drive_v3.Schema$File> {
-    if (!newName) {
-        throw new Error('O novo nome não pode ser vazio.');
-    }
+    if (!newName) throw new Error('O novo nome é obrigatório.');
+    
     try {
         const { drive } = await getGoogleApiClientsForUser();
         const response = await drive.files.update({
             fileId: fileId,
-            requestBody: {
-                name: newName,
-            },
+            requestBody: { name: newName },
             fields: 'id, name, mimeType, webViewLink, iconLink, createdTime',
             supportsAllDrives: true,
         });
         
-        if (!response.data) {
-             throw new Error('A API do Google não retornou dados do arquivo após a renomeação.');
-        }
+        if (!response.data) throw new Error('Falha na resposta da API de renomeação.');
 
         return response.data;
     } catch (error: any) {
-        console.error('Error renaming file in Google Drive:', error);
-        throw new Error(error.message || 'Ocorreu um erro desconhecido ao renomear o arquivo.');
+        console.error('[DriveAction] Erro ao renomear:', error.message);
+        throw new Error('Erro ao atualizar o nome do item no Drive.');
     }
 }
 
+/**
+ * Cria uma nova pasta.
+ */
 export async function createFolder(parentId: string, folderName: string): Promise<drive_v3.Schema$File> {
-    if (!folderName) {
-        throw new Error('O nome da pasta não pode ser vazio.');
-    }
+    if (!folderName) throw new Error('O nome da pasta é obrigatório.');
+    
     try {
         const { drive } = await getGoogleApiClientsForUser();
         const fileMetadata = {
@@ -108,21 +115,22 @@ export async function createFolder(parentId: string, folderName: string): Promis
         };
         const file = await drive.files.create({
             requestBody: fileMetadata,
-            fields: 'id, name, mimeType, webViewLink, iconLink, createdTime',
+            fields: 'id, name, mimeType, webViewLink, createdTime',
             supportsAllDrives: true,
         });
 
-        if (!file.data) {
-            throw new Error('A API do Google não retornou dados da pasta após a criação.');
-        }
+        if (!file.data) throw new Error('Falha na criação da pasta.');
 
         return file.data;
     } catch (error: any) {
-        console.error('Error creating folder in Google Drive:', error);
-        throw new Error(error.message || 'Ocorreu um erro desconhecido ao criar a pasta no Google Drive.');
+        console.error('[DriveAction] Erro ao criar pasta:', error.message);
+        throw new Error('Erro ao criar pasta no Drive.');
     }
 }
 
+/**
+ * Copia um arquivo para um novo local (usado na geração de rascunhos).
+ */
 export async function copyFile(fileId: string, name: string, parentId: string): Promise<drive_v3.Schema$File> {
     try {
         const { drive } = await getGoogleApiClientsForUser();
@@ -135,9 +143,12 @@ export async function copyFile(fileId: string, name: string, parentId: string): 
             fields: 'id, name, webViewLink',
             supportsAllDrives: true,
         });
+        
+        if (!res.data) throw new Error('A API não retornou dados da cópia.');
+        
         return res.data;
     } catch (error: any) {
-        console.error('Error copying file in Drive:', error);
-        throw new Error(error.message || 'Erro ao copiar arquivo no Drive.');
+        console.error('[DriveAction] Erro ao copiar arquivo:', error.message);
+        throw new Error(`Falha ao copiar modelo no Drive: ${error.message}`);
     }
 }
