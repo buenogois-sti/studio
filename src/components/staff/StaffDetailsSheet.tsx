@@ -174,7 +174,7 @@ export function StaffDetailsSheet({ staff, processes, open, onOpenChange }: Staf
             </div>
             <div className="flex-1">
                 {href ? (
-                    <a href={href} target={actionType === 'whatsapp' ? '_blank' : undefined}>
+                    <a href={href} target={actionType === 'whatsapp' ? '_blank' : undefined} className="flex-1">
                         <div className="flex flex-col text-left">
                             <span className="text-[10px] uppercase font-black text-muted-foreground leading-none mb-1 tracking-widest">{label}</span>
                             <span className={cn("text-sm font-medium break-all", !value && "text-muted-foreground italic font-normal", isInteractive && "group-hover:text-primary transition-colors")}>
@@ -223,7 +223,7 @@ export function StaffDetailsSheet({ staff, processes, open, onOpenChange }: Staf
           <div className="px-6 bg-white/5 border-b border-white/5 shrink-0">
             <TabsList className="bg-transparent gap-6 h-12 p-0">
               <TabsTrigger value="profile" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent text-slate-400 data-[state=active]:text-white font-bold h-full px-0">Ficha do Membro</TabsTrigger>
-              <TabsTrigger value="financial" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent text-slate-400 data-[state=active]:text-white font-bold h-full px-0">Histórico Financeiro</TabsTrigger>
+              <TabsTrigger value="financial" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent text-slate-400 data-[state=active]:text-white font-bold h-full px-0">Carteira Profissional</TabsTrigger>
               <TabsTrigger value="activity" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent text-slate-400 data-[state=active]:text-white font-bold h-full px-0">Monitor de Atividade</TabsTrigger>
             </TabsList>
           </div>
@@ -307,19 +307,22 @@ export function StaffDetailsSheet({ staff, processes, open, onOpenChange }: Staf
                     <p className="text-lg font-black text-white tabular-nums">{financialSummary.paid.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
                   </div>
                   <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-center">
-                    <p className="text-[9px] font-black uppercase text-amber-500 tracking-widest mb-1">Disponível</p>
+                    <p className="text-[9px] font-black uppercase text-amber-500 tracking-widest mb-1">Liberado</p>
                     <p className="text-lg font-black text-white tabular-nums">{financialSummary.available.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
                   </div>
                   <div className="p-4 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-center">
-                    <p className="text-[9px] font-black uppercase text-blue-500 tracking-widest mb-1">Retido</p>
+                    <p className="text-[9px] font-black uppercase text-blue-500 tracking-widest mb-1">Retido (Processos)</p>
                     <p className="text-lg font-black text-white tabular-nums">{financialSummary.retained.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
                   </div>
                 </div>
 
                 <div className="space-y-6">
-                  <div className="flex items-center gap-2">
-                    <History className="h-4 w-4 text-primary" />
-                    <h3 className="font-black text-xs uppercase tracking-widest text-muted-foreground">Extrato Consolidado</h3>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <History className="h-4 w-4 text-primary" />
+                      <h3 className="font-black text-xs uppercase tracking-widest text-muted-foreground">Extrato de Créditos</h3>
+                    </div>
+                    <Badge variant="outline" className="text-[10px] font-bold">Consolidado</Badge>
                   </div>
                   
                   {isLoadingCredits || isLoadingReimbursements ? (
@@ -361,6 +364,11 @@ export function StaffDetailsSheet({ staff, processes, open, onOpenChange }: Staf
                                 {credit.status}
                               </Badge>
                               <span className="text-[10px] text-muted-foreground font-bold">{format(credit.date.toDate(), 'dd/MM/yyyy')}</span>
+                              {credit.paymentForecast && (
+                                <Badge variant="secondary" className="text-[8px] font-black uppercase bg-primary/10 text-primary border-primary/20 gap-1">
+                                  <Clock className="h-2.5 w-2.5" /> Previsto: {format(credit.paymentForecast.toDate(), 'dd/MM/yyyy')}
+                                </Badge>
+                              )}
                             </div>
                             <p className="text-sm font-bold text-slate-200 truncate">{credit.description}</p>
                           </div>

@@ -267,6 +267,7 @@ export type StaffCredit = {
   financialEventId?: string;
   reimbursementId?: string;
   paymentDate?: Timestamp;
+  paymentForecast?: Timestamp;
   paidBy?: string;
   authorName?: string;
   monthKey?: string;

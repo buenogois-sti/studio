@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -30,11 +29,12 @@ import {
   Info,
   Check,
   AlertTriangle,
-  RefreshCw
+  RefreshCw,
+  CalendarDays
 } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, where, getDocs, getDoc, FieldValue, Timestamp, doc, deleteDoc, orderBy, limit } from 'firebase/firestore';
-import type { Staff, FinancialTitle, StaffCredit } from '@/lib/types';
+import type { Staff, FinancialTitle, StaffCredit, UserProfile } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -45,7 +45,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
 import { H1 } from '@/components/ui/typography';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { processRepasse, launchPayroll, deleteStaffCredit, updateStaffCredit, addManualStaffCredit } from '@/lib/finance-actions';
+import { processRepasse, launchPayroll, deleteStaffCredit, updateStaffCredit, addManualStaffCredit, updateCreditForecast } from '@/lib/finance-actions';
 import {
   Dialog,
   DialogContent,
@@ -78,6 +78,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useSession } from 'next-auth/react';
 
 const roleLabels: Record<string, string> = {
   lawyer: 'Advogado',
@@ -243,7 +244,17 @@ function PaymentHistory({ onShowVoucher }: { onShowVoucher: (t: FinancialTitle) 
   );
 }
 
-function PayoutList({ filterRole, onRefresh, onPaid }: { filterRole?: string; onRefresh?: () => void; onPaid: (total: number, credits: any[], staff: Staff) => void }) {
+function PayoutList({ 
+  filterRole, 
+  onRefresh, 
+  onPaid,
+  isAdmin 
+}: { 
+  filterRole?: string; 
+  onRefresh?: () => void; 
+  onPaid: (total: number, credits: any[], staff: Staff) => void;
+  isAdmin: boolean;
+}) {
   const { firestore } = useFirebase();
   const [selectedStaff, setSelectedStaff] = React.useState<Staff | null>(null);
   const [staffCredits, setStaffCredits] = React.useState<any[]>([]);
@@ -299,17 +310,19 @@ function PayoutList({ filterRole, onRefresh, onPaid }: { filterRole?: string; on
                 <TableCell><Badge variant="outline" className="text-[10px] uppercase border-white/10 text-slate-400">{roleLabels[member.role] || member.role}</Badge></TableCell>
                 <TableCell className="text-right"><RepasseValue staffId={member.id} /></TableCell>
                 <TableCell className="text-right"><div className="flex justify-end gap-2">
-                  <Button variant="ghost" size="sm" className="h-8 text-[10px] font-black uppercase text-blue-400 hover:bg-blue-500/10" onClick={() => handleOpenManage(member)}>Gerenciar</Button>
-                  <Button variant="ghost" size="sm" className="h-8 text-[10px] font-black uppercase text-emerald-400 hover:bg-emerald-500/10" onClick={() => handleOpenRepasse(member)} disabled={isCheckingCredits === member.id}>
-                    {isCheckingCredits === member.id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Quitar Saldo'}
-                  </Button>
+                  <Button variant="ghost" size="sm" className="h-8 text-[10px] font-black uppercase text-blue-400 hover:bg-blue-500/10" onClick={() => handleOpenManage(member)}>Ver Carteira</Button>
+                  {isAdmin && (
+                    <Button variant="ghost" size="sm" className="h-8 text-[10px] font-black uppercase text-emerald-400 hover:bg-emerald-500/10" onClick={() => handleOpenRepasse(member)} disabled={isCheckingCredits === member.id}>
+                      {isCheckingCredits === member.id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Quitar Saldo'}
+                    </Button>
+                  )}
                 </div></TableCell>
               </TableRow>
             ))}</TableBody>
         </Table>
       </Card>
       <RepassePaymentDialog staff={selectedStaff} credits={staffCredits} open={isRepasseOpen} onOpenChange={setIsRepasseOpen} onPaid={(total, credits) => { setIsRepasseOpen(false); if (selectedStaff) onPaid(total, credits, selectedStaff); onRefresh?.(); }} />
-      <ManageCreditsDialog staff={selectedStaff} open={isManageOpen} onOpenChange={setIsManageOpen} onUpdate={() => onRefresh?.()} />
+      <ManageCreditsDialog staff={selectedStaff} open={isManageOpen} onOpenChange={setIsManageOpen} onUpdate={() => onRefresh?.()} isAdmin={isAdmin} />
     </div>
   );
 }
@@ -351,26 +364,43 @@ function RepassePaymentDialog({ staff, credits, open, onOpenChange, onPaid }: { 
   );
 }
 
-function ManageCreditsDialog({ staff, open, onOpenChange, onUpdate }: { staff: Staff | null; open: boolean; onOpenChange: (open: boolean) => void; onUpdate: () => void; }) {
+function ManageCreditsDialog({ staff, open, onOpenChange, onUpdate, isAdmin }: { staff: Staff | null; open: boolean; onOpenChange: (open: boolean) => void; onUpdate: () => void; isAdmin: boolean; }) {
   const { firestore } = useFirebase();
   const { toast } = useToast();
   const [filter, setFilter] = React.useState<'ALL' | 'DISPONIVEL' | 'RETIDO'>('ALL');
   const [isProcessing, setIsProcessing] = React.useState<string | null>(null);
-  const [isAdding, setIsAdding] = React.useState(false);
-  const [editingCredit, setEditingCredit] = React.useState<any | null>(null);
+  const [forecastDate, setForecastDate] = React.useState(format(new Date(), 'yyyy-MM-dd'));
+  const [isForecasting, setIsForecasting] = React.useState(false);
 
   const creditsQuery = useMemoFirebase(() => {
     if (!firestore || !staff) return null;
     return query(collection(firestore, `staff/${staff.id}/credits`), orderBy('date', 'desc'), limit(100));
   }, [firestore, staff?.id, open]);
 
-  const { data: credits, isLoading } = useCollection<any>(creditsQuery);
+  const { data: credits, isLoading } = useCollection<StaffCredit>(creditsQuery);
 
   const filteredCredits = React.useMemo(() => {
     if (!credits) return [];
     if (filter === 'ALL') return credits.filter(c => c.status !== 'PAGO');
     return credits.filter(c => c.status === filter);
   }, [credits, filter]);
+
+  const handleUpdateForecast = async () => {
+    if (!staff || isForecasting) return;
+    const availableIds = filteredCredits.filter(c => c.status === 'DISPONIVEL').map(c => c.id);
+    if (availableIds.length === 0) return;
+
+    setIsForecasting(true);
+    try {
+      await updateCreditForecast(staff.id, availableIds, forecastDate);
+      toast({ title: 'Previsão de pagamento atualizada!' });
+      onUpdate();
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Erro', description: e.message });
+    } finally {
+      setIsForecasting(false);
+    }
+  };
 
   const handleDelete = async (id: string) => {
     if (!staff || !confirm("Deseja realmente excluir este lançamento?")) return;
@@ -383,8 +413,75 @@ function ManageCreditsDialog({ staff, open, onOpenChange, onUpdate }: { staff: S
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-4xl bg-[#020617] border-white/10 p-0 overflow-hidden h-[85vh] flex flex-col">
-        <DialogHeader className="p-6 border-b border-white/5 bg-white/5"><div className="flex items-center justify-between"><div className="flex items-center gap-4"><div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-black text-lg">{staff.firstName.charAt(0)}{staff.lastName.charAt(0)}</div><div><DialogTitle className="text-xl font-black text-white">{staff.firstName} {staff.lastName}</DialogTitle><DialogDescription className="text-slate-400">Auditoria e gestão de lançamentos pendentes</DialogDescription></div></div><Button size="sm" onClick={() => setIsAdding(true)} className="gap-2" disabled={isLoading}><Plus className="h-4 w-4" /> Novo Lançamento</Button></div></DialogHeader>
-        <div className="flex-1 overflow-hidden flex flex-col"><div className="p-4 bg-black/20 flex items-center gap-2"><Button variant={filter === 'ALL' ? 'default' : 'ghost'} size="sm" onClick={() => setFilter('ALL')} className="text-[10px] uppercase font-black h-8">Todos Pendentes</Button><Button variant={filter === 'DISPONIVEL' ? 'default' : 'ghost'} size="sm" onClick={() => setFilter('DISPONIVEL')} className="text-[10px] uppercase font-black h-8 text-emerald-400">Disponíveis</Button><Button variant={filter === 'RETIDO' ? 'default' : 'ghost'} size="sm" onClick={() => setFilter('RETIDO')} className="text-[10px] uppercase font-black h-8 text-blue-400">Retidos</Button></div><ScrollArea className="flex-1"><div className="p-6">{isLoading ? (<div className="flex flex-col items-center justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>) : filteredCredits.length > 0 ? (<div className="space-y-3">{filteredCredits.map(c => (<div key={c.id} className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5 group hover:border-white/20 transition-all"><div className="flex-1 min-w-0 mr-4"><div className="flex items-center gap-2 mb-1"><Badge variant="outline" className={cn("text-[8px] font-black uppercase px-1.5 h-4 border-none", c.status === 'DISPONIVEL' ? "bg-emerald-500/20 text-emerald-400" : "bg-blue-500/20 text-blue-400")}>{c.status}</Badge><span className="text-[10px] text-muted-foreground font-medium">{c.date ? format(c.date.toDate(), 'dd/MM/yyyy') : 'N/A'}</span></div><p className="text-sm font-bold text-white truncate">{c.description}</p><p className="text-[10px] text-slate-500 uppercase font-bold">{c.type}</p></div><div className="flex items-center gap-6"><span className="text-sm font-black text-white tabular-nums">{c.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span><div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"><Button variant="ghost" size="icon" className="h-8 w-8 text-blue-400" onClick={() => setEditingCredit(c)} disabled={!!isProcessing}><Edit className="h-4 w-4" /></Button><Button variant="ghost" size="icon" className="h-8 w-8 text-rose-500" onClick={() => handleDelete(c.id)} disabled={isProcessing === c.id}>{isProcessing === c.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}</Button></div></div></div>))}</div>) : (<div className="text-center py-20 opacity-30"><FileText className="h-12 w-12 mx-auto mb-2" /><p className="text-sm font-bold uppercase">Nenhum lançamento encontrado</p></div>)}</div></ScrollArea></div>
+        <DialogHeader className="p-6 border-b border-white/5 bg-white/5"><div className="flex items-center justify-between"><div className="flex items-center gap-4"><div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-black text-lg">{staff.firstName.charAt(0)}{staff.lastName.charAt(0)}</div><div><DialogTitle className="text-xl font-black text-white">{staff.firstName} {staff.lastName}</DialogTitle><DialogDescription className="text-slate-400">Auditoria e gestão de carteira profissional</DialogDescription></div></div>{isAdmin && <Button size="sm" onClick={() => {}} className="gap-2" disabled={isLoading}><Plus className="h-4 w-4" /> Novo Lançamento</Button>}</div></DialogHeader>
+        
+        <div className="flex-1 overflow-hidden flex flex-col">
+          <div className="p-4 bg-black/20 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <Button variant={filter === 'ALL' ? 'default' : 'ghost'} size="sm" onClick={() => setFilter('ALL')} className="text-[10px] uppercase font-black h-8">Carteira Pendente</Button>
+              <Button variant={filter === 'DISPONIVEL' ? 'default' : 'ghost'} size="sm" onClick={() => setFilter('DISPONIVEL')} className="text-[10px] uppercase font-black h-8 text-emerald-400">Liberados</Button>
+              <Button variant={filter === 'RETIDO' ? 'default' : 'ghost'} size="sm" onClick={() => setFilter('RETIDO')} className="text-[10px] uppercase font-black h-8 text-blue-400">Aguardando Cliente</Button>
+            </div>
+
+            {isAdmin && filter === 'DISPONIVEL' && filteredCredits.length > 0 && (
+              <div className="flex items-center gap-3 bg-white/5 p-2 rounded-xl border border-white/10 animate-in fade-in zoom-in-95">
+                <span className="text-[9px] font-black uppercase text-slate-400 ml-2">Previsão:</span>
+                <Input 
+                  type="date" 
+                  value={forecastDate} 
+                  onChange={(e) => setForecastDate(e.target.value)}
+                  className="h-8 w-32 bg-black/40 border-white/10 text-xs"
+                />
+                <Button size="sm" variant="secondary" className="h-8 text-[10px] font-black uppercase px-4" onClick={handleUpdateForecast} disabled={isForecasting}>
+                  {isForecasting ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <CalendarDays className="h-3 w-3 mr-1" />}
+                  Atualizar Previsão
+                </Button>
+              </div>
+            )}
+          </div>
+
+          <ScrollArea className="flex-1">
+            <div className="p-6">
+              {isLoading ? (
+                <div className="flex flex-col items-center justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>
+              ) : filteredCredits.length > 0 ? (
+                <div className="space-y-3">
+                  {filteredCredits.map(c => (
+                    <div key={c.id} className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5 group hover:border-white/20 transition-all">
+                      <div className="flex-1 min-w-0 mr-4">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Badge variant="outline" className={cn(
+                            "text-[8px] font-black uppercase px-1.5 h-4 border-none",
+                            c.status === 'DISPONIVEL' ? "bg-emerald-500/20 text-emerald-400" : "bg-blue-500/20 text-blue-400"
+                          )}>{c.status}</Badge>
+                          <span className="text-[10px] text-muted-foreground font-medium">{c.date ? format(c.date.toDate(), 'dd/MM/yyyy') : 'N/A'}</span>
+                          {c.paymentForecast && (
+                            <Badge variant="secondary" className="text-[8px] font-black uppercase bg-primary/10 text-primary border-primary/20 gap-1">
+                              <Clock className="h-2.5 w-2.5" /> Pago em: {format(c.paymentForecast.toDate(), 'dd/MM/yyyy')}
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-sm font-bold text-white truncate">{c.description}</p>
+                        <p className="text-[10px] text-slate-500 uppercase font-bold">{c.type}</p>
+                      </div>
+                      <div className="flex items-center gap-6">
+                        <span className="text-sm font-black text-white tabular-nums">{c.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                        {isAdmin && (
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-400" onClick={() => {}} disabled={!!isProcessing}><Edit className="h-4 w-4" /></Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-500" onClick={() => handleDelete(c.id)} disabled={isProcessing === c.id}>{isProcessing === c.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}</Button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-20 opacity-30"><FileText className="h-12 w-12 mx-auto mb-2" /><p className="text-sm font-bold uppercase">Nenhum lançamento encontrado nesta categoria</p></div>
+              )}
+            </div>
+          </ScrollArea>
+        </div>
         <DialogFooter className="p-6 border-t border-white/5 bg-black/20"><DialogClose asChild><Button variant="ghost">Fechar Painel</Button></DialogClose></DialogFooter>
       </DialogContent>
     </Dialog>
@@ -393,6 +490,7 @@ function ManageCreditsDialog({ staff, open, onOpenChange, onUpdate }: { staff: S
 
 export default function RepassesPage() {
   const { firestore } = useFirebase();
+  const { data: session } = useSession();
   const { toast } = useToast();
   
   const [isLaunching, setIsLaunching] = React.useState(false);
@@ -400,6 +498,8 @@ export default function RepassesPage() {
   const [refreshKey, setRefreshKey] = React.useState(0);
   const [isVoucherOpen, setIsVoucherOpen] = React.useState(false);
   const [voucherData, setVoucherData] = React.useState<{ staff: Staff | null, credits: any[], total: number, date?: Date }>({ staff: null, credits: [], total: 0 });
+
+  const isAdmin = session?.user?.role === 'admin' || session?.user?.role === 'financial';
 
   const loadStats = React.useCallback(async () => {
     if (!firestore) return;
@@ -451,30 +551,32 @@ export default function RepassesPage() {
   return (
     <div className="flex flex-col gap-8 pb-10">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div><H1 className="text-white">Gestão de Repasses & Folha</H1><p className="text-sm text-muted-foreground">Controle central de salários, honorários e pagamentos externos.</p></div>
+        <div><H1 className="text-white">Repasses & Carteiras</H1><p className="text-sm text-muted-foreground">Monitoramento de saldos profissionais e liquidação de honorários.</p></div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" className="border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/5 h-10" onClick={handleLaunchPayroll} disabled={isLaunching}>{isLaunching ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Zap className="mr-2 h-4 w-4" />}Rodar Folha Mensal</Button>
+          {isAdmin && (
+            <Button variant="outline" className="border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/5 h-10" onClick={handleLaunchPayroll} disabled={isLaunching}>{isLaunching ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Zap className="mr-2 h-4 w-4" />}Rodar Folha Mensal</Button>
+          )}
           <Button variant="outline" className="border-primary/20 text-primary hover:bg-primary/5 h-10" onClick={() => setRefreshKey(k => k + 1)} disabled={isLaunching}><RefreshCw className={cn("mr-2 h-4 w-4", isLaunching && "animate-spin")} />Recarregar Saldos</Button>
         </div>
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="bg-emerald-500/5 border-emerald-500/20"><CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-emerald-400">Pago este Mês</CardTitle></CardHeader><CardContent className="p-4 pt-0"><p className="text-2xl font-black text-white">{stats.totalPaidMonth.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p></CardContent></Card>
-        <Card className="bg-amber-500/5 border-amber-500/20"><CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-amber-400">Disponível p/ Saque</CardTitle></CardHeader><CardContent className="p-4 pt-0"><p className="text-2xl font-black text-white">{stats.totalPending.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p></CardContent></Card>
-        <Card className="bg-blue-500/5 border-blue-500/20"><CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-blue-400">Aguardando Clientes</CardTitle></CardHeader><CardContent className="p-4 pt-0"><p className="text-2xl font-black text-white">{stats.totalRetained.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p></CardContent></Card>
-        <Card className="bg-white/5 border-white/10"><CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-slate-400">Total Equipe</CardTitle></CardHeader><CardContent className="p-4 pt-0"><p className="text-2xl font-black text-white">{stats.staffCount} Profissionais</p></CardContent></Card>
+        <Card className="bg-emerald-500/5 border-emerald-500/20"><CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-emerald-400">Total Liquidado (Mês)</CardTitle></CardHeader><CardContent className="p-4 pt-0"><p className="text-2xl font-black text-white">{stats.totalPaidMonth.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p></CardContent></Card>
+        <Card className="bg-amber-500/5 border-amber-500/20"><CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-amber-400">Saldos Liberados</CardTitle></CardHeader><CardContent className="p-4 pt-0"><p className="text-2xl font-black text-white">{stats.totalPending.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p></CardContent></Card>
+        <Card className="bg-blue-500/5 border-blue-500/20"><CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-blue-400">Honorários Retidos</CardTitle></CardHeader><CardContent className="p-4 pt-0"><p className="text-2xl font-black text-white">{stats.totalRetained.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p></CardContent></Card>
+        <Card className="bg-white/5 border-white/10"><CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-slate-400">Profissionais Ativos</CardTitle></CardHeader><CardContent className="p-4 pt-0"><p className="text-2xl font-black text-white">{stats.staffCount}</p></CardContent></Card>
       </div>
 
       <Tabs defaultValue="lawyers" className="w-full">
         <TabsList className="grid w-full grid-cols-4 bg-[#0f172a] border border-white/5 p-1 h-12">
-          <TabsTrigger value="lawyers" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold h-10"><Briefcase className="h-4 w-4" /> Honorários</TabsTrigger>
-          <TabsTrigger value="staff" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold h-10"><Users className="h-4 w-4" /> Administrativo</TabsTrigger>
-          <TabsTrigger value="providers" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold h-10"><ShieldCheck className="h-4 w-4" /> Fornecedores</TabsTrigger>
+          <TabsTrigger value="lawyers" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold h-10"><Briefcase className="h-4 w-4" /> Advogados</TabsTrigger>
+          <TabsTrigger value="staff" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold h-10"><Users className="h-4 w-4" /> Colaboradores</TabsTrigger>
+          <TabsTrigger value="providers" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold h-10"><ShieldCheck className="h-4 w-4" /> Provedores</TabsTrigger>
           <TabsTrigger value="history" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold h-10"><History className="h-4 w-4" /> Histórico</TabsTrigger>
         </TabsList>
-        <TabsContent value="lawyers" className="mt-6"><PayoutList filterRole="lawyer" onRefresh={() => setRefreshKey(k => k + 1)} onPaid={handleRepassePaid} /></TabsContent>
-        <TabsContent value="staff" className="mt-6"><PayoutList filterRole="employee" onRefresh={() => setRefreshKey(k => k + 1)} onPaid={handleRepassePaid} /></TabsContent>
-        <TabsContent value="providers" className="mt-6"><PayoutList filterRole="provider" onRefresh={() => setRefreshKey(k => k + 1)} onPaid={handleRepassePaid} /></TabsContent>
+        <TabsContent value="lawyers" className="mt-6"><PayoutList filterRole="lawyer" onRefresh={() => setRefreshKey(k => k + 1)} onPaid={handleRepassePaid} isAdmin={isAdmin} /></TabsContent>
+        <TabsContent value="staff" className="mt-6"><PayoutList filterRole="employee" onRefresh={() => setRefreshKey(k => k + 1)} onPaid={handleRepassePaid} isAdmin={isAdmin} /></TabsContent>
+        <TabsContent value="providers" className="mt-6"><PayoutList filterRole="provider" onRefresh={() => setRefreshKey(k => k + 1)} onPaid={handleRepassePaid} isAdmin={isAdmin} /></PayoutList></TabsContent>
         <TabsContent value="history" className="mt-6"><PaymentHistory onShowVoucher={handleShowVoucherFromHistory} /></TabsContent>
       </Tabs>
       

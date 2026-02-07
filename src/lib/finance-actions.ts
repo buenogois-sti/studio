@@ -110,7 +110,7 @@ export async function createFinancialEventAndTitles(data: CreateEventData) {
             description: `Part. Honorários (${rem.type}): ${description}`,
             value: lawyerValue,
             status: 'RETIDO', // Fica retido até o título ser pago
-            date: Timestamp.now(),
+            date: Timestamp.now() as any,
             financialEventId: eventRef.id
           };
           batch.set(creditRef, newCredit);
@@ -251,6 +251,31 @@ export async function processRepasse(staffId: string, creditIds: string[], total
       href: '/dashboard/reembolsos'
     });
 
+    return { success: true };
+  } catch (error: any) {
+    throw new Error(error.message);
+  }
+}
+
+export async function updateCreditForecast(staffId: string, creditIds: string[], forecastDate: string) {
+  if (!firestoreAdmin) throw new Error("Servidor indisponível.");
+  const session = await getServerSession(authOptions);
+  if (!session || !['admin', 'financial'].includes(session.user.role || '')) {
+    throw new Error("Apenas administradores podem definir previsões de pagamento.");
+  }
+
+  const batch = firestoreAdmin.batch();
+  const staffRef = firestoreAdmin.collection('staff').doc(staffId);
+
+  for (const id of creditIds) {
+    const creditRef = staffRef.collection('credits').doc(id);
+    batch.update(creditRef, { 
+      paymentForecast: Timestamp.fromDate(new Date(forecastDate))
+    });
+  }
+
+  try {
+    await batch.commit();
     return { success: true };
   } catch (error: any) {
     throw new Error(error.message);
