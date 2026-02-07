@@ -20,7 +20,8 @@ import {
   Clock,
   Activity,
   XCircle,
-  Sparkles
+  Sparkles,
+  RefreshCw
 } from 'lucide-react';
 import { 
   Bar, 
@@ -43,8 +44,8 @@ import { ptBR } from 'date-fns/locale';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { H1 } from '@/components/ui/typography';
-import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, Timestamp, query, orderBy, where, limit } from 'firebase/firestore';
+import { useFirebase } from '@/firebase';
+import { collection, query, orderBy, where, limit, getDocs, Timestamp } from 'firebase/firestore';
 import type { Process, Client, FinancialTitle, Staff, LegalDeadline, Hearing, Lead } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -54,39 +55,81 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 const COLORS = ['#F5D030', '#3b82f6', '#10b981', '#f43f5e', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316'];
 
 export default function RelatoriosPage() {
-  const { firestore, isUserLoading } = useFirebase();
+  const { firestore, areServicesAvailable } = useFirebase();
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+  const [data, setData] = React.useState<{
+    clients: Client[];
+    processes: Process[];
+    titles: FinancialTitle[];
+    staff: Staff[];
+    deadlines: LegalDeadline[];
+    hearings: Hearing[];
+    leads: Lead[];
+  }>({
+    clients: [],
+    processes: [],
+    titles: [],
+    staff: [],
+    deadlines: [],
+    hearings: [],
+    leads: [],
+  });
 
-  // OTIMIZAÇÃO: Filtro de data para reduzir leituras em coleções grandes
-  const sixMonthsAgo = React.useMemo(() => Timestamp.fromDate(subMonths(new Date(), 6)), []);
+  const fetchData = React.useCallback(async () => {
+    if (!firestore) return;
+    setIsLoading(true);
+    setError(null);
 
-  // Queries
-  const clientsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'clients'), limit(200)) : null, [firestore]);
-  const { data: clientsData } = useCollection<Client>(clientsQuery);
+    try {
+      const sixMonthsAgo = Timestamp.fromDate(subMonths(new Date(), 6));
 
-  const processesQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'processes'), where('createdAt', '>=', sixMonthsAgo), limit(500)) : null, [firestore]);
-  const { data: processesData } = useCollection<Process>(processesQuery);
+      // Carregamento único em vez de onSnapshot para economizar leituras (getDocs)
+      const [
+        clientsSnap,
+        processesSnap,
+        titlesSnap,
+        staffSnap,
+        deadlinesSnap,
+        hearingsSnap,
+        leadsSnap
+      ] = await Promise.all([
+        getDocs(query(collection(firestore, 'clients'), limit(100))),
+        getDocs(query(collection(firestore, 'processes'), where('createdAt', '>=', sixMonthsAgo), limit(200))),
+        getDocs(query(collection(firestore, 'financial_titles'), where('dueDate', '>=', sixMonthsAgo), orderBy('dueDate', 'desc'), limit(200))),
+        getDocs(query(collection(firestore, 'staff'), limit(50))),
+        getDocs(query(collection(firestore, 'deadlines'), where('endDate', '>=', sixMonthsAgo), limit(200))),
+        getDocs(query(collection(firestore, 'hearings'), where('date', '>=', sixMonthsAgo), limit(200))),
+        getDocs(query(collection(firestore, 'leads'), where('createdAt', '>=', sixMonthsAgo), limit(200)))
+      ]);
 
-  const titlesQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'financial_titles'), where('dueDate', '>=', sixMonthsAgo), orderBy('dueDate', 'desc'), limit(500)) : null, [firestore]);
-  const { data: titlesData, error: titlesError } = useCollection<FinancialTitle>(titlesQuery);
+      setData({
+        clients: clientsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Client)),
+        processes: processesSnap.docs.map(d => ({ id: d.id, ...d.data() } as Process)),
+        titles: titlesSnap.docs.map(d => ({ id: d.id, ...d.data() } as FinancialTitle)),
+        staff: staffSnap.docs.map(d => ({ id: d.id, ...d.data() } as Staff)),
+        deadlines: deadlinesSnap.docs.map(d => ({ id: d.id, ...d.data() } as LegalDeadline)),
+        hearings: hearingsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Hearing)),
+        leads: leadsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Lead)),
+      });
+    } catch (e: any) {
+      console.error("[Relatorios] Fetch error:", e);
+      setError(e.message);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [firestore]);
 
-  const staffQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'staff'), limit(100)) : null, [firestore]);
-  const { data: staffData } = useCollection<Staff>(staffQuery);
+  React.useEffect(() => {
+    if (areServicesAvailable) {
+      fetchData();
+    }
+  }, [areServicesAvailable, fetchData]);
 
-  const deadlinesQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'deadlines'), where('endDate', '>=', sixMonthsAgo), limit(500)) : null, [firestore]);
-  const { data: deadlinesData } = useCollection<LegalDeadline>(deadlinesQuery);
-
-  const hearingsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'hearings'), where('date', '>=', sixMonthsAgo), limit(500)) : null, [firestore]);
-  const { data: hearingsData } = useCollection<Hearing>(hearingsQuery);
-
-  const leadsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'leads'), where('createdAt', '>=', sixMonthsAgo), limit(500)) : null, [firestore]);
-  const { data: leadsData, error: leadsError } = useCollection<Lead>(leadsQuery);
-
-  // 1. Processamento de Prazos (Vencidos e Pendentes)
+  // Cálculos derivados (Memoized para evitar re-processamento)
   const deadlineStats = React.useMemo(() => {
-    if (!deadlinesData) return { pending: 0, overdue: 0, today: 0 };
     const now = startOfDay(new Date());
-    
-    return deadlinesData.reduce((acc, d) => {
+    return data.deadlines.reduce((acc, d) => {
       if (d.status === 'PENDENTE') {
         const endDate = d.endDate.toDate();
         if (isToday(endDate)) acc.today++;
@@ -95,35 +138,24 @@ export default function RelatoriosPage() {
       }
       return acc;
     }, { pending: 0, overdue: 0, today: 0 });
-  }, [deadlinesData]);
+  }, [data.deadlines]);
 
-  // 2. Leads por Tipo de Captação
   const leadCaptureData = React.useMemo(() => {
-    if (!leadsData) return [];
     const counts: Record<string, number> = {};
-    leadsData.forEach(l => {
+    data.leads.forEach(l => {
       const source = l.captureSource || 'Não Informado';
       counts[source] = (counts[source] || 0) + 1;
     });
     return Object.entries(counts).map(([name, value]) => ({ name, value }));
-  }, [leadsData]);
+  }, [data.leads]);
 
-  // 3. Leads Pendentes ("Carrinho Abandonado")
-  const pendingLeadsCount = React.useMemo(() => {
-    if (!leadsData) return 0;
-    return leadsData.filter(l => l.status === 'NOVO' || l.status === 'EM_ELABORACAO').length;
-  }, [leadsData]);
-
-  // 4. Performance por Advogado (Comparative)
   const lawyerPerformanceData = React.useMemo(() => {
-    if (!staffData || !processesData || !deadlinesData || !hearingsData) return [];
-    
-    return staffData
+    return data.staff
       .filter(s => s.role === 'lawyer' || s.role === 'partner')
       .map(lawyer => {
-        const processes = processesData.filter(p => p.leadLawyerId === lawyer.id).length;
-        const pendingDeadlines = deadlinesData.filter(d => d.authorId === lawyer.id && d.status === 'PENDENTE').length;
-        const upcomingHearings = hearingsData.filter(h => h.lawyerId === lawyer.id && h.status === 'PENDENTE').length;
+        const processes = data.processes.filter(p => p.leadLawyerId === lawyer.id).length;
+        const pendingDeadlines = data.deadlines.filter(d => d.authorId === lawyer.id && d.status === 'PENDENTE').length;
+        const upcomingHearings = data.hearings.filter(h => h.lawyerId === lawyer.id && h.status === 'PENDENTE').length;
         
         return {
           nome: `${lawyer.firstName} ${lawyer.lastName.charAt(0)}.`,
@@ -134,11 +166,9 @@ export default function RelatoriosPage() {
       })
       .filter(d => d.demandas > 0 || d.prazos > 0 || d.audiencias > 0)
       .sort((a, b) => b.demandas - a.demandas);
-  }, [staffData, processesData, deadlinesData, hearingsData]);
+  }, [data]);
 
-  // 5. Histórico Financeiro (Fluxo de Caixa)
   const financialData = React.useMemo(() => {
-    if (!titlesData) return [];
     const months = [];
     const now = new Date();
     for (let i = 5; i >= 0; i--) {
@@ -152,9 +182,9 @@ export default function RelatoriosPage() {
       });
     }
     
-    titlesData.forEach(t => {
+    data.titles.forEach(t => {
       if (t.status === 'PAGO' && t.paymentDate) {
-        const date = t.paymentDate instanceof Timestamp ? t.paymentDate.toDate() : new Date(t.paymentDate as any);
+        const date = t.paymentDate.toDate();
         const monthKey = format(date, 'yyyy-MM');
         const m = months.find(m => m.key === monthKey);
         if (m) {
@@ -164,25 +194,19 @@ export default function RelatoriosPage() {
       }
     });
     return months;
-  }, [titlesData]);
+  }, [data.titles]);
 
-  const isLoading = isUserLoading || !deadlinesData || !leadsData;
-
-  if (titlesError || leadsError) {
+  if (error) {
     return (
       <div className="p-8 space-y-6">
         <H1 className="text-white">Relatórios</H1>
         <Alert variant="destructive" className="bg-rose-500/10 border-rose-500/20 text-rose-400">
           <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Índices Requeridos no Firestore</AlertTitle>
+          <AlertTitle>Erro ao carregar dados de BI</AlertTitle>
           <AlertDescription className="text-xs mt-2 space-y-4">
-            <p>O sistema exige a criação de índices manuais no Google Cloud para processar as queries de BI.</p>
-            <div className="bg-black/20 p-4 rounded-lg space-y-2 border border-white/10 font-mono text-[10px]">
-              <p>Coleção: 'financial_titles' -> 'dueDate' (DESC)</p>
-              <p>Coleção: 'leads' -> 'createdAt' (ASC)</p>
-            </div>
-            <Button variant="outline" size="sm" asChild className="h-8 text-[10px] font-black uppercase">
-              <a href="https://console.firebase.google.com" target="_blank">Gerar Índices Agora</a>
+            <p>{error}</p>
+            <Button onClick={fetchData} variant="outline" size="sm" className="h-8 text-[10px] font-black uppercase">
+              Tentar novamente
             </Button>
           </AlertDescription>
         </Alert>
@@ -207,18 +231,21 @@ export default function RelatoriosPage() {
 
   return (
     <div className="flex flex-col gap-8 pb-12">
-      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
           <H1 className="text-white text-3xl font-black">Inteligência Operacional</H1>
-          <p className="text-sm text-slate-400 mt-1">Análise estratégica de demandas, prazos e performance da banca.</p>
+          <p className="text-sm text-slate-400 mt-1">Dados processados em {format(new Date(), 'HH:mm')}.</p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => window.print()} className="bg-[#0f172a] border-white/10 text-white font-bold h-10">
-          <Download className="mr-2 h-4 w-4" /> Exportar Relatório Geral
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" onClick={fetchData} className="text-muted-foreground hover:text-white h-10">
+            <RefreshCw className="mr-2 h-4 w-4" /> Atualizar BI
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => window.print()} className="bg-[#0f172a] border-white/10 text-white font-bold h-10">
+            <Download className="mr-2 h-4 w-4" /> Exportar Relatório
+          </Button>
+        </div>
       </div>
 
-      {/* KPI Operacionais */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="bg-[#0f172a] border-rose-500/20 border-2 relative overflow-hidden group">
           <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:scale-110 transition-transform"><Timer className="h-12 w-12 text-rose-500" /></div>
@@ -231,52 +258,51 @@ export default function RelatoriosPage() {
 
         <Card className="bg-[#0f172a] border-amber-500/20 border-2 relative overflow-hidden group">
           <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:scale-110 transition-transform"><Flame className="h-12 w-12 text-amber-500" /></div>
-          <CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-amber-400 tracking-widest">Leads Pendentes</CardTitle></CardHeader>
+          <CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-amber-400 tracking-widest">Leads Ativos</CardTitle></CardHeader>
           <CardContent className="p-4 pt-0">
-            <p className="text-3xl font-black text-amber-500 tabular-nums">{pendingLeadsCount}</p>
-            <p className="text-[10px] text-amber-400/60 font-bold uppercase mt-1">Potencial não convertido</p>
+            <p className="text-3xl font-black text-amber-500 tabular-nums">{data.leads.filter(l => l.status !== 'REPROVADO' && l.status !== 'CONVERTIDO').length}</p>
+            <p className="text-[10px] text-amber-400/60 font-bold uppercase mt-1">Em prospecção</p>
           </CardContent>
         </Card>
 
         <Card className="bg-[#0f172a] border-primary/20 border-2 relative overflow-hidden group">
           <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:scale-110 transition-transform"><Gavel className="h-12 w-12 text-primary" /></div>
-          <CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-primary tracking-widest">Prazos de Hoje</CardTitle></CardHeader>
+          <CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-primary tracking-widest">Prazos p/ Hoje</CardTitle></CardHeader>
           <CardContent className="p-4 pt-0">
             <p className="text-3xl font-black text-primary tabular-nums">{deadlineStats.today}</p>
-            <p className="text-[10px] text-primary/60 font-bold uppercase mt-1">Vencimento fatal hoje</p>
+            <p className="text-[10px] text-primary/60 font-bold uppercase mt-1">Vencimento fatal</p>
           </CardContent>
         </Card>
 
         <Card className="bg-[#0f172a] border-blue-500/20 border-2 relative overflow-hidden group">
           <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:scale-110 transition-transform"><Zap className="h-12 w-12 text-blue-500" /></div>
-          <CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-blue-400 tracking-widest">Novos Leads (Recentes)</CardTitle></CardHeader>
+          <CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-blue-400 tracking-widest">Novos Casos (6m)</CardTitle></CardHeader>
           <CardContent className="p-4 pt-0">
-            <p className="text-3xl font-black text-blue-400 tabular-nums">{leadsData?.length || 0}</p>
-            <p className="text-[10px] text-blue-400/60 font-bold uppercase mt-1">Entrada no período</p>
+            <p className="text-3xl font-black text-blue-400 tabular-nums">{data.processes.length}</p>
+            <p className="text-[10px] text-blue-400/60 font-bold uppercase mt-1">Volume de entrada</p>
           </CardContent>
         </Card>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Performance Comparativa por Advogado */}
         <Card className="bg-[#0f172a] border-white/5 shadow-2xl">
           <CardHeader>
             <CardTitle className="text-lg text-white font-black uppercase tracking-tighter flex items-center gap-2">
-              <Users className="h-5 w-5 text-primary" /> Distribuição de Carga por Advogado
+              <Users className="h-5 w-5 text-primary" /> Distribuição de Carga
             </CardTitle>
-            <CardDescription>Comparativo de processos, prazos e audiências sob responsabilidade.</CardDescription>
+            <CardDescription>Carga de trabalho por advogado (6 meses).</CardDescription>
           </CardHeader>
           <CardContent className="h-[400px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={lawyerPerformanceData} margin={{ top: 20, right: 30, left: 0, bottom: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#ffffff10" />
-                <XAxis dataKey="nome" stroke="#94a3b8" fontSize={10} fontVariant="bold" axisLine={false} tickLine={false} />
+                <XAxis dataKey="nome" stroke="#94a3b8" fontSize={10} axisLine={false} tickLine={false} />
                 <YAxis stroke="#94a3b8" fontSize={10} axisLine={false} tickLine={false} />
                 <Tooltip 
                   contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #ffffff10', borderRadius: '8px' }}
-                  labelStyle={{ color: '#fff', fontWeight: 'bold', marginBottom: '4px' }}
+                  labelStyle={{ color: '#fff', fontWeight: 'bold' }}
                 />
-                <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px', fontSize: '10px', textTransform: 'uppercase', fontWeight: 'bold' }} />
+                <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px', fontSize: '10px', textTransform: 'uppercase' }} />
                 <Bar dataKey="demandas" name="Processos" fill="#F5D030" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="prazos" name="Prazos" fill="#f43f5e" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="audiencias" name="Audiências" fill="#3b82f6" radius={[4, 4, 0, 0]} />
@@ -285,34 +311,21 @@ export default function RelatoriosPage() {
           </CardContent>
         </Card>
 
-        {/* Eficácia de Canais de Captação (Marketing Jurídico) */}
-        <Card className="bg-[#0f172a] border-white/5 shadow-2xl flex flex-col items-center justify-center">
-          <CardHeader className="w-full">
+        <Card className="bg-[#0f172a] border-white/5 shadow-2xl">
+          <CardHeader>
             <CardTitle className="text-lg text-white font-black uppercase tracking-tighter flex items-center gap-2">
-              <Target className="h-5 w-5 text-emerald-400" /> Origem de Novos Negócios (Leads)
+              <Target className="h-5 w-5 text-emerald-400" /> Origem de Clientes (Leads)
             </CardTitle>
-            <CardDescription>Breakdown por tipo de captação para análise de ROI.</CardDescription>
+            <CardDescription>Breakdown por tipo de captação.</CardDescription>
           </CardHeader>
           <CardContent className="h-[400px] w-full flex items-center justify-center">
             {leadCaptureData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie
-                    data={leadCaptureData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={80}
-                    outerRadius={120}
-                    paddingAngle={5}
-                    dataKey="value"
-                  >
-                    {leadCaptureData.map((_, index) => (
-                      <RechartsCell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
+                  <Pie data={leadCaptureData} cx="50%" cy="50%" innerRadius={80} outerRadius={120} paddingAngle={5} dataKey="value">
+                    {leadCaptureData.map((_, index) => <RechartsCell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
                   </Pie>
-                  <Tooltip 
-                    contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #ffffff10', borderRadius: '8px' }}
-                  />
+                  <Tooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #ffffff10', borderRadius: '8px' }} />
                   <Legend verticalAlign="bottom" align="center" layout="horizontal" iconType="circle" wrapperStyle={{ fontSize: '10px', textTransform: 'uppercase' }} />
                 </PieChart>
               </ResponsiveContainer>
@@ -327,21 +340,19 @@ export default function RelatoriosPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Fluxo de Caixa (Últimos 6 meses) */}
         <Card className="lg:col-span-2 bg-[#0f172a] border-white/5 shadow-2xl">
           <CardHeader>
             <CardTitle className="text-lg text-white font-black uppercase tracking-tighter flex items-center gap-2">
-              <DollarSign className="h-5 w-5 text-emerald-400" /> Evolução Financeira Real
+              <DollarSign className="h-5 w-5 text-emerald-400" /> Evolução Financeira
             </CardTitle>
-            <CardDescription>Fluxo de entradas vs saídas operacionais consolidadas.</CardDescription>
+            <CardDescription>Fluxo de caixa real (últimos 6 meses).</CardDescription>
           </CardHeader>
           <CardContent className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={financialData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorRec" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/><stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#ffffff05" />
@@ -358,13 +369,12 @@ export default function RelatoriosPage() {
           </CardContent>
         </Card>
 
-        {/* Resumo de Conversão */}
         <Card className="bg-[#0f172a] border-white/5 shadow-2xl flex flex-col">
           <CardHeader>
             <CardTitle className="text-lg text-white font-black uppercase tracking-tighter flex items-center gap-2">
-              <Activity className="h-5 w-5 text-blue-400" /> Saúde do Funil
+              <Activity className="h-5 w-5 text-blue-400" /> Saúde da Base
             </CardTitle>
-            <CardDescription>Métricas de conversão e retenção.</CardDescription>
+            <CardDescription>Indicadores de retenção.</CardDescription>
           </CardHeader>
           <CardContent className="flex-1 flex flex-col justify-between py-6">
             <div className="space-y-6">
@@ -373,31 +383,24 @@ export default function RelatoriosPage() {
                   <div className="h-8 w-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-500"><CheckCircle2 className="h-4 w-4" /></div>
                   <span className="text-xs font-bold text-slate-300 uppercase">Leads Convertidos</span>
                 </div>
-                <span className="text-lg font-black text-white">{leadsData?.filter(l => l.status === 'CONVERTIDO').length || 0}</span>
+                <span className="text-lg font-black text-white">{data.leads.filter(l => l.status === 'CONVERTIDO').length}</span>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className="h-8 w-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-500"><FolderKanban className="h-4 w-4" /></div>
-                  <span className="text-xs font-bold text-slate-300 uppercase">Total Clientes Ativos</span>
+                  <span className="text-xs font-bold text-slate-300 uppercase">Processos em Fluxo</span>
                 </div>
-                <span className="text-lg font-black text-white">{clientsData?.filter(c => c.status === 'active').length || 0}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="h-8 w-8 rounded-lg bg-rose-500/10 flex items-center justify-center text-rose-500"><XCircle className="h-4 w-4" /></div>
-                  <span className="text-xs font-bold text-slate-300 uppercase">Leads Reprovados</span>
-                </div>
-                <span className="text-lg font-black text-white">{leadsData?.filter(l => l.status === 'REPROVADO').length || 0}</span>
+                <span className="text-lg font-black text-white">{data.processes.length}</span>
               </div>
             </div>
 
             <div className="mt-8 p-4 rounded-2xl bg-primary/5 border border-primary/20">
               <div className="flex items-center gap-2 mb-2">
                 <Sparkles className="h-4 w-4 text-primary" />
-                <span className="text-[10px] font-black text-primary uppercase tracking-widest">Taxa de Conversão</span>
+                <span className="text-[10px] font-black text-primary uppercase tracking-widest">Taxa de Eficiência</span>
               </div>
               <p className="text-2xl font-black text-white">
-                {leadsData?.length ? ((leadsData.filter(l => l.status === 'CONVERTIDO').length / leadsData.length) * 100).toFixed(1) : 0}%
+                {data.leads.length ? ((data.leads.filter(l => l.status === 'CONVERTIDO').length / data.leads.length) * 100).toFixed(1) : 0}%
               </p>
             </div>
           </CardContent>

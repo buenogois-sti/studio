@@ -1,3 +1,4 @@
+
 'use client';
 import * as React from 'react';
 import {
@@ -129,31 +130,27 @@ export default function Dashboard() {
   const { firestore } = useFirebase();
   const { data: session, status } = useSession();
 
-  // OTIMIZAÇÃO: Consulta financeira estritamente limitada e sem listener em tempo real para stats históricos se não necessário
+  // OTIMIZAÇÃO: Consulta estritamente limitada a 50 itens para o Dashboard
   const titlesQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     const startOfCurrentMonth = Timestamp.fromDate(startOfMonth(new Date()));
     return query(
       collection(firestore, 'financial_titles'),
       where('dueDate', '>=', startOfCurrentMonth),
-      limit(100)
+      limit(50)
     );
   }, [firestore]);
   const { data: titlesData, isLoading: isLoadingTitles } = useCollection<FinancialTitle>(titlesQuery);
 
-  // OTIMIZAÇÃO: Limitar busca de processos para o gráfico (últimos 100)
-  const processesQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'processes'), orderBy('createdAt', 'desc'), limit(100)) : null), [firestore]);
+  const processesQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'processes'), orderBy('createdAt', 'desc'), limit(50)) : null), [firestore]);
   const { data: processesData, isLoading: isLoadingProcesses } = useCollection<Process>(processesQuery);
 
-  // OTIMIZAÇÃO: Clientes limitados
-  const clientsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'clients'), limit(50)) : null), [firestore]);
+  const clientsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'clients'), limit(20)) : null), [firestore]);
   const { data: clientsData, isLoading: isLoadingClients } = useCollection<Client>(clientsQuery);
 
-  // OTIMIZAÇÃO: Audiências limitadas às próximas 5 mais urgentes
   const hearingsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'hearings'), where('date', '>=', Timestamp.now()), orderBy('date', 'asc'), limit(5)) : null), [firestore]);
   const { data: hearingsData, isLoading: isLoadingHearings } = useCollection<Hearing>(hearingsQuery);
 
-  // OTIMIZAÇÃO: Logs limitados aos 3 mais recentes
   const logsQuery = useMemoFirebase(
     () => (firestore && session?.user?.id ? query(collection(firestore, `users/${session.user.id}/logs`), orderBy('timestamp', 'desc'), limit(3)) : null), 
     [firestore, session?.user?.id]
@@ -210,25 +207,6 @@ export default function Dashboard() {
     return monthLabels.map(month => ({ month: month.name, newCases: counts[month.key] }));
   }, [processesData]);
 
-  const StatCard = React.memo(({ title, value, icon: Icon, href, description }: { title: string; value: string | number; icon: React.ElementType; href: string; description: string }) => (
-    <Link href={href} className="group">
-      <Card className="bg-[#0f172a] border-border/50 transition-all duration-300 hover:bg-[#1e293b] hover:-translate-y-1 relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-1 h-full bg-primary/20 group-hover:bg-primary" />
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-xs font-black uppercase tracking-widest text-muted-foreground">{title}</CardTitle>
-          <div className="bg-primary/10 p-2 rounded-md">
-            <Icon className="h-4 w-4 text-primary" />
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-black text-white">{value}</div>
-          <p className="text-[10px] text-muted-foreground mt-1 uppercase font-bold">{description}</p>
-        </CardContent>
-      </Card>
-    </Link>
-  ));
-  StatCard.displayName = 'StatCard';
-
   return (
     <div className="flex flex-col gap-8">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
@@ -237,43 +215,51 @@ export default function Dashboard() {
             Olá, {session?.user?.name?.split(' ')[0]}
             </h1>
             <p className="text-muted-foreground font-medium mt-1">
-            Pulsação operacional e insights estratégicos.
+            Resumo tático operacional.
             </p>
         </div>
         <Badge variant="outline" className="h-8 px-3 border-emerald-500/20 bg-emerald-500/5 text-emerald-600 font-bold">
-            <CheckCircle2 className="h-3 w-3 mr-1.5" /> Sistema Online
+            <CheckCircle2 className="h-3 w-3 mr-1.5" /> Monitoramento Ativo
         </Badge>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard 
-          title="Faturamento Bruto" 
-          value={dashboardStats.totalRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-          icon={DollarSign}
-          href="/dashboard/financeiro"
-          description="Recebido (Mês)"
-        />
-        <StatCard 
-          title="Clientes Recentes" 
-          value={dashboardStats.totalClients}
-          icon={Users}
-          href="/dashboard/clientes"
-          description="Contatos na base"
-        />
-        <StatCard 
-          title="Processos Ativos" 
-          value={dashboardStats.activeProcessesCount}
-          icon={FolderKanban}
-          href="/dashboard/processos"
-          description="Em andamento"
-        />
-        <StatCard 
-          title="Pauta Urgente" 
-          value={dashboardStats.upcomingHearingsCount}
-          icon={Calendar}
-          href="/dashboard/audiencias"
-          description="Audiências próximas"
-        />
+        <Card className="bg-[#0f172a] border-border/50">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-xs font-black uppercase tracking-widest text-muted-foreground">Faturamento (Mês)</CardTitle>
+            <DollarSign className="h-4 w-4 text-primary" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-black text-white">{dashboardStats.totalRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
+          </CardContent>
+        </Card>
+        <Card className="bg-[#0f172a] border-border/50">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-xs font-black uppercase tracking-widest text-muted-foreground">Novos Clientes</CardTitle>
+            <Users className="h-4 w-4 text-primary" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-black text-white">{dashboardStats.totalClients}</div>
+          </CardContent>
+        </Card>
+        <Card className="bg-[#0f172a] border-border/50">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-xs font-black uppercase tracking-widest text-muted-foreground">Processos Ativos</CardTitle>
+            <FolderKanban className="h-4 w-4 text-primary" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-black text-white">{dashboardStats.activeProcessesCount}</div>
+          </CardContent>
+        </Card>
+        <Card className="bg-[#0f172a] border-border/50">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-xs font-black uppercase tracking-widest text-muted-foreground">Pauta Urgente</CardTitle>
+            <Calendar className="h-4 w-4 text-primary" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-black text-white">{dashboardStats.upcomingHearingsCount}</div>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -286,8 +272,7 @@ export default function Dashboard() {
             
             <Card className="bg-[#0f172a] border-border/50 shadow-none">
                 <CardHeader>
-                    <CardTitle className="font-headline text-xl text-white">Curva de Crescimento</CardTitle>
-                    <CardDescription>Novos processos nos últimos meses.</CardDescription>
+                    <CardTitle className="font-headline text-xl text-white">Novas Demandas</CardTitle>
                 </CardHeader>
                 <CardContent>
                     <ChartContainer config={{ newCases: { label: 'Novos Casos', color: '#F5D030' } }} className="h-[250px] w-full">
@@ -309,7 +294,7 @@ export default function Dashboard() {
                 <CardHeader className="border-b border-white/5">
                     <CardTitle className="font-headline text-xl flex items-center gap-2 text-white uppercase tracking-tighter">
                         <Calendar className="h-5 w-5 text-primary" />
-                        Pauta Imediata
+                        Próximos Atos
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-6">
@@ -320,18 +305,18 @@ export default function Dashboard() {
                     ) : (
                         <div className="space-y-6 text-slate-300">
                             {hearingsData?.map(h => (
-                                <div key={h.id} className="flex items-start gap-4 p-3 rounded-xl hover:bg-white/5 transition-colors border border-transparent hover:border-white/5">
+                                <div key={h.id} className="flex items-start gap-4 p-3 rounded-xl hover:bg-white/5 transition-colors">
                                     <div className="flex flex-col items-center justify-center p-2 bg-black/40 rounded-xl w-12 h-12 border border-white/5 shrink-0">
                                         <span className="text-[10px] font-black uppercase text-primary leading-none">{format(h.date.toDate(), 'MMM', { locale: ptBR })}</span>
                                         <span className="text-lg font-black text-white leading-none">{format(h.date.toDate(), 'dd')}</span>
                                     </div>
                                     <div className="min-w-0">
                                         <p className="font-bold text-sm truncate text-white">Audiência {h.type}</p>
-                                        <p className="text-[10px] text-muted-foreground uppercase flex items-center gap-1"><Users className="h-2.5 w-2.5" /> Dr(a). {h.lawyerName}</p>
+                                        <p className="text-[10px] text-muted-foreground uppercase flex items-center gap-1"><Users className="h-2.5 w-2.5" /> {h.lawyerName}</p>
                                     </div>
                                 </div>
                             ))}
-                            {hearingsData?.length === 0 && <p className="text-xs italic text-muted-foreground text-center py-10 opacity-30">Sem compromissos agendados.</p>}
+                            {hearingsData?.length === 0 && <p className="text-xs italic text-muted-foreground text-center py-10 opacity-30">Sem compromissos.</p>}
                         </div>
                     )}
                 </CardContent>
