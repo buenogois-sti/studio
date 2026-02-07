@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { DependencyList, createContext, useContext, ReactNode, useMemo, useState, useEffect, useRef } from 'react';
@@ -82,13 +81,13 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
         const expectedProject = 'studio-7080106838-23904';
         
         // Decodificar token para ver o projeto real para o qual foi emitido
-        let tokenProject = 'unknown';
+        let tokenAudience = 'unknown';
         try {
           const parts = session.customToken!.split('.');
           if (parts.length > 1) {
             // No browser, usamos atob para decodificar o payload do JWT
             const payload = JSON.parse(atob(parts[1]));
-            tokenProject = payload.aud || 'not found in payload';
+            tokenAudience = payload.aud || 'not found in payload';
           }
         } catch (e) {}
 
@@ -96,12 +95,14 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
           code: errorCode,
           message: error.message,
           clientProject,
-          tokenProject,
+          tokenAudience,
           expectedProject
         });
 
-        if (clientProject !== tokenProject) {
-          console.warn(`[Firebase Auth] ⚠️ PROJECT ID MISMATCH: O token foi gerado para o projeto "${tokenProject}", mas o cliente está configurado para "${clientProject}". Verifique se o FIREBASE_SERVICE_ACCOUNT_JSON no seu .env.local pertence ao projeto correto.`);
+        // NOTA: Para Custom Tokens, a audiência (aud) é geralmente a URL do Identity Toolkit.
+        // O erro 400 real acontece se a chave de serviço no servidor pertencer a um projeto diferente da chave de API no cliente.
+        if (tokenAudience !== "https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit") {
+           console.warn(`[Firebase Auth] ⚠️ Token Audience incomum: "${tokenAudience}". Verifique se o FIREBASE_SERVICE_ACCOUNT_JSON no seu .env.local pertence ao projeto correto.`);
         }
         
         setUserAuthState((state) => ({ ...state, userError: error, isUserLoading: false }));

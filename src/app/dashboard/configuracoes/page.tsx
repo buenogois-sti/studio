@@ -37,12 +37,13 @@ import {
   Instagram,
   Globe,
   BarChart3,
-  Tag
+  Tag,
+  FileText
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
-import { useDoc, useFirebase, useMemoFirebase, useCollection } from '@/firebase';
+import { useDoc, useFirebase, useMemoFirebase } from '@/firebase';
 import { doc, collection, setDoc } from 'firebase/firestore';
 import type { UserProfile, UserRole, UserRoleInfo, SEOSettings } from '@/lib/types';
 import { ClientKitManager } from '@/components/settings/client-kit-manager';
@@ -813,7 +814,7 @@ function LicenseTab() {
                     </div>
                     <div className="p-5 rounded-2xl bg-blue-500/5 border border-blue-500/20 text-blue-400/80 text-[11px] italic leading-relaxed">
                         <Info className="h-4 w-4 inline-block mr-2" />
-                        O plano de manutenção Bueno Gois inclui atualizações críticas de segurança, monitoramento de performance, garantia de integridade das APIs do Google e suporte a novos colaboradores.
+                        O plan de manutenção Bueno Gois inclui atualizações críticas de segurança, monitoramento de performance, garantia de integridade das APIs do Google e suporte a novos colaboradores.
                     </div>
                 </CardContent>
             </Card>
