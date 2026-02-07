@@ -39,7 +39,9 @@ import {
   Tag,
   FileText,
   Copy,
-  BookMarked
+  BookMarked,
+  Gavel,
+  History
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -743,43 +745,42 @@ function TagsDictionaryTab() {
   const { toast } = useToast();
   const sections = [
     {
-      title: "Tags de Qualificação do Cliente",
+      title: "Padrão de Qualificação (Mandatos / Iniciais)",
       items: [
-        { tag: "{{CLIENTE_NOME_COMPLETO}}", desc: "Nome completo ou Razão Social" },
-        { tag: "{{CLIENTE_PRIMEIRO_NOME}}", desc: "Apenas o primeiro nome" },
+        { tag: "{{CLIENTE_NOME_COMPLETO}}", desc: "Nome completo / Razão Social" },
+        { tag: "{{RECLAMANTE_NOME}}", desc: "Alias p/ peças trabalhistas (Ativo)" },
         { tag: "{{CLIENTE_CPF_CNPJ}}", desc: "CPF ou CNPJ formatado" },
         { tag: "{{CLIENTE_RG}}", desc: "Número do RG" },
         { tag: "{{CLIENTE_NACIONALIDADE}}", desc: "Ex: brasileiro(a)" },
         { tag: "{{CLIENTE_ESTADO_CIVIL}}", desc: "Ex: solteiro(a), casado(a)" },
         { tag: "{{CLIENTE_PROFISSAO}}", desc: "Ex: ajudante geral, motorista" },
         { tag: "{{CLIENTE_ENDERECO_COMPLETO}}", desc: "Logradouro, nº, Bairro, Cidade/UF" },
-        { tag: "{{CLIENTE_WHATSAPP}}", desc: "Número de celular/whatsapp" },
       ]
     },
     {
-      title: "Tags de Advogado & Equipe",
+      title: "Endereçamento & Dados do Juízo",
       items: [
-        { tag: "{{ADVOGADO_LIDER_NOME}}", desc: "Nome do advogado responsável" },
-        { tag: "{{ADVOGADO_LIDER_OAB}}", desc: "Número da OAB do responsável" },
+        { tag: "{{PROCESSO_NUMERO_CNJ}}", desc: "Número oficial do processo" },
+        { tag: "{{PROCESSO_VARA}}", desc: "Vara / Câmara (Ex: 6ª Vara do Trabalho)" },
+        { tag: "{{PROCESSO_FORUM}}", desc: "Fórum / Comarca (Ex: São Bernardo do Campo)" },
+        { tag: "{{RECLAMADA_NOME}}", desc: "Primeiro Réu (Polo Passivo)" },
+        { tag: "{{RECLAMADA_LISTA_TODOS}}", desc: "Todos os Réus (Lista separada por vírgula)" },
       ]
     },
     {
-      title: "Tags do Processo / Ação",
+      title: "Dados da Banca Bueno Gois",
       items: [
-        { tag: "{{PROCESSO_NUMERO_CNJ}}", desc: "Número oficial CNJ" },
-        { tag: "{{PROCESSO_TITULO}}", desc: "Nome do processo no sistema" },
-        { tag: "{{PROCESSO_AREA}}", desc: "Área jurídica (Ex: Trabalhista)" },
-        { tag: "{{PROCESSO_VALOR}}", desc: "Valor da causa formatado" },
-        { tag: "{{REU_NOME}}", desc: "Nome da parte contrária" },
+        { tag: "{{ADVOGADO_LIDER_NOME}}", desc: "Nome do advogado titular" },
+        { tag: "{{ADVOGADO_LIDER_OAB}}", desc: "Número da OAB do titular" },
+        { tag: "{{ESCRITORIO_NOME}}", desc: "Bueno Gois Advogados e Associados" },
+        { tag: "{{ESCRITORIO_ENDERECO}}", desc: "Endereço da sede configurado" },
       ]
     },
     {
-      title: "Tags do Escritório & Data",
+      title: "Datas & Fechamentos",
       items: [
-        { tag: "{{ESCRITORIO_NOME}}", desc: "Nome configurado na aba Geral" },
-        { tag: "{{ESCRITORIO_ENDERECO}}", desc: "Endereço configurado na aba Geral" },
-        { tag: "{{DATA_EXTENSO}}", desc: "Ex: 15 de maio de 2024" },
-        { tag: "{{DATA_HOJE}}", desc: "Ex: 15/05/2024" },
+        { tag: "{{DATA_EXTENSO}}", desc: "Ex: 15 de julho de 2025" },
+        { tag: "{{DATA_HOJE}}", desc: "Ex: 15/07/2025" },
       ]
     }
   ];

@@ -191,9 +191,14 @@ export async function draftDocument(
             ? `${clientData.address.street || ''}, ${clientData.address.number || 'S/N'}, ${clientData.address.neighborhood || ''}, ${clientData.address.city || ''}/${clientData.address.state || ''}`
             : 'Endereço não informado';
 
+        const clientFullName = `${clientData.firstName} ${clientData.lastName || ''}`.trim();
+        const firstOpposingParty = processData.opposingParties?.[0]?.name || '---';
+        const allOpposingParties = processData.opposingParties?.map(p => p.name).join(', ') || '---';
+
         const dataMap = {
-            // Tags de Cliente
-            'CLIENTE_NOME_COMPLETO': `${clientData.firstName} ${clientData.lastName || ''}`.trim(),
+            // Tags de Cliente / Reclamante
+            'CLIENTE_NOME_COMPLETO': clientFullName,
+            'RECLAMANTE_NOME': clientFullName,
             'CLIENTE_PRIMEIRO_NOME': clientData.firstName || '',
             'CLIENTE_DOCUMENTO': clientData.document || '---',
             'CLIENTE_CPF_CNPJ': clientData.document || '---',
@@ -210,14 +215,18 @@ export async function draftDocument(
             'CLIENTE_ESTADO_CIVIL': clientData.civilStatus || 'solteiro(a)',
             'CLIENTE_PROFISSAO': clientData.profession || 'ajudante geral',
             
-            // Tags de Processo
+            // Tags de Processo / Endereçamento
             'PROCESSO_TITULO': processData.name || '',
             'PROCESSO_NUMERO_CNJ': processData.processNumber || 'Pendente',
             'PROCESSO_AREA': processData.legalArea || '---',
             'PROCESSO_FORUM': processData.court || '---',
             'PROCESSO_VARA': processData.courtBranch || '---',
             'PROCESSO_VALOR': (processData.caseValue || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
-            'REU_NOME': processData.opposingParties?.[0]?.name || 'Parte contrária não identificada',
+            
+            // Tags de Réu / Reclamada
+            'REU_NOME': firstOpposingParty,
+            'RECLAMADA_NOME': firstOpposingParty,
+            'RECLAMADA_LISTA_TODOS': allOpposingParties,
             
             // Tags de Advogado
             'ADVOGADO_LIDER_NOME': lawyerName,
