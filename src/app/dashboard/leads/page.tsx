@@ -26,10 +26,11 @@ import {
   Info,
   LayoutGrid,
   List,
-  UserPlus
+  UserPlus,
+  ChevronRight
 } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase, useDoc } from '@/firebase';
-import { collection, query, orderBy, doc, deleteDoc, Timestamp } from 'firebase/firestore';
+import { collection, query, orderBy, doc, deleteDoc, Timestamp, limit } from 'firebase/firestore';
 import type { Lead, Client, Staff, LeadStatus, LeadPriority, UserProfile } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -126,7 +127,7 @@ export default function LeadsPage() {
   const leadsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'leads'), orderBy('createdAt', 'desc')) : null), [firestore]);
   const { data: leadsData, isLoading: isLoadingLeads } = useCollection<Lead>(leadsQuery);
 
-  const clientsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'clients'), limit(500) : null), [firestore]);
+  const clientsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'clients'), limit(500)) : null), [firestore]);
   const { data: clientsData } = useCollection<Client>(clientsQuery);
   const clientsMap = React.useMemo(() => new Map(clientsData?.map(c => [c.id, c])), [clientsData]);
 
@@ -232,9 +233,9 @@ export default function LeadsPage() {
         <div className="flex items-center gap-3">
           <div className="relative w-64">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input 
+            <input 
               placeholder="Pesquisar..." 
-              className="pl-8 bg-[#0f172a] border-white/10 text-white" 
+              className="w-full h-10 pl-8 rounded-md bg-[#0f172a] border border-white/10 text-white text-sm outline-none focus:ring-1 focus:ring-primary transition-all" 
               value={searchTerm} 
               onChange={e => setSearchTerm(e.target.value)} 
             />
@@ -295,7 +296,6 @@ export default function LeadsPage() {
         </div>
       ) : (
         <div className="grid gap-4">
-          {/* List View implementation here if needed, but Kanban is preferred */}
           {filteredLeads.map(lead => (
              <LeadKanbanCard 
                 key={lead.id} 
@@ -352,7 +352,7 @@ export default function LeadsPage() {
                             <SelectValue placeholder="Delegar para..." />
                           </SelectTrigger>
                         </FormControl>
-                        <SelectContent className="bg-[#0f172a] border-white/10">
+                        <SelectContent className="bg-[#0f172a] border-white/10 text-white">
                           {lawyers.map(l => (
                             <SelectItem key={l.id} value={l.id}>Dr(a). {l.firstName} {l.lastName}</SelectItem>
                           ))}
@@ -385,7 +385,7 @@ export default function LeadsPage() {
                       <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Prioridade *</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl><SelectTrigger className="h-11 bg-black/40 border-white/10"><SelectValue /></SelectTrigger></FormControl>
-                        <SelectContent className="bg-[#0f172a] border-white/10">
+                        <SelectContent className="bg-[#0f172a] border-white/10 text-white">
                           <SelectItem value="BAIXA">🔵 Baixa</SelectItem>
                           <SelectItem value="MEDIA">🟢 Média</SelectItem>
                           <SelectItem value="ALTA">🟡 Alta</SelectItem>
@@ -403,7 +403,7 @@ export default function LeadsPage() {
                       <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Fonte *</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl><SelectTrigger className="h-11 bg-black/40 border-white/10"><SelectValue /></SelectTrigger></FormControl>
-                        <SelectContent className="bg-[#0f172a] border-white/10">
+                        <SelectContent className="bg-[#0f172a] border-white/10 text-white">
                           <SelectItem value="Google Ads">Google Ads</SelectItem>
                           <SelectItem value="WhatsApp">WhatsApp</SelectItem>
                           <SelectItem value="Indicação">Indicação</SelectItem>
