@@ -9,7 +9,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Palette,
   Users,
   Save,
   PowerOff,
@@ -47,7 +46,6 @@ import { useDoc, useFirebase, useMemoFirebase, useCollection } from '@/firebase'
 import { doc, collection, setDoc } from 'firebase/firestore';
 import type { UserProfile, UserRole, UserRoleInfo, SEOSettings } from '@/lib/types';
 import { ClientKitManager } from '@/components/settings/client-kit-manager';
-import { AppearanceTab } from '@/components/settings/appearance-tab';
 import { TemplateLibraryManager } from '@/components/settings/template-library-manager';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -884,7 +882,6 @@ export default function ConfiguracoesPage() {
           <TabsTrigger value="financeiro" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold px-6 h-10 shrink-0">Financeiro</TabsTrigger>
           <TabsTrigger value="kit-cliente" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold px-6 h-10 shrink-0">Kit Cliente</TabsTrigger>
           <TabsTrigger value="modelos-acervo" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold px-6 h-10 shrink-0">Modelos</TabsTrigger>
-          <TabsTrigger value="aparencia" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold px-6 h-10 shrink-0">Aparência</TabsTrigger>
           <TabsTrigger value="backup" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold px-6 h-10 shrink-0">Backup</TabsTrigger>
           <TabsTrigger value="licenca" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold px-6 h-10 shrink-0">Licença</TabsTrigger>
         </TabsList>
@@ -981,10 +978,6 @@ export default function ConfiguracoesPage() {
 
         <TabsContent value="modelos-acervo" className="animate-in fade-in duration-300">
             <TemplateLibraryManager />
-        </TabsContent>
-
-        <TabsContent value="aparencia" className="animate-in fade-in duration-300">
-          <AppearanceTab />
         </TabsContent>
 
         <TabsContent value="backup" className="animate-in fade-in duration-300">
