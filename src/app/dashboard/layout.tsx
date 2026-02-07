@@ -94,7 +94,7 @@ const sidebarSections = [
     label: 'Financeiro (Caixa)',
     items: [
       { href: '/dashboard/financeiro', label: 'Faturamento', icon: DollarSign, roles: ['admin', 'financial'] },
-      { href: '/dashboard/repasses', label: 'Folha & Repasses', icon: Wallet, roles: ['admin', 'financial'] },
+      { href: '/dashboard/repasses', label: 'Carteira & Repasses', icon: Wallet, roles: ['admin', 'financial', 'lawyer'] },
       { href: '/dashboard/reembolsos', label: 'Reembolsos', icon: Receipt, roles: ['admin', 'lawyer', 'financial', 'assistant'] },
     ]
   },
@@ -116,7 +116,7 @@ const BreadcrumbMap: { [key: string]: string } = {
   '/dashboard/audiencias': 'Audiências',
   '/dashboard/reembolsos': 'Reembolsos',
   '/dashboard/financeiro': 'Financeiro',
-  '/dashboard/repasses': 'Repasses & Folha',
+  '/dashboard/repasses': 'Carteira & Repasses',
   '/dashboard/relatorios': 'Relatórios Gerenciais',
   '/dashboard/acervo': 'Acervo de Modelos',
   '/dashboard/arquivo': 'Arquivo Digital',
@@ -282,7 +282,7 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
         </Sidebar>
         <SidebarInset className="bg-[#020617] min-h-screen">
             <header className="flex h-14 items-center gap-4 border-b border-white/5 bg-[#020617]/95 backdrop-blur-md px-4 lg:h-[60px] lg:px-6 sticky top-0 z-30">
-            <SidebarTrigger className="shrink-0 md:hidden text-white" />
+            <SidebarTrigger className="shrink-0 text-white" />
             {getBreadcrumb()}
             <div className="ml-auto flex items-center gap-2">
                 <NotificationBell />

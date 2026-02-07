@@ -32,7 +32,7 @@ import {
   RefreshCw,
   CalendarDays
 } from 'lucide-react';
-import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
+import { useFirebase, useCollection, useMemoFirebase, useDoc } from '@/firebase';
 import { collection, query, where, getDocs, getDoc, FieldValue, Timestamp, doc, deleteDoc, orderBy, limit } from 'firebase/firestore';
 import type { Staff, FinancialTitle, StaffCredit, UserProfile } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -358,7 +358,7 @@ function RepassePaymentDialog({ staff, credits, open, onOpenChange, onPaid }: { 
           </div>
           <div className="flex items-start gap-4 p-5 rounded-2xl bg-blue-500/5 border border-blue-500/20 text-[11px] text-blue-400/80 leading-relaxed"><div className="h-6 w-6 rounded-full bg-blue-500/10 flex items-center justify-center shrink-0"><Info className="h-3.5 w-3.5" /></div><p>Esta operação registrará uma saída de caixa oficial no financeiro central do escritório e gerará um aviso de liquidação para o profissional.</p></div>
         </div>
-        <DialogFooter className="bg-black/20 p-6 border-t border-white/5 gap-3"><DialogClose asChild><Button variant="ghost" className="text-slate-400 hover:text-white font-bold h-14 px-8 text-xs uppercase tracking-widest" disabled={isProcessing}>Cancelar</Button></DialogClose><Button className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase tracking-widest text-[11px] h-14 shadow-xl shadow-emerald-900/20 group" onClick={handlePay} disabled={isProcessing}>{isProcessing ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <CheckCircle2 className="mr-2 h-5 w-5" />}{isProcessing ? 'Processando...' : 'Confirmar Pagamento e Emitir'}</Button></DialogFooter>
+        <DialogFooter className="bg-black/20 p-6 border-t border-white/5 gap-3"><DialogClose asChild><Button variant="ghost" className="text-slate-400 hover:text-white font-bold h-14 px-8 text-xs uppercase tracking-widest" disabled={isProcessing}>Cancelar</Button></DialogClose><Button className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase tracking-widest text-[11px] h-14 shadow-xl shadow-emerald-900/20 group" onClick={handlePay} disabled={isProcessing}>{isProcessing ? <Loader2 className="h-5 w-5 animate-spin" /> : <CheckCircle2 className="mr-2 h-5 w-5" />}{isProcessing ? 'Processando...' : 'Confirmar Pagamento e Emitir'}</Button></DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -488,8 +488,81 @@ function ManageCreditsDialog({ staff, open, onOpenChange, onUpdate, isAdmin }: {
   );
 }
 
-export default function RepassesPage() {
+function LawyerWalletView({ staffId, staffName }: { staffId: string; staffName: string }) {
   const { firestore } = useFirebase();
+  const [filter, setFilter] = React.useState<'ALL' | 'DISPONIVEL' | 'RETIDO'>('ALL');
+
+  const creditsQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, `staff/${staffId}/credits`), orderBy('date', 'desc'), limit(100));
+  }, [firestore, staffId]);
+
+  const { data: credits, isLoading } = useCollection<StaffCredit>(creditsQuery);
+
+  const filteredCredits = React.useMemo(() => {
+    if (!credits) return [];
+    if (filter === 'ALL') return credits.filter(c => c.status !== 'PAGO');
+    return credits.filter(c => c.status === filter);
+  }, [credits, filter]);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-2">
+          <Button variant={filter === 'ALL' ? 'default' : 'ghost'} size="sm" onClick={() => setFilter('ALL')} className="text-[10px] uppercase font-black h-8">Carteira Pendente</Button>
+          <Button variant={filter === 'DISPONIVEL' ? 'default' : 'ghost'} size="sm" onClick={() => setFilter('DISPONIVEL')} className="text-[10px] uppercase font-black h-8 text-emerald-400">Liberados</Button>
+          <Button variant={filter === 'RETIDO' ? 'default' : 'ghost'} size="sm" onClick={() => setFilter('RETIDO')} className="text-[10px] uppercase font-black h-8 text-blue-400">Aguardando Cliente</Button>
+        </div>
+      </div>
+
+      <Card className="bg-[#0f172a] border-white/5 overflow-hidden">
+        <ScrollArea className="h-[60vh]">
+          <div className="p-6">
+            {isLoading ? (
+              <div className="space-y-4">
+                {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-20 w-full bg-white/5 rounded-xl" />)}
+              </div>
+            ) : filteredCredits.length > 0 ? (
+              <div className="space-y-3">
+                {filteredCredits.map(c => (
+                  <div key={c.id} className="flex items-center justify-between p-5 rounded-2xl bg-white/5 border border-white/5 hover:border-primary/20 transition-all group">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <Badge variant="outline" className={cn(
+                          "text-[8px] font-black uppercase px-2 h-5 border-none",
+                          c.status === 'DISPONIVEL' ? "bg-emerald-500/20 text-emerald-400" : "bg-blue-500/20 text-blue-400"
+                        )}>{c.status}</Badge>
+                        <span className="text-[10px] text-muted-foreground font-bold tracking-widest">{c.date ? format(c.date.toDate(), 'dd/MM/yyyy') : 'N/A'}</span>
+                        {c.paymentForecast && (
+                          <Badge variant="secondary" className="text-[8px] font-black uppercase bg-primary/10 text-primary border-primary/20 gap-1 h-5">
+                            <Clock className="h-2.5 w-2.5" /> Pagamento Previsto: {format(c.paymentForecast.toDate(), 'dd/MM/yyyy')}
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-sm font-bold text-white truncate">{c.description}</p>
+                      <p className="text-[9px] text-slate-500 uppercase font-black tracking-widest mt-1">{c.type}</p>
+                    </div>
+                    <div className="text-right ml-6">
+                      <span className="text-lg font-black text-white tabular-nums">{c.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-20 opacity-30 flex flex-col items-center">
+                <FileText className="h-12 w-12 mb-4" />
+                <p className="text-sm font-black uppercase tracking-widest">Nenhum lançamento pendente encontrado</p>
+              </div>
+            )}
+          </div>
+        </ScrollArea>
+      </Card>
+    </div>
+  );
+}
+
+export default function RepassesPage() {
+  const { firestore, user } = useFirebase();
   const { data: session } = useSession();
   const { toast } = useToast();
   
@@ -499,27 +572,53 @@ export default function RepassesPage() {
   const [isVoucherOpen, setIsVoucherOpen] = React.useState(false);
   const [voucherData, setVoucherData] = React.useState<{ staff: Staff | null, credits: any[], total: number, date?: Date }>({ staff: null, credits: [], total: 0 });
 
-  const isAdmin = session?.user?.role === 'admin' || session?.user?.role === 'financial';
+  const userProfileRef = useMemoFirebase(
+    () => (firestore && user?.uid ? doc(firestore, 'users', user.uid) : null),
+    [firestore, user?.uid]
+  );
+  const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
+
+  const isAdmin = userProfile?.role === 'admin' || userProfile?.role === 'financial';
+  const isLawyer = userProfile?.role === 'lawyer';
 
   const loadStats = React.useCallback(async () => {
-    if (!firestore) return;
+    if (!firestore || !userProfile) return;
     try {
-      const staffSnap = await getDocs(collection(firestore, 'staff'));
-      let pending = 0; let retained = 0;
-      for (const s of staffSnap.docs) {
-        const credSnap = await getDocs(collection(firestore, `staff/${s.id}/credits`));
+      if (isAdmin) {
+        const staffSnap = await getDocs(collection(firestore, 'staff'));
+        let pending = 0; let retained = 0;
+        for (const s of staffSnap.docs) {
+          const credSnap = await getDocs(collection(firestore, `staff/${s.id}/credits`));
+          credSnap.docs.forEach(d => {
+            const val = d.data().value || 0;
+            if (d.data().status === 'DISPONIVEL') pending += val;
+            if (d.data().status === 'RETIDO') retained += val;
+          });
+        }
+        const startOfCurrentMonth = startOfMonth(new Date());
+        const paidSnap = await getDocs(query(collection(firestore, 'financial_titles'), where('origin', '==', 'HONORARIOS_PAGOS'), where('paymentDate', '>=', Timestamp.fromDate(startOfCurrentMonth))));
+        const paid = paidSnap.docs.reduce((sum, d) => sum + (d.data().value || 0), 0);
+        setStats({ totalPending: pending, totalPaidMonth: paid, staffCount: staffSnap.size, totalRetained: retained });
+      } else if (isLawyer) {
+        // Stats específicas do advogado
+        const credSnap = await getDocs(collection(firestore, `staff/${userProfile.id}/credits`));
+        let pending = 0; let retained = 0; let paid = 0;
+        const startOfCurrentMonth = startOfMonth(new Date());
+        
         credSnap.docs.forEach(d => {
-          const val = d.data().value || 0;
-          if (d.data().status === 'DISPONIVEL') pending += val;
-          if (d.data().status === 'RETIDO') retained += val;
+          const data = d.data();
+          const val = data.value || 0;
+          if (data.status === 'DISPONIVEL') pending += val;
+          if (data.status === 'RETIDO') retained += val;
+          if (data.status === 'PAGO') {
+            const pDate = data.paymentDate?.toDate();
+            if (pDate && pDate >= startOfCurrentMonth) paid += val;
+          }
         });
+        setStats({ totalPending: pending, totalPaidMonth: paid, staffCount: 1, totalRetained: retained });
       }
-      const startOfCurrentMonth = startOfMonth(new Date());
-      const paidSnap = await getDocs(query(collection(firestore, 'financial_titles'), where('origin', '==', 'HONORARIOS_PAGOS'), where('paymentDate', '>=', Timestamp.fromDate(startOfCurrentMonth))));
-      const paid = paidSnap.docs.reduce((sum, d) => sum + (d.data().value || 0), 0);
-      setStats({ totalPending: pending, totalPaidMonth: paid, staffCount: staffSnap.size, totalRetained: retained });
     } catch (e) { console.warn('[RepassesStats] Failed to load full stats.'); }
-  }, [firestore]);
+  }, [firestore, isAdmin, isLawyer, userProfile]);
 
   React.useEffect(() => { loadStats(); }, [loadStats, refreshKey]);
 
@@ -551,7 +650,10 @@ export default function RepassesPage() {
   return (
     <div className="flex flex-col gap-8 pb-10">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div><H1 className="text-white">Repasses & Carteiras</H1><p className="text-sm text-muted-foreground">Monitoramento de saldos profissionais e liquidação de honorários.</p></div>
+        <div>
+          <H1 className="text-white">{isAdmin ? 'Repasses & Carteiras' : 'Minha Carteira Profissional'}</H1>
+          <p className="text-sm text-muted-foreground">{isAdmin ? 'Monitoramento de saldos profissionais e liquidação de honorários.' : 'Acompanhe seus créditos liberados e próximos recebimentos.'}</p>
+        </div>
         <div className="flex items-center gap-2">
           {isAdmin && (
             <Button variant="outline" className="border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/5 h-10" onClick={handleLaunchPayroll} disabled={isLaunching}>{isLaunching ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Zap className="mr-2 h-4 w-4" />}Rodar Folha Mensal</Button>
@@ -561,24 +663,45 @@ export default function RepassesPage() {
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="bg-emerald-500/5 border-emerald-500/20"><CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-emerald-400">Total Liquidado (Mês)</CardTitle></CardHeader><CardContent className="p-4 pt-0"><p className="text-2xl font-black text-white">{stats.totalPaidMonth.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p></CardContent></Card>
-        <Card className="bg-amber-500/5 border-amber-500/20"><CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-amber-400">Saldos Liberados</CardTitle></CardHeader><CardContent className="p-4 pt-0"><p className="text-2xl font-black text-white">{stats.totalPending.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p></CardContent></Card>
-        <Card className="bg-blue-500/5 border-blue-500/20"><CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-blue-400">Honorários Retidos</CardTitle></CardHeader><CardContent className="p-4 pt-0"><p className="text-2xl font-black text-white">{stats.totalRetained.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p></CardContent></Card>
-        <Card className="bg-white/5 border-white/10"><CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-slate-400">Profissionais Ativos</CardTitle></CardHeader><CardContent className="p-4 pt-0"><p className="text-2xl font-black text-white">{stats.staffCount}</p></CardContent></Card>
+        <Card className="bg-emerald-500/5 border-emerald-500/20"><CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-emerald-400 tracking-widest">{isAdmin ? 'Total Liquidado (Mês)' : 'Total Recebido (Mês)'}</CardTitle></CardHeader><CardContent className="p-4 pt-0"><p className="text-2xl font-black text-white">{stats.totalPaidMonth.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p></CardContent></Card>
+        <Card className="bg-amber-500/5 border-amber-500/20"><CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-amber-400 tracking-widest">{isAdmin ? 'Saldos Liberados' : 'Seu Saldo Liberado'}</CardTitle></CardHeader><CardContent className="p-4 pt-0"><p className="text-2xl font-black text-white">{stats.totalPending.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p></CardContent></Card>
+        <Card className="bg-blue-500/5 border-blue-500/20"><CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-blue-400 tracking-widest">{isAdmin ? 'Honorários Retidos' : 'Seus Honorários Retidos'}</CardTitle></CardHeader><CardContent className="p-4 pt-0"><p className="text-2xl font-black text-white">{stats.totalRetained.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p></CardContent></Card>
+        {isAdmin && <Card className="bg-white/5 border-white/10"><CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Profissionais Ativos</CardTitle></CardHeader><CardContent className="p-4 pt-0"><p className="text-2xl font-black text-white">{stats.staffCount}</p></CardContent></Card>}
       </div>
 
-      <Tabs defaultValue="lawyers" className="w-full">
-        <TabsList className="grid w-full grid-cols-4 bg-[#0f172a] border border-white/5 p-1 h-12">
-          <TabsTrigger value="lawyers" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold h-10"><Briefcase className="h-4 w-4" /> Advogados</TabsTrigger>
-          <TabsTrigger value="staff" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold h-10"><Users className="h-4 w-4" /> Colaboradores</TabsTrigger>
-          <TabsTrigger value="providers" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold h-10"><ShieldCheck className="h-4 w-4" /> Provedores</TabsTrigger>
-          <TabsTrigger value="history" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold h-10"><History className="h-4 w-4" /> Histórico</TabsTrigger>
-        </TabsList>
-        <TabsContent value="lawyers" className="mt-6"><PayoutList filterRole="lawyer" onRefresh={() => setRefreshKey(k => k + 1)} onPaid={handleRepassePaid} isAdmin={isAdmin} /></TabsContent>
-        <TabsContent value="staff" className="mt-6"><PayoutList filterRole="employee" onRefresh={() => setRefreshKey(k => k + 1)} onPaid={handleRepassePaid} isAdmin={isAdmin} /></TabsContent>
-        <TabsContent value="providers" className="mt-6"><PayoutList filterRole="provider" onRefresh={() => setRefreshKey(k => k + 1)} onPaid={handleRepassePaid} isAdmin={isAdmin} /></TabsContent>
-        <TabsContent value="history" className="mt-6"><PaymentHistory onShowVoucher={handleShowVoucherFromHistory} /></TabsContent>
-      </Tabs>
+      {isAdmin ? (
+        <Tabs defaultValue="lawyers" className="w-full">
+          <TabsList className="grid w-full grid-cols-4 bg-[#0f172a] border border-white/5 p-1 h-12">
+            <TabsTrigger value="lawyers" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold h-10"><Briefcase className="h-4 w-4" /> Advogados</TabsTrigger>
+            <TabsTrigger value="staff" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold h-10"><Users className="h-4 w-4" /> Colaboradores</TabsTrigger>
+            <TabsTrigger value="providers" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold h-10"><ShieldCheck className="h-4 w-4" /> Provedores</TabsTrigger>
+            <TabsTrigger value="history" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold h-10"><History className="h-4 w-4" /> Histórico Geral</TabsTrigger>
+          </TabsList>
+          <TabsContent value="lawyers" className="mt-6"><PayoutList filterRole="lawyer" onRefresh={() => setRefreshKey(k => k + 1)} onPaid={handleRepassePaid} isAdmin={isAdmin} /></TabsContent>
+          <TabsContent value="staff" className="mt-6"><PayoutList filterRole="employee" onRefresh={() => setRefreshKey(k => k + 1)} onPaid={handleRepassePaid} isAdmin={isAdmin} /></TabsContent>
+          <TabsContent value="providers" className="mt-6"><PayoutList filterRole="provider" onRefresh={() => setRefreshKey(k => k + 1)} onPaid={handleRepassePaid} isAdmin={isAdmin} /></TabsContent>
+          <TabsContent value="history" className="mt-6"><PaymentHistory onShowVoucher={handleShowVoucherFromHistory} /></TabsContent>
+        </Tabs>
+      ) : isLawyer ? (
+        <Tabs defaultValue="wallet" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 bg-[#0f172a] border border-white/5 p-1 h-12">
+            <TabsTrigger value="wallet" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold h-10"><Wallet className="h-4 w-4" /> Meus Créditos Pendentes</TabsTrigger>
+            <TabsTrigger value="history" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold h-10"><History className="h-4 w-4" /> Meu Histórico de Recebimento</TabsTrigger>
+          </TabsList>
+          <TabsContent value="wallet" className="mt-6">
+            <LawyerWalletView staffId={userProfile.id} staffName={`${userProfile.firstName} ${userProfile.lastName}`} />
+          </TabsContent>
+          <TabsContent value="history" className="mt-6">
+            <PaymentHistory onShowVoucher={handleShowVoucherFromHistory} />
+          </TabsContent>
+        </Tabs>
+      ) : (
+        <div className="flex flex-col items-center justify-center py-20 opacity-40">
+          <AlertCircle className="h-12 w-12 mb-4" />
+          <p className="font-bold text-lg">Acesso Restrito</p>
+          <p className="text-sm">Contate um administrador para vincular sua conta à equipe.</p>
+        </div>
+      )}
       
       <StaffVoucherDialog staff={voucherData.staff} credits={voucherData.credits} totalValue={voucherData.total} paymentDate={voucherData.date} open={isVoucherOpen} onOpenChange={setIsVoucherOpen} />
     </div>
