@@ -546,10 +546,10 @@ export function LandingClient({ initialSettings, initialSeo }: { initialSettings
               </p>
               <div className="flex items-center gap-4">
                 <Link href={instagramUrl} target="_blank" className="h-10 w-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-primary hover:text-primary-foreground transition-all duration-300">
-                  <Instagram className="h-5 w-5" />
+                  <Instagram className="h-6 w-6 />
                 </Link>
                 <Link href="#" className="h-10 w-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-primary hover:text-primary-foreground transition-all duration-300">
-                  <AtSign className="h-5 w-5" />
+                  <AtSign className="h-6 w-6" />
                 </Link>
               </div>
             </div>
