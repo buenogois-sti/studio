@@ -64,6 +64,7 @@ import { initializeAdminDriveStructure } from '@/lib/admin-drive-actions';
 import { cn } from '@/lib/utils';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const roleSchema = z.object({
   email: z.string().email('Formato de email inválido.'),
@@ -703,7 +704,7 @@ function SEOTab() {
               <h4 className="text-xs font-black uppercase tracking-widest">Rastreamento & Analytics</h4>
             </div>
             
-            <div grid grid-cols-1 md:grid-cols-2 gap-6>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Google Analytics ID (G-XXXXXXX)</Label>
                 <Input 
