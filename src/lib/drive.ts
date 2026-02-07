@@ -8,7 +8,7 @@ import type { Session } from 'next-auth';
 import type { Client, Process } from './types';
 
 const ROOT_CLIENTS_FOLDER_ID = '1DVI828qlM7SoN4-FJsGj9wwmxcOEjh6l';
-const ROOT_PROCESSES_FOLDER_ID = '1V6xGiXQnapkA4y4m3on1s5zZTYqMPkhH'; // Global processes root
+const ROOT_PROCESSES_FOLDER_ID = '1V6xGiXQnapkA4y4m3on1s5zZTYqMPkhH';
 
 const CLIENT_FOLDER_STRUCTURE: Record<string, string[] | Record<string, string[]>> = {
   'level1': [
@@ -69,34 +69,12 @@ export async function getGoogleApiClientsForUser(): Promise<GoogleApiClients> {
     return { drive, sheets, calendar, tasks, docs };
 }
 
-async function createMultipleFolders(drive: drive_v3.Drive, parentId: string, folderNames: string[]): Promise<Map<string, string>> {
-  const folderIds = new Map<string, string>();
-  for (const name of folderNames) {
-    const fileMetadata = {
-      name,
-      mimeType: 'application/vnd.google-apps.folder',
-      parents: [parentId],
-    };
-    try {
-      const file = await drive.files.create({
-        requestBody: fileMetadata,
-        fields: 'id',
-        supportsAllDrives: true,
-      });
-      if (file.data.id) {
-        folderIds.set(name, file.data.id);
-      }
-    } catch (error: any) {
-        console.error(`Error creating folder '${name}':`, error.message);
-    }
-  }
-  return folderIds;
-}
-
 async function findFolderByName(drive: drive_v3.Drive, parentId: string, name: string): Promise<string | null> {
     try {
+        // Escapar aspas simples para a query do Drive
+        const safeName = name.replace(/'/g, "\\'");
         const res = await drive.files.list({
-            q: `'${parentId}' in parents and mimeType = 'application/vnd.google-apps.folder' and name = '${name}' and trashed = false`,
+            q: `'${parentId}' in parents and mimeType = 'application/vnd.google-apps.folder' and name = '${safeName}' and trashed = false`,
             fields: 'files(id)',
             pageSize: 1,
             supportsAllDrives: true,
@@ -107,9 +85,36 @@ async function findFolderByName(drive: drive_v3.Drive, parentId: string, name: s
         }
         return null;
     } catch (error: any) {
-        console.error(`Error finding folder '${name}':`, error.message);
+        console.error(`[findFolderByName] Error finding folder '${name}':`, error.message);
         return null;
     }
+}
+
+async function createMultipleFolders(drive: drive_v3.Drive, parentId: string, folderNames: string[]): Promise<Map<string, string>> {
+  const folderIds = new Map<string, string>();
+  for (const name of folderNames) {
+    try {
+      // Verificar se a subpasta já existe antes de criar
+      let folderId = await findFolderByName(drive, parentId, name);
+      
+      if (!folderId) {
+        const file = await drive.files.create({
+          requestBody: {
+            name,
+            mimeType: 'application/vnd.google-apps.folder',
+            parents: [parentId],
+          },
+          fields: 'id',
+          supportsAllDrives: true,
+        });
+        folderId = file.data.id!;
+      }
+      folderIds.set(name, folderId);
+    } catch (error: any) {
+        console.error(`[createMultipleFolders] Error ensuring folder '${name}':`, error.message);
+    }
+  }
+  return folderIds;
 }
 
 export async function syncClientToDrive(clientId: string, clientName: string): Promise<void> {
@@ -140,7 +145,8 @@ export async function syncClientToDrive(clientId: string, clientName: string): P
             mainFolderId = file.data.id!;
         }
 
-        const level1FolderIds = await createMultipleFolders(drive, mainFolderId, CLIENT_FOLDER_STRUCTURE.level1 as string[]);
+        // Garante a estrutura de nível 1 (01 - Cadastro, 02 - Contratos...)
+        await createMultipleFolders(drive, mainFolderId, CLIENT_FOLDER_STRUCTURE.level1 as string[]);
 
         await clientRef.update({
             driveFolderId: mainFolderId,
@@ -162,44 +168,55 @@ export async function syncProcessToDrive(processId: string): Promise<void> {
         if (!processDoc.exists) throw new Error('Processo não encontrado.');
         const processData = processDoc.data() as Process;
 
-        if (processData.driveFolderId && processData.globalDriveFolderId) {
-            return;
-        }
-
+        // Se o processo já tem IDs mapeados, não precisamos criar nada do zero
+        // mas podemos validar se as pastas existem se quisermos ser ultra-seguros.
+        // Por ora, vamos focar em não duplicar se os IDs estiverem vazios.
+        
         const clientRef = firestoreAdmin.collection('clients').doc(processData.clientId);
         const clientDoc = await clientRef.get();
         if (!clientDoc.exists) throw new Error('Cliente não encontrado.');
         const clientData = clientDoc.data() as Client;
 
+        // Garante que o cliente tenha pasta
         if (!clientData.driveFolderId) {
             await syncClientToDrive(clientData.id, `${clientData.firstName} ${clientData.lastName}`);
             const updatedClient = await clientRef.get();
             clientData.driveFolderId = updatedClient.data()?.driveFolderId;
         }
 
+        if (!clientData.driveFolderId) throw new Error('Falha ao obter pasta do cliente.');
+
         const { drive } = await getGoogleApiClientsForUser();
 
-        // 1. Organização na pasta do Cliente
-        let processosFolderId = await findFolderByName(drive, clientData.driveFolderId!, '03 - Processos');
+        // 1. Localiza ou cria a pasta "03 - Processos" dentro do Cliente
+        let processosFolderId = await findFolderByName(drive, clientData.driveFolderId, '03 - Processos');
         if (!processosFolderId) {
-            const created = await createMultipleFolders(drive, clientData.driveFolderId!, ['03 - Processos']);
+            const created = await createMultipleFolders(drive, clientData.driveFolderId, ['03 - Processos']);
             processosFolderId = created.get('03 - Processos')!;
         }
 
         const processFolderName = `${processData.processNumber || 'SEM-NUMERO'} - ${processData.name}`;
         
-        // Criar pasta do processo dentro do Cliente
-        const clientProcessFolder = await drive.files.create({
-            requestBody: {
-                name: processFolderName,
-                mimeType: 'application/vnd.google-apps.folder',
-                parents: [processosFolderId!],
-            },
-            fields: 'id',
-            supportsAllDrives: true,
-        });
+        // IDEMPOTÊNCIA: Verifica se a pasta do processo já existe no cliente
+        let clientProcessFolderId = processData.driveFolderId || await findFolderByName(drive, processosFolderId!, processFolderName);
+        
+        if (!clientProcessFolderId) {
+            const res = await drive.files.create({
+                requestBody: {
+                    name: processFolderName,
+                    mimeType: 'application/vnd.google-apps.folder',
+                    parents: [processosFolderId!],
+                },
+                fields: 'id',
+                supportsAllDrives: true,
+            });
+            clientProcessFolderId = res.data.id!;
+        }
 
-        // 2. Organização na pasta Global por Tipo de Ação
+        // Garante as subpastas operacionais (Petições, Atas, Recursos...)
+        await createMultipleFolders(drive, clientProcessFolderId!, PROCESS_FOLDER_STRUCTURE.level1 as string[]);
+
+        // 2. Organização na pasta Global por Tipo de Ação (Trabalhista, Cível...)
         let areaFolderId = await findFolderByName(drive, ROOT_PROCESSES_FOLDER_ID, processData.legalArea);
         if (!areaFolderId) {
             const res = await drive.files.create({
@@ -214,25 +231,27 @@ export async function syncProcessToDrive(processId: string): Promise<void> {
             areaFolderId = res.data.id!;
         }
 
-        // Shortcut ou pasta espelhada na pasta global
-        const globalProcessFolder = await drive.files.create({
-            requestBody: {
-                name: processFolderName,
-                mimeType: 'application/vnd.google-apps.folder',
-                parents: [areaFolderId!],
-            },
-            fields: 'id',
-            supportsAllDrives: true,
-        });
-
-        if (clientProcessFolder.data.id) {
-            await createMultipleFolders(drive, clientProcessFolder.data.id, PROCESS_FOLDER_STRUCTURE.level1 as string[]);
-            await processRef.update({
-                driveFolderId: clientProcessFolder.data.id,
-                globalDriveFolderId: globalProcessFolder.data.id,
-                updatedAt: new Date(),
+        // IDEMPOTÊNCIA: Verifica se a pasta do processo já existe na pasta global da área
+        let globalProcessFolderId = processData.globalDriveFolderId || await findFolderByName(drive, areaFolderId!, processFolderName);
+        if (!globalProcessFolderId) {
+            const res = await drive.files.create({
+                requestBody: {
+                    name: processFolderName,
+                    mimeType: 'application/vnd.google-apps.folder',
+                    parents: [areaFolderId!],
+                },
+                fields: 'id',
+                supportsAllDrives: true,
             });
+            globalProcessFolderId = res.data.id!;
         }
+
+        // Atualiza o Firestore com os IDs finais
+        await processRef.update({
+            driveFolderId: clientProcessFolderId,
+            globalDriveFolderId: globalProcessFolderId,
+            updatedAt: new Date(),
+        });
         
     } catch (error: any) {
         console.error("Error in syncProcessToDrive:", error);
