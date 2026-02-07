@@ -73,14 +73,22 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
       console.log('[Firebase Auth] Sincronizando com Custom Token...');
       
       signInWithCustomToken(auth, session.customToken).then(() => {
+        console.log('[Firebase Auth] ✅ User signed in with custom token');
         lastTokenRef.current = session.customToken!;
       }).catch((error: any) => {
         const errorCode = error?.code || 'UNKNOWN_ERROR';
         const clientProject = auth.app.options.projectId;
         const expectedProject = 'studio-7080106838-23904';
         
+        console.error('[Firebase Auth] ❌ Erro ao autenticar Custom Token:', {
+          code: errorCode,
+          message: error.message,
+          clientProject,
+          expectedProject
+        });
+
         if (clientProject !== expectedProject) {
-          console.warn('[Firebase Auth] ⚠️ PROJECT ID MISMATCH detectado.');
+          console.warn('[Firebase Auth] ⚠️ PROJECT ID MISMATCH detectado. Verifique .env.local');
         }
         
         setUserAuthState((state) => ({ ...state, userError: error, isUserLoading: false }));

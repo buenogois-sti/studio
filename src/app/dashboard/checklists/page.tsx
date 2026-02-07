@@ -21,7 +21,8 @@ import {
   User,
   ShieldCheck,
   X,
-  AlertTriangle
+  AlertTriangle,
+  MessageSquare
 } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy, limit, Timestamp } from 'firebase/firestore';
@@ -59,6 +60,21 @@ import { upsertChecklistTemplate, deleteChecklistTemplate, saveChecklistExecutio
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 export default function ChecklistsPage() {
   const { firestore } = useFirebase();
@@ -356,7 +372,7 @@ function ChecklistEditorDialog({ open, onOpenChange, template }: { open: boolean
                 <h3 className="text-sm font-black uppercase tracking-widest text-primary flex items-center gap-2">
                   <ListChecks className="h-4 w-4" /> Itens de Verificação
                 </h3>
-                <Button onClick={addItem} size="sm" variant="outline" className="h-8 border-primary/20 text-primary hover:bg-primary/10 text-[10px] font-black uppercase">
+                <Button onClick={addItem} type="button" size="sm" variant="outline" className="h-8 border-primary/20 text-primary hover:bg-primary/10 text-[10px] font-black uppercase">
                   <Plus className="h-3 w-3 mr-1" /> Adicionar Passo
                 </Button>
               </div>

@@ -299,7 +299,7 @@ export async function processHearingReturn(hearingId: string, data: {
           tasklist: '@default',
           requestBody: {
             title: `📋 SEGUIMENTO: ${data.nextStepType} | ${hearingData.processName || 'Processo'}`,
-            notes: `Referente ao retorno do ato realizado em ${format(hearingData.date.toDate(), 'dd/MM/yyyy')}.\nResultado: ${data.resultNotes}`,
+            notes: `Referente ao retorno do ato realizado em ${format(hearingData.date.toDate(), 'dd/MM/yyyy', { locale: ptBR })}.\nResultado: ${data.resultNotes}`,
             due: taskDate.toISOString(),
           }
         });
@@ -321,7 +321,7 @@ export async function processHearingReturn(hearingId: string, data: {
         responsibleParty: hearingData.responsibleParty,
         status: 'PENDENTE',
         type: data.newHearingType || 'UNA',
-        notes: `Designada em ata após o ato de ${format(hearingData.date.toDate(), 'dd/MM/yyyy')}`
+        notes: `Designada em ata após o ato de ${format(hearingData.date.toDate(), 'dd/MM/yyyy', { locale: ptBR })}`
       });
     }
 

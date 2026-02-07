@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -20,7 +19,8 @@ import {
   CheckCircle2, 
   AlertCircle,
   Smartphone,
-  ShieldCheck
+  ShieldCheck,
+  X
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -98,7 +98,6 @@ export function QuickHearingDialog({ process, open, onOpenChange, onSuccess }: Q
         }
       }
 
-      // Buscar dados do cliente para links de notificação
       if (process.clientId) {
         getDoc(doc(firestore, 'clients', process.clientId)).then(snap => {
           if (snap.exists()) setClientData({ id: snap.id, ...snap.data() } as Client);
@@ -188,7 +187,6 @@ export function QuickHearingDialog({ process, open, onOpenChange, onSuccess }: Q
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
               
-              {/* Seção 1: Profissional e Tipo */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 rounded-3xl bg-white/5 border border-white/10 relative overflow-hidden">
                 <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
                   <UserCheck className="h-20 w-24" />
@@ -244,7 +242,6 @@ export function QuickHearingDialog({ process, open, onOpenChange, onSuccess }: Q
                 />
               </div>
 
-              {/* Seção 2: Data e Local */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <FormField
                   control={form.control}
@@ -314,7 +311,6 @@ export function QuickHearingDialog({ process, open, onOpenChange, onSuccess }: Q
                 />
               </div>
 
-              {/* Seção 3: Comunicação com Cliente */}
               <div className="p-6 rounded-3xl bg-blue-500/5 border border-blue-500/20 space-y-6">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -396,7 +392,7 @@ export function QuickHearingDialog({ process, open, onOpenChange, onSuccess }: Q
             className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90 font-black uppercase tracking-widest text-[11px] h-12 shadow-xl shadow-primary/20"
             onClick={() => form.handleSubmit(onSubmit)()}
           >
-            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
+            {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
             Confirmar Escala e Distribuir
           </Button>
         </DialogFooter>
