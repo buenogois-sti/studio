@@ -546,7 +546,7 @@ export function LandingClient({ initialSettings, initialSeo }: { initialSettings
               </p>
               <div className="flex items-center gap-4">
                 <Link href={instagramUrl} target="_blank" className="h-10 w-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-primary hover:text-primary-foreground transition-all duration-300">
-                  <Instagram className="h-6 w-6 />
+                  <Instagram className="h-6 w-6" />
                 </Link>
                 <Link href="#" className="h-10 w-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-primary hover:text-primary-foreground transition-all duration-300">
                   <AtSign className="h-6 w-6" />
@@ -612,7 +612,9 @@ export function LandingClient({ initialSettings, initialSeo }: { initialSettings
           <div className="pt-12 border-t border-white/5 flex flex-col md:flex-row items-center justify-between gap-6 text-[10px] font-black uppercase tracking-widest text-slate-500">
             <p>&copy; {new Date().getFullYear()} {currentSettings?.officeName || 'Bueno Gois Advogados e Associados'} </p>
             <div className="flex gap-8">
-              <Link href="#" className="hover:text-primary transition-colors">Termos de Uso</Link>
+              <Link href="/login" className="hover:text-primary transition-colors flex items-center gap-1.5 group">
+                <Lock className="h-3 w-3 opacity-50 group-hover:opacity-100" /> Área do Advogado
+              </Link>
               <Link href="#" className="hover:text-primary transition-colors">Privacidade</Link>
               <p className="text-primary/40">Powered by LexFlow Elite</p>
             </div>
