@@ -289,7 +289,7 @@ export default function ProcessosPage() {
         </Card>
       </div>
 
-      <div className="grid gap-3 min-h-[400px]">
+      <div className="grid gap-4 min-h-[400px]">
         {isLoading && !paginatedProcesses.length ? (
           <div className="flex flex-col items-center justify-center py-32 space-y-4">
             <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -305,169 +305,183 @@ export default function ProcessosPage() {
             const isExpanded = expandedProcessId === p.id;
 
             return (
-              <Card key={p.id} className="border-none shadow-md overflow-hidden bg-[#0f172a] hover:bg-white/[0.02] transition-all duration-300 group">
+              <Card key={p.id} className="border-none shadow-xl overflow-hidden bg-[#0f172a] hover:bg-white/[0.01] transition-all duration-300 group">
                 <CardContent className="p-0">
-                  <div className="p-4 flex flex-col gap-3">
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1 flex-wrap">
-                          <h3 className="font-bold text-lg text-white group-hover:text-primary transition-colors cursor-pointer truncate max-w-[400px]" onClick={() => setExpandedProcessId(isExpanded ? null : p.id)}>
+                  <div className="p-5 flex flex-col gap-4">
+                    {/* Linha 1: Grade de 12 colunas para Identificação, Cliente e Status */}
+                    <div className="grid grid-cols-12 gap-6 items-center">
+                      
+                      {/* Pilar 1: Identificação (5 Colunas) */}
+                      <div className="col-span-12 md:col-span-5 min-w-0">
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <h3 className="font-bold text-lg text-white leading-none truncate group-hover:text-primary transition-colors cursor-pointer" onClick={() => setExpandedProcessId(isExpanded ? null : p.id)}>
                             {p.name}
                           </h3>
-                          <Badge variant="outline" className={cn("gap-1 h-5 px-1.5 text-[8px] font-black uppercase tracking-widest", statusInfo.color)}>
+                          <Badge variant="outline" className={cn("gap-1 h-5 px-1.5 text-[8px] font-black uppercase tracking-widest border-none", statusInfo.color)}>
                             {statusInfo.label}
                           </Badge>
                         </div>
                         <div className="flex flex-wrap items-center gap-3">
-                          {p.processNumber && <span className="text-[10px] font-mono text-slate-500 bg-white/5 px-1.5 rounded">{p.processNumber}</span>}
-                          <div className="flex items-center gap-1 text-[9px] font-black uppercase text-primary/70">
+                          {p.processNumber && (
+                            <span className="text-[10px] font-mono font-bold text-slate-500 bg-white/5 px-1.5 py-0.5 rounded border border-white/5">
+                              {p.processNumber}
+                            </span>
+                          )}
+                          <div className="flex items-center gap-1.5 text-[9px] font-black uppercase text-primary/80">
                             <Scale className="h-3 w-3" /> {p.legalArea}
                           </div>
                           {leadLawyer && (
-                            <div className="flex items-center gap-1 text-[9px] font-bold text-emerald-400 uppercase">
+                            <div className="flex items-center gap-1.5 text-[9px] font-bold text-emerald-400 uppercase">
                               <UserCheck className="h-3 w-3" /> Dr(a). {leadLawyer.firstName}
                             </div>
                           )}
                         </div>
                       </div>
-                      
-                      <div className="flex items-center gap-1 shrink-0">
-                        <Button variant="ghost" size="icon" onClick={() => setExpandedProcessId(isExpanded ? null : p.id)} className="h-8 w-8 text-white/20 hover:text-white">
-                          {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                        </Button>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-white/20 hover:text-white"><MoreVertical className="h-4 w-4" /></Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-64 bg-[#0f172a] border-white/10 shadow-2xl p-1">
-                            <DropdownMenuLabel className="text-[10px] font-black uppercase text-slate-500 px-2 py-1.5 tracking-widest">Gestão do Caso</DropdownMenuLabel>
-                            <DropdownMenuItem onClick={() => { setSelectedProcess(p); setIsTimelineOpen(true); }} className="gap-2 focus:bg-white/5">
-                              <History className="h-4 w-4 text-primary" /> <span className="font-bold">Timeline do Processo</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => { setSelectedProcess(p); setIsDeadlineOpen(true); }} className="gap-2 focus:bg-white/5">
-                              <Timer className="h-4 w-4 text-rose-400" /> <span className="font-bold">Lançar Prazo Fatal</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => { setSelectedProcess(p); setIsHearingOpen(true); }} className="gap-2 focus:bg-white/5">
-                              <Gavel className="h-4 w-4 text-amber-400" /> <span className="font-bold">Agendar Audiência</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => { setSelectedProcess(p); setIsDraftingOpen(true); }} className="gap-2 focus:bg-white/5">
-                              <FilePlus2 className="h-4 w-4 text-emerald-400" /> <span className="font-bold">Gerar Documento (IA)</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator className="bg-white/5" />
-                            <DropdownMenuItem onSelect={() => setEventProcess(p)} className="gap-2 focus:bg-white/5">
-                              <DollarSign className="h-4 w-4 text-blue-400" /> <span className="font-bold">Evento Financeiro</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator className="bg-white/5" />
-                            <DropdownMenuItem onClick={() => { setEditingProcess(p); setIsSheetOpen(true); }} className="gap-2 focus:bg-white/5">
-                              <FileText className="h-4 w-4 text-slate-400" /> <span className="font-bold">Editar Dados</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => setProcessToArchive(p)} className="gap-2 text-rose-500 focus:bg-rose-500/10">
-                              <ArchiveX className="h-4 w-4" /> <span className="font-bold">Arquivar Caso</span>
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+
+                      {/* Pilar 2: Cliente (3 Colunas) */}
+                      <div className="col-span-12 md:col-span-3 border-l border-white/5 pl-6 hidden md:block">
+                        <Link href={`/dashboard/clientes?searchTerm=${client ? `${client.firstName} ${client.lastName}` : ''}`} className="block group/link">
+                          <p className="text-[8px] font-black uppercase text-slate-500 tracking-widest mb-1">Cliente / Outorgante</p>
+                          <div className="flex items-center gap-2">
+                            <div className="h-7 w-7 rounded bg-blue-500/10 flex items-center justify-center shrink-0 border border-blue-500/20">
+                              <User className="h-3.5 w-3.5 text-blue-400" />
+                            </div>
+                            <p className="text-xs font-bold text-slate-200 truncate group-hover/link:text-primary transition-colors">
+                              {client ? `${client.firstName} ${client.lastName}` : 'Sem Cliente'}
+                            </p>
+                          </div>
+                        </Link>
+                      </div>
+
+                      {/* Pilar 3: Operacional (4 Colunas) */}
+                      <div className="col-span-12 md:col-span-4 flex items-center justify-end gap-2 md:gap-4">
+                        {/* Atalho Audiência */}
+                        <Link href="/dashboard/audiencias" className={cn("flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all border border-transparent", processHearings.length > 0 ? "bg-amber-500/5 hover:bg-amber-500/10 hover:border-amber-500/20" : "opacity-20")}>
+                          <Calendar className="h-4 w-4 text-amber-400" />
+                          <span className="text-[8px] font-black uppercase text-amber-500/70">{processHearings.length > 0 ? format(processHearings[0].date.toDate(), 'dd/MM/yy') : '---'}</span>
+                        </Link>
+
+                        {/* Atalho Acordo */}
+                        <Link href="/dashboard/financeiro" className={cn("flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all border border-transparent", processAgreement ? "bg-emerald-500/5 hover:bg-emerald-500/10 hover:border-emerald-500/20" : "opacity-20")}>
+                          <Handshake className="h-4 w-4 text-emerald-400" />
+                          <span className="text-[8px] font-black uppercase text-emerald-500/70">{processAgreement ? 'Firmado' : '---'}</span>
+                        </Link>
+
+                        {/* Atalho Prazos */}
+                        <Link href="/dashboard/prazos" className="flex flex-col items-center gap-1 px-3 py-2 rounded-xl bg-rose-500/5 hover:bg-rose-500/10 transition-all border border-transparent hover:border-rose-500/20">
+                          <Timer className="h-4 w-4 text-rose-400" />
+                          <span className="text-[8px] font-black uppercase text-rose-500/70">Prazos</span>
+                        </Link>
+
+                        <div className="h-10 w-px bg-white/5 mx-1" />
+
+                        {/* Ações e Expansão */}
+                        <div className="flex items-center gap-1">
+                          <Button variant="ghost" size="icon" onClick={() => setExpandedProcessId(isExpanded ? null : p.id)} className="h-9 w-9 text-white/20 hover:text-white hover:bg-white/5">
+                            {isExpanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-9 w-9 text-white/20 hover:text-white hover:bg-white/5"><MoreVertical className="h-5 w-5" /></Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-64 bg-[#0f172a] border-white/10 shadow-2xl p-1">
+                              <DropdownMenuLabel className="text-[10px] font-black uppercase text-slate-500 px-2 py-1.5 tracking-widest">Gestão do Caso</DropdownMenuLabel>
+                              <DropdownMenuItem onClick={() => { setSelectedProcess(p); setIsTimelineOpen(true); }} className="gap-2 focus:bg-white/5">
+                                <History className="h-4 w-4 text-primary" /> <span className="font-bold">Timeline do Processo</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => { setSelectedProcess(p); setIsDeadlineOpen(true); }} className="gap-2 focus:bg-white/5">
+                                <Timer className="h-4 w-4 text-rose-400" /> <span className="font-bold">Lançar Prazo Fatal</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => { setSelectedProcess(p); setIsHearingOpen(true); }} className="gap-2 focus:bg-white/5">
+                                <Gavel className="h-4 w-4 text-amber-400" /> <span className="font-bold">Agendar Audiência</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => { setSelectedProcess(p); setIsDraftingOpen(true); }} className="gap-2 focus:bg-white/5">
+                                <FilePlus2 className="h-4 w-4 text-emerald-400" /> <span className="font-bold">Gerar Documento (IA)</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator className="bg-white/5" />
+                              <DropdownMenuItem onSelect={() => setEventProcess(p)} className="gap-2 focus:bg-white/5">
+                                <DollarSign className="h-4 w-4 text-blue-400" /> <span className="font-bold">Evento Financeiro</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator className="bg-white/5" />
+                              <DropdownMenuItem onClick={() => { setEditingProcess(p); setIsSheetOpen(true); }} className="gap-2 focus:bg-white/5">
+                                <FileText className="h-4 w-4 text-slate-400" /> <span className="font-bold">Editar Dados</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => setProcessToArchive(p)} className="gap-2 text-rose-500 focus:bg-rose-500/10">
+                                <ArchiveX className="h-4 w-4" /> <span className="font-bold">Arquivar Caso</span>
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 pt-2 border-t border-white/5">
-                      <Link href={`/dashboard/clientes?searchTerm=${client ? `${client.firstName} ${client.lastName}` : ''}`} className="flex items-center gap-2 p-2 rounded-lg hover:bg-white/5 transition-all group/link">
-                        <div className="h-7 w-7 rounded bg-blue-500/10 flex items-center justify-center shrink-0">
-                          <User className="h-3.5 w-3.5 text-blue-400" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-[8px] font-black uppercase text-slate-500 tracking-tighter">Cliente</p>
-                          <p className="text-[10px] font-bold text-slate-300 truncate group-hover/link:text-primary">
-                            {client ? `${client.firstName} ${client.lastName}` : 'Sem Cliente'}
-                          </p>
-                        </div>
-                      </Link>
-
-                      <Link href="/dashboard/audiencias" className={cn("flex items-center gap-2 p-2 rounded-lg transition-all group/link", processHearings.length > 0 ? "hover:bg-amber-500/10" : "opacity-30")}>
-                        <div className="h-7 w-7 rounded bg-amber-500/10 flex items-center justify-center shrink-0">
-                          <Calendar className="h-3.5 w-3.5 text-amber-400" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-[8px] font-black uppercase text-slate-500 tracking-tighter">Audiência</p>
-                          <p className="text-[10px] font-bold text-amber-400 truncate">
-                            {processHearings.length > 0 ? format(processHearings[0].date.toDate(), 'dd/MM/yyyy') : 'Nenhuma'}
-                          </p>
-                        </div>
-                      </Link>
-
-                      <Link href="/dashboard/financeiro" className={cn("flex items-center gap-2 p-2 rounded-lg transition-all group/link", processAgreement ? "hover:bg-emerald-500/10" : "opacity-30")}>
-                        <div className="h-7 w-7 rounded bg-emerald-500/10 flex items-center justify-center shrink-0">
-                          <Handshake className="h-3.5 w-3.5 text-emerald-400" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-[8px] font-black uppercase text-slate-500 tracking-tighter">Acordo</p>
-                          <p className="text-[10px] font-black text-emerald-400 uppercase">
-                            {processAgreement ? 'Firmado' : 'Em Cobrança'}
-                          </p>
-                        </div>
-                      </Link>
-
-                      <Link href="/dashboard/prazos" className="flex items-center gap-2 p-2 rounded-lg hover:bg-rose-500/10 transition-all group/link">
-                        <div className="h-7 w-7 rounded bg-rose-500/10 flex items-center justify-center shrink-0">
-                          <Timer className="h-3.5 w-3.5 text-rose-400" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-[8px] font-black uppercase text-slate-500 tracking-tighter">Prazos</p>
-                          <p className="text-[10px] font-bold text-rose-400 uppercase tracking-widest">Ver Guia</p>
-                        </div>
-                      </Link>
-                    </div>
-
+                    {/* Expansão de Detalhes (Inteligente) */}
                     {isExpanded && (
-                      <div className="rounded-xl bg-white/[0.03] p-4 animate-in slide-in-from-top-2 duration-300 space-y-4 border border-white/5 mt-1">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-                          <div>
-                            <p className="text-[9px] font-black uppercase text-slate-500 mb-1 tracking-widest flex items-center gap-1.5"><Building className="h-3 w-3" /> Juízo</p>
-                            <p className="text-slate-300 font-medium leading-tight">{p.courtBranch || '---'}<br />{p.court || '---'}</p>
+                      <div className="rounded-2xl bg-white/[0.03] p-6 animate-in slide-in-from-top-2 duration-300 space-y-6 border border-white/5 mt-1">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                          <div className="space-y-3">
+                            <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2"><Building className="h-3.5 w-3.5" /> COMPETÊNCIA / JUÍZO</p>
+                            <div className="pl-5.5 border-l-2 border-primary/20">
+                              <p className="text-sm text-slate-300 font-bold leading-tight">{p.courtBranch || 'Vara não informada'}</p>
+                              <p className="text-[11px] text-slate-500 mt-1">{p.court || 'Fórum não informado'}</p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="text-[9px] font-black uppercase text-slate-500 mb-1 tracking-widest flex items-center gap-1.5"><DollarSign className="h-3 w-3" /> Valor Causa</p>
-                            <p className="text-blue-400 font-black text-base">{(p.caseValue || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                          <div className="space-y-3">
+                            <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2"><DollarSign className="h-3.5 w-3.5 text-emerald-500" /> VALOR DA CAUSA</p>
+                            <div className="pl-5.5 border-l-2 border-emerald-500/20">
+                              <p className="text-xl font-black text-white tabular-nums">{(p.caseValue || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                              <p className="text-[10px] text-slate-500 uppercase font-bold">Risco Estimado</p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="text-[9px] font-black uppercase text-slate-500 mb-1 tracking-widest flex items-center gap-1.5"><Users className="h-3 w-3" /> Réus</p>
-                            <div className="space-y-0.5">
-                              {p.opposingParties?.slice(0, 2).map((op, i) => (
-                                <p key={i} className="text-slate-300 font-bold truncate text-[10px]">{op.name}</p>
-                              ))}
-                              {(!p.opposingParties || p.opposingParties.length === 0) && <p className="text-slate-600 italic">Nenhum</p>}
+                          <div className="space-y-3">
+                            <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2"><Users className="h-3.5 w-3.5 text-rose-400" /> RÉUS / RECLAMADAS</p>
+                            <div className="pl-5.5 border-l-2 border-rose-500/20 space-y-1">
+                              {p.opposingParties && p.opposingParties.length > 0 ? p.opposingParties.slice(0, 3).map((op, i) => (
+                                <p key={i} className="text-sm text-slate-300 font-bold truncate">{op.name}</p>
+                              )) : <p className="text-xs text-slate-600 italic">Nenhum réu cadastrado</p>}
+                              {p.opposingParties && p.opposingParties.length > 3 && <p className="text-[9px] text-primary font-black uppercase">+ {p.opposingParties.length - 3} outros</p>}
                             </div>
                           </div>
                         </div>
                         
                         {p.description && (
-                          <div className="pt-3 border-t border-white/5">
-                            <p className="text-[9px] font-black uppercase text-slate-500 mb-1 tracking-widest">Estratégia</p>
-                            <p className="text-[11px] text-slate-400 leading-relaxed italic line-clamp-2">{p.description}</p>
+                          <div className="pt-5 border-t border-white/5">
+                            <p className="text-[10px] font-black uppercase text-slate-500 mb-2 tracking-widest">DIRETRIZES ESTRATÉGICAS</p>
+                            <div className="p-4 rounded-xl bg-black/40 border border-white/5">
+                              <p className="text-sm text-slate-400 leading-relaxed italic">{p.description}</p>
+                            </div>
                           </div>
                         )}
                       </div>
                     )}
 
-                    <div className="flex items-center justify-between pt-1">
+                    {/* Rodapé: Ações de Sistema */}
+                    <div className="flex items-center justify-between pt-2 border-t border-white/5">
                       <div className="flex items-center gap-2">
                         {p.driveFolderId ? (
-                          <a href={`https://drive.google.com/drive/folders/${p.driveFolderId}`} target="_blank" className="text-emerald-400 font-black text-[8px] uppercase flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-500/5 border border-emerald-500/20 hover:bg-emerald-500/10 transition-all">
-                            <FolderOpen className="h-3 w-3" /> Drive
-                          </a>
+                          <Button variant="outline" size="sm" className="h-7 px-3 border-emerald-500/20 text-emerald-400 bg-emerald-500/5 hover:bg-emerald-500/10 text-[9px] font-black uppercase gap-1.5 rounded-full" asChild>
+                            <a href={`https://drive.google.com/drive/folders/${p.driveFolderId}`} target="_blank">
+                              <FolderOpen className="h-3 w-3" /> Drive do Caso
+                            </a>
+                          </Button>
                         ) : (
-                          <button className="text-amber-400 font-black text-[8px] uppercase flex items-center gap-1 px-2 py-1 rounded-full bg-amber-500/5 border border-amber-500/20 hover:bg-amber-500/10 transition-all" onClick={() => handleSyncProcess(p)} disabled={isSyncing === p.id}>
-                            {isSyncing === p.id ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <RefreshCw className="h-2.5 w-2.5" />} Drive
-                          </button>
+                          <Button variant="ghost" size="sm" className="h-7 px-3 text-amber-400 hover:text-amber-300 hover:bg-amber-500/5 text-[9px] font-black uppercase gap-1.5 rounded-full" onClick={() => handleSyncProcess(p)} disabled={isSyncing === p.id}>
+                            {isSyncing === p.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} Pendente Drive
+                          </Button>
                         )}
                         {p.courtWebsite && (
-                          <a href={p.courtWebsite} target="_blank" className="text-blue-400 font-black text-[8px] uppercase flex items-center gap-1 px-2 py-1 rounded-full bg-blue-500/5 border border-blue-500/20 hover:bg-blue-500/10 transition-all">
-                            <ExternalLink className="h-3 w-3" /> Portal
-                          </a>
+                          <Button variant="outline" size="sm" className="h-7 px-3 border-blue-500/20 text-blue-400 bg-blue-500/5 hover:bg-blue-500/10 text-[9px] font-black uppercase gap-1.5 rounded-full" asChild>
+                            <a href={p.courtWebsite} target="_blank">
+                              <ExternalLink className="h-3 w-3" /> Portal Judiciário
+                            </a>
+                          </Button>
                         )}
                       </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-[8px] text-slate-600 font-black uppercase tracking-widest">Protocolo: {p.createdAt ? format(p.createdAt.toDate(), 'dd/MM/yy') : '---'}</span>
-                        <span className="text-[8px] text-slate-700 font-mono">#{p.id.substring(0, 6)}</span>
+                      <div className="flex items-center gap-4">
+                        <span className="text-[9px] text-slate-600 font-black uppercase tracking-widest flex items-center gap-1.5">
+                          <CalendarIcon className="h-2.5 w-2.5" /> Protocolo: {p.createdAt ? format(p.createdAt.toDate(), 'dd/MM/yyyy') : '---'}
+                        </span>
+                        <span className="text-[9px] text-slate-700 font-mono tracking-tighter opacity-50">#{p.id.substring(0, 8).toUpperCase()}</span>
                       </div>
                     </div>
                   </div>
@@ -476,14 +490,14 @@ export default function ProcessosPage() {
             );
           })
         ) : (
-          <div className="text-center py-20 bg-[#0f172a] rounded-2xl border-2 border-dashed border-white/5 opacity-40">
-            <FolderKanban className="h-12 w-12 mx-auto mb-4" />
-            <p className="font-bold text-white uppercase tracking-widest text-[10px]">Nenhum processo encontrado</p>
+          <div className="text-center py-24 bg-[#0f172a] rounded-3xl border-2 border-dashed border-white/5 opacity-40">
+            <FolderKanban className="h-16 w-16 mx-auto mb-4 text-slate-500" />
+            <p className="font-black text-white uppercase tracking-widest text-xs">Nenhum processo localizado</p>
           </div>
         )}
 
         {totalPages > 1 && (
-          <div className="flex items-center justify-center gap-6 mt-4 py-4 border-t border-white/5">
+          <div className="flex items-center justify-center gap-6 mt-6 py-6 border-t border-white/5">
             <Button 
               variant="outline" 
               size="sm" 
@@ -492,14 +506,14 @@ export default function ProcessosPage() {
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }} 
               disabled={currentPage === 1 || isLoading} 
-              className="bg-[#0f172a] border-border/50 text-white hover:bg-primary/10 hover:text-primary h-8 px-3 text-[10px] font-black uppercase"
+              className="bg-[#0f172a] border-border/50 text-white hover:bg-primary/10 hover:text-primary h-9 px-4 text-[10px] font-black uppercase"
             >
-              <ChevronLeft className="h-3 w-3 mr-1" /> Anterior
+              <ChevronLeft className="h-4 w-4 mr-2" /> Anterior
             </Button>
             
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-black text-white bg-primary/10 px-2 py-0.5 rounded">Pág {currentPage}</span>
-              <span className="text-[10px] text-muted-foreground font-medium">/ {totalPages}</span>
+              <span className="text-[11px] font-black text-white bg-primary/10 px-3 py-1 rounded">Página {currentPage}</span>
+              <span className="text-[11px] text-muted-foreground font-bold">/ {totalPages}</span>
             </div>
             
             <Button 
@@ -510,9 +524,9 @@ export default function ProcessosPage() {
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }} 
               disabled={currentPage === totalPages || isLoading} 
-              className="bg-[#0f172a] border-border/50 text-white hover:bg-primary/10 hover:text-primary h-8 px-3 text-[10px] font-black uppercase"
+              className="bg-[#0f172a] border-border/50 text-white hover:bg-primary/10 hover:text-primary h-9 px-4 text-[10px] font-black uppercase"
             >
-              Próxima <ChevronRight className="h-3 w-3 ml-1" />
+              Próxima <ChevronRight className="h-4 w-4 ml-2" />
             </Button>
           </div>
         )}
