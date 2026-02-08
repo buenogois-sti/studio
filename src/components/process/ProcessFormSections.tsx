@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState } from 'react';
@@ -174,7 +173,7 @@ export function ClientsSection({ control, onClientSelect }: ClientsSectionProps)
                   <div className="flex-1">
                     <FormField
                       control={control}
-                      name={`secondaryClientIds.${index}`}
+                      name={`secondaryClientIds.${index}` as any}
                       render={({ field: subField }) => (
                         <ClientSearchInput 
                           selectedClientId={subField.value} 
@@ -222,7 +221,7 @@ export function PartiesSection({ control, partyFields, onAddParty, onRemoveParty
   const { toast } = useToast();
 
   const handleOpposingCepSearch = async (index: number) => {
-    const cep = getValues(`opposingParties.${index}.cep` as any)?.replace(/\D/g, '');
+    const cep = (getValues(`opposingParties.${index}.cep` as any) as string)?.replace(/\D/g, '');
     if (!cep || cep.length !== 8) {
       toast({ variant: 'destructive', title: 'CEP Inválido' });
       return;
@@ -284,7 +283,7 @@ export function PartiesSection({ control, partyFields, onAddParty, onRemoveParty
                   <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField
                       control={control}
-                      name={`opposingParties.${index}.name`}
+                      name={`opposingParties.${index}.name` as any}
                       render={({ field: nameField }) => (
                         <FormItem>
                           <FormLabel className="text-[10px] uppercase font-black text-primary tracking-widest">
@@ -296,6 +295,7 @@ export function PartiesSection({ control, partyFields, onAddParty, onRemoveParty
                               className="h-11 bg-black/20 border-white/10"
                               onKeyDown={(e) => e.stopPropagation()}
                               {...nameField}
+                              value={nameField.value as string || ''}
                             />
                           </FormControl>
                           <FormMessage />
@@ -304,7 +304,7 @@ export function PartiesSection({ control, partyFields, onAddParty, onRemoveParty
                     />
                     <FormField
                       control={control}
-                      name={`opposingParties.${index}.document`}
+                      name={`opposingParties.${index}.document` as any}
                       render={({ field: docField }) => (
                         <FormItem>
                           <FormLabel className="text-[10px] uppercase font-black text-slate-500 tracking-widest">
@@ -316,6 +316,7 @@ export function PartiesSection({ control, partyFields, onAddParty, onRemoveParty
                               className="h-11 bg-black/20 border-white/10 font-mono"
                               onKeyDown={(e) => e.stopPropagation()}
                               {...docField}
+                              value={docField.value as string || ''}
                             />
                           </FormControl>
                         </FormItem>
@@ -336,7 +337,7 @@ export function PartiesSection({ control, partyFields, onAddParty, onRemoveParty
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField
                     control={control}
-                    name={`opposingParties.${index}.email`}
+                    name={`opposingParties.${index}.email` as any}
                     render={({ field: emailField }) => (
                       <FormItem>
                         <FormLabel className="text-[9px] uppercase font-bold text-slate-500">Email Jurídico / RH</FormLabel>
@@ -348,6 +349,7 @@ export function PartiesSection({ control, partyFields, onAddParty, onRemoveParty
                               className="pl-10 h-10 text-xs bg-black/20" 
                               {...emailField} 
                               onKeyDown={(e) => e.stopPropagation()} 
+                              value={emailField.value as string || ''}
                             />
                           </div>
                         </FormControl>
@@ -356,7 +358,7 @@ export function PartiesSection({ control, partyFields, onAddParty, onRemoveParty
                   />
                   <FormField
                     control={control}
-                    name={`opposingParties.${index}.phone`}
+                    name={`opposingParties.${index}.phone` as any}
                     render={({ field: phoneField }) => (
                       <FormItem>
                         <FormLabel className="text-[9px] uppercase font-bold text-slate-500">Telefone</FormLabel>
@@ -368,6 +370,7 @@ export function PartiesSection({ control, partyFields, onAddParty, onRemoveParty
                               className="pl-10 h-10 text-xs bg-black/20" 
                               {...phoneField} 
                               onKeyDown={(e) => e.stopPropagation()} 
+                              value={phoneField.value as string || ''}
                             />
                           </div>
                         </FormControl>
@@ -392,6 +395,7 @@ export function PartiesSection({ control, partyFields, onAddParty, onRemoveParty
                                 {...cepField} 
                                 onKeyDown={(e) => e.stopPropagation()} 
                                 maxLength={9}
+                                value={cepField.value as string || ''}
                               />
                               <button 
                                 type="button" 
@@ -409,7 +413,7 @@ export function PartiesSection({ control, partyFields, onAddParty, onRemoveParty
                   <div className="md:col-span-3 space-y-2">
                     <FormField
                       control={control}
-                      name={`opposingParties.${index}.address`}
+                      name={`opposingParties.${index}.address` as any}
                       render={({ field: addrField }) => (
                         <FormItem>
                           <FormLabel className="text-[9px] uppercase font-bold text-slate-500">Endereço Completo</FormLabel>
@@ -421,6 +425,7 @@ export function PartiesSection({ control, partyFields, onAddParty, onRemoveParty
                                 className="pl-10 min-h-[80px] text-xs bg-black/20 resize-none pt-2" 
                                 {...addrField} 
                                 onKeyDown={(e) => e.stopPropagation()} 
+                                value={addrField.value as string || ''}
                               />
                             </div>
                           </FormControl>
@@ -432,7 +437,7 @@ export function PartiesSection({ control, partyFields, onAddParty, onRemoveParty
 
                 <FormField
                   control={control}
-                  name={`opposingParties.${index}.observation`}
+                  name={`opposingParties.${index}.observation` as any}
                   render={({ field: obsField }) => (
                     <FormItem>
                       <FormLabel className="text-[9px] uppercase font-bold text-slate-500">Observações do Réu</FormLabel>
@@ -442,6 +447,7 @@ export function PartiesSection({ control, partyFields, onAddParty, onRemoveParty
                           className="h-10 text-xs bg-black/20" 
                           {...obsField} 
                           onKeyDown={(e) => e.stopPropagation()} 
+                          value={obsField.value as string || ''}
                         />
                       </FormControl>
                     </FormItem>
@@ -791,7 +797,7 @@ export function TeamSection({ control, staff, teamFields, onAddMember, onRemoveM
                   <div className="col-span-7">
                     <FormField
                       control={control}
-                      name={`teamParticipants.${index}.staffId`}
+                      name={`teamParticipants.${index}.staffId` as any}
                       render={({ field: memberField }) => (
                         <FormItem>
                           <Select onValueChange={memberField.onChange} value={memberField.value}>
@@ -815,7 +821,7 @@ export function TeamSection({ control, staff, teamFields, onAddMember, onRemoveM
                   <div className="col-span-3">
                     <FormField
                       control={control}
-                      name={`teamParticipants.${index}.percentage`}
+                      name={`teamParticipants.${index}.percentage` as any}
                       render={({ field: pctField }) => (
                         <FormItem>
                           <FormControl>

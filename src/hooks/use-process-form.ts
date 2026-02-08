@@ -27,8 +27,12 @@ export const processSchema = z.object({
   })).default([]),
   opposingParties: z.array(z.object({
     name: z.string().min(1, 'Nome é obrigatório'),
+    document: z.string().optional().or(z.literal('')),
     email: z.string().email('E-mail inválido').optional().or(z.literal('')),
     phone: z.string().optional().or(z.literal('')),
+    cep: z.string().optional().or(z.literal('')),
+    address: z.string().optional().or(z.literal('')),
+    observation: z.string().optional().or(z.literal('')),
   })).default([]),
   description: z.string().optional().or(z.literal('')),
 });
@@ -89,7 +93,6 @@ export const useProcessForm = (process?: Process | null, onSave?: () => void) =>
     };
   }, [process]);
 
-  // Salva rascunho no localStorage
   const saveDraft = useCallback(async (values: ProcessFormValues, processId?: string) => {
     try {
       localStorage.setItem(
@@ -104,7 +107,6 @@ export const useProcessForm = (process?: Process | null, onSave?: () => void) =>
     }
   }, []);
 
-  // Carrega rascunho do localStorage
   const loadDraft = useCallback((processId?: string) => {
     try {
       const draft = localStorage.getItem(DRAFT_STORAGE_KEY(processId));
@@ -115,7 +117,6 @@ export const useProcessForm = (process?: Process | null, onSave?: () => void) =>
     }
   }, []);
 
-  // Remove rascunho após salvar com sucesso
   const clearDraft = useCallback((processId?: string) => {
     try {
       localStorage.removeItem(DRAFT_STORAGE_KEY(processId));

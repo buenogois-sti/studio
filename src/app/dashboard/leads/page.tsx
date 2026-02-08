@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -38,7 +37,8 @@ import {
   Activity,
   FileUp,
   Mail,
-  Phone
+  Phone,
+  Download
 } from 'lucide-react';
 import { 
   DndContext, 
@@ -106,6 +106,9 @@ import { Separator } from '@/components/ui/separator';
 import { LocationSearch } from '@/components/shared/LocationSearch';
 import { v4 as uuidv4 } from 'uuid';
 import { listFiles } from '@/lib/drive-actions';
+import { useSession } from 'next-auth/react';
+import { Skeleton } from '@/components/ui/skeleton';
+import { syncLeadToDrive } from '@/lib/drive';
 
 const STAGES: LeadStatus[] = ['NOVO', 'ENTREVISTA', 'DOCUMENTACAO', 'CONTRATUAL', 'PRONTO'];
 
@@ -611,7 +614,7 @@ function NewLeadSheet({ open, onOpenChange, lawyers, onCreated }: { open: boolea
     setIsSaving(true);
     try {
       const result = await createLead(values);
-      if (result.success) {
+      if (result.success && result.id) {
         // Sync drive folder for lead
         await syncLeadToDrive(result.id);
         toast({ title: 'Lead Criado!', description: 'O atendimento foi iniciado e a pasta no Drive organizada.' });
