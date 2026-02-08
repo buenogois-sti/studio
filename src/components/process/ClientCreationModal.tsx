@@ -130,7 +130,7 @@ export function ClientCreationModal({ open, onOpenChange, onClientCreated }: Cli
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent 
-        className="sm:max-w-[500px] z-[200] bg-[#020617] border-white/10 text-white shadow-2xl h-[90vh] flex flex-col p-0 overflow-hidden"
+        className="sm:max-w-[500px] z-[150] bg-[#020617] border-white/10 text-white shadow-2xl h-[90vh] flex flex-col p-0 overflow-hidden"
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
         <DialogHeader className="p-6 border-b border-white/5 shrink-0">
@@ -253,7 +253,7 @@ export function ClientCreationModal({ open, onOpenChange, onClientCreated }: Cli
                               <SelectValue placeholder="Selecione a área jurídica" />
                             </SelectTrigger>
                           </FormControl>
-                          <SelectContent className="bg-[#0f172a] border-white/10 text-white">
+                          <SelectContent className="bg-[#0f172a] border-white/10 text-white z-[300]">
                             {LEGAL_AREAS.map((area) => (
                               <SelectItem key={area} value={area} className="font-bold">
                                 {area}
@@ -283,10 +283,10 @@ export function ClientCreationModal({ open, onOpenChange, onClientCreated }: Cli
               Cancelar
             </Button>
             <Button
-              type="submit"
-              form="quick-client-form"
+              type="button"
               disabled={isLoading}
               className="flex-1 h-12 gap-2 bg-primary text-primary-foreground font-black uppercase tracking-widest text-[11px] shadow-lg shadow-primary/20 hover:scale-[1.02] transition-all"
+              onClick={() => form.handleSubmit(onSubmit)()}
             >
               {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
               Salvar Cliente
