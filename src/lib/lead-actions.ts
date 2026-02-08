@@ -107,8 +107,14 @@ export async function updateLeadOpposingParties(id: string, parties: OpposingPar
 
 /**
  * Converte um Lead aprovado em um Processo ativo, migrando todos os dados.
+ * Exige dados judiciais (passo final do protocolo).
  */
-export async function convertLeadToProcess(leadId: string) {
+export async function convertLeadToProcess(leadId: string, data: {
+  processNumber: string;
+  court: string;
+  courtBranch: string;
+  caseValue: number;
+}) {
   if (!firestoreAdmin) throw new Error('Servidor indisponível.');
   const session = await getServerSession(authOptions);
   if (!session) throw new Error('Não autenticado.');
@@ -126,13 +132,13 @@ export async function convertLeadToProcess(leadId: string) {
     const clientDoc = await clientRef.get();
     if (!clientDoc.exists) throw new Error('Cliente vinculado não encontrado.');
 
-    // 2. Preparar payload do novo processo
+    // 2. Preparar payload do novo processo com os dados judiciais fornecidos
     const processRef = firestoreAdmin.collection('processes').doc();
     
     const timelineEvent: TimelineEvent = {
       id: uuidv4(),
       type: 'system',
-      description: `PROCESSO DISTRIBUÍDO: Convertido a partir do CRM (Lead #${leadId.substring(0, 6)}). Responsável: ${session.user.name}. Reclamadas e dados migrados automaticamente.`,
+      description: `PROCESSO DISTRIBUÍDO (PROTOCOLO): Convertido a partir do CRM (Lead #${leadId.substring(0, 6)}). Autos distribuídos na ${data.courtBranch} do ${data.court}. Número CNJ: ${data.processNumber}. Responsável: ${session.user.name}.`,
       date: Timestamp.now() as any,
       authorName: session.user.name || 'Sistema'
     };
@@ -143,6 +149,10 @@ export async function convertLeadToProcess(leadId: string) {
       legalArea: leadData.legalArea,
       description: leadData.description || '',
       status: 'Ativo',
+      processNumber: data.processNumber,
+      court: data.court,
+      courtBranch: data.courtBranch,
+      caseValue: data.caseValue,
       leadLawyerId: leadData.lawyerId,
       opposingParties: leadData.opposingParties || [],
       driveFolderId: leadData.driveFolderId || '',
@@ -175,7 +185,7 @@ export async function convertLeadToProcess(leadId: string) {
       await createNotification({
         userId: leadData.lawyerId,
         title: "Processo Protocolado",
-        description: `O lead "${leadData.title}" foi convertido em processo ativo.`,
+        description: `O lead "${leadData.title}" foi convertido em processo ativo (CNJ: ${data.processNumber}).`,
         type: 'success',
         href: '/dashboard/processos'
       });

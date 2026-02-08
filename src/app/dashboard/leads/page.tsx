@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -41,7 +40,9 @@ import {
   Download,
   Hash,
   Mail,
-  Phone
+  Phone,
+  DollarSign,
+  Gavel
 } from 'lucide-react';
 import { 
   DndContext, 
@@ -110,6 +111,7 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { uploadFile, listFiles } from '@/lib/drive-actions';
 import { syncLeadToDrive } from '@/lib/drive';
+import { LocationSearch } from '@/components/shared/LocationSearch';
 
 const STAGES: LeadStatus[] = ['NOVO', 'ENTREVISTA', 'DOCUMENTACAO', 'CONTRATUAL', 'PRONTO'];
 
@@ -140,6 +142,146 @@ const leadFormSchema = z.object({
   isUrgent: z.boolean().default(false),
   description: z.string().optional(),
 });
+
+const conversionSchema = z.object({
+  processNumber: z.string().min(10, 'O número CNJ é obrigatório para protocolar.'),
+  court: z.string().min(3, 'O fórum/comarca é obrigatório.'),
+  courtBranch: z.string().min(3, 'A vara judiciária é obrigatória.'),
+  caseValue: z.coerce.number().min(0, 'Informe o valor da causa.'),
+});
+
+function LeadConversionDialog({ 
+  lead, 
+  open, 
+  onOpenChange, 
+  onConfirm 
+}: { 
+  lead: Lead | null; 
+  open: boolean; 
+  onOpenChange: (o: boolean) => void;
+  onConfirm: (data: z.infer<typeof conversionSchema>) => void;
+}) {
+  const form = useForm<z.infer<typeof conversionSchema>>({
+    resolver: zodResolver(conversionSchema),
+    defaultValues: {
+      processNumber: '',
+      court: '',
+      courtBranch: '',
+      caseValue: 0,
+    }
+  });
+
+  const handleCurrencyChange = (raw: string) => {
+    const digits = raw.replace(/\D/g, '');
+    const numericValue = Number(digits) / 100;
+    form.setValue('caseValue', numericValue, { shouldDirty: true, shouldValidate: true });
+  };
+
+  const formatCurrencyBRL = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
+  };
+
+  if (!lead) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md bg-[#020617] border-white/10 text-white shadow-2xl h-[90vh] flex flex-col p-0 overflow-hidden">
+        <DialogHeader className="p-6 border-b border-white/5 bg-white/5 shrink-0">
+          <DialogTitle className="flex items-center gap-2 text-white font-headline text-xl">
+            <ArrowRightLeft className="h-6 w-6 text-emerald-500" />
+            Protocolar Processo
+          </DialogTitle>
+          <DialogDescription className="text-slate-400">
+            Preencha os dados judiciais definitivos para converter este lead em processo.
+          </DialogDescription>
+        </DialogHeader>
+
+        <ScrollArea className="flex-1">
+          <Form {...form}>
+            <form id="conversion-form" onSubmit={form.handleSubmit(onConfirm)} className="p-6 space-y-6">
+              <FormField
+                control={form.control}
+                name="processNumber"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Número do Processo (CNJ) *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="0000000-00.0000.0.00.0000" className="bg-black/40 border-white/10 h-11 font-mono tracking-widest" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="court"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Fórum / Comarca *</FormLabel>
+                    <FormControl>
+                      <LocationSearch value={field.value} onSelect={field.onChange} placeholder="Pesquisar tribunal..." />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="courtBranch"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Vara / Câmara *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Ex: 2ª Vara do Trabalho de SBC" className="bg-black/40 border-white/10 h-11" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="caseValue"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Valor da Causa (R$) *</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-emerald-500" />
+                        <Input 
+                          placeholder="0,00" 
+                          className="pl-9 bg-black/40 border-white/10 h-11 font-bold"
+                          value={formatCurrencyBRL(field.value)}
+                          onChange={(e) => handleCurrencyChange(e.target.value)}
+                        />
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </form>
+          </Form>
+        </ScrollArea>
+
+        <DialogFooter className="p-6 border-t border-white/5 bg-white/5 shrink-0 gap-3">
+          <DialogClose asChild>
+            <Button variant="ghost" className="text-slate-400 font-bold uppercase text-[10px] tracking-widest">Cancelar</Button>
+          </DialogClose>
+          <Button 
+            type="submit" 
+            form="conversion-form"
+            className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase tracking-widest text-[11px] h-12 shadow-xl shadow-emerald-900/20"
+          >
+            Confirmar Protocolo
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 function LeadCard({ lead, client, lawyer, onClick }: { lead: Lead; client?: Client; lawyer?: Staff; onClick: () => void }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: lead.id });
@@ -176,7 +318,7 @@ function LeadCard({ lead, client, lawyer, onClick }: { lead: Lead; client?: Clie
               {priority.label}
             </Badge>
             {isLocked && (
-              <Badge variant="outline" className="text-[8px] font-black uppercase bg-amber-500/10 text-amber-500 border-amber-500/20 px-1.5 h-4.5 gap-1">
+              <Badge variant="outline" className="text-[8px] font-black uppercase bg-amber-500/10 text-amber-400 border-amber-500/20 px-1.5 h-4.5 gap-1">
                 <Lock className="h-2.5 w-2.5" /> Pendência
               </Badge>
             )}
@@ -253,7 +395,21 @@ function KanbanColumn({ id, stage, leads, clientsMap, staffMap, onCardClick }: {
   );
 }
 
-function LeadDetailsSheet({ lead, client, open, onOpenChange, onConvert, isProcessing }: { lead: Lead | null; client?: Client; open: boolean; onOpenChange: (o: boolean) => void; onConvert: (id: string) => void; isProcessing: boolean }) {
+function LeadDetailsSheet({ 
+  lead, 
+  client, 
+  open, 
+  onOpenChange, 
+  onProtocolClick,
+  isProcessing 
+}: { 
+  lead: Lead | null; 
+  client?: Client; 
+  open: boolean; 
+  onOpenChange: (o: boolean) => void; 
+  onProtocolClick: (lead: Lead) => void; 
+  isProcessing: boolean 
+}) {
   const [activeTab, setActiveTab] = React.useState('burocracia');
   const [files, setFiles] = React.useState<any[]>([]);
   const [isUploading, setIsUploading] = React.useState(false);
@@ -372,31 +528,41 @@ function LeadDetailsSheet({ lead, client, open, onOpenChange, onConvert, isProce
 
   if (!lead) return null;
 
+  const isReadyToProtocol = lead.status === 'PRONTO';
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="sm:max-w-4xl w-full p-0 flex flex-col bg-[#020617] border-white/10 text-white">
+      <SheetContent className="sm:max-w-4xl w-full p-0 flex flex-col bg-[#020617] border-white/10 text-white shadow-2xl">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
-          <SheetHeader className="p-6 border-b border-white/5 bg-white/5">
+          <SheetHeader className="p-6 border-b border-white/5 bg-white/5 shrink-0">
             <div className="flex items-center justify-between">
               <div>
                 <Badge variant="outline" className={cn("text-[9px] font-black uppercase mb-2", stageConfig[lead.status as LeadStatus].color)}>Fase Atual: {stageConfig[lead.status as LeadStatus].label}</Badge>
                 <SheetTitle className="text-2xl font-black font-headline text-white">{lead.title}</SheetTitle>
                 <SheetDescription className="text-slate-400">Origem: {lead.captureSource} | Ref: #{lead.id.substring(0, 6)}</SheetDescription>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-col items-end gap-2">
                 <Button 
-                  onClick={() => onConvert(lead.id)} 
-                  disabled={isProcessing || lead.status === 'DISTRIBUIDO'} 
-                  className="bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase tracking-widest text-[10px] h-12 px-8"
+                  onClick={() => onProtocolClick(lead)} 
+                  disabled={isProcessing || lead.status === 'DISTRIBUIDO' || !isReadyToProtocol} 
+                  className={cn(
+                    "bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase tracking-widest text-[10px] h-12 px-8 transition-all",
+                    !isReadyToProtocol && "opacity-50 grayscale cursor-not-allowed"
+                  )}
                 >
                   {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ArrowRightLeft className="mr-2 h-4 w-4" />}
                   Protocolar Processo
                 </Button>
+                {!isReadyToProtocol && lead.status !== 'DISTRIBUIDO' && (
+                  <p className="text-[9px] text-amber-500 font-bold uppercase flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" /> Conclua a triagem para protocolar
+                  </p>
+                )}
               </div>
             </div>
           </SheetHeader>
 
-          <div className="px-6 bg-white/5 border-b border-white/5">
+          <div className="px-6 bg-white/5 border-b border-white/5 shrink-0">
             <TabsList className="bg-transparent gap-8 h-14 p-0">
               <TabsTrigger value="burocracia" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent text-slate-400 data-[state=active]:text-white font-black uppercase text-[10px] tracking-widest">Dados do Cliente</TabsTrigger>
               <TabsTrigger value="reclamadas" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent text-slate-400 text-[10px] uppercase font-black tracking-widest">Polo Passivo (Réus)</TabsTrigger>
@@ -618,6 +784,7 @@ export default function LeadsPage() {
   const [isClientModalOpen, setIsClientModalOpen] = React.useState(false);
   const [selectedLead, setSelectedLead] = React.useState<Lead | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = React.useState(false);
+  const [isConversionOpen, setIsConversionOpen] = React.useState(false);
   const [isProcessing, setIsProcessing] = React.useState<string | null>(null);
 
   const sensors = useSensors(
@@ -694,12 +861,19 @@ export default function LeadsPage() {
     }
   };
 
-  const handleConvert = async (leadId: string) => {
-    setIsProcessing(leadId);
+  const handleProtocolStart = (lead: Lead) => {
+    setSelectedLead(lead);
+    setIsConversionOpen(true);
+  };
+
+  const handleConfirmProtocol = async (data: z.infer<typeof conversionSchema>) => {
+    if (!selectedLead) return;
+    setIsProcessing(selectedLead.id);
     try {
-      const result = await convertLeadToProcess(leadId);
+      const result = await convertLeadToProcess(selectedLead.id, data);
       if (result.success) {
-        toast({ title: 'Processo Protocolado!', description: 'O lead foi migrado para a área de processos ativos.' });
+        toast({ title: 'Processo Protocolado!', description: 'O lead foi migrado para a área de processos ativos com os dados judiciais.' });
+        setIsConversionOpen(false);
         setIsDetailsOpen(false);
       }
     } catch (e: any) {
@@ -769,8 +943,15 @@ export default function LeadsPage() {
         client={selectedLead ? clientsMap.get(selectedLead.clientId) : undefined}
         open={isDetailsOpen} 
         onOpenChange={setIsDetailsOpen}
-        onConvert={handleConvert}
+        onProtocolClick={handleProtocolStart}
         isProcessing={isProcessing === selectedLead?.id}
+      />
+
+      <LeadConversionDialog 
+        lead={selectedLead}
+        open={isConversionOpen}
+        onOpenChange={setIsConversionOpen}
+        onConfirm={handleConfirmProtocol}
       />
 
       <Dialog open={isNewLeadOpen} onOpenChange={setIsNewLeadOpen}>
