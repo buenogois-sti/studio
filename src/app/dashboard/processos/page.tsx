@@ -16,7 +16,7 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronUp,
-  Calendar,
+  Calendar as CalendarIcon,
   RefreshCw,
   Timer,
   UserCheck,
@@ -308,10 +308,9 @@ export default function ProcessosPage() {
               <Card key={p.id} className="border-none shadow-xl overflow-hidden bg-[#0f172a] hover:bg-white/[0.01] transition-all duration-300 group">
                 <CardContent className="p-0">
                   <div className="p-5 flex flex-col gap-4">
-                    {/* Linha 1: Grade de 12 colunas para Identificação, Cliente e Status */}
                     <div className="grid grid-cols-12 gap-6 items-center">
                       
-                      {/* Pilar 1: Identificação (5 Colunas) */}
+                      {/* Pilar 1: Identificação */}
                       <div className="col-span-12 md:col-span-5 min-w-0">
                         <div className="flex items-center gap-2 mb-1.5">
                           <h3 className="font-bold text-lg text-white leading-none truncate group-hover:text-primary transition-colors cursor-pointer" onClick={() => setExpandedProcessId(isExpanded ? null : p.id)}>
@@ -338,7 +337,7 @@ export default function ProcessosPage() {
                         </div>
                       </div>
 
-                      {/* Pilar 2: Cliente (3 Colunas) */}
+                      {/* Pilar 2: Cliente */}
                       <div className="col-span-12 md:col-span-3 border-l border-white/5 pl-6 hidden md:block">
                         <Link href={`/dashboard/clientes?searchTerm=${client ? `${client.firstName} ${client.lastName}` : ''}`} className="block group/link">
                           <p className="text-[8px] font-black uppercase text-slate-500 tracking-widest mb-1">Cliente / Outorgante</p>
@@ -353,21 +352,18 @@ export default function ProcessosPage() {
                         </Link>
                       </div>
 
-                      {/* Pilar 3: Operacional (4 Colunas) */}
+                      {/* Pilar 3: Operacional */}
                       <div className="col-span-12 md:col-span-4 flex items-center justify-end gap-2 md:gap-4">
-                        {/* Atalho Audiência */}
                         <Link href="/dashboard/audiencias" className={cn("flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all border border-transparent", processHearings.length > 0 ? "bg-amber-500/5 hover:bg-amber-500/10 hover:border-amber-500/20" : "opacity-20")}>
-                          <Calendar className="h-4 w-4 text-amber-400" />
+                          <CalendarIcon className="h-4 w-4 text-amber-400" />
                           <span className="text-[8px] font-black uppercase text-amber-500/70">{processHearings.length > 0 ? format(processHearings[0].date.toDate(), 'dd/MM/yy') : '---'}</span>
                         </Link>
 
-                        {/* Atalho Acordo */}
                         <Link href="/dashboard/financeiro" className={cn("flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all border border-transparent", processAgreement ? "bg-emerald-500/5 hover:bg-emerald-500/10 hover:border-emerald-500/20" : "opacity-20")}>
                           <Handshake className="h-4 w-4 text-emerald-400" />
                           <span className="text-[8px] font-black uppercase text-emerald-500/70">{processAgreement ? 'Firmado' : '---'}</span>
                         </Link>
 
-                        {/* Atalho Prazos */}
                         <Link href="/dashboard/prazos" className="flex flex-col items-center gap-1 px-3 py-2 rounded-xl bg-rose-500/5 hover:bg-rose-500/10 transition-all border border-transparent hover:border-rose-500/20">
                           <Timer className="h-4 w-4 text-rose-400" />
                           <span className="text-[8px] font-black uppercase text-rose-500/70">Prazos</span>
@@ -375,7 +371,6 @@ export default function ProcessosPage() {
 
                         <div className="h-10 w-px bg-white/5 mx-1" />
 
-                        {/* Ações e Expansão */}
                         <div className="flex items-center gap-1">
                           <Button variant="ghost" size="icon" onClick={() => setExpandedProcessId(isExpanded ? null : p.id)} className="h-9 w-9 text-white/20 hover:text-white hover:bg-white/5">
                             {isExpanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
@@ -415,7 +410,6 @@ export default function ProcessosPage() {
                       </div>
                     </div>
 
-                    {/* Expansão de Detalhes (Inteligente) */}
                     {isExpanded && (
                       <div className="rounded-2xl bg-white/[0.03] p-6 animate-in slide-in-from-top-2 duration-300 space-y-6 border border-white/5 mt-1">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -455,7 +449,6 @@ export default function ProcessosPage() {
                       </div>
                     )}
 
-                    {/* Rodapé: Ações de Sistema */}
                     <div className="flex items-center justify-between pt-2 border-t border-white/5">
                       <div className="flex items-center gap-2">
                         {p.driveFolderId ? (
