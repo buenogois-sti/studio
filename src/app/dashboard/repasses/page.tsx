@@ -296,7 +296,7 @@ function PayoutList({
 
   return (
     <div className="space-y-4">
-      <div className="relative w-full max-w-sm"><Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" /><Input placeholder="Pesquisar colaborador..." className="pl-8 bg-card border-border/50 text-white" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /></div>
+      <div className="relative w-full max-sm:w-full max-w-sm"><Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" /><Input placeholder="Pesquisar colaborador..." className="pl-8 bg-card border-border/50 text-white" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /></div>
       <Card className="bg-[#0f172a] border-white/5 overflow-hidden">
         <Table><TableHeader><TableRow className="border-white/5 shadow-none"><TableHead className="text-muted-foreground">Nome do Colaborador</TableHead><TableHead className="text-muted-foreground">Perfil</TableHead><TableHead className="text-right text-muted-foreground">Total Disponível</TableHead><TableHead className="text-right text-muted-foreground">Ação</TableHead></TableRow></TableHeader>
           <TableBody>{isLoadingStaff ? (Array.from({ length: 3 }).map((_, i) => (<TableRow key={i}><TableCell colSpan={4}><Skeleton className="h-10 w-full bg-white/5" /></TableCell></TableRow>))) : filteredStaff.map(member => (
@@ -605,7 +605,7 @@ export default function RepassesPage() {
     () => (firestore && user?.uid ? doc(firestore, 'users', user.uid) : null),
     [firestore, user?.uid]
   );
-  const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
+  const { data: userProfile, isLoading: isUserProfileLoading } = useDoc<UserProfile>(userProfileRef);
 
   const isAdmin = userProfile?.role === 'admin' || userProfile?.role === 'financial';
   const isLawyer = userProfile?.role === 'lawyer';
@@ -694,7 +694,7 @@ export default function RepassesPage() {
         <Card className="bg-emerald-500/5 border-emerald-500/20"><CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-emerald-400 tracking-widest">{isAdmin ? 'Total Liquidado (Mês)' : 'Seu Recebido (Mês)'}</CardTitle></CardHeader><CardContent className="p-4 pt-0"><p className="text-2xl font-black text-white">{stats.totalPaidMonth.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p></CardContent></Card>
         <Card className="bg-amber-500/5 border-amber-500/20"><CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-amber-400 tracking-widest">{isAdmin ? 'Saldos Liberados (Banca)' : 'Seu Saldo Liberado'}</CardTitle></CardHeader><CardContent className="p-4 pt-0"><p className="text-2xl font-black text-white">{stats.totalPending.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p></CardContent></Card>
         <Card className="bg-blue-500/5 border-blue-500/20"><CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-blue-400 tracking-widest">{isAdmin ? 'Honorários Retidos (Futuro)' : 'Honorários Retidos'}</CardTitle></CardHeader><CardContent className="p-4 pt-0"><p className="text-2xl font-black text-white">{stats.totalRetained.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p></CardContent></Card>
-        <Card className="bg-white/5 border-white/10"><CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Ativos p/ Liquidação</CardTitle></CardHeader><CardContent className="p-4 pt-0"><p className="text-2xl font-black text-white">{isAdmin ? stats.staffCount : '1'}</p></CardContent>
+        <Card className="bg-white/5 border-white/10"><CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Ativos p/ Liquidação</CardTitle></CardHeader><CardContent className="p-4 pt-0"><p className="text-2xl font-black text-white">{isAdmin ? stats.staffCount : '1'}</p></CardContent></Card>
       </div>
 
       {isAdmin ? (
