@@ -1,4 +1,3 @@
-
 'use client';
 import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -419,156 +418,160 @@ function NewTitleDialog({ onCreated }: { onCreated: () => void }) {
           Novo Lançamento
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md bg-card border-border max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-md bg-card border-border h-[90vh] flex flex-col p-0 overflow-hidden shadow-2xl">
+        <DialogHeader className="p-6 border-b border-white/5 shrink-0">
           <DialogTitle className="text-white">Novo Título Financeiro</DialogTitle>
           <DialogDescription className="text-slate-400">Lançamento manual de entrada ou saída.</DialogDescription>
         </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-4">
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="type"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-white">Tipo</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl><SelectTrigger className="bg-background border-border shadow-none"><SelectValue /></SelectTrigger></FormControl>
-                      <SelectContent>
-                        <SelectItem value="RECEITA">Entrada (Receita)</SelectItem>
-                        <SelectItem value="DESPESA">Saída (Despesa)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="origin"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-white">Categoria</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl><SelectTrigger className="bg-background border-border shadow-none"><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
-                      <SelectContent>
-                        <SelectItem value="HONORARIOS_CONTRATUAIS">Honorários</SelectItem>
-                        <SelectItem value="SUCUMBENCIA">Sucumbência</SelectItem>
-                        <SelectItem value="SALARIOS_PROLABORE">Salários/Pró-Labore</SelectItem>
-                        <SelectItem value="ALUGUEL_CONTAS">Aluguel/Contas</SelectItem>
-                        <SelectItem value="INFRAESTRUTURA_TI">TI/Software</SelectItem>
-                        <SelectItem value="OUTRAS_DESPESAS">Outros</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <FormLabel className="text-white">Vincular a um Processo (Opcional)</FormLabel>
-              {selectedProcess ? (
-                <div className="flex items-center justify-between p-3 rounded-lg border-2 border-primary/30 bg-primary/5">
-                  <div className="flex items-center gap-2 overflow-hidden">
-                    <FolderKanban className="h-4 w-4 text-primary shrink-0" />
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold text-white truncate">{selectedProcess.name}</p>
-                      <p className="text-[10px] text-muted-foreground font-mono">{selectedProcess.processNumber}</p>
-                    </div>
-                  </div>
-                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-white" onClick={() => setSelectedProcess(null)}>
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              ) : (
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input 
-                    className="bg-background border-border pl-9 h-11" 
-                    placeholder="Pesquisar processo..." 
-                    value={processSearch}
-                    onChange={(e) => setProcessSearch(e.target.value)}
-                  />
-                  {isSearchingProcess && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-primary" />}
-                  {processResults.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-[#0f172a] border border-border rounded-lg shadow-2xl z-50 overflow-hidden">
-                      <ScrollArea className="max-h-[200px]">
-                        {processResults.map(p => (
-                          <button
-                            key={p.id}
-                            type="button"
-                            className="w-full text-left p-3 hover:bg-white/5 transition-colors border-b border-white/5 last:border-0"
-                            onClick={() => {
-                              setSelectedProcess(p);
-                              setProcessResults([]);
-                              setProcessSearch('');
-                            }}
-                          >
-                            <p className="text-xs font-bold text-white truncate">{p.name}</p>
-                            <p className="text-[9px] text-muted-foreground font-mono">{p.processNumber}</p>
-                          </button>
-                        ))}
-                      </ScrollArea>
-                    </div>
+        
+        <ScrollArea className="flex-1">
+          <Form {...form}>
+            <form id="new-title-form" onSubmit={form.handleSubmit(onSubmit)} className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="type"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-white">Tipo</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl><SelectTrigger className="bg-background border-border shadow-none"><SelectValue /></SelectTrigger></FormControl>
+                        <SelectContent>
+                          <SelectItem value="RECEITA">Entrada (Receita)</SelectItem>
+                          <SelectItem value="DESPESA">Saída (Despesa)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </FormItem>
                   )}
-                </div>
-              )}
-            </div>
+                />
+                <FormField
+                  control={form.control}
+                  name="origin"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-white">Categoria</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl><SelectTrigger className="bg-background border-border shadow-none"><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
+                        <SelectContent>
+                          <SelectItem value="HONORARIOS_CONTRATUAIS">Honorários</SelectItem>
+                          <SelectItem value="SUCUMBENCIA">Sucumbência</SelectItem>
+                          <SelectItem value="SALARIOS_PROLABORE">Salários/Pró-Labore</SelectItem>
+                          <SelectItem value="ALUGUEL_CONTAS">Aluguel/Contas</SelectItem>
+                          <SelectItem value="INFRAESTRUTURA_TI">TI/Software</SelectItem>
+                          <SelectItem value="OUTRAS_DESPESAS">Outros</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </FormItem>
+                  )}
+                />
+              </div>
 
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-white">Descrição</FormLabel>
-                  <FormControl><Input className="bg-background border-border h-11" placeholder="Ex: Honorários Processo X" {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="value"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-white">Valor (R$) *</FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-bold">R$</span>
-                        <Input 
-                          className="bg-background border-border pl-9 h-11" 
-                          type="text"
-                          value={formatCurrencyValue(field.value)}
-                          onChange={(e) => handleValueChange(e, field.onChange)}
-                        />
+              <div className="space-y-2">
+                <FormLabel className="text-white">Vincular a um Processo (Opcional)</FormLabel>
+                {selectedProcess ? (
+                  <div className="flex items-center justify-between p-3 rounded-lg border-2 border-primary/30 bg-primary/5">
+                    <div className="flex items-center gap-2 overflow-hidden">
+                      <FolderKanban className="h-4 w-4 text-primary shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-white truncate">{selectedProcess.name}</p>
+                        <p className="text-[10px] text-muted-foreground font-mono">{selectedProcess.processNumber}</p>
                       </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
+                    </div>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-white" onClick={() => setSelectedProcess(null)}>
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input 
+                      className="bg-background border-border pl-9 h-11" 
+                      placeholder="Pesquisar processo..." 
+                      value={processSearch}
+                      onChange={(e) => setProcessSearch(e.target.value)}
+                    />
+                    {isSearchingProcess && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-primary" />}
+                    {processResults.length > 0 && (
+                      <div className="absolute top-full left-0 right-0 mt-1 bg-[#0f172a] border border-border rounded-lg shadow-2xl z-50 overflow-hidden">
+                        <ScrollArea className="max-h-[200px]">
+                          {processResults.map(p => (
+                            <button
+                              key={p.id}
+                              type="button"
+                              className="w-full text-left p-3 hover:bg-white/5 transition-colors border-b border-white/5 last:border-0"
+                              onClick={() => {
+                                setSelectedProcess(p);
+                                setProcessResults([]);
+                                setProcessSearch('');
+                              }}
+                            >
+                              <p className="text-xs font-bold text-white truncate">{p.name}</p>
+                              <p className="text-[9px] text-muted-foreground font-mono">{p.processNumber}</p>
+                            </button>
+                          ))}
+                        </ScrollArea>
+                      </div>
+                    )}
+                  </div>
                 )}
-              />
+              </div>
+
               <FormField
                 control={form.control}
-                name="dueDate"
+                name="description"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-white">Vencimento</FormLabel>
-                    <FormControl><Input type="date" className="bg-background border-border h-11 text-white" {...field} /></FormControl>
+                    <FormLabel className="text-white">Descrição</FormLabel>
+                    <FormControl><Input className="bg-background border-border h-11" placeholder="Ex: Honorários Processo X" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-            </div>
-            <DialogFooter className="pt-4">
-              <DialogClose asChild><Button variant="outline" type="button" className="text-white">Cancelar</Button></DialogClose>
-              <Button type="submit" disabled={isSaving}>
-                {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Salvar Lançamento
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="value"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-white">Valor (R$) *</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-bold">R$</span>
+                          <Input 
+                            className="bg-background border-border pl-9 h-11" 
+                            type="text"
+                            value={formatCurrencyValue(field.value)}
+                            onChange={(e) => handleValueChange(e, field.onChange)}
+                          />
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="dueDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-white">Vencimento</FormLabel>
+                      <FormControl><Input type="date" className="bg-background border-border h-11 text-white" {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </form>
+          </Form>
+        </ScrollArea>
+
+        <DialogFooter className="p-6 border-t border-white/5 bg-white/5 shrink-0 gap-2">
+          <DialogClose asChild><Button variant="outline" type="button" className="text-white">Cancelar</Button></DialogClose>
+          <Button type="submit" form="new-title-form" disabled={isSaving}>
+            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Salvar Lançamento
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

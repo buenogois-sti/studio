@@ -51,6 +51,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const returnSchema = z.object({
   resultNotes: z.string().min(10, 'Descreva detalhadamente o que ocorreu no ato.'),
@@ -112,8 +113,8 @@ export function HearingReturnDialog({ hearing, open, onOpenChange, onSuccess }: 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl bg-card border-border max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-2xl bg-card border-border h-[90vh] flex flex-col p-0 overflow-hidden shadow-2xl">
+        <DialogHeader className="p-6 border-b border-white/5 shrink-0">
           <DialogTitle className="flex items-center gap-2 text-white font-headline text-xl">
             <History className="h-6 w-6 text-primary" />
             {isPericia ? 'Retorno de Perícia Técnica' : 'Retorno de Audiência'}
@@ -123,181 +124,184 @@ export function HearingReturnDialog({ hearing, open, onOpenChange, onSuccess }: 
           </DialogDescription>
         </DialogHeader>
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 pt-4">
-            
-            <FormField
-              control={form.control}
-              name="resultNotes"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-white font-bold flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-primary" /> Síntese do Ato *
-                  </FormLabel>
-                  <FormControl>
-                    <Textarea 
-                      placeholder={isPericia 
-                        ? "Descreva o que foi analisado pelo perito, quesitos respondidos e clima da diligência..." 
-                        : "Resuma a ata, propostas de acordo, testemunhas ouvidas e ordens do juiz..."}
-                      className="min-h-[120px] bg-background border-border resize-none text-sm leading-relaxed" 
-                      {...field} 
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="space-y-4 p-6 rounded-2xl bg-primary/5 border border-primary/20">
-              <div className="flex items-center gap-2 text-primary font-black uppercase text-[10px] tracking-widest mb-4">
-                <ArrowRight className="h-3 w-3" /> Seguimento Jurídico (Iteração)
-              </div>
+        <ScrollArea className="flex-1">
+          <Form {...form}>
+            <form id="hearing-return-form" onSubmit={form.handleSubmit(onSubmit)} className="p-6 space-y-6">
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="createLegalDeadline"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-center space-x-2 space-y-0">
-                        <FormControl>
-                          <Checkbox 
-                            checked={field.value} 
-                            onCheckedChange={field.onChange} 
-                            className="border-primary data-[state=checked]:bg-primary"
-                          />
-                        </FormControl>
-                        <Label className="text-xs font-bold text-slate-200 cursor-pointer">Lançar Prazo Fatal (Diário)</Label>
-                      </FormItem>
-                    )}
-                  />
+              <FormField
+                control={form.control}
+                name="resultNotes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-white font-bold flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-primary" /> Síntese do Ato *
+                    </FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        placeholder={isPericia 
+                          ? "Descreva o que foi analisado pelo perito, quesitos respondidos e clima da diligência..." 
+                          : "Resuma a ata, propostas de acordo, testemunhas ouvidas e ordens do juiz..."}
+                        className="min-h-[120px] bg-background border-border resize-none text-sm leading-relaxed" 
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-                  <FormField
-                    control={form.control}
-                    name="scheduleNewHearing"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-center space-x-2 space-y-0">
-                        <FormControl>
-                          <Checkbox 
-                            checked={field.value} 
-                            onCheckedChange={field.onChange}
-                            className="border-primary data-[state=checked]:bg-primary"
-                          />
-                        </FormControl>
-                        <Label className="text-xs font-bold text-slate-200 cursor-pointer">Reagendar / Novo Ato Judicial</Label>
-                      </FormItem>
-                    )}
-                  />
+              <div className="space-y-4 p-6 rounded-2xl bg-primary/5 border border-primary/20">
+                <div className="flex items-center gap-2 text-primary font-black uppercase text-[10px] tracking-widest mb-4">
+                  <ArrowRight className="h-3 w-3" /> Seguimento Jurídico (Iteração)
                 </div>
-
-                <div className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="nextStepDeadline"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-[10px] uppercase font-bold text-slate-500">Data p/ Próxima Ação</FormLabel>
-                        <FormControl>
-                          <Input type="date" className="h-10 bg-background border-border" {...field} />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              </div>
-
-              {showNewHearingFields && (
-                <div className="pt-4 border-t border-white/5 space-y-4 animate-in fade-in zoom-in-95 duration-300">
-                  <div className="flex items-center justify-between p-3 bg-black/20 rounded-xl border border-white/5">
-                    <div className="space-y-0.5">
-                      <Label htmlFor="date-not-set" className="text-xs font-bold text-amber-400">Data não designada em ata?</Label>
-                      <p className="text-[10px] text-slate-500">Marque se o juiz não definiu o próximo ato no momento.</p>
-                    </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
                     <FormField
                       control={form.control}
-                      name="dateNotSet"
+                      name="createLegalDeadline"
                       render={({ field }) => (
-                        <FormControl>
-                          <Switch 
-                            id="date-not-set"
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                            className="data-[state=checked]:bg-amber-500"
-                          />
-                        </FormControl>
+                        <FormItem className="flex flex-row items-center space-x-2 space-y-0">
+                          <FormControl>
+                            <Checkbox 
+                              checked={field.value} 
+                              onCheckedChange={field.onChange} 
+                              className="border-primary data-[state=checked]:bg-primary"
+                            />
+                          </FormControl>
+                          <Label className="text-xs font-bold text-slate-200 cursor-pointer">Lançar Prazo Fatal (Diário)</Label>
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="scheduleNewHearing"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center space-x-2 space-y-0">
+                          <FormControl>
+                            <Checkbox 
+                              checked={field.value} 
+                              onCheckedChange={field.onChange}
+                              className="border-primary data-[state=checked]:bg-primary"
+                            />
+                          </FormControl>
+                          <Label className="text-xs font-bold text-slate-200 cursor-pointer">Reagendar / Novo Ato Judicial</Label>
+                        </FormItem>
                       )}
                     />
                   </div>
 
-                  {!dateNotSet && (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                      <FormField
-                        control={form.control}
-                        name="newHearingType"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="text-[9px] uppercase font-bold text-primary">Tipo de Ato</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                              <FormControl><SelectTrigger className="h-9 text-xs bg-background border-primary/20"><SelectValue /></SelectTrigger></FormControl>
-                              <SelectContent className="bg-[#0f172a] text-white">
-                                <SelectItem value="UNA">Audiência Una</SelectItem>
-                                <SelectItem value="INSTRUCAO">Instrução</SelectItem>
-                                <SelectItem value="PERICIA">Perícia</SelectItem>
-                                <SelectItem value="CONCILIACAO">Conciliação</SelectItem>
-                                <SelectItem value="JULGAMENTO">Julgamento</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="newHearingDate"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="text-[9px] uppercase font-bold text-primary">Nova Data</FormLabel>
-                            <FormControl><Input type="date" className="h-9 text-xs bg-background" {...field} /></FormControl>
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="newHearingTime"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="text-[9px] uppercase font-bold text-primary">Horário</FormLabel>
-                            <FormControl><Input type="time" className="h-9 text-xs bg-background" {...field} /></FormControl>
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                  )}
-
-                  {dateNotSet && (
-                    <div className="flex items-center gap-2 p-3 bg-amber-500/5 border border-amber-500/20 rounded-xl text-amber-500 text-[10px] font-bold italic">
-                      <HelpCircle className="h-3 w-3" />
-                      O andamento será registrado apenas como nota estratégica. Verifique os autos posteriormente.
-                    </div>
-                  )}
+                  <div className="space-y-4">
+                    <FormField
+                      control={form.control}
+                      name="nextStepDeadline"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-[10px] uppercase font-bold text-slate-500">Data p/ Próxima Ação</FormLabel>
+                          <FormControl>
+                            <Input type="date" className="h-10 bg-background border-border" {...field} />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                 </div>
-              )}
-            </div>
 
-            <DialogFooter className="pt-4 gap-2">
-              <DialogClose asChild>
-                <Button variant="ghost" type="button" className="text-slate-400">Cancelar</Button>
-              </DialogClose>
-              <Button 
-                type="submit" 
-                disabled={isSaving} 
-                className="bg-primary text-primary-foreground hover:bg-primary/90 font-black uppercase tracking-widest text-[11px] px-8 h-12 shadow-xl shadow-primary/20"
-              >
-                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
-                Finalizar e Atualizar Agenda
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
+                {showNewHearingFields && (
+                  <div className="pt-4 border-t border-white/5 space-y-4 animate-in fade-in zoom-in-95 duration-300">
+                    <div className="flex items-center justify-between p-3 bg-black/20 rounded-xl border border-white/5">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="date-not-set" className="text-xs font-bold text-amber-400">Data não designada em ata?</Label>
+                        <p className="text-[10px] text-slate-500">Marque se o juiz não definiu o próximo ato no momento.</p>
+                      </div>
+                      <FormField
+                        control={form.control}
+                        name="dateNotSet"
+                        render={({ field }) => (
+                          <FormControl>
+                            <Switch 
+                              id="date-not-set"
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                              className="data-[state=checked]:bg-amber-500"
+                            />
+                          </FormControl>
+                        )}
+                      />
+                    </div>
+
+                    {!dateNotSet && (
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <FormField
+                          control={form.control}
+                          name="newHearingType"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-[9px] uppercase font-bold text-primary">Tipo de Ato</FormLabel>
+                              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <FormControl><SelectTrigger className="h-9 text-xs bg-background border-primary/20"><SelectValue /></SelectTrigger></FormControl>
+                                <SelectContent className="bg-[#0f172a] text-white">
+                                  <SelectItem value="UNA">Audiência Una</SelectItem>
+                                  <SelectItem value="INSTRUCAO">Instrução</SelectItem>
+                                  <SelectItem value="PERICIA">Perícia</SelectItem>
+                                  <SelectItem value="CONCILIACAO">Conciliação</SelectItem>
+                                  <SelectItem value="JULGAMENTO">Julgamento</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="newHearingDate"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-[9px] uppercase font-bold text-primary">Nova Data</FormLabel>
+                              <FormControl><Input type="date" className="h-9 text-xs bg-background" {...field} /></FormControl>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="newHearingTime"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-[9px] uppercase font-bold text-primary">Horário</FormLabel>
+                              <FormControl><Input type="time" className="h-9 text-xs bg-background" {...field} /></FormControl>
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    )}
+
+                    {dateNotSet && (
+                      <div className="flex items-center gap-2 p-3 bg-amber-500/5 border border-amber-500/20 rounded-xl text-amber-500 text-[10px] font-bold italic">
+                        <HelpCircle className="h-3 w-3" />
+                        O andamento será registrado apenas como nota estratégica. Verifique os autos posteriormente.
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </form>
+          </Form>
+        </ScrollArea>
+
+        <DialogFooter className="p-6 border-t border-white/5 bg-white/5 shrink-0 gap-2">
+          <DialogClose asChild>
+            <Button variant="ghost" type="button" className="text-slate-400 font-bold uppercase text-[10px]">Cancelar</Button>
+          </DialogClose>
+          <Button 
+            type="submit" 
+            form="hearing-return-form"
+            disabled={isSaving} 
+            className="bg-primary text-primary-foreground hover:bg-primary/90 font-black uppercase tracking-widest text-[11px] px-8 h-12 shadow-xl shadow-primary/20"
+          >
+            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
+            Finalizar e Atualizar Agenda
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

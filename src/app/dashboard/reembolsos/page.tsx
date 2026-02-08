@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -34,7 +33,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useFirebase, useCollection, useMemoFirebase, useDoc } from '@/firebase';
-import { collection, query, where, orderBy, doc, Timestamp } from 'firebase/firestore';
+import { collection, query, where, orderBy, doc, Timestamp, getDocs } from 'firebase/firestore';
 import type { Reimbursement, ReimbursementStatus, UserProfile, Process } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose, DialogTrigger } from '@/components/ui/dialog';
@@ -181,140 +180,143 @@ function NewReimbursementDialog({
           Solicitar Reembolso
         </Button>
       </DialogTrigger>
-      <DialogContent className="bg-[#0f172a] border-white/10 sm:max-w-lg text-white max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="bg-[#0f172a] border-white/10 sm:max-w-lg text-white h-[90vh] flex flex-col p-0 overflow-hidden shadow-2xl">
+        <DialogHeader className="p-6 border-b border-white/5 shrink-0">
           <DialogTitle className="text-white">Nova Solicitação</DialogTitle>
           <DialogDescription className="text-slate-400">Preencha os detalhes da despesa para reembolso.</DialogDescription>
         </DialogHeader>
         
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-2">
-            {canManage && (
-              <FormField
-                control={form.control}
-                name="userId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-white">Colaborador (Admin)</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl><SelectTrigger className="bg-black/40 border-white/10"><SelectValue placeholder="Selecione o usuário" /></SelectTrigger></FormControl>
-                      <SelectContent className="bg-[#0f172a] border-white/10 text-white">
-                        {users?.map(u => (
-                          <SelectItem key={u.id} value={u.id}>{u.firstName} {u.lastName}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
-
-            <div className="space-y-2">
-              <FormLabel className="text-white">Vincular a um Processo (Opcional)</FormLabel>
-              {selectedProcess ? (
-                <div className="flex items-center justify-between p-3 rounded-lg border-2 border-primary/30 bg-primary/5">
-                  <div className="flex items-center gap-2 overflow-hidden">
-                    <FolderKanban className="h-4 w-4 text-primary shrink-0" />
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold text-white truncate">{selectedProcess.name}</p>
-                      <p className="text-[10px] text-muted-foreground font-mono">{selectedProcess.processNumber}</p>
-                    </div>
-                  </div>
-                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-white" onClick={() => setSelectedProcess(null)}>
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              ) : (
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input 
-                    className="bg-black/40 border-white/10 pl-9" 
-                    placeholder="Pesquisar processo..." 
-                    value={processSearch}
-                    onChange={(e) => setProcessSearch(e.target.value)}
-                  />
-                  {isSearchingProcess && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-primary" />}
-                  
-                  {processResults.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-[#0f172a] border border-white/10 rounded-lg shadow-2xl z-50 overflow-hidden">
-                      <ScrollArea className="max-h-[200px]">
-                        {processResults.map(p => (
-                          <button
-                            key={p.id}
-                            type="button"
-                            className="w-full text-left p-3 hover:bg-white/5 transition-colors border-b border-white/5 last:border-0"
-                            onClick={() => {
-                              setSelectedProcess(p);
-                              setProcessResults([]);
-                              setProcessSearch('');
-                            }}
-                          >
-                            <p className="text-xs font-bold text-white truncate">{p.name}</p>
-                            <p className="text-[9px] text-muted-foreground font-mono">{p.processNumber}</p>
-                          </button>
-                        ))}
-                      </ScrollArea>
-                    </div>
+        <ScrollArea className="flex-1">
+          <Form {...form}>
+            <form id="reimbursement-form" onSubmit={form.handleSubmit(onSubmit)} className="p-6 space-y-4">
+              {canManage && (
+                <FormField
+                  control={form.control}
+                  name="userId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-white">Colaborador (Admin)</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl><SelectTrigger className="bg-black/40 border-white/10"><SelectValue placeholder="Selecione o usuário" /></SelectTrigger></FormControl>
+                        <SelectContent className="bg-[#0f172a] border-white/10 text-white">
+                          {users?.map(u => (
+                            <SelectItem key={u.id} value={u.id}>{u.firstName} {u.lastName}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
                   )}
-                </div>
+                />
               )}
-            </div>
 
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-white">Descrição da Despesa *</FormLabel>
-                  <FormControl><Input className="bg-black/40 border-white/10 text-white" placeholder="Ex: Cópias de Processo - Fórum SBC" {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="value"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-white">Valor (R$) *</FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-bold">R$</span>
-                        <Input 
-                          className="bg-black/40 border-white/10 pl-9 text-white" 
-                          type="text"
-                          value={formatCurrencyValue(field.value)}
-                          onChange={(e) => handleValueChange(e, field.onChange)}
-                        />
+              <div className="space-y-2">
+                <FormLabel className="text-white">Vincular a um Processo (Opcional)</FormLabel>
+                {selectedProcess ? (
+                  <div className="flex items-center justify-between p-3 rounded-lg border-2 border-primary/30 bg-primary/5">
+                    <div className="flex items-center gap-2 overflow-hidden">
+                      <FolderKanban className="h-4 w-4 text-primary shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-white truncate">{selectedProcess.name}</p>
+                        <p className="text-[10px] text-muted-foreground font-mono">{selectedProcess.processNumber}</p>
                       </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
+                    </div>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-white" onClick={() => setSelectedProcess(null)}>
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input 
+                      className="bg-black/40 border-white/10 pl-9" 
+                      placeholder="Pesquisar processo..." 
+                      value={processSearch}
+                      onChange={(e) => setProcessSearch(e.target.value)}
+                    />
+                    {isSearchingProcess && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-primary" />}
+                    
+                    {processResults.length > 0 && (
+                      <div className="absolute top-full left-0 right-0 mt-1 bg-[#0f172a] border border-white/10 rounded-lg shadow-2xl z-50 overflow-hidden">
+                        <ScrollArea className="max-h-[200px]">
+                          {processResults.map(p => (
+                            <button
+                              key={p.id}
+                              type="button"
+                              className="w-full text-left p-3 hover:bg-white/5 transition-colors border-b border-white/5 last:border-0"
+                              onClick={() => {
+                                setSelectedProcess(p);
+                                setProcessResults([]);
+                                setProcessSearch('');
+                              }}
+                            >
+                              <p className="text-xs font-bold text-white truncate">{p.name}</p>
+                              <p className="text-[9px] text-muted-foreground font-mono">{p.processNumber}</p>
+                            </button>
+                          ))}
+                        </ScrollArea>
+                      </div>
+                    )}
+                  </div>
                 )}
-              />
+              </div>
+
               <FormField
                 control={form.control}
-                name="requestDate"
+                name="description"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-white">Data da Despesa *</FormLabel>
-                    <FormControl><Input className="bg-black/40 border-white/10 text-white" type="date" {...field} /></FormControl>
+                    <FormLabel className="text-white">Descrição da Despesa *</FormLabel>
+                    <FormControl><Input className="bg-black/40 border-white/10 text-white" placeholder="Ex: Cópias de Processo - Fórum SBC" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-            </div>
-            <DialogFooter className="pt-4">
-              <DialogClose asChild><Button variant="outline" className="text-slate-400 hover:text-white border-white/10" type="button" disabled={isSaving}>Cancelar</Button></DialogClose>
-              <Button type="submit" disabled={isSaving} className="bg-primary text-primary-foreground font-bold">
-                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                {isSaving ? 'Enviando...' : 'Enviar Pedido'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="value"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-white">Valor (R$) *</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-bold">R$</span>
+                          <Input 
+                            className="bg-black/40 border-white/10 pl-9 text-white" 
+                            type="text"
+                            value={formatCurrencyValue(field.value)}
+                            onChange={(e) => handleValueChange(e, field.onChange)}
+                          />
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="requestDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-white">Data da Despesa *</FormLabel>
+                      <FormControl><Input className="bg-black/40 border-white/10 text-white" type="date" {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </form>
+          </Form>
+        </ScrollArea>
+
+        <DialogFooter className="p-6 border-t border-white/5 bg-white/5 shrink-0 gap-2">
+          <DialogClose asChild><Button variant="outline" className="text-slate-400 hover:text-white border-white/10" type="button" disabled={isSaving}>Cancelar</Button></DialogClose>
+          <Button type="submit" form="reimbursement-form" disabled={isSaving} className="bg-primary text-primary-foreground font-bold">
+            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            {isSaving ? 'Enviando...' : 'Enviar Pedido'}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -637,7 +639,6 @@ function ReimbursementTable({
                 </TableCell>
                 <TableCell className="text-right px-6">
                   <div className="flex justify-end gap-2">
-                    {/* Solicitar Reanálise para Pedidos Negados */}
                     {!canManage && r.status === 'NEGADO' && r.userId === currentUserId && (
                       <Button 
                         variant="outline" 

@@ -125,8 +125,8 @@ function InviteUserDialog({ onInvite, userToEdit }: { onInvite: () => void, user
                   <span>Convidar Usuário</span>
                 </Button>
             </DialogTrigger>
-            <DialogContent className="bg-[#0f172a] border-white/10 text-white">
-                <DialogHeader>
+            <DialogContent className="bg-[#0f172a] border-white/10 text-white max-h-[90vh] flex flex-col p-0 overflow-hidden shadow-2xl">
+                <DialogHeader className="p-6 border-b border-white/5 shrink-0">
                     <DialogTitle className="text-xl font-headline font-bold">
                       {userToEdit ? 'Editar Permissões' : 'Convidar p/ a Banca'}
                     </DialogTitle>
@@ -134,54 +134,58 @@ function InviteUserDialog({ onInvite, userToEdit }: { onInvite: () => void, user
                         O acesso é liberado via Google Workspace após o convite.
                     </DialogDescription>
                 </DialogHeader>
-                <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 pt-4">
-                        <FormField
-                            control={form.control}
-                            name="email"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">E-mail do Colaborador *</FormLabel>
-                                    <FormControl>
-                                      <div className="relative">
-                                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-                                        <Input placeholder="usuario@buenogoisadvogado.com.br" className="pl-10 bg-black/40 border-white/10 h-11" {...field} disabled={!!userToEdit} />
-                                      </div>
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                         <FormField
-                            control={form.control}
-                            name="role"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Perfil de Acesso (Permissions) *</FormLabel>
-                                     <Select onValueChange={field.onChange} value={field.value}>
-                                        <FormControl>
-                                            <SelectTrigger className="bg-black/40 border-white/10 h-11"><SelectValue placeholder="Selecione um perfil..." /></SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent className="bg-[#0f172a] border-white/10 text-white">
-                                            <SelectItem value="admin">⭐ Administrador (Total)</SelectItem>
-                                            <SelectItem value="lawyer">⚖️ Advogado (Operacional)</SelectItem>
-                                            <SelectItem value="financial">💰 Financeiro (Contas)</SelectItem>
-                                            <SelectItem value="assistant">📋 Secretaria / Apoio</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <DialogFooter className="gap-2">
-                            <DialogClose asChild><Button type="button" variant="ghost" className="text-slate-400">Cancelar</Button></DialogClose>
-                            <Button type="submit" disabled={isSaving} className="bg-primary text-primary-foreground font-black uppercase tracking-widest text-[11px] h-11 px-8">
-                                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
-                                {isSaving ? 'Salvando...' : 'Salvar Perfil'}
-                            </Button>
-                        </DialogFooter>
-                    </form>
-                </Form>
+                
+                <ScrollArea className="flex-1">
+                  <Form {...form}>
+                      <form id="invite-form" onSubmit={form.handleSubmit(onSubmit)} className="p-6 space-y-6">
+                          <FormField
+                              control={form.control}
+                              name="email"
+                              render={({ field }) => (
+                                  <FormItem>
+                                      <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">E-mail do Colaborador *</FormLabel>
+                                      <FormControl>
+                                        <div className="relative">
+                                          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                                          <Input placeholder="usuario@buenogoisadvogado.com.br" className="pl-10 bg-black/40 border-white/10 h-11" {...field} disabled={!!userToEdit} />
+                                        </div>
+                                      </FormControl>
+                                      <FormMessage />
+                                  </FormItem>
+                              )}
+                          />
+                           <FormField
+                              control={form.control}
+                              name="role"
+                              render={({ field }) => (
+                                  <FormItem>
+                                      <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Perfil de Acesso (Permissions) *</FormLabel>
+                                       <Select onValueChange={field.onChange} value={field.value}>
+                                          <FormControl>
+                                              <SelectTrigger className="bg-black/40 border-white/10 h-11"><SelectValue placeholder="Selecione um perfil..." /></SelectTrigger>
+                                          </FormControl>
+                                          <SelectContent className="bg-[#0f172a] border-white/10 text-white">
+                                              <SelectItem value="admin">⭐ Administrador (Total)</SelectItem>
+                                              <SelectItem value="lawyer">⚖️ Advogado (Operacional)</SelectItem>
+                                              <SelectItem value="financial">💰 Financeiro (Contas)</SelectItem>
+                                              <SelectItem value="assistant">📋 Secretaria / Apoio</SelectItem>
+                                          </SelectContent>
+                                      </Select>
+                                      <FormMessage />
+                                  </FormItem>
+                              )}
+                          />
+                      </form>
+                  </Form>
+                </ScrollArea>
+
+                <DialogFooter className="p-6 border-t border-white/5 bg-white/5 shrink-0 gap-2">
+                    <DialogClose asChild><Button type="button" variant="ghost" className="text-slate-400 font-bold uppercase text-[10px]">Cancelar</Button></DialogClose>
+                    <Button type="submit" form="invite-form" disabled={isSaving} className="bg-primary text-primary-foreground font-black uppercase tracking-widest text-[11px] h-11 px-8">
+                        {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
+                        {isSaving ? 'Salvando...' : 'Salvar Perfil'}
+                    </Button>
+                </DialogFooter>
             </DialogContent>
         </Dialog>
     )
