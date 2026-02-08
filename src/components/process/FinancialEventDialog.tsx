@@ -109,130 +109,134 @@ export function FinancialEventDialog({ process, open, onOpenChange, onEventCreat
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] h-[90vh] flex flex-col p-0 overflow-hidden shadow-2xl">
+      <DialogContent className="sm:max-w-[600px] h-[90vh] flex flex-col p-0 overflow-hidden shadow-2xl bg-card border-border">
         <DialogHeader className="p-6 border-b border-white/5 shrink-0">
-          <DialogTitle>Novo Evento Financeiro</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="text-white">Novo Evento Financeiro</DialogTitle>
+          <DialogDescription className="text-slate-400">
             Crie um evento jurídico para o processo "{process?.name}". Isso irá gerar os títulos financeiros automaticamente.
           </DialogDescription>
         </DialogHeader>
         
         <ScrollArea className="flex-1">
-          <Form {...form}>
-            <form id="financial-event-form" onSubmit={form.handleSubmit(onSubmit)} className="p-6 space-y-4">
-               <FormField
-                  control={form.control}
-                  name="type"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Tipo de Evento *</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
-                        <SelectContent>
-                          <SelectItem value="ACORDO">Acordo</SelectItem>
-                          <SelectItem value="SENTENCA">Sentença</SelectItem>
-                          <SelectItem value="EXECUCAO">Execução</SelectItem>
-                          <SelectItem value="CONTRATO">Contrato de Honorários</SelectItem>
-                          <SelectItem value="CUSTAS">Custas Processuais</SelectItem>
-                          <SelectItem value="PERICIA">Perícia / Assistência</SelectItem>
-                          <SelectItem value="DESLOCAMENTO">Deslocamento / Diligência</SelectItem>
-                          <SelectItem value="ADICIONAL">Adicional / Extra</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              <FormField
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Descrição do Evento *</FormLabel>
-                    <FormControl><Textarea placeholder="Ex: Acordo homologado em audiência." {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="eventDate"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <FormLabel>Data do Evento *</FormLabel>
-                      <FormControl>
-                          <Input
-                            type="date"
-                            {...field}
-                            value={field.value instanceof Date ? format(field.value, 'yyyy-MM-dd') : ''}
-                            onChange={(e) => field.onChange(e.target.valueAsDate)}
-                          />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+          <div className="p-6">
+            <Form {...form}>
+              <form id="financial-event-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                  <FormField
                     control={form.control}
-                    name="totalValue"
+                    name="type"
                     render={({ field }) => (
-                        <FormItem>
-                        <FormLabel>Valor Total (R$) *</FormLabel>
+                      <FormItem>
+                        <FormLabel className="text-white">Tipo de Evento *</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl><SelectTrigger className="bg-background border-border"><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
+                          <SelectContent className="bg-card border-border text-white">
+                            <SelectItem value="ACORDO">Acordo</SelectItem>
+                            <SelectItem value="SENTENCA">Sentença</SelectItem>
+                            <SelectItem value="EXECUCAO">Execução</SelectItem>
+                            <SelectItem value="CONTRATO">Contrato de Honorários</SelectItem>
+                            <SelectItem value="CUSTAS">Custas Processuais</SelectItem>
+                            <SelectItem value="PERICIA">Perícia / Assistência</SelectItem>
+                            <SelectItem value="DESLOCAMENTO">Deslocamento / Diligência</SelectItem>
+                            <SelectItem value="ADICIONAL">Adicional / Extra</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-white">Descrição do Evento *</FormLabel>
+                      <FormControl><Textarea className="bg-background border-border" placeholder="Ex: Acordo homologado em audiência." {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="eventDate"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col">
+                        <FormLabel className="text-white">Data do Evento *</FormLabel>
                         <FormControl>
-                          <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-bold">R$</span>
                             <Input
-                              type="text"
-                              placeholder="0,00"
-                              className="pl-9"
-                              value={formatCurrencyForDisplay(field.value)}
-                              onChange={(e) => handleCurrencyChange(e, field)}
+                              type="date"
+                              className="bg-background border-border"
+                              {...field}
+                              value={field.value instanceof Date ? format(field.value, 'yyyy-MM-dd') : ''}
+                              onChange={(e) => field.onChange(e.target.valueAsDate)}
                             />
-                          </div>
                         </FormControl>
                         <FormMessage />
-                        </FormItem>
+                      </FormItem>
                     )}
-                />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField
+                  />
+                   <FormField
                       control={form.control}
-                      name="installments"
+                      name="totalValue"
                       render={({ field }) => (
                           <FormItem>
-                          <FormLabel>Nº de Parcelas *</FormLabel>
-                          <FormControl><Input type="number" min="1" {...field} /></FormControl>
-                          <FormMessage />
-                          </FormItem>
-                      )}
-                  />
-                  <FormField
-                      control={form.control}
-                      name="firstDueDate"
-                      render={({ field }) => (
-                          <FormItem className="flex flex-col">
-                          <FormLabel>Vencimento da 1ª Parcela *</FormLabel>
+                          <FormLabel className="text-white">Valor Total (R$) *</FormLabel>
                           <FormControl>
-                               <Input
-                                  type="date"
-                                  {...field}
-                                  value={field.value instanceof Date ? format(field.value, 'yyyy-MM-dd') : ''}
-                                  onChange={(e) => field.onChange(e.target.valueAsDate)}
+                            <div className="relative">
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-bold">R$</span>
+                              <Input
+                                type="text"
+                                placeholder="0,00"
+                                className="pl-9 bg-background border-border"
+                                value={formatCurrencyForDisplay(field.value)}
+                                onChange={(e) => handleCurrencyChange(e, field)}
                               />
+                            </div>
                           </FormControl>
                           <FormMessage />
                           </FormItem>
                       )}
                   />
-              </div>
-            </form>
-          </Form>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                        control={form.control}
+                        name="installments"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel className="text-white">Nº de Parcelas *</FormLabel>
+                            <FormControl><Input type="number" min="1" className="bg-background border-border" {...field} /></FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    <FormField
+                        control={form.control}
+                        name="firstDueDate"
+                        render={({ field }) => (
+                            <FormItem className="flex flex-col">
+                            <FormLabel className="text-white">Vencimento da 1ª Parcela *</FormLabel>
+                            <FormControl>
+                                 <Input
+                                    type="date"
+                                    className="bg-background border-border"
+                                    {...field}
+                                    value={field.value instanceof Date ? format(field.value, 'yyyy-MM-dd') : ''}
+                                    onChange={(e) => field.onChange(e.target.valueAsDate)}
+                                />
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                </div>
+              </form>
+            </Form>
+          </div>
         </ScrollArea>
 
-        <DialogFooter className="p-6 border-t border-white/5 shrink-0 gap-2">
-          <DialogClose asChild><Button type="button" variant="outline" disabled={isSaving}>Cancelar</Button></DialogClose>
+        <DialogFooter className="p-6 border-t border-white/5 shrink-0 gap-2 bg-white/5">
+          <DialogClose asChild><Button type="button" variant="outline" className="text-white" disabled={isSaving}>Cancelar</Button></DialogClose>
           <Button type="submit" form="financial-event-form" disabled={isSaving}>
             {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {isSaving ? "Gerando..." : "Gerar Títulos"}

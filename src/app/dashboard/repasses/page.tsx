@@ -130,12 +130,12 @@ function StaffVoucherDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-4xl bg-white text-slate-900 p-0 overflow-hidden border-none shadow-none print:shadow-none">
+      <DialogContent className="sm:max-w-4xl bg-white text-slate-900 p-0 overflow-hidden border-none shadow-none print:shadow-none h-[90vh] flex flex-col">
         <DialogHeader className="p-6 pb-0 sr-only">
           <DialogTitle>Comprovante de Liquidação Profissional</DialogTitle>
           <DialogDescription>Extrato detalhado de pagamentos realizados ao colaborador.</DialogDescription>
         </DialogHeader>
-        <ScrollArea className="max-h-[90vh] print:max-h-full">
+        <ScrollArea className="flex-1 print:h-auto">
           <div className="p-10 space-y-8 bg-white" id="staff-voucher-print-area">
             <div className="flex justify-between items-center border-b-2 border-slate-900 pb-4">
               <div className="flex items-center gap-3">
@@ -192,7 +192,7 @@ function StaffVoucherDialog({
             </div>
           </div>
         </ScrollArea>
-        <DialogFooter className="p-6 bg-slate-50 border-t print:hidden flex justify-end gap-3">
+        <DialogFooter className="p-6 bg-slate-50 border-t print:hidden flex justify-end gap-3 shrink-0">
           <DialogClose asChild><Button variant="ghost" className="text-slate-600 font-bold">Fechar</Button></DialogClose>
           <Button onClick={() => window.print()} className="gap-2 bg-slate-900 text-white font-bold"><Printer className="h-4 w-4" /> Imprimir Comprovante</Button>
         </DialogFooter>
@@ -344,16 +344,18 @@ function RepassePaymentDialog({ staff, credits, open, onOpenChange, onPaid }: { 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-4xl bg-[#020617] border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.5)] p-0 overflow-hidden">
-        <div className="p-8 space-y-8">
-          <DialogHeader><div className="flex items-center gap-4 mb-2"><div className="h-12 w-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center"><Wallet className="h-6 w-6 text-emerald-400" /></div><div className="text-left"><DialogTitle className="text-2xl font-black text-white font-headline">Processar Liquidação</DialogTitle><DialogDescription className="text-slate-400 mt-1">Confirmando o pagamento para <span className="text-white font-bold">{staff.firstName} {staff.lastName}</span>.</DialogDescription></div></div></DialogHeader>
-          <div className="relative group"><div className="absolute -inset-1 bg-gradient-to-r from-emerald-500/20 to-primary/20 rounded-3xl blur opacity-25 group-hover:opacity-40 transition duration-1000"></div><div className="relative p-10 rounded-3xl bg-white/5 border border-white/10 text-center space-y-2"><p className="text-[10px] font-black uppercase text-emerald-400 tracking-[0.25em] mb-1">Valor Total Líquido a Pagar</p><div className="flex items-center justify-center gap-3"><span className="text-2xl font-bold text-white/40 mt-2">R$</span><span className="text-6xl font-black text-white tracking-tighter tabular-nums">{totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div></div></div>
-          <div className="space-y-4"><div className="flex items-center justify-between"><h4 className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Extrato de Créditos Selecionados ({credits.length})</h4><Badge variant="outline" className="bg-white/5 border-white/10 text-slate-400 text-[9px] h-5 font-mono">REF: {staff.id.substring(0, 8).toUpperCase()}</Badge></div>
-            <ScrollArea className="h-[350px] -mx-2 px-2"><div className="space-y-3">{credits.map(c => (<div key={c.id} className="flex items-center justify-between p-5 rounded-2xl bg-[#0f172a] border border-white/5 hover:border-emerald-500/30 transition-all duration-300 group/item"><div className="min-w-0 flex-1 flex items-center gap-5"><div className={cn("h-12 w-12 rounded-xl flex items-center justify-center shrink-0 shadow-inner", c.type === 'REEMBOLSO' ? "bg-blue-500/10" : c.type === 'SALARIO' ? "bg-purple-500/10" : "bg-emerald-500/10")}>{c.type === 'REEMBOLSO' ? <Receipt className="h-6 w-6 text-blue-400" /> : c.type === 'SALARIO' ? <Briefcase className="h-6 w-6 text-purple-400" /> : <Coins className="h-6 w-6 text-emerald-400" />}</div><div className="min-w-0 flex-1"><p className="text-sm font-bold text-slate-200 truncate leading-tight mb-1">{c.description}</p><div className="flex items-center gap-2"><Badge variant="outline" className={cn("text-[8px] font-black uppercase px-2 h-4.5 border-none", c.type === 'REEMBOLSO' ? "bg-blue-500/20 text-blue-400" : c.type === 'SALARIO' ? "bg-purple-500/10 text-purple-400" : "bg-emerald-500/20 text-emerald-400")}>{c.type === 'REEMBOLSO' ? 'Ressarcimento' : c.type === 'SALARIO' ? 'Pro-labore' : 'Participação'}</Badge>{c.date && <span className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">📅 {format(c.date.toDate(), 'dd/MM/yy')}</span>}</div></div></div><div className="text-right ml-6 shrink-0"><p className="text-lg font-black text-white tabular-nums tracking-tight">{c.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p></div></div>))}</div></ScrollArea>
+      <DialogContent className="sm:max-w-4xl bg-[#020617] border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.5)] p-0 overflow-hidden h-[90vh] flex flex-col">
+        <ScrollArea className="flex-1">
+          <div className="p-8 space-y-8">
+            <DialogHeader><div className="flex items-center gap-4 mb-2"><div className="h-12 w-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center"><Wallet className="h-6 w-6 text-emerald-400" /></div><div className="text-left"><DialogTitle className="text-2xl font-black text-white font-headline">Processar Liquidação</DialogTitle><DialogDescription className="text-slate-400 mt-1">Confirmando o pagamento para <span className="text-white font-bold">{staff.firstName} {staff.lastName}</span>.</DialogDescription></div></div></DialogHeader>
+            <div className="relative group"><div className="absolute -inset-1 bg-gradient-to-r from-emerald-500/20 to-primary/20 rounded-3xl blur opacity-25 group-hover:opacity-40 transition duration-1000"></div><div className="relative p-10 rounded-3xl bg-white/5 border border-white/10 text-center space-y-2"><p className="text-[10px] font-black uppercase text-emerald-400 tracking-[0.25em] mb-1">Valor Total Líquido a Pagar</p><div className="flex items-center justify-center gap-3"><span className="text-2xl font-bold text-white/40 mt-2">R$</span><span className="text-6xl font-black text-white tracking-tighter tabular-nums">{totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div></div></div>
+            <div className="space-y-4"><div className="flex items-center justify-between"><h4 className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Extrato de Créditos Selecionados ({credits.length})</h4><Badge variant="outline" className="bg-white/5 border-white/10 text-slate-400 text-[9px] h-5 font-mono">REF: {staff.id.substring(0, 8).toUpperCase()}</Badge></div>
+              <div className="space-y-3">{credits.map(c => (<div key={c.id} className="flex items-center justify-between p-5 rounded-2xl bg-[#0f172a] border border-white/5 hover:border-emerald-500/30 transition-all duration-300 group/item"><div className="min-w-0 flex-1 flex items-center gap-5"><div className={cn("h-12 w-12 rounded-xl flex items-center justify-center shrink-0 shadow-inner", c.type === 'REEMBOLSO' ? "bg-blue-500/10" : c.type === 'SALARIO' ? "bg-purple-500/10" : "bg-emerald-500/10")}>{c.type === 'REEMBOLSO' ? <Receipt className="h-6 w-6 text-blue-400" /> : c.type === 'SALARIO' ? <Briefcase className="h-6 w-6 text-purple-400" /> : <Coins className="h-6 w-6 text-emerald-400" />}</div><div className="min-w-0 flex-1"><p className="text-sm font-bold text-slate-200 truncate leading-tight mb-1">{c.description}</p><div className="flex items-center gap-2"><Badge variant="outline" className={cn("text-[8px] font-black uppercase px-2 h-4.5 border-none", c.type === 'REEMBOLSO' ? "bg-blue-500/20 text-blue-400" : c.type === 'SALARIO' ? "bg-purple-500/10 text-purple-400" : "bg-emerald-500/20 text-emerald-400")}>{c.type === 'REEMBOLSO' ? 'Ressarcimento' : c.type === 'SALARIO' ? 'Pro-labore' : 'Participação'}</Badge>{c.date && <span className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">📅 {format(c.date.toDate(), 'dd/MM/yy')}</span>}</div></div></div><div className="text-right ml-6 shrink-0"><p className="text-lg font-black text-white tabular-nums tracking-tight">{c.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p></div></div>))}</div>
+            </div>
+            <div className="flex items-start gap-4 p-5 rounded-2xl bg-blue-500/5 border border-blue-500/20 text-[11px] text-blue-400/80 leading-relaxed"><div className="h-6 w-6 rounded-full bg-blue-500/10 flex items-center justify-center shrink-0"><Info className="h-3.5 w-3.5" /></div><p>Esta operação registrará uma saída de caixa oficial no financeiro central do escritório e gerará um aviso de liquidação para o profissional.</p></div>
           </div>
-          <div className="flex items-start gap-4 p-5 rounded-2xl bg-blue-500/5 border border-blue-500/20 text-[11px] text-blue-400/80 leading-relaxed"><div className="h-6 w-6 rounded-full bg-blue-500/10 flex items-center justify-center shrink-0"><Info className="h-3.5 w-3.5" /></div><p>Esta operação registrará uma saída de caixa oficial no financeiro central do escritório e gerará um aviso de liquidação para o profissional.</p></div>
-        </div>
-        <DialogFooter className="bg-black/20 p-6 border-t border-white/5 gap-3"><DialogClose asChild><Button variant="ghost" className="text-slate-400 hover:text-white font-bold h-14 px-8 text-xs uppercase tracking-widest" disabled={isProcessing}>Cancelar</Button></DialogClose><Button className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase tracking-widest text-[11px] h-14 shadow-xl shadow-emerald-900/20 group" onClick={handlePay} disabled={isProcessing}>{isProcessing ? <Loader2 className="h-5 w-5 animate-spin" /> : <CheckCircle2 className="mr-2 h-5 w-5" />}{isProcessing ? 'Processando...' : 'Confirmar Pagamento e Emitir'}</Button></DialogFooter>
+        </ScrollArea>
+        <DialogFooter className="bg-black/20 p-6 border-t border-white/5 gap-3 shrink-0"><DialogClose asChild><Button variant="ghost" className="text-slate-400 hover:text-white font-bold h-14 px-8 text-xs uppercase tracking-widest" disabled={isProcessing}>Cancelar</Button></DialogClose><Button className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase tracking-widest text-[11px] h-14 shadow-xl shadow-emerald-900/20 group" onClick={handlePay} disabled={isProcessing}>{isProcessing ? <Loader2 className="h-5 w-5 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}{isProcessing ? 'Processando...' : 'Confirmar Pagamento e Emitir'}</Button></DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -407,11 +409,11 @@ function ManageCreditsDialog({ staff, open, onOpenChange, onUpdate, isAdmin }: {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-4xl bg-[#020617] border-white/10 p-0 overflow-hidden h-[85vh] flex flex-col">
-        <DialogHeader className="p-6 border-b border-white/5 bg-white/5"><div className="flex items-center justify-between"><div className="flex items-center gap-4"><div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-black text-lg">{staff.firstName.charAt(0)}{staff.lastName.charAt(0)}</div><div><DialogTitle className="text-xl font-black text-white">{staff.firstName} {staff.lastName}</DialogTitle><DialogDescription className="text-slate-400">Auditoria e gestão de carteira profissional</DialogDescription></div></div>{isAdmin && <Button size="sm" onClick={() => {}} className="gap-2" disabled={isLoading}><Plus className="h-4 w-4" /> Novo Lançamento</Button>}</div></DialogHeader>
+      <DialogContent className="sm:max-w-4xl bg-[#020617] border-white/10 p-0 overflow-hidden h-[90vh] flex flex-col">
+        <DialogHeader className="p-6 border-b border-white/5 bg-white/5 shrink-0"><div className="flex items-center justify-between"><div className="flex items-center gap-4"><div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-black text-lg">{staff.firstName.charAt(0)}{staff.lastName.charAt(0)}</div><div><DialogTitle className="text-xl font-black text-white">{staff.firstName} {staff.lastName}</DialogTitle><DialogDescription className="text-slate-400">Auditoria e gestão de carteira profissional</DialogDescription></div></div>{isAdmin && <Button size="sm" onClick={() => {}} className="gap-2" disabled={isLoading}><Plus className="h-4 w-4" /> Novo Lançamento</Button>}</div></DialogHeader>
         
         <div className="flex-1 overflow-hidden flex flex-col">
-          <div className="p-4 bg-black/20 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="p-4 bg-black/20 flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0">
             <div className="flex items-center gap-2">
               <Button variant={filter === 'ALL' ? 'default' : 'ghost'} size="sm" onClick={() => setFilter('ALL')} className="text-[10px] uppercase font-black h-8">Carteira Pendente</Button>
               <Button variant={filter === 'DISPONIVEL' ? 'default' : 'ghost'} size="sm" onClick={() => setFilter('DISPONIVEL')} className="text-[10px] uppercase font-black h-8 text-emerald-400">Liberados</Button>
@@ -477,7 +479,7 @@ function ManageCreditsDialog({ staff, open, onOpenChange, onUpdate, isAdmin }: {
             </div>
           </ScrollArea>
         </div>
-        <DialogFooter className="p-6 border-t border-white/5 bg-black/20"><DialogClose asChild><Button variant="ghost">Fechar Painel</Button></DialogClose></DialogFooter>
+        <DialogFooter className="p-6 border-t border-white/5 bg-black/20 shrink-0"><DialogClose asChild><Button variant="ghost">Fechar Painel</Button></DialogClose></DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -705,7 +707,7 @@ export default function RepassesPage() {
           </TabsList>
           <TabsContent value="lawyers" className="mt-6"><PayoutList filterRole="lawyer" onRefresh={() => setRefreshKey(k => k + 1)} onPaid={handleRepassePaid} isAdmin={isAdmin} /></TabsContent>
           <TabsContent value="staff" className="mt-6"><PayoutList filterRole="employee" onRefresh={() => setRefreshKey(k => k + 1)} onPaid={handleRepassePaid} isAdmin={isAdmin} /></TabsContent>
-          <TabsContent value="providers" className="mt-6"><PayoutList filterRole="provider" onRefresh={() => setRefreshKey(k => k + 1)} onPaid={handleRepassePaid} isAdmin={isAdmin} /></TabsContent>
+          <TabsContent value="providers" className="mt-6"><PayoutList filterRole="provider" onRefresh={() => setRefreshKey(k => k + 1)} onPaid={handleRepassePaid} isAdmin={isAdmin} /></PayoutList></TabsContent>
           <TabsContent value="history" className="mt-6"><PaymentHistory onShowVoucher={handleShowVoucherFromHistory} /></TabsContent>
         </Tabs>
       ) : isLawyer ? (
