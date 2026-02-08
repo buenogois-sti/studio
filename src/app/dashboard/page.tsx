@@ -43,7 +43,7 @@ import { useFirebase, useCollection, useMemoFirebase, useDoc } from '@/firebase'
 import { collection, query, orderBy, limit, Timestamp, where, doc } from 'firebase/firestore';
 import type { Client, FinancialTitle, Process, Hearing, Log, UserProfile, StaffCredit, LegalDeadline } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import { format, isBefore, startOfMonth } from 'date-fns';
+import { format, isBefore, startOfMonth, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -352,6 +352,8 @@ export default function Dashboard() {
     return Timestamp.fromDate(startOfMonth(new Date()));
   }, []);
 
+  const stableNow = React.useMemo(() => Timestamp.now(), []);
+
   const userProfileRef = useMemoFirebase(() => (firestore && session?.user?.id ? doc(firestore, 'users', session.user.id) : null), [firestore, session]);
   const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
   const role = userProfile?.role || 'assistant';
@@ -374,10 +376,9 @@ export default function Dashboard() {
   const hearingsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     const base = collection(firestore, 'hearings');
-    // Usamos Timestamp.now() fixado no momento da montagem para evitar flicker
-    if (role === 'lawyer') return query(base, where('lawyerId', '==', session?.user?.id), where('date', '>=', Timestamp.now()), orderBy('date', 'asc'), limit(5));
-    return query(base, where('date', '>=', Timestamp.now()), orderBy('date', 'asc'), limit(5));
-  }, [firestore, role, session]);
+    if (role === 'lawyer') return query(base, where('lawyerId', '==', session?.user?.id), where('date', '>=', stableNow), orderBy('date', 'asc'), limit(5));
+    return query(base, where('date', '>=', stableNow), orderBy('date', 'asc'), limit(5));
+  }, [firestore, role, session, stableNow]);
   const { data: hearingsData, isLoading: isLoadingHearings } = useCollection<Hearing>(hearingsQuery);
 
   const deadlinesQuery = useMemoFirebase(() => {

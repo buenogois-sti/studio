@@ -47,7 +47,8 @@ import {
   isSameMonth, 
   addMonths, 
   subMonths,
-  addDays
+  addDays,
+  startOfDay
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -104,7 +105,6 @@ export default function AudienciasPage() {
   const { toast } = useToast();
   const router = useRouter();
 
-  // Estabiliza a data de corte para evitar re-subs cíclicas
   const stableHistoryCutoff = React.useMemo(() => {
     return Timestamp.fromDate(subMonths(new Date(), 3));
   }, []);
