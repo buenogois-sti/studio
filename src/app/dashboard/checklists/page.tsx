@@ -456,7 +456,7 @@ function ChecklistEditorDialog({ open, onOpenChange, template }: { open: boolean
                 {items.length === 0 && (
                   <div className="text-center py-16 bg-black/20 rounded-3xl border-2 border-dashed border-white/5 opacity-30 flex flex-col items-center gap-3">
                     <Target className="h-10 w-10" />
-                    <p className="font-bold text-xs uppercase tracking-widest">Adicione the primeiro passo de verificação</p>
+                    <p className="font-bold text-xs uppercase tracking-widest">Adicione o primeiro passo de verificação</p>
                   </div>
                 )}
               </div>
