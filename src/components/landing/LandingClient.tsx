@@ -144,6 +144,7 @@ function useScrollPosition() {
       
       rafId = requestAnimationFrame(() => {
         const currentScrollY = window.scrollY;
+        // Debounce: Só atualiza se o scroll mudou mais que 10px para aliviar o processamento
         if (Math.abs(currentScrollY - lastScrollY) > 10) {
           setScrollPosition(currentScrollY);
           lastScrollY = currentScrollY;

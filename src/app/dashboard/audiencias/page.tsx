@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -103,6 +104,11 @@ export default function AudienciasPage() {
   const { toast } = useToast();
   const router = useRouter();
 
+  // Estabiliza a data de corte para evitar re-subs cíclicas
+  const stableHistoryCutoff = React.useMemo(() => {
+    return Timestamp.fromDate(subMonths(new Date(), 3));
+  }, []);
+
   const userProfileRef = useMemoFirebase(
     () => (firestore && user?.uid ? doc(firestore, 'users', user.uid) : null),
     [firestore, user?.uid]
@@ -116,17 +122,16 @@ export default function AudienciasPage() {
   const hearingsQuery = useMemoFirebase(() => {
     if (!firestore || !userProfile) return null;
     const base = collection(firestore, 'hearings');
-    const threeMonthsAgo = Timestamp.fromDate(subMonths(new Date(), 3));
 
     if (userProfile.role === 'admin' || userProfile.role === 'assistant') {
       if (selectedLawyerFilter !== 'all') {
-        return query(base, where('lawyerId', '==', selectedLawyerFilter), where('date', '>=', threeMonthsAgo), orderBy('date', 'asc'), limit(100));
+        return query(base, where('lawyerId', '==', selectedLawyerFilter), where('date', '>=', stableHistoryCutoff), orderBy('date', 'asc'), limit(100));
       }
-      return query(base, where('date', '>=', threeMonthsAgo), orderBy('date', 'asc'), limit(200));
+      return query(base, where('date', '>=', stableHistoryCutoff), orderBy('date', 'asc'), limit(200));
     }
     
-    return query(base, where('lawyerId', '==', userProfile.id), where('date', '>=', threeMonthsAgo), orderBy('date', 'asc'), limit(100));
-  }, [firestore, userProfile, selectedLawyerFilter, refreshKey]);
+    return query(base, where('lawyerId', '==', userProfile.id), where('date', '>=', stableHistoryCutoff), orderBy('date', 'asc'), limit(100));
+  }, [firestore, userProfile, selectedLawyerFilter, refreshKey, stableHistoryCutoff]);
 
   const { data: hearingsData, isLoading: isLoadingHearings, error: hearingsError } = useCollection<Hearing>(hearingsQuery);
 
@@ -154,7 +159,7 @@ export default function AudienciasPage() {
 
   const weekDays = React.useMemo(() => {
     const days = [];
-    const today = new Date();
+    const today = startOfDay(new Date());
     for (let i = 0; i < 7; i++) days.push(addDays(today, i));
     return days;
   }, []);

@@ -1,3 +1,4 @@
+
 'use client';
 import * as React from 'react';
 import {
@@ -49,9 +50,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { analyzeOfficeStatus, type OfficeInsightsOutput } from '@/ai/flows/office-insights-flow';
 
-// --- SUB-COMPONENTES DE VISÃO ---
+// --- SUB-COMPONENTES DE VISÃO MEMOIZADOS ---
 
-function AIAdvisor({ stats, activities, isLoading, role }: { stats: any, activities: string[], isLoading: boolean, role: string }) {
+const AIAdvisor = React.memo(({ stats, activities, isLoading, role }: { stats: any, activities: string[], isLoading: boolean, role: string }) => {
     const [insights, setInsights] = React.useState<OfficeInsightsOutput | null>(null);
     const [isAnalyzing, setIsAnalyzing] = React.useState(false);
 
@@ -132,13 +133,13 @@ function AIAdvisor({ stats, activities, isLoading, role }: { stats: any, activit
             </CardContent>
         </Card>
     );
-}
+});
+AIAdvisor.displayName = 'AIAdvisor';
 
-// --- VIEW COMPONENTS ---
+// --- VIEW COMPONENTS MEMOIZADOS ---
 
-function AdminDashboard({ stats, isLoading, logsData, hearingsData, chartData }: any) {
-  return (
-    <div className="space-y-8">
+const AdminDashboard = React.memo(({ stats, isLoading, logsData, hearingsData, chartData }: any) => (
+    <div className="space-y-8 animate-in fade-in duration-500">
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard title="Receita Bruta (Mês)" value={stats.totalRevenue} icon={DollarSign} currency />
         <StatCard title="Eficiência Triagem" value={stats.leadsConverted} icon={Zap} suffix="%" />
@@ -155,12 +156,11 @@ function AdminDashboard({ stats, isLoading, logsData, hearingsData, chartData }:
         </div>
       </div>
     </div>
-  );
-}
+));
+AdminDashboard.displayName = 'AdminDashboard';
 
-function LawyerDashboard({ stats, isLoading, hearingsData, deadlinesData }: any) {
-  return (
-    <div className="space-y-8">
+const LawyerDashboard = React.memo(({ stats, isLoading, hearingsData, deadlinesData }: any) => (
+    <div className="space-y-8 animate-in fade-in duration-500">
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard title="Minha Carteira" value={stats.activeProcessesCount} icon={Briefcase} />
         <StatCard title="Meus Honorários" value={stats.personalFees} icon={Wallet} currency />
@@ -177,12 +177,11 @@ function LawyerDashboard({ stats, isLoading, hearingsData, deadlinesData }: any)
         </div>
       </div>
     </div>
-  );
-}
+));
+LawyerDashboard.displayName = 'LawyerDashboard';
 
-function FinancialDashboard({ stats, isLoading, titlesData }: any) {
-  return (
-    <div className="space-y-8">
+const FinancialDashboard = React.memo(({ stats, isLoading, titlesData }: any) => (
+    <div className="space-y-8 animate-in fade-in duration-500">
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard title="Recebido (Mês)" value={stats.totalRevenue} icon={TrendingUp} currency color="text-emerald-500" />
         <StatCard title="Pendentes" value={stats.pendingReceivables} icon={Clock} currency color="text-amber-500" />
@@ -206,12 +205,11 @@ function FinancialDashboard({ stats, isLoading, titlesData }: any) {
         </CardContent>
       </Card>
     </div>
-  );
-}
+));
+FinancialDashboard.displayName = 'FinancialDashboard';
 
-function AssistantDashboard({ stats, hearingsData, leadsData, isLoading }: any) {
-  return (
-    <div className="space-y-8">
+const AssistantDashboard = React.memo(({ stats, hearingsData, leadsData, isLoading }: any) => (
+    <div className="space-y-8 animate-in fade-in duration-500">
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard title="Atos p/ Hoje" value={stats.hearingsToday} icon={Calendar} color="text-primary" />
         <StatCard title="Novos Leads" value={stats.newLeads} icon={Zap} color="text-amber-400" />
@@ -233,8 +231,8 @@ function AssistantDashboard({ stats, hearingsData, leadsData, isLoading }: any) 
         </Card>
       </div>
     </div>
-  );
-}
+));
+AssistantDashboard.displayName = 'AssistantDashboard';
 
 // --- HELPER COMPONENTS ---
 
@@ -349,6 +347,11 @@ export default function Dashboard() {
   const { firestore } = useFirebase();
   const { data: session, status } = useSession();
 
+  // Estabiliza a data de início do mês para evitar re-subscriptions cíclicas no Firebase
+  const stableStartOfMonth = React.useMemo(() => {
+    return Timestamp.fromDate(startOfMonth(new Date()));
+  }, []);
+
   const userProfileRef = useMemoFirebase(() => (firestore && session?.user?.id ? doc(firestore, 'users', session.user.id) : null), [firestore, session]);
   const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
   const role = userProfile?.role || 'assistant';
@@ -356,9 +359,8 @@ export default function Dashboard() {
   // QUERIES DINÂMICAS POR ROLE
   const titlesQuery = useMemoFirebase(() => {
     if (!firestore) return null;
-    const start = Timestamp.fromDate(startOfMonth(new Date()));
-    return query(collection(firestore, 'financial_titles'), where('dueDate', '>=', start), limit(role === 'admin' ? 10 : 5));
-  }, [firestore, role]);
+    return query(collection(firestore, 'financial_titles'), where('dueDate', '>=', stableStartOfMonth), limit(role === 'admin' ? 10 : 5));
+  }, [firestore, role, stableStartOfMonth]);
   const { data: titlesData, isLoading: isLoadingTitles } = useCollection<FinancialTitle>(titlesQuery);
 
   const processesQuery = useMemoFirebase(() => {
@@ -372,6 +374,7 @@ export default function Dashboard() {
   const hearingsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     const base = collection(firestore, 'hearings');
+    // Usamos Timestamp.now() fixado no momento da montagem para evitar flicker
     if (role === 'lawyer') return query(base, where('lawyerId', '==', session?.user?.id), where('date', '>=', Timestamp.now()), orderBy('date', 'asc'), limit(5));
     return query(base, where('date', '>=', Timestamp.now()), orderBy('date', 'asc'), limit(5));
   }, [firestore, role, session]);
@@ -448,7 +451,7 @@ export default function Dashboard() {
   }, [processesData]);
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-8 pb-10">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div className="animate-in slide-in-from-left duration-500">
             <h1 className="text-4xl font-black tracking-tight font-headline text-white">
