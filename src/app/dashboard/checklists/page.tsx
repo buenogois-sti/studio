@@ -364,8 +364,8 @@ function ChecklistEditorDialog({ open, onOpenChange, template }: { open: boolean
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-3xl bg-[#020617] border-white/10 text-white max-h-[90vh] flex flex-col p-0 shadow-2xl">
-        <DialogHeader className="p-6 border-b border-white/5 bg-white/5">
+      <DialogContent className="sm:max-w-3xl bg-[#020617] border-white/10 text-white h-[90vh] flex flex-col p-0 shadow-2xl overflow-hidden">
+        <DialogHeader className="p-6 border-b border-white/5 bg-white/5 shrink-0">
           <DialogTitle className="flex items-center gap-2 text-white font-headline text-xl">
             <Edit className="h-6 w-6 text-primary" />
             Editor de Modelo
@@ -373,8 +373,8 @@ function ChecklistEditorDialog({ open, onOpenChange, template }: { open: boolean
           <DialogDescription className="text-slate-400">Desenvolva o passo a passo padrão para as rotinas do escritório.</DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 p-6">
-          <div className="space-y-8">
+        <ScrollArea className="flex-1">
+          <div className="p-6 space-y-8">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Título do Checklist *</Label>
@@ -402,7 +402,7 @@ function ChecklistEditorDialog({ open, onOpenChange, template }: { open: boolean
 
             <Separator className="bg-white/5" />
 
-            <div className="space-y-4">
+            <div className="space-y-4 pb-10">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-black uppercase tracking-widest text-primary flex items-center gap-2">
                   <ListChecks className="h-4 w-4" /> Itens de Verificação
@@ -464,7 +464,7 @@ function ChecklistEditorDialog({ open, onOpenChange, template }: { open: boolean
           </div>
         </ScrollArea>
 
-        <DialogFooter className="p-6 border-t border-white/5 bg-white/5 gap-3">
+        <DialogFooter className="p-6 border-t border-white/5 bg-white/5 gap-3 shrink-0">
           <DialogClose asChild><Button variant="ghost" className="text-slate-400 font-bold uppercase text-[10px] tracking-widest">Cancelar</Button></DialogClose>
           <Button 
             disabled={isSaving} 
@@ -552,8 +552,8 @@ function ChecklistExecutorDialog({ open, onOpenChange, template }: { open: boole
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-3xl bg-[#020617] border-white/10 text-white max-h-[90vh] flex flex-col p-0 shadow-2xl">
-        <DialogHeader className="p-6 border-b border-white/5 bg-primary/5">
+      <DialogContent className="sm:max-w-3xl bg-[#020617] border-white/10 text-white h-[90vh] flex flex-col p-0 shadow-2xl overflow-hidden">
+        <DialogHeader className="p-6 border-b border-white/5 bg-primary/5 shrink-0">
           <div className="flex items-center gap-4">
             <div className="h-14 w-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0 shadow-inner">
               <Play className="h-7 w-7 text-primary animate-pulse" />
@@ -565,8 +565,8 @@ function ChecklistExecutorDialog({ open, onOpenChange, template }: { open: boole
           </div>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 p-6">
-          <div className="space-y-10 pb-10">
+        <ScrollArea className="flex-1">
+          <div className="p-6 space-y-10 pb-10">
             <div className="space-y-3">
               <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
                 <FolderKanban className="h-3 w-3 text-primary" /> Vínculo Processual (Opcional)
@@ -709,7 +709,7 @@ function ChecklistExecutorDialog({ open, onOpenChange, template }: { open: boole
 
             <Separator className="bg-white/5" />
 
-            <div className="space-y-3">
+            <div className="space-y-3 pb-10">
               <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
                 <MessageSquare className="h-3 w-3 text-primary" /> Notas Finais da Operação
               </Label>
@@ -723,7 +723,7 @@ function ChecklistExecutorDialog({ open, onOpenChange, template }: { open: boole
           </div>
         </ScrollArea>
 
-        <DialogFooter className="p-6 border-t border-white/5 bg-white/5 gap-3">
+        <DialogFooter className="p-6 border-t border-white/5 bg-white/5 gap-3 shrink-0">
           <DialogClose asChild><Button variant="ghost" className="text-slate-400 font-bold uppercase text-[10px] tracking-widest h-14">Cancelar</Button></DialogClose>
           <Button 
             disabled={isSaving} 
@@ -757,8 +757,8 @@ function ChecklistDetailsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-3xl bg-[#020617] border-white/10 text-white max-h-[90vh] flex flex-col p-0 shadow-2xl">
-        <DialogHeader className="p-6 border-b border-white/5 bg-primary/5">
+      <DialogContent className="sm:max-w-3xl bg-[#020617] border-white/10 text-white h-[90vh] flex flex-col p-0 shadow-2xl overflow-hidden">
+        <DialogHeader className="p-6 border-b border-white/5 bg-primary/5 shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="h-14 w-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0 shadow-inner">
@@ -775,8 +775,8 @@ function ChecklistDetailsDialog({
           </div>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 p-6">
-          <div className="space-y-10 pb-10" id="checklist-print-area">
+        <ScrollArea className="flex-1">
+          <div className="p-6 space-y-10 pb-10" id="checklist-print-area">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-1">
                 <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Responsável</Label>
@@ -866,7 +866,7 @@ function ChecklistDetailsDialog({
           </div>
         </ScrollArea>
 
-        <DialogFooter className="p-6 border-t border-white/5 bg-white/5">
+        <DialogFooter className="p-6 border-t border-white/5 bg-white/5 shrink-0">
           <DialogClose asChild><Button variant="ghost" className="w-full text-slate-400 font-bold uppercase text-[10px] tracking-widest">Fechar Relatório</Button></DialogClose>
         </DialogFooter>
       </DialogContent>
