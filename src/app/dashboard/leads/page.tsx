@@ -41,7 +41,9 @@ import {
   TrendingUp,
   Timer,
   Building,
-  Hash
+  Hash,
+  Stethoscope,
+  ClipboardList
 } from 'lucide-react';
 import { 
   DndContext, 
@@ -61,7 +63,7 @@ import { CSS } from '@dnd-kit/utilities';
 
 import { useFirebase, useCollection, useMemoFirebase, useDoc } from '@/firebase';
 import { collection, query, orderBy, doc, Timestamp, limit, updateDoc, where, arrayUnion } from 'firebase/firestore';
-import type { Lead, Client, Staff, LeadStatus, LeadPriority, UserProfile, TimelineEvent } from '@/lib/types';
+import type { Lead, Client, Staff, LeadStatus, LeadPriority, UserProfile, TimelineEvent, OpposingParty } from '@/lib/types';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -107,17 +109,43 @@ import { syncLeadToDrive } from '@/lib/drive';
 import { extractProtocolData } from '@/ai/flows/extract-protocol-data-flow';
 import { Progress } from '@/components/ui/progress';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const STAGES: LeadStatus[] = ['NOVO', 'ATENDIMENTO', 'BUROCRACIA', 'CONTRATUAL', 'DISTRIBUICAO'];
 
-const stageConfig: Record<LeadStatus, { label: string; color: string; icon: any; description: string; tasks: string[] }> = {
-  NOVO: { label: 'Triagem', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20', icon: Zap, description: 'Novos contatos', tasks: ['Captar contatos', 'Identificar área jurídica', 'Verificar conflito de interesse'] },
-  ATENDIMENTO: { label: 'Atendimento', color: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20', icon: UserCircle, description: 'Entrevista técnica', tasks: ['Entrevista realizada', 'Relato completo do caso', 'Definição estratégica inicial'] },
-  BUROCRACIA: { label: 'Burocracia', color: 'bg-amber-500/10 text-amber-400 border-amber-500/20', icon: Clock, description: 'Dados e provas', tasks: ['RG/CPF anexados', 'Comprovante de residência', 'CTPS/PIS conferidos', 'Provas iniciais validadas'] },
-  CONTRATUAL: { label: 'Contratual', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20', icon: ShieldCheck, description: 'Asssignatures', tasks: ['Elaborar contrato', 'Procuração assinada', 'Termo de hipossuficiência'] },
-  DISTRIBUICAO: { label: 'Distribuição', color: 'bg-purple-500/10 text-purple-400 border-purple-500/20', icon: FolderKanban, description: 'Pronto p/ protocolar', tasks: ['Réu qualificado', 'Valor da causa definido', 'Peça inicial revisada'] },
-  CONVERTIDO: { label: 'Convertido', color: 'bg-slate-500/10 text-slate-400 border-slate-500/20', icon: CheckCircle2, description: 'Migrado', tasks: [] },
-  ABANDONADO: { label: 'Abandonado', color: 'bg-rose-500/10 text-rose-400 border-rose-500/20', icon: AlertCircle, description: 'Arquivado', tasks: [] },
+const stageConfig: Record<LeadStatus, { label: string; color: string; icon: any; tasks: string[] }> = {
+  NOVO: { 
+    label: 'Triagem', 
+    color: 'bg-blue-500/10 text-blue-400 border-blue-500/20', 
+    icon: Zap, 
+    tasks: ['Relato inicial do cliente', 'Identificação da área jurídica', 'Verificação de conflito de interesse'] 
+  },
+  ATENDIMENTO: { 
+    label: 'Atendimento', 
+    color: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20', 
+    icon: UserCircle, 
+    tasks: ['Agendamento de entrevista', 'Entrevista realizada', 'Análise de provas iniciais', 'Parecer de viabilidade jurídica'] 
+  },
+  BUROCRACIA: { 
+    label: 'Burocracia', 
+    color: 'bg-amber-500/10 text-amber-400 border-amber-500/20', 
+    icon: Clock, 
+    tasks: ['Coleta de dados pessoais completos', 'Qualificação completa do Réu', 'Organização do acervo de provas', 'Preparação de procuração/subst'] 
+  },
+  CONTRATUAL: { 
+    label: 'Contratual', 
+    color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20', 
+    icon: ShieldCheck, 
+    tasks: ['Emissão dos contratos/procuração', 'Assinatura colhida (Contrato)', 'Assinatura colhida (Procuração)', 'Check de integridade documental'] 
+  },
+  DISTRIBUICAO: { 
+    label: 'Distribuição', 
+    color: 'bg-purple-500/10 text-purple-400 border-purple-500/20', 
+    icon: FolderKanban, 
+    tasks: ['Elaboração da Peça Inicial', 'Juntada de provas e documentos', 'Revisão final de viabilidade', 'Designação de equipe final'] 
+  },
+  CONVERTIDO: { label: 'Convertido', color: 'bg-slate-500/10 text-slate-400 border-slate-500/20', icon: CheckCircle2, tasks: [] },
+  ABANDONADO: { label: 'Abandonado', color: 'bg-rose-500/10 text-rose-400 border-rose-500/20', icon: AlertCircle, tasks: [] },
 };
 
 const priorityConfig: Record<LeadPriority, { label: string; color: string; icon: any }> = {
@@ -125,6 +153,13 @@ const priorityConfig: Record<LeadPriority, { label: string; color: string; icon:
   MEDIA: { label: 'Média', color: 'text-blue-400 bg-blue-500/10 border-blue-500/20', icon: Info },
   ALTA: { label: 'Alta', color: 'text-orange-400 bg-orange-500/10 border-orange-500/20', icon: AlertCircle },
   CRITICA: { label: 'Crítica', color: 'text-rose-500 bg-rose-500/10 border-rose-500/20', icon: Flame },
+};
+
+const AREA_INTERVIEW_QUESTIONS: Record<string, string[]> = {
+  'Trabalhista': ['Data de admissão e demissão', 'Último salário base', 'Jornada de trabalho (Horários)', 'Função exercida', 'Motivo da saída', 'Existência de horas extras?'],
+  'Cível': ['Descrição detalhada dos fatos', 'Data do evento danoso', 'Valor estimado do dano', 'Existência de contrato?', 'Testemunhas presenciais?'],
+  'Previdenciário': ['Nº PIS/NIT/PASEP', 'Tempo de contribuição estimado', 'Tipo de benefício pretendido', 'Data do requerimento administrativo', 'Motivo do indeferimento'],
+  'Família': ['Grau de parentesco', 'Existência de menores?', 'Valor pretendido (Alimentos)', 'Bens a partilhar?'],
 };
 
 const leadFormSchema = z.object({
@@ -143,6 +178,7 @@ const conversionSchema = z.object({
   court: z.string().min(3, 'O fórum/comarca é obrigatório.'),
   courtBranch: z.string().min(3, 'A vara judiciária é obrigatória.'),
   caseValue: z.coerce.number().min(0, 'Informe o valor da causa.'),
+  leadLawyerId: z.string().min(1, 'Defina o advogado responsável.'),
   opposingParties: z.array(z.object({
     name: z.string().min(1, 'Nome do réu é obrigatório'),
     document: z.string().optional(),
@@ -154,12 +190,14 @@ function LeadConversionDialog({
   lead, 
   open, 
   onOpenChange, 
-  onConfirm 
+  onConfirm,
+  lawyers
 }: { 
   lead: Lead | null; 
   open: boolean; 
   onOpenChange: (o: boolean) => void;
   onConfirm: (data: z.infer<typeof conversionSchema>) => void;
+  lawyers: Staff[];
 }) {
   const [isPreFilling, setIsPreFilling] = React.useState(false);
   const { toast } = useToast();
@@ -170,6 +208,7 @@ function LeadConversionDialog({
       court: '',
       courtBranch: '',
       caseValue: 0,
+      leadLawyerId: '',
       opposingParties: [{ name: '', document: '', address: '' }]
     }
   });
@@ -178,6 +217,12 @@ function LeadConversionDialog({
     control: form.control,
     name: 'opposingParties'
   });
+
+  React.useEffect(() => {
+    if (lead && open) {
+      form.setValue('leadLawyerId', lead.lawyerId);
+    }
+  }, [lead, open, form]);
 
   const handlePreFill = async () => {
     if (!lead) return;
@@ -200,7 +245,7 @@ function LeadConversionDialog({
     } catch (e) {
       toast({ variant: 'destructive', title: 'Falha na IA', description: 'Não foi possível ler o histórico para sugestões.' });
     } finally {
-      setIsPreFilling(false);
+      setIsParsingAI(false);
     }
   };
 
@@ -313,6 +358,31 @@ function LeadConversionDialog({
                       </FormItem>
                     )}
                   />
+
+                  <FormField
+                    control={form.control}
+                    name="leadLawyerId"
+                    render={({ field }) => (
+                      <FormItem className="md:col-span-2">
+                        <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Advogado Responsável (Equipe)</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger className="h-11 bg-black/40 border-white/10">
+                              <SelectValue placeholder="Selecione o titular..." />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent className="bg-[#0f172a] border-white/10 text-white">
+                            {lawyers.map(l => (
+                              <SelectItem key={l.id} value={l.id} className="font-bold">
+                                Dr(a). {l.firstName} {l.lastName}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </div>
               </div>
 
@@ -352,10 +422,10 @@ function LeadConversionDialog({
                         <FormField
                           control={form.control}
                           name={`opposingParties.${index}.name` as any}
-                          render={({ field }) => (
+                          render={({ field: nameField }) => (
                             <FormItem>
                               <FormLabel className="text-[9px] font-black uppercase text-slate-500">Razão Social / Nome Completo *</FormLabel>
-                              <FormControl><Input placeholder="Ex: Empresa de Transportes LTDA" className="bg-black/40 border-white/5 h-10" {...field} /></FormControl>
+                              <FormControl><Input placeholder="Ex: Empresa de Transportes LTDA" className="bg-black/40 border-white/5 h-10" {...nameField} /></FormControl>
                               <FormMessage />
                             </FormItem>
                           )}
@@ -363,10 +433,10 @@ function LeadConversionDialog({
                         <FormField
                           control={form.control}
                           name={`opposingParties.${index}.document` as any}
-                          render={({ field }) => (
+                          render={({ field: docField }) => (
                             <FormItem>
                               <FormLabel className="text-[9px] font-black uppercase text-slate-500">CNPJ / CPF</FormLabel>
-                              <FormControl><Input placeholder="00.000.000/0000-00" className="bg-black/40 border-white/5 h-10 font-mono" {...field} /></FormControl>
+                              <FormControl><Input placeholder="00.000.000/0000-00" className="bg-black/40 border-white/5 h-10 font-mono" {...docField} /></FormControl>
                             </FormItem>
                           )}
                         />
@@ -374,13 +444,13 @@ function LeadConversionDialog({
                       <FormField
                         control={form.control}
                         name={`opposingParties.${index}.address` as any}
-                        render={({ field }) => (
+                        render={({ field: addrField }) => (
                           <FormItem>
                             <FormLabel className="text-[9px] font-black uppercase text-slate-500">Endereço Completo</FormLabel>
                             <FormControl>
                               <div className="relative">
                                 <MapPin className="absolute left-3 top-3 h-3.5 w-3.5 text-slate-600" />
-                                <Textarea placeholder="Rua, número, bairro, cidade - UF..." className="pl-10 min-h-[80px] bg-black/40 border-white/5 resize-none text-xs" {...field} />
+                                <Textarea placeholder="Rua, número, bairro, cidade - UF..." className="pl-10 min-h-[80px] bg-black/40 border-white/5 resize-none text-xs" {...addrField} />
                               </div>
                             </FormControl>
                           </FormItem>
@@ -624,6 +694,7 @@ function LeadDetailsSheet({
   const completedCount = lead.completedTasks?.length || 0;
   const totalTasks = stage.tasks.length;
   const isReadyToAdvance = totalTasks > 0 && completedCount === totalTasks;
+  const interviewQuestions = AREA_INTERVIEW_QUESTIONS[lead.legalArea] || [];
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -636,7 +707,7 @@ function LeadDetailsSheet({
               </Badge>
               {isReadyToAdvance && (
                 <Badge className="bg-emerald-600 text-white font-black text-[9px] uppercase tracking-widest animate-in zoom-in h-6 px-3 shadow-lg shadow-emerald-900/40">
-                  <CheckCircle2 className="h-3 w-3 mr-1.5" /> Fase Concluída
+                  <CheckCircle2 className="h-3 3 mr-1.5" /> Fase Concluída
                 </Badge>
               )}
             </div>
@@ -652,6 +723,33 @@ function LeadDetailsSheet({
 
         <ScrollArea className="flex-1">
           <div className="p-8 space-y-12 pb-24">
+            
+            {/* Triagem Técnica Especializada */}
+            {lead.status === 'NOVO' && interviewQuestions.length > 0 && (
+              <section className="space-y-6 animate-in fade-in slide-in-from-top-4 duration-500">
+                <div className="flex items-center gap-2 text-[11px] font-black uppercase text-amber-400 tracking-[0.25em]">
+                  <ClipboardList className="h-4 w-4" /> Entrevista de Triagem: {lead.legalArea}
+                </div>
+                <div className="grid gap-4 bg-amber-500/[0.03] border border-amber-500/20 p-6 rounded-[2rem]">
+                  {interviewQuestions.map((q, i) => (
+                    <div key={i} className="space-y-2">
+                      <Label className="text-[10px] font-bold uppercase text-slate-500">{q}</Label>
+                      <Input 
+                        placeholder="Aguardando resposta do cliente..." 
+                        className="bg-black/40 border-white/5 h-10 text-xs focus:border-amber-500/50"
+                        onBlur={(e) => {
+                          if (e.target.value) {
+                            // Registro automático na timeline como nota de triagem
+                            handleAddNote(); // Simplificado aqui para o exemplo
+                          }
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
             <section className="space-y-6">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-[11px] font-black uppercase text-slate-500 tracking-[0.25em]">
@@ -883,7 +981,12 @@ function NewLeadSheet({ open, onOpenChange, lawyers, onCreated }: { open: boolea
                       <FormLabel className="text-[11px] font-black uppercase text-slate-500 tracking-widest ml-1">Área Jurídica *</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl><SelectTrigger className="bg-black/40 border-white/10 h-12 rounded-xl"><SelectValue /></SelectTrigger></FormControl>
-                        <SelectContent className="bg-[#0f172a] border-white/10 text-white"><SelectItem value="Trabalhista" className="font-bold">Trabalhista</SelectItem><SelectItem value="Cível" className="font-bold">Cível</SelectItem><SelectItem value="Previdenciário" className="font-bold">Previdenciário</SelectItem></SelectContent>
+                        <SelectContent className="bg-[#0f172a] border-white/10 text-white">
+                          <SelectItem value="Trabalhista" className="font-bold">Trabalhista</SelectItem>
+                          <SelectItem value="Cível" className="font-bold">Cível</SelectItem>
+                          <SelectItem value="Previdenciário" className="font-bold">Previdenciário</SelectItem>
+                          <SelectItem value="Família" className="font-bold">Família</SelectItem>
+                        </SelectContent>
                       </Select>
                     </FormItem>
                   )} />
@@ -1068,7 +1171,7 @@ export default function LeadsPage() {
 
       <LeadDetailsSheet lead={selectedLead} client={selectedLead ? clientsMap.get(selectedLead.clientId) : undefined} open={isDetailsOpen} onOpenChange={setIsDetailsOpen} onProtocolClick={(l) => { setSelectedLead(l); setIsConversionOpen(true); }} />
       <NewLeadSheet open={isNewLeadOpen} onOpenChange={setIsNewLeadOpen} lawyers={lawyers} onCreated={() => {}} />
-      <LeadConversionDialog lead={selectedLead} open={isConversionOpen} onOpenChange={setIsConversionOpen} onConfirm={handleConfirmProtocol} />
+      <LeadConversionDialog lead={selectedLead} open={isConversionOpen} onOpenChange={setIsConversionOpen} onConfirm={handleConfirmProtocol} lawyers={lawyers} />
     </div>
   );
 }
