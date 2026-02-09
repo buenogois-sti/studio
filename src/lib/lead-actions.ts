@@ -105,6 +105,7 @@ export async function convertLeadToProcess(leadId: string, data: {
   court: string;
   courtBranch: string;
   caseValue: number;
+  opposingParties: OpposingParty[];
 }) {
   if (!firestoreAdmin) throw new Error('Servidor indisponível.');
   const session = await getServerSession(authOptions);
@@ -140,7 +141,7 @@ export async function convertLeadToProcess(leadId: string, data: {
       courtBranch: data.courtBranch,
       caseValue: data.caseValue,
       leadLawyerId: leadData.lawyerId,
-      opposingParties: leadData.opposingParties || [],
+      opposingParties: data.opposingParties || [],
       driveFolderId: leadData.driveFolderId || '',
       timeline: [timelineEvent],
       createdAt: Timestamp.now() as any,

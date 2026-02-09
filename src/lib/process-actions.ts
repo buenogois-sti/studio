@@ -1,3 +1,4 @@
+
 'use server';
 import { firestoreAdmin } from '@/firebase/admin';
 import type { Process, DocumentTemplate, TimelineEvent, Client, Staff } from './types';
@@ -60,7 +61,7 @@ async function applyBoldToTexts(docsApi: any, fileId: string, texts: string[]) {
         const content = docRes.data.body?.content || [];
         const requests: any[] = [];
 
-        const targets = [...new Set(texts.filter(t => t && t.length > 2))];
+        const targets = [...new Set(targets = texts.filter(t => t && t.length > 2))];
 
         for (const structuralElement of content) {
             const paragraph = structuralElement.paragraph;
@@ -155,10 +156,12 @@ export async function draftDocument(
         const physicalFolderId = processData.driveFolderId;
         if (!physicalFolderId) throw new Error("Pasta do processo não disponível.");
 
+        // Lógica de destino baseada em palavras-chave para Contratos e Procurações
+        const isContractOrPoA = ['procuração', 'contrato', 'substabelecimento', 'honorar'].some(
+            word => category.toLowerCase().includes(word) || documentName.toLowerCase().includes(word)
+        );
+
         const categoryMap: Record<string, string> = {
-            'procuração': '02 - Contratos e Procurações',
-            'contrato': '02 - Contratos e Procurações',
-            'substabelecimento': '02 - Contratos e Procurações',
             'ata': '05 - Atas e Audiências',
             'audiência': '05 - Atas e Audiências',
             'recurso': '04 - Recursos',
@@ -166,7 +169,15 @@ export async function draftDocument(
             'sentença': '02 - Decisões e Sentenças',
         };
         
-        const targetFolderName = Object.entries(categoryMap).find(([key]) => category.toLowerCase().includes(key) || documentName.toLowerCase().includes(key))?.[1] || '01 - Petições';
+        let targetFolderName = '01 - Petições';
+        if (isContractOrPoA) {
+            targetFolderName = '02 - Contratos e Procurações';
+        } else {
+            targetFolderName = Object.entries(categoryMap).find(
+                ([key]) => category.toLowerCase().includes(key) || documentName.toLowerCase().includes(key)
+            )?.[1] || '01 - Petições';
+        }
+
         const targetFolderId = await ensureSubfolder(drive, physicalFolderId, targetFolderName);
 
         const [clientDoc, staffDoc] = await Promise.all([

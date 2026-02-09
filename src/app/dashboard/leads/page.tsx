@@ -39,7 +39,9 @@ import {
   Bot,
   RefreshCw,
   TrendingUp,
-  Timer
+  Timer,
+  Building,
+  Hash
 } from 'lucide-react';
 import { 
   DndContext, 
@@ -85,14 +87,7 @@ import {
   DialogFooter,
   DialogClose,
 } from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { useForm } from 'react-hook-form';
+import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -111,6 +106,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { syncLeadToDrive } from '@/lib/drive';
 import { extractProtocolData } from '@/ai/flows/extract-protocol-data-flow';
 import { Progress } from '@/components/ui/progress';
+import { Label } from '@/components/ui/label';
 
 const STAGES: LeadStatus[] = ['NOVO', 'ATENDIMENTO', 'BUROCRACIA', 'CONTRATUAL', 'DISTRIBUICAO'];
 
@@ -147,6 +143,11 @@ const conversionSchema = z.object({
   court: z.string().min(3, 'O fórum/comarca é obrigatório.'),
   courtBranch: z.string().min(3, 'A vara judiciária é obrigatória.'),
   caseValue: z.coerce.number().min(0, 'Informe o valor da causa.'),
+  opposingParties: z.array(z.object({
+    name: z.string().min(1, 'Nome do réu é obrigatório'),
+    document: z.string().optional(),
+    address: z.string().optional(),
+  })).min(1, 'Pelo menos um réu deve ser qualificado.'),
 });
 
 function LeadConversionDialog({ 
@@ -169,7 +170,13 @@ function LeadConversionDialog({
       court: '',
       courtBranch: '',
       caseValue: 0,
+      opposingParties: [{ name: '', document: '', address: '' }]
     }
+  });
+
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: 'opposingParties'
   });
 
   const handlePreFill = async () => {
@@ -211,7 +218,7 @@ function LeadConversionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md bg-[#020617] border-white/10 text-white shadow-2xl h-[90vh] flex flex-col p-0 overflow-hidden">
+      <DialogContent className="sm:max-w-3xl bg-[#020617] border-white/10 text-white shadow-2xl h-[90vh] flex flex-col p-0 overflow-hidden">
         <DialogHeader className="p-6 border-b border-white/5 bg-white/5 shrink-0">
           <div className="flex items-center justify-between">
             <DialogTitle className="flex items-center gap-2 text-white font-headline text-xl">
@@ -236,70 +243,153 @@ function LeadConversionDialog({
 
         <ScrollArea className="flex-1">
           <Form {...form}>
-            <form id="conversion-form" onSubmit={form.handleSubmit(onConfirm)} className="p-6 space-y-6">
-              <FormField
-                control={form.control}
-                name="processNumber"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Número do Processo (CNJ) *</FormLabel>
-                    <FormControl>
-                      <Input placeholder="0000000-00.0000.0.00.0000" className="bg-black/40 border-white/10 h-11 font-mono tracking-widest" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            <form id="conversion-form" onSubmit={form.handleSubmit(onConfirm)} className="p-6 space-y-8">
+              
+              <div className="space-y-6">
+                <div className="flex items-center gap-2 text-[11px] font-black uppercase text-primary tracking-widest">
+                  <FolderKanban className="h-4 w-4" /> Dados da Ação
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FormField
+                    control={form.control}
+                    name="processNumber"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Número do Processo (CNJ) *</FormLabel>
+                        <FormControl>
+                          <Input placeholder="0000000-00.0000.0.00.0000" className="bg-black/40 border-white/10 h-11 font-mono tracking-widest" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-              <FormField
-                control={form.control}
-                name="court"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Fórum / Comarca *</FormLabel>
-                    <FormControl>
-                      <LocationSearch value={field.value} onSelect={field.onChange} placeholder="Pesquisar tribunal..." />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                  <FormField
+                    control={form.control}
+                    name="caseValue"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Valor da Causa (R$) *</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-emerald-500" />
+                            <Input 
+                              placeholder="0,00" 
+                              className="pl-9 bg-black/40 border-white/10 h-11 font-bold"
+                              value={formatCurrencyBRL(field.value)}
+                              onChange={(e) => handleCurrencyChange(e.target.value)}
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-              <FormField
-                control={form.control}
-                name="courtBranch"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Vara / Câmara *</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Ex: 2ª Vara do Trabalho de SBC" className="bg-black/40 border-white/10 h-11" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                  <FormField
+                    control={form.control}
+                    name="court"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Fórum / Comarca *</FormLabel>
+                        <FormControl>
+                          <LocationSearch value={field.value} onSelect={field.onChange} placeholder="Pesquisar tribunal..." />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-              <FormField
-                control={form.control}
-                name="caseValue"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Valor da Causa (R$) *</FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-emerald-500" />
-                        <Input 
-                          placeholder="0,00" 
-                          className="pl-9 bg-black/40 border-white/10 h-11 font-bold"
-                          value={formatCurrencyBRL(field.value)}
-                          onChange={(e) => handleCurrencyChange(e.target.value)}
+                  <FormField
+                    control={form.control}
+                    name="courtBranch"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Vara / Câmara *</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Ex: 2ª Vara do Trabalho de SBC" className="bg-black/40 border-white/10 h-11" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+
+              <Separator className="bg-white/5" />
+
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-[11px] font-black uppercase text-rose-400 tracking-widest">
+                    <Building className="h-4 w-4" /> Qualificação do Réu (Polo Passivo)
+                  </div>
+                  <Button 
+                    type="button" 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => append({ name: '', document: '', address: '' })}
+                    className="h-8 text-[10px] font-black uppercase text-primary hover:bg-primary/10"
+                  >
+                    <Plus className="h-3 w-3 mr-1.5" /> Adicionar Outro Réu
+                  </Button>
+                </div>
+
+                <div className="grid gap-4">
+                  {fields.map((field, index) => (
+                    <div key={field.id} className="p-6 rounded-3xl bg-white/[0.02] border border-white/5 space-y-4 relative group">
+                      <Button 
+                        type="button" 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={() => remove(index)}
+                        disabled={fields.length === 1}
+                        className="absolute top-4 right-4 h-8 w-8 text-rose-500/50 hover:text-rose-500 hover:bg-rose-500/10 rounded-full"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name={`opposingParties.${index}.name` as any}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-[9px] font-black uppercase text-slate-500">Razão Social / Nome Completo *</FormLabel>
+                              <FormControl><Input placeholder="Ex: Empresa de Transportes LTDA" className="bg-black/40 border-white/5 h-10" {...field} /></FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name={`opposingParties.${index}.document` as any}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-[9px] font-black uppercase text-slate-500">CNPJ / CPF</FormLabel>
+                              <FormControl><Input placeholder="00.000.000/0000-00" className="bg-black/40 border-white/5 h-10 font-mono" {...field} /></FormControl>
+                            </FormItem>
+                          )}
                         />
                       </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                      <FormField
+                        control={form.control}
+                        name={`opposingParties.${index}.address` as any}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-[9px] font-black uppercase text-slate-500">Endereço Completo</FormLabel>
+                            <FormControl>
+                              <div className="relative">
+                                <MapPin className="absolute left-3 top-3 h-3.5 w-3.5 text-slate-600" />
+                                <Textarea placeholder="Rua, número, bairro, cidade - UF..." className="pl-10 min-h-[80px] bg-black/40 border-white/5 resize-none text-xs" {...field} />
+                              </div>
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
             </form>
           </Form>
         </ScrollArea>
@@ -313,7 +403,7 @@ function LeadConversionDialog({
             form="conversion-form"
             className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase tracking-widest text-[11px] h-12 shadow-xl shadow-emerald-900/20"
           >
-            Finalizar Distribuição
+            Finalizar Distribuição & Criar Processo
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -823,7 +913,7 @@ function NewLeadSheet({ open, onOpenChange, lawyers, onCreated }: { open: boolea
 
 export default function LeadsPage() {
   const { firestore, user } = useFirebase();
-  const { data: nextSession } = useSession();
+  const { data: sessionData } = useSession();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = React.useState('');
   const [isNewLeadOpen, setIsNewLeadOpen] = React.useState(false);
