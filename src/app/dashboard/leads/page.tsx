@@ -43,7 +43,9 @@ import {
   Check,
   Sparkles,
   Bot,
-  RefreshCw
+  RefreshCw,
+  TrendingUp,
+  Timer
 } from 'lucide-react';
 import { 
   DndContext, 
@@ -70,7 +72,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
-import { format, formatDistanceToNow } from 'date-fns';
+import { format, formatDistanceToNow, differenceInHours } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
   DropdownMenu,
@@ -120,11 +122,11 @@ import { Checkbox } from '@/components/ui/checkbox';
 const STAGES: LeadStatus[] = ['NOVO', 'ATENDIMENTO', 'BUROCRACIA', 'CONTRATUAL', 'DISTRIBUICAO'];
 
 const stageConfig: Record<LeadStatus, { label: string; color: string; icon: any; description: string; tasks: string[] }> = {
-  NOVO: { label: 'Triagem', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20', icon: Zap, description: 'Novos contatos', tasks: ['Captar contatos', 'Identificar área'] },
-  ATENDIMENTO: { label: 'Atendimento', color: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20', icon: UserCircle, description: 'Entrevista técnica', tasks: ['Entrevista realizada', 'Relato completo', 'Dados bancários'] },
-  BUROCRACIA: { label: 'Burocracia', color: 'bg-amber-500/10 text-amber-400 border-amber-500/20', icon: Clock, description: 'Dados e provas', tasks: ['RG/CPF anexados', 'Comprovante residência', 'Provas iniciais'] },
-  CONTRATUAL: { label: 'Contratual', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20', icon: ShieldCheck, description: 'Assinaturas', tasks: ['Contrato assinado', 'Procuração assinada'] },
-  DISTRIBUICAO: { label: 'Distribuição', color: 'bg-purple-500/10 text-purple-400 border-purple-500/20', icon: FolderKanban, description: 'Pronto p/ protocolar', tasks: ['Réu qualificado', 'Valor da causa', 'Justiça gratuita'] },
+  NOVO: { label: 'Triagem', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20', icon: Zap, description: 'Novos contatos', tasks: ['Captar contatos', 'Identificar área jurídica', 'Verificar conflito de interesse'] },
+  ATENDIMENTO: { label: 'Atendimento', color: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20', icon: UserCircle, description: 'Entrevista técnica', tasks: ['Entrevista realizada', 'Relato completo do caso', 'Definição estratégica inicial'] },
+  BUROCRACIA: { label: 'Burocracia', color: 'bg-amber-500/10 text-amber-400 border-amber-500/20', icon: Clock, description: 'Dados e provas', tasks: ['RG/CPF anexados', 'Comprovante de residência', 'CTPS/PIS conferidos', 'Provas iniciais validadas'] },
+  CONTRATUAL: { label: 'Contratual', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20', icon: ShieldCheck, description: 'Assinaturas', tasks: ['Elaborar contrato', 'Procuração assinada', 'Termo de hipossuficiência'] },
+  DISTRIBUICAO: { label: 'Distribuição', color: 'bg-purple-500/10 text-purple-400 border-purple-500/20', icon: FolderKanban, description: 'Pronto p/ protocolar', tasks: ['Réu qualificado', 'Valor da causa definido', 'Peça inicial revisada'] },
   CONVERTIDO: { label: 'Convertido', color: 'bg-slate-500/10 text-slate-400 border-slate-500/20', icon: CheckCircle2, description: 'Migrado', tasks: [] },
   ABANDONADO: { label: 'Abandonado', color: 'bg-rose-500/10 text-rose-400 border-rose-500/20', icon: AlertCircle, description: 'Arquivado', tasks: [] },
 };
@@ -198,7 +200,7 @@ function LeadConversionDialog({
     } catch (e) {
       toast({ variant: 'destructive', title: 'Falha na IA', description: 'Não foi possível ler o histórico para sugestões.' });
     } finally {
-      setIsPreFilling(false);
+      setIsParsingAI(false);
     }
   };
 
@@ -336,6 +338,12 @@ function LeadCard({ lead, client, lawyer, onClick }: { lead: Lead; client?: Clie
   const totalTasks = stage.tasks.length;
   const progress = totalTasks > 0 ? (completedCount / totalTasks) * 100 : 0;
 
+  const hoursInStage = React.useMemo(() => {
+    const entryDate = lead.stageEntryDates?.[lead.status];
+    if (!entryDate) return 0;
+    return Math.abs(differenceInHours(new Date(), entryDate.toDate()));
+  }, [lead.status, lead.stageEntryDates]);
+
   return (
     <Card 
       ref={setNodeRef} 
@@ -359,7 +367,13 @@ function LeadCard({ lead, client, lawyer, onClick }: { lead: Lead; client?: Clie
               {lead.legalArea}
             </Badge>
           </div>
-          {lead.isUrgent && <Flame className="h-3.5 w-3.5 text-rose-500 animate-pulse" />}
+          {hoursInStage > 24 ? (
+            <div className="flex items-center gap-1 text-[8px] font-black text-rose-500 animate-pulse">
+              <Clock className="h-3 w-3" /> {Math.floor(hoursInStage / 24)}d
+            </div>
+          ) : (
+            <span className="text-[8px] font-black text-slate-600 uppercase">{hoursInStage}h na fase</span>
+          )}
         </div>
         
         <h4 className="text-sm font-bold text-slate-200 group-hover/card:text-primary transition-colors line-clamp-2 leading-snug min-h-[40px]">
@@ -381,7 +395,7 @@ function LeadCard({ lead, client, lawyer, onClick }: { lead: Lead; client?: Clie
             <div className="h-7 w-7 rounded-full bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0">
               <UserCircle className="h-4 w-4 text-blue-400" />
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-[11px] font-bold text-slate-300 truncate">{client?.firstName} {client?.lastName}</p>
               <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">{lead.captureSource}</p>
             </div>
@@ -395,7 +409,7 @@ function LeadCard({ lead, client, lawyer, onClick }: { lead: Lead; client?: Clie
               <span className="text-[9px] text-slate-500 font-bold uppercase">Dr(a). {lawyer?.firstName}</span>
             </div>
             <div className="flex items-center gap-1 text-[8px] text-slate-600 font-black uppercase tracking-tighter">
-              <Clock className="h-2.5 w-2.5" /> {formatDistanceToNow(lead.updatedAt.toDate(), { locale: ptBR, addSuffix: true })}
+              <History className="h-2.5 w-2.5" /> {formatDistanceToNow(lead.updatedAt.toDate(), { locale: ptBR, addSuffix: true })}
             </div>
           </div>
         </div>
@@ -511,7 +525,7 @@ function LeadDetailsSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="sm:max-w-2xl bg-[#020617] border-white/10 text-white p-0 flex flex-col overflow-hidden shadow-2xl">
+      <SheetContent className="sm:max-w-2xl bg-[#020617] border-white/10 text-white p-0 flex flex-col h-[100vh] overflow-hidden shadow-2xl">
         <SheetHeader className="p-6 border-b border-white/5 bg-white/5 shrink-0">
           <div className="flex items-center justify-between mb-2">
             <Badge variant="outline" className={cn("text-[9px] font-black uppercase h-5 px-2", stage.color)}>
@@ -766,6 +780,39 @@ export default function LeadsPage() {
     return list.filter(l => l.title.toLowerCase().includes(q) || clientsMap.get(l.clientId)?.firstName.toLowerCase().includes(q));
   }, [leadsData, searchTerm, clientsMap, userProfile]);
 
+  const stats = React.useMemo(() => {
+    if (!leadsData) return { total: 0, urgent: 0, ready: 0, slowestStage: '---', highDemand: '---' };
+    
+    const now = new Date();
+    const stageTimes: Record<string, number[]> = {};
+    const stageCounts: Record<string, number> = {};
+
+    leadsData.forEach(l => {
+      stageCounts[l.status] = (stageCounts[l.status] || 0) + 1;
+      const entryDate = l.stageEntryDates?.[l.status]?.toDate();
+      if (entryDate) {
+        const hours = Math.abs(differenceInHours(now, entryDate));
+        if (!stageTimes[l.status]) stageTimes[l.status] = [];
+        stageTimes[l.status].push(hours);
+      }
+    });
+
+    const avgTimes = Object.entries(stageTimes).map(([stage, times]) => ({
+      stage,
+      avg: times.reduce((a, b) => a + b, 0) / times.length
+    })).sort((a, b) => b.avg - a.avg);
+
+    const highDemand = Object.entries(stageCounts).sort((a, b) => b[1] - a[1])[0];
+
+    return {
+      total: leadsData.length,
+      urgent: leadsData.filter(l => l.isUrgent).length,
+      ready: leadsData.filter(l => l.status === 'DISTRIBUICAO').length,
+      slowestStage: avgTimes[0] ? stageConfig[avgTimes[0].stage as LeadStatus].label : '---',
+      highDemand: highDemand ? stageConfig[highDemand[0] as LeadStatus].label : '---'
+    };
+  }, [leadsData]);
+
   const handleDragEnd = async (event: any) => {
     const { active, over } = event;
     if (!over) return;
@@ -804,6 +851,34 @@ export default function LeadsPage() {
           <div className="relative w-64 group"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" /><Input placeholder="Pesquisar leads..." className="pl-10 bg-[#0f172a] border-white/5 h-11 text-sm" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} /></div>
           <Button onClick={() => setIsNewLeadOpen(true)} className="bg-primary text-primary-foreground font-black uppercase text-[11px] tracking-widest h-11 px-8 shadow-xl shadow-primary/20 transition-all"><PlusCircle className="mr-2 h-4 w-4" /> Novo Lead</Button>
         </div>
+      </div>
+
+      {/* Monitor de Performance */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 animate-in fade-in duration-500">
+        <Card className="bg-[#0f172a] border-white/5">
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="h-10 w-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400"><TrendingUp className="h-5 w-5" /></div>
+            <div><p className="text-[9px] font-black uppercase text-slate-500 tracking-widest">Maior Demanda</p><p className="text-sm font-black text-white">{stats.highDemand}</p></div>
+          </CardContent>
+        </Card>
+        <Card className="bg-[#0f172a] border-white/5">
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="h-10 w-10 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400"><Timer className="h-5 w-5" /></div>
+            <div><p className="text-[9px] font-black uppercase text-slate-500 tracking-widest">Gargalo (Tempo)</p><p className="text-sm font-black text-white">{stats.slowestStage}</p></div>
+          </CardContent>
+        </Card>
+        <Card className="bg-[#0f172a] border-white/5">
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="h-10 w-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400"><Flame className="h-5 w-5" /></div>
+            <div><p className="text-[9px] font-black uppercase text-slate-500 tracking-widest">Casos Urgetes</p><p className="text-sm font-black text-white">{stats.urgent}</p></div>
+          </CardContent>
+        </Card>
+        <Card className="bg-[#0f172a] border-white/5">
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="h-10 w-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400"><FolderKanban className="h-5 w-5" /></div>
+            <div><p className="text-[9px] font-black uppercase text-slate-500 tracking-widest">Pronto p/ Protocolo</p><p className="text-sm font-black text-white">{stats.ready}</p></div>
+          </CardContent>
+        </Card>
       </div>
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>

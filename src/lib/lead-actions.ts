@@ -35,6 +35,7 @@ export async function createLead(data: {
       ? Timestamp.fromDate(new Date(data.prescriptionDate))
       : undefined;
 
+    const now = Timestamp.now();
     const payload: any = {
       clientId: data.clientId,
       lawyerId: data.lawyerId,
@@ -46,9 +47,12 @@ export async function createLead(data: {
       description: data.description || '',
       status: 'NOVO' as LeadStatus,
       opposingParties: [],
-      completedTasks: ['Captar contatos'], // Tarefa inicial padrão
-      createdAt: Timestamp.now(),
-      updatedAt: Timestamp.now(),
+      completedTasks: ['Captar contatos'], 
+      stageEntryDates: {
+        'NOVO': now
+      },
+      createdAt: now,
+      updatedAt: now,
     };
 
     if (prescriptionDate) {
@@ -75,14 +79,16 @@ export async function createLead(data: {
 }
 
 /**
- * Atualiza o status (fase) do lead no Kanban.
+ * Atualiza o status (fase) do lead no Kanban e registra data de entrada.
  */
 export async function updateLeadStatus(id: string, status: LeadStatus) {
   if (!firestoreAdmin) throw new Error('Servidor indisponível.');
   try {
+    const now = Timestamp.now();
     await firestoreAdmin.collection('leads').doc(id).update({
       status,
-      updatedAt: Timestamp.now()
+      [`stageEntryDates.${status}`]: now,
+      updatedAt: now
     });
     revalidatePath('/dashboard/leads');
     return { success: true };

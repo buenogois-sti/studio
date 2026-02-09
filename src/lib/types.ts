@@ -115,8 +115,8 @@ export type Lead = {
   description?: string;
   driveFolderId?: string;
   opposingParties?: OpposingParty[];
-  // Controle de sub-etapas (checklists)
   completedTasks?: string[]; 
+  stageEntryDates?: Record<string, Timestamp>;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 };
