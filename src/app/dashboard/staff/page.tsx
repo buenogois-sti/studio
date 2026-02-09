@@ -1,3 +1,4 @@
+
 'use client';
 import * as React from 'react';
 import {
@@ -426,7 +427,7 @@ export default function StaffPage() {
         </div>
 
         <Sheet open={isSheetOpen} onOpenChange={(open) => { if (!open) setEditingStaff(null); setIsSheetOpen(open); }}>
-            <SheetContent className="sm:max-w-4xl w-full flex flex-col p-0 bg-[#020617] border-border">
+            <SheetContent className="sm:max-w-5xl w-full flex flex-col p-0 bg-[#020617] border-border">
             <SheetHeader className="p-6 border-b border-white/5 shrink-0">
                 <SheetTitle className="text-white text-2xl font-black font-headline">{editingStaff ? 'Editar Membro' : 'Novo Membro da Equipe'}</SheetTitle>
                 <SheetDescription className="text-slate-400">Configure o perfil e os dados profissionais do colaborador.</SheetDescription>

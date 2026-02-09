@@ -1,3 +1,4 @@
+
 'use client';
 import * as React from 'react';
 import {
@@ -475,7 +476,7 @@ export default function ClientsPage() {
       )}
 
       <Sheet open={isSheetOpen} onOpenChange={(open) => { if (!open) setEditingClient(null); setIsSheetOpen(open); }}>
-        <SheetContent className="sm:max-w-4xl w-full p-0 flex flex-col bg-[#020617] border-border">
+        <SheetContent className="sm:max-w-5xl w-full p-0 flex flex-col bg-[#020617] border-border">
           <SheetHeader className="px-6 pt-6 pb-2">
             <SheetTitle className="text-white text-2xl font-black font-headline">{editingClient ? 'Editar Cadastro' : 'Novo Cliente'}</SheetTitle>
             <SheetDescription className="text-slate-400">Certifique-se de preencher RG e CPF para habilitar a automação de documentos.</SheetDescription>
