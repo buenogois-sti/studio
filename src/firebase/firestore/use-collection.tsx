@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Query,
   onSnapshot,
@@ -9,98 +9,144 @@ import {
   QuerySnapshot,
   CollectionReference,
 } from 'firebase/firestore';
-import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
-/** Utility type to add an 'id' field to a given type T. */
+/**
+ * Global Registry para compartilhamento de subscrições.
+ * Evita múltiplas conexões para a mesma query e permite retorno instantâneo de cache.
+ */
+const queryCache = new Map<string, {
+  unsubscribe: () => void;
+  listeners: Set<(data: any[], error: any, loading: boolean) => void>;
+  lastData: any[] | null;
+  lastError: any | null;
+  isLoading: boolean;
+}>();
+
 export type WithId<T> = T & { id: string };
 
-/**
- * Interface for the return value of the useCollection hook.
- * @template T Type of the document data.
- */
 export interface UseCollectionResult<T> {
-  data: WithId<T>[] | null; // Document data with ID, or null.
-  isLoading: boolean;       // True if loading.
-  error: FirestoreError | Error | null; // Error object, or null.
+  data: WithId<T>[] | null;
+  isLoading: boolean;
+  error: any | null;
+  isStale: boolean; // Indica se os dados vieram do cache e estão sendo revalidados
 }
 
-/* Internal implementation of Query:
-  https://github.com/firebase/firebase-js-sdk/blob/c5f08a9bc5da0d2b0207802c972d53724ccef055/packages/firestore/src/lite-api/reference.ts#L143
-*/
 export interface InternalQuery extends Query<DocumentData> {
   _query: {
     path: {
       canonicalString(): string;
-      toString(): string;
     }
   }
 }
 
-/**
- * React hook to subscribe to a Firestore collection or query in real-time.
- * Handles nullable references/queries.
- */
-export function useCollection<T = any>(
-    memoizedTargetRefOrQuery: ((CollectionReference<DocumentData> | Query<DocumentData>) & {__memo?: boolean})  | null | undefined,
-): UseCollectionResult<T> {
-  type ResultItemType = WithId<T>;
-  type StateDataType = ResultItemType[] | null;
+function getQueryKey(query: CollectionReference<DocumentData> | Query<DocumentData>): string {
+  if (query.type === 'collection') {
+    return (query as CollectionReference).path;
+  }
+  // Tenta extrair a string canônica da query para servir como chave única
+  try {
+    return (query as unknown as InternalQuery)._query.path.canonicalString() + JSON.stringify((query as any)._query.filters || '');
+  } catch (e) {
+    return query.toString();
+  }
+}
 
-  const [data, setData] = useState<StateDataType>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [error, setError] = useState<FirestoreError | Error | null>(null);
+export function useCollection<T = any>(
+  memoizedQuery: ((CollectionReference<DocumentData> | Query<DocumentData>) & {__memo?: boolean}) | null | undefined,
+): UseCollectionResult<T> {
+  const [state, setState] = useState<UseCollectionResult<T>>({
+    data: null,
+    isLoading: !!memoizedQuery,
+    error: null,
+    isStale: false
+  });
 
   useEffect(() => {
-    if (!memoizedTargetRefOrQuery) {
-      setData(null);
-      setIsLoading(false);
-      setError(null);
+    if (!memoizedQuery) {
+      setState({ data: null, isLoading: false, error: null, isStale: false });
       return;
     }
 
-    setIsLoading(true);
-    setError(null);
+    if (!memoizedQuery.__memo) {
+      console.warn('[useCollection] Query não memoizada detectada. Use useMemoFirebase para evitar loops.');
+    }
 
-    const unsubscribe = onSnapshot(
-      memoizedTargetRefOrQuery,
-      (snapshot: QuerySnapshot<DocumentData>) => {
-        const results: ResultItemType[] = [];
-        for (const doc of snapshot.docs) {
-          results.push({ ...(doc.data() as T), id: doc.id });
-        }
-        setData(results);
-        setError(null);
-        setIsLoading(false);
-      },
-      (err: FirestoreError) => {
-        const path: string =
-          memoizedTargetRefOrQuery.type === 'collection'
-            ? (memoizedTargetRefOrQuery as CollectionReference).path
-            : (memoizedTargetRefOrQuery as unknown as InternalQuery)._query.path.canonicalString();
+    const key = getQueryKey(memoizedQuery);
+    let cacheEntry = queryCache.get(key);
 
-        if (err.code === 'permission-denied') {
-          const contextualError = new FirestorePermissionError({
-            operation: 'list',
-            path,
-          });
-          setError(contextualError);
-        } else {
-          // Preserve o erro original (como erro de índice) para diagnóstico
-          setError(err);
+    // Se já temos dados no cache, entrega imediatamente (SWR)
+    if (cacheEntry && cacheEntry.lastData) {
+      setState({
+        data: cacheEntry.lastData,
+        isLoading: false,
+        error: cacheEntry.lastError,
+        isStale: true
+      });
+    } else {
+      setState(prev => ({ ...prev, isLoading: true, isStale: false }));
+    }
+
+    const onUpdate = (data: any[], error: any, loading: boolean) => {
+      setState({ data, error, isLoading: loading, isStale: false });
+    };
+
+    if (!cacheEntry) {
+      const listeners = new Set<(data: any[], error: any, loading: boolean) => void>();
+      listeners.add(onUpdate);
+
+      const entry = {
+        listeners,
+        lastData: null as any[] | null,
+        lastError: null as any,
+        isLoading: true,
+        unsubscribe: () => {}
+      };
+
+      queryCache.set(key, entry);
+
+      const unsubscribe = onSnapshot(
+        memoizedQuery,
+        (snapshot: QuerySnapshot<DocumentData>) => {
+          const results = snapshot.docs.map(doc => ({ ...(doc.data() as T), id: doc.id }));
+          entry.lastData = results;
+          entry.lastError = null;
+          entry.isLoading = false;
+          entry.listeners.forEach(l => l(results, null, false));
+        },
+        (err: FirestoreError) => {
+          let errorToReport = err;
+          if (err.code === 'permission-denied') {
+            errorToReport = new FirestorePermissionError({
+              operation: 'list',
+              path: key,
+            }) as any;
+          }
+          entry.lastError = errorToReport;
+          entry.isLoading = false;
+          entry.listeners.forEach(l => l(entry.lastData || [], errorToReport, false));
         }
-        
-        setData(null);
-        setIsLoading(false);
-        console.error('[useCollection] Error:', err);
+      );
+
+      entry.unsubscribe = unsubscribe;
+      cacheEntry = entry;
+    } else {
+      cacheEntry.listeners.add(onUpdate);
+    }
+
+    return () => {
+      if (cacheEntry) {
+        cacheEntry.listeners.delete(onUpdate);
+        // Delay para remover a subscrição (mantém cache vivo em navegações rápidas)
+        setTimeout(() => {
+          if (cacheEntry && cacheEntry.listeners.size === 0) {
+            cacheEntry.unsubscribe();
+            queryCache.delete(key);
+          }
+        }, 5000);
       }
-    );
+    };
+  }, [memoizedQuery]);
 
-    return () => unsubscribe();
-  }, [memoizedTargetRefOrQuery]);
-
-  if(memoizedTargetRefOrQuery && !memoizedTargetRefOrQuery.__memo) {
-    throw new Error(memoizedTargetRefOrQuery + ' was not properly memoized using useMemoFirebase');
-  }
-  return { data, isLoading, error };
+  return state;
 }
