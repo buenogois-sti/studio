@@ -1,4 +1,3 @@
-
 'use client';
 import * as React from 'react';
 import {
@@ -249,7 +248,6 @@ export default function ClientsPage() {
                 
                 return (
                   <Card key={client.id} className="relative flex flex-col group hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 overflow-hidden bg-[#0f172a] border-white/5">
-                    {/* Visual Integrity Indicator */}
                     <div className="absolute top-0 left-0 w-full h-1 bg-white/5">
                         <div className={cn("h-full transition-all duration-1000", integrity < 50 ? "bg-rose-500" : integrity < 80 ? "bg-amber-500" : "bg-emerald-500")} style={{ width: `${integrity}%` }} />
                     </div>

@@ -13,7 +13,6 @@ import {
   UserCircle,
   FolderKanban,
   ArrowRightLeft,
-  Briefcase,
   AlertCircle,
   Scale,
   ArrowRight,
@@ -29,8 +28,6 @@ import {
   History,
   MessageSquare,
   Plus,
-  FolderOpen,
-  Lock,
   ExternalLink,
   DollarSign,
   Gavel,
@@ -40,7 +37,6 @@ import {
   Phone,
   Download,
   Check,
-  Sparkles,
   Bot,
   RefreshCw,
   TrendingUp,
@@ -63,9 +59,9 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 
 import { useFirebase, useCollection, useMemoFirebase, useDoc } from '@/firebase';
-import { collection, query, orderBy, doc, Timestamp, limit, updateDoc, where, arrayUnion, arrayRemove } from 'firebase/firestore';
-import type { Lead, Client, Staff, LeadStatus, LeadPriority, UserProfile, OpposingParty, TimelineEvent } from '@/lib/types';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { collection, query, orderBy, doc, Timestamp, limit, updateDoc, where, arrayUnion } from 'firebase/firestore';
+import type { Lead, Client, Staff, LeadStatus, LeadPriority, UserProfile, TimelineEvent } from '@/lib/types';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -124,7 +120,7 @@ const stageConfig: Record<LeadStatus, { label: string; color: string; icon: any;
   NOVO: { label: 'Triagem', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20', icon: Zap, description: 'Novos contatos', tasks: ['Captar contatos', 'Identificar área jurídica', 'Verificar conflito de interesse'] },
   ATENDIMENTO: { label: 'Atendimento', color: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20', icon: UserCircle, description: 'Entrevista técnica', tasks: ['Entrevista realizada', 'Relato completo do caso', 'Definição estratégica inicial'] },
   BUROCRACIA: { label: 'Burocracia', color: 'bg-amber-500/10 text-amber-400 border-amber-500/20', icon: Clock, description: 'Dados e provas', tasks: ['RG/CPF anexados', 'Comprovante de residência', 'CTPS/PIS conferidos', 'Provas iniciais validadas'] },
-  CONTRATUAL: { label: 'Contratual', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20', icon: ShieldCheck, description: 'Assinaturas', tasks: ['Elaborar contrato', 'Procuração assinada', 'Termo de hipossuficiência'] },
+  CONTRATUAL: { label: 'Contratual', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20', icon: ShieldCheck, description: 'Asssignatures', tasks: ['Elaborar contrato', 'Procuração assinada', 'Termo de hipossuficiência'] },
   DISTRIBUICAO: { label: 'Distribuição', color: 'bg-purple-500/10 text-purple-400 border-purple-500/20', icon: FolderKanban, description: 'Pronto p/ protocolar', tasks: ['Réu qualificado', 'Valor da causa definido', 'Peça inicial revisada'] },
   CONVERTIDO: { label: 'Convertido', color: 'bg-slate-500/10 text-slate-400 border-slate-500/20', icon: CheckCircle2, description: 'Migrado', tasks: [] },
   ABANDONADO: { label: 'Abandonado', color: 'bg-rose-500/10 text-rose-400 border-rose-500/20', icon: AlertCircle, description: 'Arquivado', tasks: [] },
@@ -582,23 +578,6 @@ function LeadDetailsSheet({
             </section>
 
             <section className="space-y-4">
-              <div className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-500 tracking-[0.2em]">
-                <Scale className="h-3.5 w-3.5" /> Polo Passivo (Reclamadas)
-              </div>
-              <div className="grid gap-3">
-                {lead.opposingParties?.map((op, i) => (
-                  <div key={i} className="p-4 rounded-2xl bg-white/5 border border-white/10">
-                    <p className="text-sm font-bold text-slate-200">{op.name}</p>
-                    <p className="text-[10px] text-slate-500 uppercase font-black">{op.document || 'DOC NÃO INFORMADO'}</p>
-                  </div>
-                ))}
-                {(!lead.opposingParties || lead.opposingParties.length === 0) && (
-                  <div className="text-center py-8 border-2 border-dashed border-white/5 rounded-3xl opacity-30 italic text-xs">Nenhum réu cadastrado.</div>
-                )}
-              </div>
-            </section>
-
-            <section className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-500 tracking-[0.2em]">
                   <FileText className="h-3.5 w-3.5" /> Documentação de Triagem
@@ -853,28 +832,28 @@ export default function LeadsPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 animate-in fade-in duration-500">
         <Card className="bg-[#0f172a] border-white/5">
-          <CardContent className="p-4 flex items-center gap-4">
+          <CardHeader className="p-4 flex items-center gap-4">
             <div className="h-10 w-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400"><TrendingUp className="h-5 w-5" /></div>
             <div><p className="text-[9px] font-black uppercase text-slate-500 tracking-widest">Maior Demanda</p><p className="text-sm font-black text-white">{stats.highDemand}</p></div>
-          </CardContent>
+          </CardHeader>
         </Card>
         <Card className="bg-[#0f172a] border-white/5">
-          <CardContent className="p-4 flex items-center gap-4">
+          <CardHeader className="p-4 flex items-center gap-4">
             <div className="h-10 w-10 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400"><Timer className="h-5 w-5" /></div>
             <div><p className="text-[9px] font-black uppercase text-slate-500 tracking-widest">Gargalo (Tempo)</p><p className="text-sm font-black text-white">{stats.slowestStage}</p></div>
-          </CardContent>
+          </CardHeader>
         </Card>
         <Card className="bg-[#0f172a] border-white/5">
-          <CardContent className="p-4 flex items-center gap-4">
+          <CardHeader className="p-4 flex items-center gap-4">
             <div className="h-10 w-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400"><Flame className="h-5 w-5" /></div>
-            <div><p className="text-[9px] font-black uppercase text-slate-500 tracking-widest">Casos Urgetes</p><p className="text-sm font-black text-white">{stats.urgent}</p></div>
-          </CardContent>
+            <div><p className="text-[9px] font-black uppercase text-slate-500 tracking-widest">Casos Urgentes</p><p className="text-sm font-black text-white">{stats.urgent}</p></div>
+          </CardHeader>
         </Card>
         <Card className="bg-[#0f172a] border-white/5">
-          <CardContent className="p-4 flex items-center gap-4">
+          <CardHeader className="p-4 flex items-center gap-4">
             <div className="h-10 w-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400"><FolderKanban className="h-5 w-5" /></div>
             <div><p className="text-[9px] font-black uppercase text-slate-500 tracking-widest">Pronto p/ Protocolo</p><p className="text-sm font-black text-white">{stats.ready}</p></div>
-          </CardContent>
+          </CardHeader>
         </Card>
       </div>
 

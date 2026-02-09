@@ -1,10 +1,9 @@
-
 'use client';
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import * as React from 'react';
-import { useSession, signOut } from 'next-auth/react';
+import { useSession } from 'next-auth/react';
 import { useToast } from '@/components/ui/use-toast';
 
 import {
@@ -39,7 +38,6 @@ import {
   DollarSign,
   Settings,
   Briefcase,
-  AlertCircle,
   Loader2,
   Library,
   BarChart,
@@ -59,7 +57,6 @@ import {
   useMemoFirebase,
 } from '@/firebase';
 import { doc } from 'firebase/firestore';
-import { Button } from '@/components/ui/button';
 import { NotificationBell } from '@/components/NotificationBell';
 
 const sidebarSections = [
@@ -128,7 +125,6 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
     const router = useRouter();
     const { data: session, status } = useSession();
     const { firestore } = useFirebase();
-    const { toast } = useToast();
 
     const userProfileRef = useMemoFirebase(
         () => (firestore && session?.user?.id ? doc(firestore, 'users', session.user.id) : null),
@@ -188,10 +184,10 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
     return (
         <SidebarProvider>
         <Sidebar variant="sidebar" collapsible="icon" className="border-r border-white/5">
-            <SidebarHeader className="h-14 justify-center p-2 group-data-[collapsible=icon]:justify-center border-b border-white/5">
-            <Link href="/dashboard" className="flex items-center gap-2">
+            <SidebarHeader className="h-16 justify-center px-4 group-data-[collapsible=icon]:justify-center border-b border-white/5 bg-[#020617]">
+            <Link href="/dashboard" className="flex items-center gap-3">
                 <Logo />
-                <span className="font-bold text-lg text-white group-data-[collapsible=icon]:hidden">
+                <span className="font-bold text-xl text-white tracking-tight group-data-[collapsible=icon]:hidden">
                 Bueno Gois
                 </span>
             </Link>

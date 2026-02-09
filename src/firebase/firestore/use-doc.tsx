@@ -10,15 +10,15 @@ import {
 } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
 
-interface DocCacheEntry {
+interface DocCacheEntry<T = any> {
   unsubscribe: () => void;
-  listeners: Set<(data: any, error: any, loading: boolean) => void>;
-  lastData: any | null;
+  listeners: Set<(data: WithId<T> | null, error: any, loading: boolean) => void>;
+  lastData: WithId<T> | null;
   lastError: any | null;
   isLoading: boolean;
 }
 
-const docCache = new Map<string, DocCacheEntry>();
+const docCache = new Map<string, DocCacheEntry<any>>();
 
 type WithId<T> = T & { id: string };
 
@@ -59,18 +59,18 @@ export function useDoc<T = any>(
       setState(prev => ({ ...prev, isLoading: true, isStale: false }));
     }
 
-    const onUpdate = (data: any, error: any, loading: boolean) => {
+    const onUpdate = (data: WithId<T> | null, error: any, loading: boolean) => {
       setState({ data, error, isLoading: loading, isStale: false });
     };
 
     if (!cacheEntry) {
-      const listeners = new Set<(data: any, error: any, loading: boolean) => void>();
+      const listeners = new Set<(data: WithId<T> | null, error: any, loading: boolean) => void>();
       listeners.add(onUpdate);
 
-      const entry: DocCacheEntry = {
+      const entry: DocCacheEntry<T> = {
         listeners,
-        lastData: null as any | null,
-        lastError: null as any | null,
+        lastData: null,
+        lastError: null,
         isLoading: true,
         unsubscribe: () => {}
       };

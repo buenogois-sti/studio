@@ -3,8 +3,8 @@ import { cn } from '@/lib/utils';
 
 export function Logo({ className }: { className?: string }) {
   return (
-    <div className={cn("bg-primary text-primary-foreground h-8 w-8 flex items-center justify-center rounded-md", className)}>
-        <Scale size={40} />
+    <div className={cn("bg-primary h-9 w-9 flex items-center justify-center rounded-xl shadow-lg shadow-primary/20 transition-transform hover:scale-105", className)}>
+        <Scale className="h-5 w-5 text-primary-foreground" strokeWidth={2.5} />
     </div>
   );
 }
