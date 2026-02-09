@@ -193,7 +193,7 @@ function LeadConversionDialog({
     } catch (e) {
       toast({ variant: 'destructive', title: 'Falha na IA', description: 'Não foi possível ler o histórico para sugestões.' });
     } finally {
-      setIsParsingAI(false);
+      setIsPreFilling(false);
     }
   };
 
@@ -346,12 +346,12 @@ function LeadCard({ lead, client, lawyer, onClick }: { lead: Lead; client?: Clie
       {...listeners}
       onClick={onClick}
       className={cn(
-        "bg-[#0f172a] border-white/5 border-2 hover:border-primary/40 transition-all cursor-grab active:cursor-grabbing group/card shadow-lg",
+        "bg-[#0f172a] border-white/5 border-2 hover:border-primary/40 transition-all cursor-grab active:cursor-grabbing group/card shadow-lg p-0 overflow-hidden",
         isDragging && "opacity-50 border-primary scale-105 z-50",
         lead.isUrgent && "border-rose-500/20 ring-1 ring-rose-500/10"
       )}
     >
-      <CardContent className="p-4 space-y-4">
+      <div className="p-4 space-y-4">
         <div className="flex items-start justify-between">
           <div className="flex flex-wrap gap-1.5">
             <Badge variant="outline" className={cn("text-[8px] font-black uppercase border-none px-1.5 h-4.5", priority.color)}>
@@ -361,53 +361,65 @@ function LeadCard({ lead, client, lawyer, onClick }: { lead: Lead; client?: Clie
               {lead.legalArea}
             </Badge>
           </div>
-          {hoursInStage > 24 ? (
-            <div className="flex items-center gap-1 text-[8px] font-black text-rose-500 animate-pulse">
-              <Clock className="h-3 w-3" /> {Math.floor(hoursInStage / 24)}d
-            </div>
-          ) : (
-            <span className="text-[8px] font-black text-slate-600 uppercase">{hoursInStage}h na fase</span>
-          )}
+          <div className={cn(
+            "flex items-center gap-1 text-[8px] font-black uppercase tracking-tighter transition-colors",
+            hoursInStage > 24 ? "text-rose-500 animate-pulse" : hoursInStage > 12 ? "text-amber-500" : "text-slate-500"
+          )}>
+            <Clock className="h-3 w-3" /> {hoursInStage}h na fase
+          </div>
         </div>
         
-        <h4 className="text-sm font-bold text-slate-200 group-hover/card:text-primary transition-colors line-clamp-2 leading-snug min-h-[40px]">
+        <h4 className="text-base font-black text-white group-hover/card:text-primary transition-colors line-clamp-2 leading-tight min-h-[40px] uppercase tracking-tight">
           {lead.title}
         </h4>
 
         {totalTasks > 0 && (
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between text-[8px] font-black uppercase text-slate-500 tracking-widest">
-              <span>Produção {completedCount}/{totalTasks}</span>
-              <span>{Math.round(progress)}%</span>
+          <div className="space-y-2 pt-1">
+            <div className="flex items-center justify-between text-[8px] font-black uppercase text-slate-500 tracking-[0.15em]">
+              <span className="flex items-center gap-1.5">
+                <ShieldCheck className={cn("h-3 w-3", progress === 100 ? "text-emerald-500" : "text-slate-600")} />
+                Produção {completedCount}/{totalTasks}
+              </span>
+              <span className={cn(progress === 100 ? "text-emerald-500" : "text-white")}>{Math.round(progress)}%</span>
             </div>
-            <Progress value={progress} className="h-1 bg-white/5 [&>div]:bg-primary/60" />
+            <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+              <div 
+                className={cn(
+                  "h-full transition-all duration-500 rounded-full",
+                  progress === 100 ? "bg-emerald-500" : "bg-gradient-to-r from-primary/40 to-primary shadow-[0_0_8px_rgba(245,208,48,0.2)]"
+                )}
+                style={{ width: `${progress}%` }} 
+              />
+            </div>
           </div>
         )}
 
-        <div className="space-y-3 pt-3 border-t border-white/5">
-          <div className="flex items-center gap-2">
-            <div className="h-7 w-7 rounded-full bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0">
-              <UserCircle className="h-4 w-4 text-blue-400" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-[11px] font-bold text-slate-300 truncate">{client?.firstName} {client?.lastName}</p>
-              <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">{lead.captureSource}</p>
-            </div>
+        <div className="flex items-center gap-3 p-3 rounded-2xl bg-black/30 border border-white/5 group-hover/card:border-primary/20 transition-all duration-300">
+          <div className="h-9 w-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0 shadow-inner">
+            <UserCircle className="h-5 w-5 text-blue-400" />
           </div>
-          
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5">
-              <div className="h-5 w-5 rounded bg-primary/10 flex items-center justify-center text-primary text-[8px] font-black border border-primary/20">
-                {lawyer?.firstName?.charAt(0)}
-              </div>
-              <span className="text-[9px] text-slate-500 font-bold uppercase">Dr(a). {lawyer?.firstName}</span>
-            </div>
-            <div className="flex items-center gap-1 text-[8px] text-slate-600 font-black uppercase tracking-tighter">
-              <History className="h-2.5 w-2.5" /> {formatDistanceToNow(lead.updatedAt.toDate(), { locale: ptBR, addSuffix: true })}
-            </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-black text-slate-200 truncate leading-none mb-1">{client?.firstName} {client?.lastName}</p>
+            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest flex items-center gap-1">
+              <TrendingUp className="h-2.5 w-2.5 text-primary" /> {lead.captureSource}
+            </p>
           </div>
         </div>
-      </CardContent>
+      </div>
+
+      <div className="px-4 py-3 border-t border-white/5 bg-white/[0.02] flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-primary text-[9px] font-black border border-primary/20 shadow-sm">
+            {lawyer?.firstName?.charAt(0)}
+          </div>
+          <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter truncate max-w-[80px]">
+            {lawyer?.firstName}
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5 text-[9px] text-slate-600 font-black uppercase tracking-widest">
+          <RefreshCw className="h-3 w-3" /> {formatDistanceToNow(lead.updatedAt.toDate(), { locale: ptBR, addSuffix: false })}
+        </div>
+      </div>
     </Card>
   );
 }
@@ -417,17 +429,17 @@ function KanbanColumn({ id, stage, leads, clientsMap, staffMap, onCardClick }: {
   const config = stageConfig[stage as LeadStatus] || stageConfig.NOVO;
 
   return (
-    <div ref={setNodeRef} className="flex flex-col gap-4 min-w-[300px] w-full max-w-[320px] bg-white/[0.01] p-4 rounded-3xl border border-white/5 transition-colors hover:bg-white/[0.02]">
-      <div className="flex items-center justify-between px-2 mb-2 pb-2 border-b border-white/5">
-        <div className="flex items-center gap-2.5">
-          <div className={cn("h-2.5 w-2.5 rounded-full shadow-[0_0_8px] shadow-current", config.color.split(' ')[1])} />
-          <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-300">{config.label}</h3>
+    <div ref={setNodeRef} className="flex flex-col gap-4 min-w-[320px] w-full max-w-[340px] bg-white/[0.01] p-4 rounded-[2rem] border border-white/5 transition-colors hover:bg-white/[0.02] h-full">
+      <div className="flex items-center justify-between px-3 mb-2 pb-2 border-b border-white/5">
+        <div className="flex items-center gap-3">
+          <div className={cn("h-3 w-3 rounded-full shadow-[0_0_12px] shadow-current animate-pulse", config.color.split(' ')[1])} />
+          <h3 className="text-[12px] font-black uppercase tracking-[0.25em] text-white/90">{config.label}</h3>
         </div>
-        <Badge variant="secondary" className="bg-white/5 text-slate-500 text-[10px] font-black px-2 h-5 border-none">{leads.length}</Badge>
+        <Badge variant="secondary" className="bg-white/5 text-slate-500 text-[11px] font-black px-2.5 h-6 border-none rounded-lg shadow-inner">{leads.length}</Badge>
       </div>
       
-      <ScrollArea className="flex-1 h-full pr-3">
-        <div className="flex flex-col gap-3 pb-4">
+      <ScrollArea className="flex-1 h-full pr-2">
+        <div className="flex flex-col gap-4 pb-10">
           <SortableContext items={leads.map(l => l.id)} strategy={verticalListSortingStrategy}>
             {leads.map((lead: Lead) => (
               <LeadCard 
@@ -440,10 +452,13 @@ function KanbanColumn({ id, stage, leads, clientsMap, staffMap, onCardClick }: {
             ))}
           </SortableContext>
           {leads.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-20 opacity-20 border-2 border-dashed border-white/5 rounded-3xl group transition-all hover:opacity-30">
-              <Target className="h-10 w-10 mb-3 text-slate-500" />
+            <div className="flex flex-col items-center justify-center py-24 opacity-20 border-2 border-dashed border-white/5 rounded-[2rem] group transition-all hover:opacity-30">
+              <div className="h-16 w-16 rounded-full bg-white/5 flex items-center justify-center mb-4">
+                <Target className="h-8 w-8 text-slate-500" />
+              </div>
               <div className="text-center space-y-1">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Fila Limpa</p>
+                <p className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">Esteira Vazia</p>
+                <p className="text-[9px] text-slate-600 font-bold uppercase">Aguardando demandas</p>
               </div>
             </div>
           )}
@@ -467,7 +482,7 @@ function LeadDetailsSheet({
   onProtocolClick: (l: Lead) => void;
 }) {
   const { firestore } = useFirebase();
-  const { data: nextSession } = useSession();
+  const { data: session } = useSession();
   const { toast } = useToast();
   const [files, setFiles] = React.useState<any[]>([]);
   const [isLoadingFiles, setIsLoadingFiles] = React.useState(false);
@@ -496,14 +511,14 @@ function LeadDetailsSheet({
   };
 
   const handleAddNote = async () => {
-    if (!newNote.trim() || !lead || !firestore || !nextSession?.user?.name) return;
+    if (!newNote.trim() || !lead || !firestore || !session?.user?.name) return;
     try {
       const event: TimelineEvent = {
         id: uuidv4(),
         type: 'note',
         description: newNote.trim(),
         date: Timestamp.now() as any,
-        authorName: nextSession.user.name,
+        authorName: session.user.name,
       };
       await updateDoc(doc(firestore, 'leads', lead.id), {
         timeline: arrayUnion(event),
@@ -516,107 +531,187 @@ function LeadDetailsSheet({
 
   if (!lead) return null;
   const stage = stageConfig[lead.status] || stageConfig.NOVO;
+  const completedCount = lead.completedTasks?.length || 0;
+  const totalTasks = stage.tasks.length;
+  const isReadyToAdvance = totalTasks > 0 && completedCount === totalTasks;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="sm:max-w-2xl bg-[#020617] border-white/10 text-white p-0 flex flex-col h-[100vh] overflow-hidden shadow-2xl">
-        <SheetHeader className="p-6 border-b border-white/5 bg-white/5 shrink-0">
-          <div className="flex items-center justify-between mb-2">
-            <Badge variant="outline" className={cn("text-[9px] font-black uppercase h-5 px-2", stage.color)}>
-              <stage.icon className="h-3 w-3 mr-1" /> {stage.label}
-            </Badge>
+        <SheetHeader className="p-8 border-b border-white/5 bg-white/[0.02] shrink-0">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <Badge variant="outline" className={cn("text-[10px] font-black uppercase h-6 px-3 border-2 transition-all", stage.color)}>
+                <stage.icon className="h-3.5 w-3.5 mr-2" /> {stage.label}
+              </Badge>
+              {isReadyToAdvance && (
+                <Badge className="bg-emerald-600 text-white font-black text-[9px] uppercase tracking-widest animate-in zoom-in h-6 px-3 shadow-lg shadow-emerald-900/40">
+                  <CheckCircle2 className="h-3 w-3 mr-1.5" /> Fase Concluída
+                </Badge>
+              )}
+            </div>
             {lead.status === 'DISTRIBUICAO' && (
-              <Button size="sm" className="bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase text-[10px] h-8" onClick={() => onProtocolClick(lead)}>
-                <RefreshCw className="h-3 w-3 mr-1.5" /> Protocolar Agora
+              <Button size="sm" className="bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase text-[10px] h-9 px-6 shadow-xl shadow-emerald-900/20" onClick={() => onProtocolClick(lead)}>
+                <RefreshCw className="h-3.5 w-3.5 mr-2" /> Protocolar Agora
               </Button>
             )}
           </div>
-          <SheetTitle className="text-2xl font-black font-headline text-white">{lead.title}</SheetTitle>
+          <SheetTitle className="text-3xl font-black font-headline text-white leading-tight uppercase tracking-tight">{lead.title}</SheetTitle>
+          <SheetDescription className="text-slate-400 mt-2 font-medium">Gestão de micro-etapas e triagem de documentos pré-processuais.</SheetDescription>
         </SheetHeader>
 
         <ScrollArea className="flex-1">
-          <div className="p-6 space-y-10 pb-20">
-            <section className="space-y-4">
-              <div className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-500 tracking-[0.2em]">
-                <Activity className="h-3.5 w-3.5" /> Checklist da Etapa: {stage.label}
-              </div>
-              <div className="grid gap-2">
-                {stage.tasks.map(task => (
-                  <div key={task} className="flex items-center gap-3 p-4 rounded-2xl bg-white/5 border border-white/10 group cursor-pointer hover:bg-white/10 transition-all" onClick={() => handleToggleTask(task)}>
-                    <div className={cn(
-                      "h-5 w-5 rounded border flex items-center justify-center transition-all",
-                      lead.completedTasks?.includes(task) ? "bg-primary border-primary text-primary-foreground" : "border-white/20"
-                    )}>
-                      {lead.completedTasks?.includes(task) && <Check className="h-3 w-3" />}
-                    </div>
-                    <span className={cn("text-sm font-bold", lead.completedTasks?.includes(task) ? "text-primary line-through opacity-50" : "text-slate-300")}>
-                      {task}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            <section className="space-y-4">
-              <div className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-500 tracking-[0.2em]">
-                <UserCircle className="h-3.5 w-3.5" /> Cliente Principal
-              </div>
-              <div className="p-6 rounded-3xl bg-white/5 border border-white/10 flex items-center gap-6">
-                <div className="h-16 w-16 rounded-2xl bg-blue-500/10 flex items-center justify-center border border-blue-500/20 shrink-0">
-                  <UserCircle className="h-10 w-10 text-blue-400" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h4 className="text-xl font-black text-white truncate">{client?.firstName} {client?.lastName}</h4>
-                  <div className="flex flex-wrap gap-4 mt-2">
-                    <div className="flex items-center gap-1.5 text-xs text-slate-400"><Mail className="h-3.5 w-3.5 text-primary" /> {client?.email || 'N/A'}</div>
-                    <div className="flex items-center gap-1.5 text-xs text-slate-400"><Smartphone className="h-3.5 w-3.5 text-emerald-500" /> {client?.mobile || 'N/A'}</div>
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            <section className="space-y-4">
+          <div className="p-8 space-y-12 pb-24">
+            <section className="space-y-6">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-500 tracking-[0.2em]">
-                  <FileText className="h-3.5 w-3.5" /> Documentação de Triagem
+                <div className="flex items-center gap-2 text-[11px] font-black uppercase text-slate-500 tracking-[0.25em]">
+                  <Activity className="h-4 w-4 text-primary" /> Checklist da Etapa: {stage.label}
+                </div>
+                <span className="text-[10px] font-black text-white bg-white/5 px-2 py-1 rounded-lg border border-white/5">{completedCount}/{totalTasks} Concluído</span>
+              </div>
+              
+              <div className="grid gap-3">
+                {stage.tasks.map(task => {
+                  const isDone = lead.completedTasks?.includes(task);
+                  return (
+                    <div 
+                      key={task} 
+                      className={cn(
+                        "flex items-center gap-4 p-5 rounded-3xl border-2 transition-all duration-300 group cursor-pointer",
+                        isDone 
+                          ? "bg-emerald-500/[0.03] border-emerald-500/20 opacity-80" 
+                          : "bg-white/[0.03] border-white/5 hover:border-primary/30 hover:bg-white/[0.05]"
+                      )} 
+                      onClick={() => handleToggleTask(task)}
+                    >
+                      <div className={cn(
+                        "h-6 w-6 rounded-xl border-2 flex items-center justify-center transition-all shadow-inner",
+                        isDone ? "bg-emerald-500 border-emerald-500 text-white" : "border-white/10 group-hover:border-primary/50"
+                      )}>
+                        {isDone && <Check className="h-3.5 w-3.5 stroke-[3]" />}
+                      </div>
+                      <span className={cn(
+                        "text-sm font-bold tracking-tight flex-1",
+                        isDone ? "text-emerald-400/70 line-through" : "text-slate-200"
+                      )}>
+                        {task}
+                      </span>
+                      {!isDone && <ArrowRight className="h-4 w-4 text-white/5 group-hover:text-primary transition-colors opacity-0 group-hover:opacity-100" />}
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+
+            <section className="space-y-6">
+              <div className="flex items-center gap-2 text-[11px] font-black uppercase text-slate-500 tracking-[0.25em]">
+                <UserCircle className="h-4 w-4 text-blue-400" /> Cliente de Triagem
+              </div>
+              <div className="p-8 rounded-[2.5rem] bg-gradient-to-br from-white/[0.02] to-white/[0.05] border border-white/10 flex items-center gap-8 shadow-2xl relative overflow-hidden group">
+                <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
+                  <Bot className="h-24 w-24 text-primary" />
+                </div>
+                <div className="h-20 w-20 rounded-[2rem] bg-blue-500/10 flex items-center justify-center border-2 border-blue-500/20 shrink-0 shadow-inner">
+                  <UserCircle className="h-12 w-12 text-blue-400" />
+                </div>
+                <div className="min-w-0 flex-1 relative z-10">
+                  <h4 className="text-2xl font-black text-white truncate tracking-tight">{client?.firstName} {client?.lastName}</h4>
+                  <div className="flex flex-wrap gap-6 mt-4">
+                    <div className="flex items-center gap-2 text-sm text-slate-400 font-medium">
+                      <div className="h-7 w-7 rounded-lg bg-white/5 flex items-center justify-center"><Mail className="h-3.5 w-3.5 text-primary" /></div>
+                      {client?.email || 'N/A'}
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-slate-400 font-medium">
+                      <div className="h-7 w-7 rounded-lg bg-white/5 flex items-center justify-center"><Smartphone className="h-3.5 w-3.5 text-emerald-500" /></div>
+                      {client?.mobile || 'N/A'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-[11px] font-black uppercase text-slate-500 tracking-[0.25em]">
+                  <FileText className="h-4 w-4 text-primary" /> Evidências e Documentos
                 </div>
                 {lead.driveFolderId && (
-                  <Button variant="ghost" size="sm" className="h-7 text-[9px] font-black uppercase text-primary gap-1.5" asChild>
-                    <a href={`https://drive.google.com/drive/folders/${lead.driveFolderId}`} target="_blank"><ExternalLink className="h-3 w-3" /> Abrir Drive</a>
+                  <Button variant="ghost" size="sm" className="h-8 text-[10px] font-black uppercase text-primary hover:bg-primary/10 gap-2 border border-primary/20 rounded-xl" asChild>
+                    <a href={`https://drive.google.com/drive/folders/${lead.driveFolderId}`} target="_blank"><ExternalLink className="h-3.5 w-3.5" /> Abrir Drive Central</a>
                   </Button>
                 )}
               </div>
               <div className="grid gap-3">
-                {isLoadingFiles ? <Skeleton className="h-20 w-full bg-white/5 rounded-2xl" /> : files.length > 0 ? (
+                {isLoadingFiles ? (
+                  <div className="space-y-3">
+                    <Skeleton className="h-16 w-full bg-white/5 rounded-2xl" />
+                    <Skeleton className="h-16 w-full bg-white/5 rounded-2xl" />
+                  </div>
+                ) : files.length > 0 ? (
                   files.map(f => (
-                    <div key={f.id} className="flex items-center justify-between p-4 rounded-2xl bg-black/40 border border-white/5 hover:border-primary/20 transition-all group">
-                      <div className="flex items-center gap-3">
-                        <div className="h-8 w-8 rounded-lg bg-white/5 flex items-center justify-center">{f.iconLink ? <img src={f.iconLink} className="h-4 w-4" /> : <FileText className="h-4 w-4" />}</div>
-                        <span className="text-sm font-bold text-slate-300">{f.name}</span>
+                    <div key={f.id} className="flex items-center justify-between p-5 rounded-3xl bg-black/40 border border-white/5 hover:border-primary/30 transition-all group">
+                      <div className="flex items-center gap-4">
+                        <div className="h-10 w-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/10 group-hover:bg-primary/10 transition-colors">
+                          {f.iconLink ? <img src={f.iconLink} className="h-5 w-5" /> : <FileText className="h-5 w-5 text-primary" />}
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-sm font-bold text-slate-200 group-hover:text-white">{f.name}</span>
+                          <span className="text-[10px] text-slate-500 font-mono uppercase tracking-widest">{f.mimeType?.split('.').pop()}</span>
+                        </div>
                       </div>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100" asChild><a href={f.webViewLink} target="_blank"><Download className="h-4 w-4" /></a></Button>
+                      <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl hover:bg-white/10" asChild>
+                        <a href={f.webViewLink} target="_blank" title="Download"><Download className="h-4 w-4 text-slate-400 group-hover:text-primary" /></a>
+                      </Button>
                     </div>
                   ))
-                ) : <div className="text-center py-10 border-2 border-dashed border-white/5 rounded-3xl opacity-30 italic text-xs">Nenhum documento anexado.</div>}
+                ) : (
+                  <div className="text-center py-16 border-2 border-dashed border-white/5 rounded-[2.5rem] opacity-30 flex flex-col items-center gap-3">
+                    <FileUp className="h-10 w-10 text-slate-500" />
+                    <p className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">Sem arquivos anexados</p>
+                  </div>
+                )}
               </div>
             </section>
 
-            <section className="space-y-4">
-              <div className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-500 tracking-[0.2em]">
-                <History className="h-3.5 w-3.5" /> Histórico de Atendimento
+            <section className="space-y-6">
+              <div className="flex items-center gap-2 text-[11px] font-black uppercase text-slate-500 tracking-[0.25em]">
+                <History className="h-4 w-4 text-primary" /> Timeline de Atendimento
               </div>
-              <div className="space-y-4">
-                <div className="flex gap-2">
-                  <Textarea placeholder="Adicionar nota..." className="bg-black/40 border-white/10 text-sm h-20" value={newNote} onChange={e => setNewNote(e.target.value)} />
-                  <Button className="h-20 w-12" onClick={handleAddNote} disabled={!newNote.trim()}><Plus className="h-5 w-5" /></Button>
+              <div className="space-y-6">
+                <div className="flex gap-3 items-end">
+                  <div className="flex-1 space-y-2">
+                    <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-1">Nova Anotação Estratégica</Label>
+                    <Textarea 
+                      placeholder="Registre pontos relevantes da entrevista ou ordens da banca..." 
+                      className="bg-black/40 border-white/10 text-sm h-24 rounded-3xl p-5 resize-none focus:border-primary transition-all shadow-inner" 
+                      value={newNote} 
+                      onChange={e => setNewNote(e.target.value)} 
+                    />
+                  </div>
+                  <Button 
+                    className={cn(
+                      "h-24 w-16 rounded-3xl transition-all",
+                      newNote.trim() ? "bg-primary text-primary-foreground shadow-xl shadow-primary/20" : "bg-white/5 text-slate-600"
+                    )} 
+                    onClick={handleAddNote} 
+                    disabled={!newNote.trim()}
+                  >
+                    <Plus className="h-6 w-6" />
+                  </Button>
                 </div>
-                <div className="space-y-4 pt-4 border-t border-white/5">
+                
+                <div className="space-y-6 relative before:absolute before:inset-0 before:ml-4 before:-translate-x-px before:h-full before:w-0.5 before:bg-gradient-to-b before:from-primary/20 before:via-border/30 before:to-transparent">
                   {(lead as any).timeline?.sort((a: any, b: any) => b.date.seconds - a.date.seconds).map((event: any) => (
-                    <div key={event.id} className="flex gap-4 items-start group">
-                      <div className="h-8 w-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center shrink-0"><MessageSquare className="h-3.5 w-3.5 text-primary" /></div>
-                      <div className="flex-1 space-y-1">
-                        <div className="flex items-center justify-between"><span className="text-[10px] font-black uppercase text-primary">{event.authorName}</span><span className="text-[9px] text-slate-500">{format(event.date.toDate(), 'dd/MM/yy HH:mm')}</span></div>
-                        <p className="text-sm text-slate-300 leading-relaxed">{event.description}</p>
+                    <div key={event.id} className="flex gap-6 items-start group relative animate-in slide-in-from-left-2">
+                      <div className="h-8 w-8 rounded-full bg-[#020617] border-2 border-primary/20 flex items-center justify-center shrink-0 z-10 shadow-sm group-hover:border-primary transition-colors">
+                        <MessageSquare className="h-3.5 w-3.5 text-primary" />
+                      </div>
+                      <div className="flex-1 space-y-2 p-5 rounded-3xl bg-white/[0.03] border border-white/5 hover:border-white/10 transition-all shadow-sm">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-black uppercase text-primary tracking-widest">{event.authorName}</span>
+                          <span className="text-[9px] text-slate-500 font-mono">{format(event.date.toDate(), 'dd/MM/yy HH:mm')}</span>
+                        </div>
+                        <p className="text-sm text-slate-300 leading-relaxed font-medium">{event.description}</p>
                       </div>
                     </div>
                   ))}
@@ -657,60 +752,68 @@ function NewLeadSheet({ open, onOpenChange, lawyers, onCreated }: { open: boolea
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="sm:max-w-xl bg-[#020617] border-white/10 text-white p-0 flex flex-col h-full shadow-2xl">
-        <SheetHeader className="p-6 border-b border-white/5 bg-white/5 shrink-0">
-          <SheetTitle className="text-2xl font-black font-headline text-white flex items-center gap-3"><PlusCircle className="h-6 w-6 text-primary" /> Iniciar Atendimento</SheetTitle>
+        <SheetHeader className="p-8 border-b border-white/5 bg-white/[0.02] shrink-0">
+          <SheetTitle className="text-3xl font-black font-headline text-white flex items-center gap-4 tracking-tight uppercase">
+            <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center border-2 border-primary/20">
+              <PlusCircle className="h-6 w-6 text-primary" />
+            </div>
+            Novo Atendimento
+          </SheetTitle>
         </SheetHeader>
         <ScrollArea className="flex-1">
-          <div className="p-6">
+          <div className="p-8">
             <Form {...form}>
-              <form id="new-lead-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <form id="new-lead-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
                 <FormField control={form.control} name="clientId" render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-[10px] font-black uppercase text-slate-500">Cliente Principal *</FormLabel>
+                    <FormLabel className="text-[11px] font-black uppercase text-slate-500 tracking-widest ml-1">Cliente Principal *</FormLabel>
                     <ClientSearchInput selectedClientId={field.value} onSelect={(c) => field.onChange(c.id)} onCreateNew={() => setShowClientModal(true)} />
                     <FormMessage />
                   </FormItem>
                 )} />
                 <FormField control={form.control} name="title" render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-[10px] font-black uppercase text-slate-500">Título da Demanda *</FormLabel>
-                    <Input placeholder="Ex: Revisional de Horas Extras" className="bg-black/40 border-white/10 h-11" {...field} />
+                    <FormLabel className="text-[11px] font-black uppercase text-slate-500 tracking-widest ml-1">Título da Demanda *</FormLabel>
+                    <Input placeholder="Ex: Revisional de Horas Extras - Empresa X" className="bg-black/40 border-white/10 h-12 rounded-xl text-base font-bold" {...field} />
                     <FormMessage />
                   </FormItem>
                 )} />
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-6">
                   <FormField control={form.control} name="lawyerId" render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-[10px] font-black uppercase text-slate-500">Responsável *</FormLabel>
+                      <FormLabel className="text-[11px] font-black uppercase text-slate-500 tracking-widest ml-1">Responsável *</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl><SelectTrigger className="bg-black/40 border-white/10 h-11"><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
-                        <SelectContent className="bg-[#0f172a] border-white/10 text-white">{lawyers.map(l => <SelectItem key={l.id} value={l.id}>Dr(a). {l.firstName}</SelectItem>)}</SelectContent>
+                        <FormControl><SelectTrigger className="bg-black/40 border-white/10 h-12 rounded-xl"><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
+                        <SelectContent className="bg-[#0f172a] border-white/10 text-white">{lawyers.map(l => <SelectItem key={l.id} value={l.id} className="font-bold">Dr(a). {l.firstName}</SelectItem>)}</SelectContent>
                       </Select>
                     </FormItem>
                   )} />
                   <FormField control={form.control} name="legalArea" render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-[10px] font-black uppercase text-slate-500">Área Jurídica *</FormLabel>
+                      <FormLabel className="text-[11px] font-black uppercase text-slate-500 tracking-widest ml-1">Área Jurídica *</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl><SelectTrigger className="bg-black/40 border-white/10 h-11"><SelectValue /></SelectTrigger></FormControl>
-                        <SelectContent className="bg-[#0f172a] border-white/10 text-white"><SelectItem value="Trabalhista">Trabalhista</SelectItem><SelectItem value="Cível">Cível</SelectItem><SelectItem value="Previdenciário">Previdenciário</SelectItem></SelectContent>
+                        <FormControl><SelectTrigger className="bg-black/40 border-white/10 h-12 rounded-xl"><SelectValue /></SelectTrigger></FormControl>
+                        <SelectContent className="bg-[#0f172a] border-white/10 text-white"><SelectItem value="Trabalhista" className="font-bold">Trabalhista</SelectItem><SelectItem value="Cível" className="font-bold">Cível</SelectItem><SelectItem value="Previdenciário" className="font-bold">Previdenciário</SelectItem></SelectContent>
                       </Select>
                     </FormItem>
                   )} />
                 </div>
                 <FormField control={form.control} name="description" render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-[10px] font-black uppercase text-slate-500">Relato Inicial</FormLabel>
-                    <Textarea className="bg-black/40 border-white/10 h-32" {...field} />
+                    <FormLabel className="text-[11px] font-black uppercase text-slate-500 tracking-widest ml-1">Relato Inicial / Briefing</FormLabel>
+                    <Textarea className="bg-black/40 border-white/10 h-40 rounded-[2rem] p-6 resize-none shadow-inner leading-relaxed" placeholder="Descreva os fatos principais narrados pelo cliente..." {...field} />
                   </FormItem>
                 )} />
               </form>
             </Form>
           </div>
         </ScrollArea>
-        <SheetFooter className="p-6 border-t border-white/5 bg-white/5 gap-3 shrink-0">
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button type="submit" form="new-lead-form" disabled={isSaving} className="flex-1 bg-primary text-primary-foreground font-black uppercase tracking-widest text-[11px] h-12 shadow-xl shadow-primary/20">{isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Target className="h-4 w-4 mr-2" />} Criar Lead</Button>
+        <SheetFooter className="p-8 border-t border-white/5 bg-white/[0.02] gap-4 shrink-0">
+          <Button variant="ghost" className="text-slate-400 font-bold uppercase text-[11px] tracking-widest px-8" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button type="submit" form="new-lead-form" disabled={isSaving} className="flex-1 bg-primary text-primary-foreground font-black uppercase tracking-widest text-[11px] h-14 rounded-2xl shadow-2xl shadow-primary/20 hover:scale-[1.02] transition-all">
+            {isSaving ? <Loader2 className="h-5 w-5 animate-spin mr-3" /> : <Target className="h-5 w-5 mr-3" />} 
+            Criar Lead & Abrir Pasta
+          </Button>
         </SheetFooter>
         <ClientCreationModal open={showClientModal} onOpenChange={setShowClientModal} onClientCreated={(c) => form.setValue('clientId', c.id)} />
       </SheetContent>
@@ -816,47 +919,57 @@ export default function LeadsPage() {
   };
 
   return (
-    <div className="flex flex-col gap-8 pb-10">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <div className="h-14 w-14 rounded-2xl bg-primary/10 border-2 border-primary/20 flex items-center justify-center shadow-xl"><Target className="h-8 w-8 text-primary" /></div>
-          <div><h1 className="text-3xl font-black font-headline text-white">CRM Jurídico & Triagem</h1><p className="text-sm text-slate-500">Linha de produção e conversão de elite.</p></div>
+    <div className="flex flex-col gap-10 pb-10">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-1">
+        <div className="flex items-center gap-5">
+          <div className="h-16 w-16 rounded-[2rem] bg-primary/10 border-2 border-primary/30 flex items-center justify-center shadow-2xl shadow-primary/10 animate-in zoom-in duration-500">
+            <Target className="h-9 w-9 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-4xl font-black font-headline text-white tracking-tight uppercase">CRM & Triagem Jurídica</h1>
+            <p className="text-sm text-slate-500 font-bold uppercase tracking-widest mt-1">Esteira de Produção e Controle de Qualidade Bueno Gois</p>
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="relative w-64 group"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" /><Input placeholder="Pesquisar leads..." className="pl-10 bg-[#0f172a] border-white/5 h-11 text-sm" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} /></div>
-          <Button onClick={() => setIsNewLeadOpen(true)} className="bg-primary text-primary-foreground font-black uppercase text-[11px] tracking-widest h-11 px-8 shadow-xl shadow-primary/20 transition-all"><PlusCircle className="mr-2 h-4 w-4" /> Novo Lead</Button>
+        <div className="flex items-center gap-4">
+          <div className="relative w-72 group">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 group-focus-within:text-primary transition-colors" />
+            <Input placeholder="Pesquisar leads ou clientes..." className="pl-11 bg-[#0f172a] border-white/5 border-2 h-12 text-sm rounded-2xl focus:border-primary/50 transition-all" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+          </div>
+          <Button onClick={() => setIsNewLeadOpen(true)} className="bg-primary text-primary-foreground font-black uppercase text-[11px] tracking-[0.2em] h-12 px-10 rounded-2xl shadow-2xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all">
+            <PlusCircle className="mr-2 h-5 w-5" /> Iniciar Lead
+          </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 animate-in fade-in duration-500">
-        <Card className="bg-[#0f172a] border-white/5">
-          <CardHeader className="p-4 flex items-center gap-4">
-            <div className="h-10 w-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400"><TrendingUp className="h-5 w-5" /></div>
-            <div><p className="text-[9px] font-black uppercase text-slate-500 tracking-widest">Maior Demanda</p><p className="text-sm font-black text-white">{stats.highDemand}</p></div>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 px-1 animate-in fade-in slide-in-from-top-4 duration-700">
+        <Card className="bg-[#0f172a] border-white/5 group hover:border-blue-500/30 transition-all">
+          <CardHeader className="p-5 flex items-center gap-5">
+            <div className="h-12 w-12 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 group-hover:scale-110 transition-transform"><TrendingUp className="h-6 w-6" /></div>
+            <div><p className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em]">Fluxo Operacional</p><p className="text-lg font-black text-white">{stats.highDemand}</p></div>
           </CardHeader>
         </Card>
-        <Card className="bg-[#0f172a] border-white/5">
-          <CardHeader className="p-4 flex items-center gap-4">
-            <div className="h-10 w-10 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400"><Timer className="h-5 w-5" /></div>
-            <div><p className="text-[9px] font-black uppercase text-slate-500 tracking-widest">Gargalo (Tempo)</p><p className="text-sm font-black text-white">{stats.slowestStage}</p></div>
+        <Card className="bg-[#0f172a] border-white/5 group hover:border-rose-500/30 transition-all">
+          <CardHeader className="p-5 flex items-center gap-5">
+            <div className="h-12 w-12 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 group-hover:scale-110 transition-transform"><Timer className="h-6 w-6" /></div>
+            <div><p className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em]">Maior Retenção</p><p className="text-lg font-black text-white">{stats.slowestStage}</p></div>
           </CardHeader>
         </Card>
-        <Card className="bg-[#0f172a] border-white/5">
-          <CardHeader className="p-4 flex items-center gap-4">
-            <div className="h-10 w-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400"><Flame className="h-5 w-5" /></div>
-            <div><p className="text-[9px] font-black uppercase text-slate-500 tracking-widest">Casos Urgentes</p><p className="text-sm font-black text-white">{stats.urgent}</p></div>
+        <Card className="bg-[#0f172a] border-white/5 group hover:border-amber-500/30 transition-all">
+          <CardHeader className="p-5 flex items-center gap-5">
+            <div className="h-12 w-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 group-hover:scale-110 transition-transform"><Flame className="h-6 w-6" /></div>
+            <div><p className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em]">Prioritários</p><p className="text-lg font-black text-white">{stats.urgent}</p></div>
           </CardHeader>
         </Card>
-        <Card className="bg-[#0f172a] border-white/5">
-          <CardHeader className="p-4 flex items-center gap-4">
-            <div className="h-10 w-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400"><FolderKanban className="h-5 w-5" /></div>
-            <div><p className="text-[9px] font-black uppercase text-slate-500 tracking-widest">Pronto p/ Protocolo</p><p className="text-sm font-black text-white">{stats.ready}</p></div>
+        <Card className="bg-[#0f172a] border-white/5 group hover:border-emerald-500/30 transition-all">
+          <CardHeader className="p-5 flex items-center gap-5">
+            <div className="h-12 w-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 group-hover:scale-110 transition-transform"><FolderKanban className="h-6 w-6" /></div>
+            <div><p className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em]">Prontos p/ Guia</p><p className="text-lg font-black text-white">{stats.ready}</p></div>
           </CardHeader>
         </Card>
       </div>
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-        <div className="flex gap-6 overflow-x-auto pb-6 no-scrollbar min-h-[650px]">
+        <div className="flex gap-8 overflow-x-auto pb-12 px-1 no-scrollbar min-h-[700px] scroll-smooth">
           {STAGES.map(stage => (
             <KanbanColumn key={stage} id={stage} stage={stage} leads={filteredLeads.filter(l => l.status === stage)} clientsMap={clientsMap} staffMap={staffMap} onCardClick={(l: Lead) => { setSelectedLead(l); setIsDetailsOpen(true); }} />
           ))}
