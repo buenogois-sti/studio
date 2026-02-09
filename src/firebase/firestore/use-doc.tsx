@@ -1,3 +1,4 @@
+
 'use client';
     
 import { useState, useEffect } from 'react';
@@ -50,7 +51,7 @@ export function useDoc<T = any>(
 
     if (cacheEntry && cacheEntry.lastData) {
       setState({
-        data: cacheEntry.lastData,
+        data: cacheEntry.lastData as WithId<T>,
         isLoading: false,
         error: cacheEntry.lastError,
         isStale: true
@@ -91,9 +92,9 @@ export function useDoc<T = any>(
             operation: 'get',
             path: key,
           });
-          entry.lastError = errorToReport;
+          entry.lastError = errorToReport as any;
           entry.isLoading = false;
-          entry.listeners.forEach(l => l(entry.lastData, errorToReport, false));
+          entry.listeners.forEach(l => l(entry.lastData, errorToReport as any, false));
         }
       );
 

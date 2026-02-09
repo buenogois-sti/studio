@@ -29,7 +29,7 @@ export const processSchema = z.object({
   opposingParties: z.array(z.object({
     name: z.string().min(1, 'Nome é obrigatório'),
     document: z.string().optional().or(z.literal('')),
-    email: z.string().email('E-mail inválido').optional().or(z.literal('')),
+    email: z.string().optional().or(z.literal('')),
     phone: z.string().optional().or(z.literal('')),
     cep: z.string().optional().or(z.literal('')),
     address: z.string().optional().or(z.literal('')),

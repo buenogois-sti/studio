@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -30,11 +31,9 @@ import {
   Plus,
   ExternalLink,
   DollarSign,
-  Gavel,
   Activity,
   FileUp,
   Mail,
-  Phone,
   Download,
   Check,
   Bot,
@@ -112,7 +111,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { syncLeadToDrive } from '@/lib/drive';
 import { extractProtocolData } from '@/ai/flows/extract-protocol-data-flow';
 import { Progress } from '@/components/ui/progress';
-import { Checkbox } from '@/components/ui/checkbox';
 
 const STAGES: LeadStatus[] = ['NOVO', 'ATENDIMENTO', 'BUROCRACIA', 'CONTRATUAL', 'DISTRIBUICAO'];
 
@@ -195,7 +193,7 @@ function LeadConversionDialog({
     } catch (e) {
       toast({ variant: 'destructive', title: 'Falha na IA', description: 'Não foi possível ler o histórico para sugestões.' });
     } finally {
-      setIsPreFilling(false);
+      setIsParsingAI(false);
     }
   };
 
@@ -469,7 +467,7 @@ function LeadDetailsSheet({
   onProtocolClick: (l: Lead) => void;
 }) {
   const { firestore } = useFirebase();
-  const { data: session } = useSession();
+  const { data: nextSession } = useSession();
   const { toast } = useToast();
   const [files, setFiles] = React.useState<any[]>([]);
   const [isLoadingFiles, setIsLoadingFiles] = React.useState(false);
@@ -498,14 +496,14 @@ function LeadDetailsSheet({
   };
 
   const handleAddNote = async () => {
-    if (!newNote.trim() || !lead || !firestore || !session?.user?.name) return;
+    if (!newNote.trim() || !lead || !firestore || !nextSession?.user?.name) return;
     try {
       const event: TimelineEvent = {
         id: uuidv4(),
         type: 'note',
         description: newNote.trim(),
         date: Timestamp.now() as any,
-        authorName: session.user.name,
+        authorName: nextSession.user.name,
       };
       await updateDoc(doc(firestore, 'leads', lead.id), {
         timeline: arrayUnion(event),
@@ -722,7 +720,7 @@ function NewLeadSheet({ open, onOpenChange, lawyers, onCreated }: { open: boolea
 
 export default function LeadsPage() {
   const { firestore, user } = useFirebase();
-  const { data: session } = useSession();
+  const { data: nextSession } = useSession();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = React.useState('');
   const [isNewLeadOpen, setIsNewLeadOpen] = React.useState(false);
