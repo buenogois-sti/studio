@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -38,7 +39,11 @@ import {
   FileUp,
   Mail,
   Phone,
-  Download
+  Download,
+  Check,
+  Sparkles,
+  Bot,
+  RefreshCw
 } from 'lucide-react';
 import { 
   DndContext, 
@@ -57,7 +62,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 
 import { useFirebase, useCollection, useMemoFirebase, useDoc } from '@/firebase';
-import { collection, query, orderBy, doc, Timestamp, limit, updateDoc, where, arrayUnion } from 'firebase/firestore';
+import { collection, query, orderBy, doc, Timestamp, limit, updateDoc, where, arrayUnion, arrayRemove } from 'firebase/firestore';
 import type { Lead, Client, Staff, LeadStatus, LeadPriority, UserProfile, OpposingParty, TimelineEvent } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -96,10 +101,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Textarea } from '@/components/ui/textarea';
-import { createLead, updateLeadStatus, convertLeadToProcess, updateLeadOpposingParties } from '@/lib/lead-actions';
+import { createLead, updateLeadStatus, convertLeadToProcess } from '@/lib/lead-actions';
 import { ClientSearchInput } from '@/components/process/ClientSearchInput';
 import { ClientCreationModal } from '@/components/process/ClientCreationModal';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet';
 import { Separator } from '@/components/ui/separator';
@@ -109,17 +113,20 @@ import { listFiles } from '@/lib/drive-actions';
 import { useSession } from 'next-auth/react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { syncLeadToDrive } from '@/lib/drive';
+import { extractProtocolData } from '@/ai/flows/extract-protocol-data-flow';
+import { Progress } from '@/components/ui/progress';
+import { Checkbox } from '@/components/ui/checkbox';
 
-const STAGES: LeadStatus[] = ['NOVO', 'ENTREVISTA', 'DOCUMENTACAO', 'CONTRATUAL', 'PRONTO'];
+const STAGES: LeadStatus[] = ['NOVO', 'ATENDIMENTO', 'BUROCRACIA', 'CONTRATUAL', 'DISTRIBUICAO'];
 
-const stageConfig: Record<LeadStatus, { label: string; color: string; icon: any; description: string }> = {
-  NOVO: { label: 'Triagem', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20', icon: Zap, description: 'Novos contatos' },
-  ENTREVISTA: { label: 'Atendimento', color: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20', icon: UserCircle, description: 'Entrevista técnica' },
-  DOCUMENTACAO: { label: 'Burocracia', color: 'bg-amber-500/10 text-amber-400 border-amber-500/20', icon: Clock, description: 'Dados e provas' },
-  CONTRATUAL: { label: 'Contratual', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20', icon: ShieldCheck, description: 'Asssignatures' },
-  PRONTO: { label: 'Protocolo', color: 'bg-purple-500/10 text-purple-400 border-purple-500/20', icon: CheckCircle2, description: 'Pronto p/ distribuir' },
-  DISTRIBUIDO: { label: 'Distribuído', color: 'bg-slate-500/10 text-slate-400 border-slate-500/20', icon: FolderKanban, description: 'Migrado' },
-  ABANDONADO: { label: 'Abandonado', color: 'bg-rose-500/10 text-rose-400 border-rose-500/20', icon: AlertCircle, description: 'Arquivado' },
+const stageConfig: Record<LeadStatus, { label: string; color: string; icon: any; description: string; tasks: string[] }> = {
+  NOVO: { label: 'Triagem', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20', icon: Zap, description: 'Novos contatos', tasks: ['Captar contatos', 'Identificar área'] },
+  ATENDIMENTO: { label: 'Atendimento', color: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20', icon: UserCircle, description: 'Entrevista técnica', tasks: ['Entrevista realizada', 'Relato completo', 'Dados bancários'] },
+  BUROCRACIA: { label: 'Burocracia', color: 'bg-amber-500/10 text-amber-400 border-amber-500/20', icon: Clock, description: 'Dados e provas', tasks: ['RG/CPF anexados', 'Comprovante residência', 'Provas iniciais'] },
+  CONTRATUAL: { label: 'Contratual', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20', icon: ShieldCheck, description: 'Assinaturas', tasks: ['Contrato assinado', 'Procuração assinada'] },
+  DISTRIBUICAO: { label: 'Distribuição', color: 'bg-purple-500/10 text-purple-400 border-purple-500/20', icon: FolderKanban, description: 'Pronto p/ protocolar', tasks: ['Réu qualificado', 'Valor da causa', 'Justiça gratuita'] },
+  CONVERTIDO: { label: 'Convertido', color: 'bg-slate-500/10 text-slate-400 border-slate-500/20', icon: CheckCircle2, description: 'Migrado', tasks: [] },
+  ABANDONADO: { label: 'Abandonado', color: 'bg-rose-500/10 text-rose-400 border-rose-500/20', icon: AlertCircle, description: 'Arquivado', tasks: [] },
 };
 
 const priorityConfig: Record<LeadPriority, { label: string; color: string; icon: any }> = {
@@ -158,6 +165,8 @@ function LeadConversionDialog({
   onOpenChange: (o: boolean) => void;
   onConfirm: (data: z.infer<typeof conversionSchema>) => void;
 }) {
+  const [isPreFilling, setIsPreFilling] = React.useState(false);
+  const { toast } = useToast();
   const form = useForm<z.infer<typeof conversionSchema>>({
     resolver: zodResolver(conversionSchema),
     defaultValues: {
@@ -168,6 +177,31 @@ function LeadConversionDialog({
     }
   });
 
+  const handlePreFill = async () => {
+    if (!lead) return;
+    setIsPreFilling(true);
+    try {
+      const timelineNotes = (lead as any).timeline?.map((e: any) => e.description) || [];
+      const result = await extractProtocolData({
+        leadTitle: lead.title,
+        leadDescription: lead.description || '',
+        timelineNotes
+      });
+
+      if (result) {
+        form.setValue('processNumber', result.suggestedProcessNumber || '');
+        form.setValue('court', result.suggestedCourt || '');
+        form.setValue('courtBranch', result.suggestedCourtBranch || '');
+        form.setValue('caseValue', result.suggestedCaseValue || 0);
+        toast({ title: 'Dados sugeridos!', description: result.reasoning });
+      }
+    } catch (e) {
+      toast({ variant: 'destructive', title: 'Falha na IA', description: 'Não foi possível ler o histórico para sugestões.' });
+    } finally {
+      setIsPreFilling(false);
+    }
+  };
+
   const formatCurrencyBRL = (value: number) => {
     return new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
   };
@@ -175,7 +209,7 @@ function LeadConversionDialog({
   const handleCurrencyChange = (raw: string) => {
     const digits = raw.replace(/\D/g, '');
     const numericValue = Number(digits) / 100;
-    form.setValue('caseValue', numericValue, { shouldDirty: true, shouldValidate: true });
+    form.setValue('caseValue', numericValue);
   };
 
   if (!lead) return null;
@@ -184,12 +218,24 @@ function LeadConversionDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md bg-[#020617] border-white/10 text-white shadow-2xl h-[90vh] flex flex-col p-0 overflow-hidden">
         <DialogHeader className="p-6 border-b border-white/5 bg-white/5 shrink-0">
-          <DialogTitle className="flex items-center gap-2 text-white font-headline text-xl">
-            <ArrowRightLeft className="h-6 w-6 text-emerald-500" />
-            Protocolar Processo
-          </DialogTitle>
-          <DialogDescription className="text-slate-400">
-            Preencha os dados judiciais definitivos para converter este lead em processo.
+          <div className="flex items-center justify-between">
+            <DialogTitle className="flex items-center gap-2 text-white font-headline text-xl">
+              <ArrowRightLeft className="h-6 w-6 text-emerald-500" />
+              Distribuição Processual
+            </DialogTitle>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handlePreFill}
+              disabled={isPreFilling}
+              className="h-8 border-primary/30 text-primary hover:bg-primary/10 text-[10px] font-black uppercase gap-2"
+            >
+              {isPreFilling ? <Loader2 className="h-3 w-3 animate-spin" /> : <Bot className="h-3 w-3" />}
+              Pré-preencher (IA)
+            </Button>
+          </div>
+          <DialogDescription className="text-slate-400 mt-2">
+            Finalize os dados para integrar o lead ao sistema de processos ativos.
           </DialogDescription>
         </DialogHeader>
 
@@ -272,7 +318,7 @@ function LeadConversionDialog({
             form="conversion-form"
             className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase tracking-widest text-[11px] h-12 shadow-xl shadow-emerald-900/20"
           >
-            Confirmar Protocolo
+            Finalizar Distribuição
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -284,10 +330,11 @@ function LeadCard({ lead, client, lawyer, onClick }: { lead: Lead; client?: Clie
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: lead.id });
   const style = { transform: CSS.Translate.toString(transform), transition };
   const priority = priorityConfig[lead.priority as LeadPriority];
-
-  const lastUpdateLabel = React.useMemo(() => {
-    return formatDistanceToNow(lead.updatedAt.toDate(), { locale: ptBR, addSuffix: true });
-  }, [lead.updatedAt]);
+  const stage = stageConfig[lead.status];
+  
+  const completedCount = lead.completedTasks?.length || 0;
+  const totalTasks = stage.tasks.length;
+  const progress = totalTasks > 0 ? (completedCount / totalTasks) * 100 : 0;
 
   return (
     <Card 
@@ -312,16 +359,22 @@ function LeadCard({ lead, client, lawyer, onClick }: { lead: Lead; client?: Clie
               {lead.legalArea}
             </Badge>
           </div>
-          {lead.isUrgent && (
-            <div className="flex items-center gap-1 text-rose-500 animate-pulse">
-              <Flame className="h-3.5 w-3.5" />
-            </div>
-          )}
+          {lead.isUrgent && <Flame className="h-3.5 w-3.5 text-rose-500 animate-pulse" />}
         </div>
         
         <h4 className="text-sm font-bold text-slate-200 group-hover/card:text-primary transition-colors line-clamp-2 leading-snug min-h-[40px]">
           {lead.title}
         </h4>
+
+        {totalTasks > 0 && (
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between text-[8px] font-black uppercase text-slate-500 tracking-widest">
+              <span>Produção {completedCount}/{totalTasks}</span>
+              <span>{Math.round(progress)}%</span>
+            </div>
+            <Progress value={progress} className="h-1 bg-white/5 [&>div]:bg-primary/60" />
+          </div>
+        )}
 
         <div className="space-y-3 pt-3 border-t border-white/5">
           <div className="flex items-center gap-2">
@@ -342,7 +395,7 @@ function LeadCard({ lead, client, lawyer, onClick }: { lead: Lead; client?: Clie
               <span className="text-[9px] text-slate-500 font-bold uppercase">Dr(a). {lawyer?.firstName}</span>
             </div>
             <div className="flex items-center gap-1 text-[8px] text-slate-600 font-black uppercase tracking-tighter">
-              <Clock className="h-2.5 w-2.5" /> {lastUpdateLabel}
+              <Clock className="h-2.5 w-2.5" /> {formatDistanceToNow(lead.updatedAt.toDate(), { locale: ptBR, addSuffix: true })}
             </div>
           </div>
         </div>
@@ -380,10 +433,9 @@ function KanbanColumn({ id, stage, leads, clientsMap, staffMap, onCardClick }: {
           </SortableContext>
           {leads.length === 0 && (
             <div className="flex flex-col items-center justify-center py-20 opacity-20 border-2 border-dashed border-white/5 rounded-3xl group transition-all hover:opacity-30">
-              <Target className="h-10 w-10 mb-3 text-slate-500 transition-transform group-hover:scale-110" />
+              <Target className="h-10 w-10 mb-3 text-slate-500" />
               <div className="text-center space-y-1">
                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Fila Limpa</p>
-                <p className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">Aguardando novas demandas</p>
               </div>
             </div>
           )}
@@ -399,14 +451,12 @@ function LeadDetailsSheet({
   open, 
   onOpenChange, 
   onProtocolClick,
-  isProcessing 
 }: { 
   lead: Lead | null; 
   client?: Client; 
   open: boolean; 
   onOpenChange: (o: boolean) => void;
   onProtocolClick: (l: Lead) => void;
-  isProcessing: boolean;
 }) {
   const { firestore } = useFirebase();
   const { data: session } = useSession();
@@ -421,18 +471,21 @@ function LeadDetailsSheet({
     try {
       const driveFiles = await listFiles(lead.driveFolderId);
       setFiles(driveFiles);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setIsLoadingFiles(false);
-    }
+    } catch (e) { console.error(e); } finally { setIsLoadingFiles(false); }
   }, [lead?.driveFolderId]);
 
-  React.useEffect(() => {
-    if (open && lead) {
-      fetchFiles();
-    }
-  }, [open, lead, fetchFiles]);
+  React.useEffect(() => { if (open && lead) fetchFiles(); }, [open, lead, fetchFiles]);
+
+  const handleToggleTask = async (task: string) => {
+    if (!lead || !firestore) return;
+    const completed = lead.completedTasks || [];
+    const isCompleted = completed.includes(task);
+    const updated = isCompleted ? completed.filter(t => t !== task) : [...completed, task];
+    
+    try {
+      await updateDoc(doc(firestore, 'leads', lead.id), { completedTasks: updated, updatedAt: Timestamp.now() });
+    } catch (e: any) { toast({ variant: 'destructive', title: 'Erro ao atualizar tarefa' }); }
+  };
 
   const handleAddNote = async () => {
     if (!newNote.trim() || !lead || !firestore || !session?.user?.name) return;
@@ -450,13 +503,10 @@ function LeadDetailsSheet({
       });
       setNewNote('');
       toast({ title: 'Nota adicionada!' });
-    } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Erro', description: e.message });
-    }
+    } catch (e: any) { toast({ variant: 'destructive', title: 'Erro', description: e.message }); }
   };
 
   if (!lead) return null;
-
   const stage = stageConfig[lead.status];
 
   return (
@@ -467,22 +517,42 @@ function LeadDetailsSheet({
             <Badge variant="outline" className={cn("text-[9px] font-black uppercase h-5 px-2", stage.color)}>
               <stage.icon className="h-3 w-3 mr-1" /> {stage.label}
             </Badge>
-            {lead.status === 'PRONTO' && (
+            {lead.status === 'DISTRIBUICAO' && (
               <Button size="sm" className="bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase text-[10px] h-8" onClick={() => onProtocolClick(lead)}>
-                <ArrowRightLeft className="h-3 w-3 mr-1.5" /> Protocolar Agora
+                <RefreshCw className="h-3 w-3 mr-1.5" /> Protocolar Agora
               </Button>
             )}
           </div>
           <SheetTitle className="text-2xl font-black font-headline text-white">{lead.title}</SheetTitle>
-          <SheetDescription className="text-slate-400">Gerenciamento de atendimento e triagem técnica.</SheetDescription>
         </SheetHeader>
 
         <ScrollArea className="flex-1">
           <div className="p-6 space-y-10 pb-20">
-            {/* Seção Cliente */}
+            {/* Checklist Produtivo */}
             <section className="space-y-4">
               <div className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-500 tracking-[0.2em]">
-                <UserCircle className="h-3.5 w-3.5" /> Informações do Cliente
+                <Activity className="h-3.5 w-3.5" /> Checklist da Etapa: {stage.label}
+              </div>
+              <div className="grid gap-2">
+                {stage.tasks.map(task => (
+                  <div key={task} className="flex items-center gap-3 p-4 rounded-2xl bg-white/5 border border-white/10 group cursor-pointer hover:bg-white/10 transition-all" onClick={() => handleToggleTask(task)}>
+                    <div className={cn(
+                      "h-5 w-5 rounded border flex items-center justify-center transition-all",
+                      lead.completedTasks?.includes(task) ? "bg-primary border-primary text-primary-foreground" : "border-white/20"
+                    )}>
+                      {lead.completedTasks?.includes(task) && <Check className="h-3 w-3" />}
+                    </div>
+                    <span className={cn("text-sm font-bold", lead.completedTasks?.includes(task) ? "text-primary line-through opacity-50" : "text-slate-300")}>
+                      {task}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="space-y-4">
+              <div className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-500 tracking-[0.2em]">
+                <UserCircle className="h-3.5 w-3.5" /> Cliente Principal
               </div>
               <div className="p-6 rounded-3xl bg-white/5 border border-white/10 flex items-center gap-6">
                 <div className="h-16 w-16 rounded-2xl bg-blue-500/10 flex items-center justify-center border border-blue-500/20 shrink-0">
@@ -491,86 +561,72 @@ function LeadDetailsSheet({
                 <div className="min-w-0 flex-1">
                   <h4 className="text-xl font-black text-white truncate">{client?.firstName} {client?.lastName}</h4>
                   <div className="flex flex-wrap gap-4 mt-2">
-                    <div className="flex items-center gap-1.5 text-xs text-slate-400">
-                      <Mail className="h-3.5 w-3.5 text-primary" /> {client?.email || 'N/A'}
-                    </div>
-                    <div className="flex items-center gap-1.5 text-xs text-slate-400">
-                      <Smartphone className="h-3.5 w-3.5 text-emerald-500" /> {client?.mobile || 'N/A'}
-                    </div>
+                    <div className="flex items-center gap-1.5 text-xs text-slate-400"><Mail className="h-3.5 w-3.5 text-primary" /> {client?.email || 'N/A'}</div>
+                    <div className="flex items-center gap-1.5 text-xs text-slate-400"><Smartphone className="h-3.5 w-3.5 text-emerald-500" /> {client?.mobile || 'N/A'}</div>
                   </div>
                 </div>
               </div>
             </section>
 
-            {/* Seção Documentação */}
+            {/* Réus (Polo Passivo) */}
+            <section className="space-y-4">
+              <div className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-500 tracking-[0.2em]">
+                <Scale className="h-3.5 w-3.5" /> Polo Passivo (Reclamadas)
+              </div>
+              <div className="grid gap-3">
+                {lead.opposingParties?.map((op, i) => (
+                  <div key={i} className="p-4 rounded-2xl bg-white/5 border border-white/10">
+                    <p className="text-sm font-bold text-slate-200">{op.name}</p>
+                    <p className="text-[10px] text-slate-500 uppercase font-black">{op.document || 'DOC NÃO INFORMADO'}</p>
+                  </div>
+                ))}
+                {(!lead.opposingParties || lead.opposingParties.length === 0) && (
+                  <div className="text-center py-8 border-2 border-dashed border-white/5 rounded-3xl opacity-30 italic text-xs">Nenhum réu cadastrado.</div>
+                )}
+              </div>
+            </section>
+
             <section className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-500 tracking-[0.2em]">
-                  <FileText className="h-3.5 w-3.5" /> Provas & Documentos
+                  <FileText className="h-3.5 w-3.5" /> Documentação de Triagem
                 </div>
                 {lead.driveFolderId && (
                   <Button variant="ghost" size="sm" className="h-7 text-[9px] font-black uppercase text-primary gap-1.5" asChild>
-                    <a href={`https://drive.google.com/drive/folders/${lead.driveFolderId}`} target="_blank">
-                      <ExternalLink className="h-3 w-3" /> Abrir no Drive
-                    </a>
+                    <a href={`https://drive.google.com/drive/folders/${lead.driveFolderId}`} target="_blank"><ExternalLink className="h-3 w-3" /> Abrir Drive</a>
                   </Button>
                 )}
               </div>
               <div className="grid gap-3">
-                {isLoadingFiles ? (
-                  <Skeleton className="h-20 w-full bg-white/5 rounded-2xl" />
-                ) : files.length > 0 ? (
+                {isLoadingFiles ? <Skeleton className="h-20 w-full bg-white/5 rounded-2xl" /> : files.length > 0 ? (
                   files.map(f => (
                     <div key={f.id} className="flex items-center justify-between p-4 rounded-2xl bg-black/40 border border-white/5 hover:border-primary/20 transition-all group">
                       <div className="flex items-center gap-3">
-                        <div className="h-8 w-8 rounded-lg bg-white/5 flex items-center justify-center">
-                          {f.iconLink ? <img src={f.iconLink} className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
-                        </div>
+                        <div className="h-8 w-8 rounded-lg bg-white/5 flex items-center justify-center">{f.iconLink ? <img src={f.iconLink} className="h-4 w-4" /> : <FileText className="h-4 w-4" />}</div>
                         <span className="text-sm font-bold text-slate-300">{f.name}</span>
                       </div>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity" asChild>
-                        <a href={f.webViewLink} target="_blank"><Download className="h-4 w-4" /></a>
-                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100" asChild><a href={f.webViewLink} target="_blank"><Download className="h-4 w-4" /></a></Button>
                     </div>
                   ))
-                ) : (
-                  <div className="text-center py-10 border-2 border-dashed border-white/5 rounded-3xl opacity-30 italic text-xs">
-                    Nenhum documento anexado ainda.
-                  </div>
-                )}
+                ) : <div className="text-center py-10 border-2 border-dashed border-white/5 rounded-3xl opacity-30 italic text-xs">Nenhum documento anexado.</div>}
               </div>
             </section>
 
-            {/* Timeline do Lead */}
             <section className="space-y-4">
               <div className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-500 tracking-[0.2em]">
-                <History className="h-3.5 w-3.5" /> Histórico de Triagem
+                <History className="h-3.5 w-3.5" /> Histórico de Atendimento
               </div>
-              
               <div className="space-y-4">
                 <div className="flex gap-2">
-                  <Textarea 
-                    placeholder="Adicionar nota de atendimento..." 
-                    className="bg-black/40 border-white/10 text-sm h-20 resize-none" 
-                    value={newNote}
-                    onChange={e => setNewNote(e.target.value)}
-                  />
-                  <Button className="h-20 w-12" onClick={handleAddNote} disabled={!newNote.trim()}>
-                    <Plus className="h-5 w-5" />
-                  </Button>
+                  <Textarea placeholder="Adicionar nota..." className="bg-black/40 border-white/10 text-sm h-20" value={newNote} onChange={e => setNewNote(e.target.value)} />
+                  <Button className="h-20 w-12" onClick={handleAddNote} disabled={!newNote.trim()}><Plus className="h-5 w-5" /></Button>
                 </div>
-
                 <div className="space-y-4 pt-4 border-t border-white/5">
                   {(lead as any).timeline?.sort((a: any, b: any) => b.date.seconds - a.date.seconds).map((event: any) => (
                     <div key={event.id} className="flex gap-4 items-start group">
-                      <div className="h-8 w-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
-                        <MessageSquare className="h-3.5 w-3.5 text-primary" />
-                      </div>
+                      <div className="h-8 w-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center shrink-0"><MessageSquare className="h-3.5 w-3.5 text-primary" /></div>
                       <div className="flex-1 space-y-1">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-black uppercase text-primary">{event.authorName}</span>
-                          <span className="text-[9px] text-slate-500">{format(event.date.toDate(), 'dd/MM/yy HH:mm')}</span>
-                        </div>
+                        <div className="flex items-center justify-between"><span className="text-[10px] font-black uppercase text-primary">{event.authorName}</span><span className="text-[9px] text-slate-500">{format(event.date.toDate(), 'dd/MM/yy HH:mm')}</span></div>
                         <p className="text-sm text-slate-300 leading-relaxed">{event.description}</p>
                       </div>
                     </div>
@@ -580,12 +636,6 @@ function LeadDetailsSheet({
             </section>
           </div>
         </ScrollArea>
-
-        <SheetFooter className="p-6 border-t border-white/5 bg-white/5">
-          <Button variant="ghost" className="w-full text-slate-500 hover:text-white font-bold uppercase text-[10px]" onClick={() => onOpenChange(false)}>
-            Fechar Ficha
-          </Button>
-        </SheetFooter>
       </SheetContent>
     </Sheet>
   );
@@ -598,16 +648,7 @@ function NewLeadSheet({ open, onOpenChange, lawyers, onCreated }: { open: boolea
 
   const form = useForm<z.infer<typeof leadFormSchema>>({
     resolver: zodResolver(leadFormSchema),
-    defaultValues: {
-      clientId: '',
-      lawyerId: '',
-      title: '',
-      legalArea: 'Trabalhista',
-      priority: 'MEDIA',
-      captureSource: 'Indicação',
-      isUrgent: false,
-      description: '',
-    }
+    defaultValues: { clientId: '', lawyerId: '', title: '', legalArea: 'Trabalhista', priority: 'MEDIA', captureSource: 'Indicação', isUrgent: false, description: '', }
   });
 
   const onSubmit = async (values: z.infer<typeof leadFormSchema>) => {
@@ -615,168 +656,73 @@ function NewLeadSheet({ open, onOpenChange, lawyers, onCreated }: { open: boolea
     try {
       const result = await createLead(values);
       if (result.success && result.id) {
-        // Sync drive folder for lead
         await syncLeadToDrive(result.id);
-        toast({ title: 'Lead Criado!', description: 'O atendimento foi iniciado e a pasta no Drive organizada.' });
+        toast({ title: 'Lead Criado!', description: 'Atendimento iniciado.' });
         onCreated();
         onOpenChange(false);
         form.reset();
       }
-    } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Erro', description: e.message });
-    } finally {
-      setIsSaving(false);
-    }
+    } catch (e: any) { toast({ variant: 'destructive', title: 'Erro', description: e.message }); } finally { setIsSaving(false); }
   };
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="sm:max-w-xl bg-[#020617] border-white/10 text-white p-0 flex flex-col h-full shadow-2xl">
         <SheetHeader className="p-6 border-b border-white/5 bg-white/5 shrink-0">
-          <SheetTitle className="text-2xl font-black font-headline text-white flex items-center gap-3">
-            <PlusCircle className="h-6 w-6 text-primary" /> Iniciar Atendimento
-          </SheetTitle>
-          <SheetDescription className="text-slate-400">Preencha a triagem inicial para designar um advogado.</SheetDescription>
+          <SheetTitle className="text-2xl font-black font-headline text-white flex items-center gap-3"><PlusCircle className="h-6 w-6 text-primary" /> Iniciar Atendimento</SheetTitle>
         </SheetHeader>
-
         <ScrollArea className="flex-1">
           <div className="p-6">
             <Form {...form}>
               <form id="new-lead-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                <FormField
-                  control={form.control}
-                  name="clientId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Cliente Principal *</FormLabel>
-                      <FormControl>
-                        <ClientSearchInput 
-                          selectedClientId={field.value} 
-                          onSelect={(c) => field.onChange(c.id)} 
-                          onCreateNew={() => setShowClientModal(true)}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="title"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Título da Demanda *</FormLabel>
-                      <FormControl><Input placeholder="Ex: Revisional de Horas Extras e Rescisão" className="bg-black/40 border-white/10 h-11" {...field} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
+                <FormField control={form.control} name="clientId" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-[10px] font-black uppercase text-slate-500">Cliente Principal *</FormLabel>
+                    <ClientSearchInput selectedClientId={field.value} onSelect={(c) => field.onChange(c.id)} onCreateNew={() => setShowClientModal(true)} />
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="title" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-[10px] font-black uppercase text-slate-500">Título da Demanda *</FormLabel>
+                    <Input placeholder="Ex: Revisional de Horas Extras" className="bg-black/40 border-white/10 h-11" {...field} />
+                    <FormMessage />
+                  </FormItem>
+                )} />
                 <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="lawyerId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Responsável *</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl><SelectTrigger className="bg-black/40 border-white/10 h-11"><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
-                          <SelectContent className="bg-[#0f172a] border-white/10 text-white">
-                            {lawyers.map(l => <SelectItem key={l.id} value={l.id}>Dr(a). {l.firstName}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="legalArea"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Área Jurídica *</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl><SelectTrigger className="bg-black/40 border-white/10 h-11"><SelectValue /></SelectTrigger></FormControl>
-                          <SelectContent className="bg-[#0f172a] border-white/10 text-white">
-                            <SelectItem value="Trabalhista">Trabalhista</SelectItem>
-                            <SelectItem value="Cível">Cível</SelectItem>
-                            <SelectItem value="Previdenciário">Previdenciário</SelectItem>
-                            <SelectItem value="Família">Família</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="priority"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Prioridade *</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl><SelectTrigger className="bg-black/40 border-white/10 h-11"><SelectValue /></SelectTrigger></FormControl>
-                          <SelectContent className="bg-[#0f172a] border-white/10 text-white">
-                            <SelectItem value="BAIXA">Baixa</SelectItem>
-                            <SelectItem value="MEDIA">Média</SelectItem>
-                            <SelectItem value="ALTA">Alta</SelectItem>
-                            <SelectItem value="CRITICA">Crítica</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="captureSource"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Origem / Canal *</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl><SelectTrigger className="bg-black/40 border-white/10 h-11"><SelectValue /></SelectTrigger></FormControl>
-                          <SelectContent className="bg-[#0f172a] border-white/10 text-white">
-                            <SelectItem value="Google">Google Search</SelectItem>
-                            <SelectItem value="Instagram">Instagram</SelectItem>
-                            <SelectItem value="Indicação">Indicação</SelectItem>
-                            <SelectItem value="Passagem">Passagem / Presencial</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <FormField
-                  control={form.control}
-                  name="description"
-                  render={({ field }) => (
+                  <FormField control={form.control} name="lawyerId" render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Relato Inicial do Caso</FormLabel>
-                      <FormControl><Textarea placeholder="Descreva brevemente os fatos narrados pelo cliente..." className="bg-black/40 border-white/10 h-32 resize-none" {...field} /></FormControl>
+                      <FormLabel className="text-[10px] font-black uppercase text-slate-500">Responsável *</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl><SelectTrigger className="bg-black/40 border-white/10 h-11"><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
+                        <SelectContent className="bg-[#0f172a] border-white/10 text-white">{lawyers.map(l => <SelectItem key={l.id} value={l.id}>Dr(a). {l.firstName}</SelectItem>)}</SelectContent>
+                      </Select>
                     </FormItem>
-                  )}
-                />
+                  )} />
+                  <FormField control={form.control} name="legalArea" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-[10px] font-black uppercase text-slate-500">Área Jurídica *</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl><SelectTrigger className="bg-black/40 border-white/10 h-11"><SelectValue /></SelectTrigger></FormControl>
+                        <SelectContent className="bg-[#0f172a] border-white/10 text-white"><SelectItem value="Trabalhista">Trabalhista</SelectItem><SelectItem value="Cível">Cível</SelectItem><SelectItem value="Previdenciário">Previdenciário</SelectItem></SelectContent>
+                      </Select>
+                    </FormItem>
+                  )} />
+                </div>
+                <FormField control={form.control} name="description" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-[10px] font-black uppercase text-slate-500">Relato Inicial</FormLabel>
+                    <Textarea className="bg-black/40 border-white/10 h-32" {...field} />
+                  </FormItem>
+                )} />
               </form>
             </Form>
           </div>
         </ScrollArea>
-
         <SheetFooter className="p-6 border-t border-white/5 bg-white/5 gap-3 shrink-0">
-          <Button variant="ghost" onClick={() => onOpenChange(false)} className="text-slate-400 font-bold uppercase text-[10px]">Cancelar</Button>
-          <Button 
-            type="submit" 
-            form="new-lead-form" 
-            disabled={isSaving} 
-            className="flex-1 bg-primary text-primary-foreground font-black uppercase tracking-widest text-[11px] h-12 shadow-xl shadow-primary/20"
-          >
-            {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Target className="h-4 w-4 mr-2" />}
-            Criar Lead e Abrir Drive
-          </Button>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button type="submit" form="new-lead-form" disabled={isSaving} className="flex-1 bg-primary text-primary-foreground font-black uppercase tracking-widest text-[11px] h-12 shadow-xl shadow-primary/20">{isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Target className="h-4 w-4 mr-2" />} Criar Lead</Button>
         </SheetFooter>
-
         <ClientCreationModal open={showClientModal} onOpenChange={setShowClientModal} onClientCreated={(c) => form.setValue('clientId', c.id)} />
       </SheetContent>
     </Sheet>
@@ -785,6 +731,7 @@ function NewLeadSheet({ open, onOpenChange, lawyers, onCreated }: { open: boolea
 
 export default function LeadsPage() {
   const { firestore, user } = useFirebase();
+  const { data: session } = useSession();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = React.useState('');
   const [isNewLeadOpen, setIsNewLeadOpen] = React.useState(false);
@@ -793,18 +740,12 @@ export default function LeadsPage() {
   const [isConversionOpen, setIsConversionOpen] = React.useState(false);
   const [isProcessing, setIsProcessing] = React.useState<string | null>(null);
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
-  );
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
 
-  const userProfileRef = useMemoFirebase(
-    () => (firestore && user?.uid ? doc(firestore, 'users', user.uid) : null),
-    [firestore, user?.uid]
-  );
+  const userProfileRef = useMemoFirebase(() => (firestore && user?.uid ? doc(firestore, 'users', user.uid) : null), [firestore, user?.uid]);
   const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
 
-  const leadsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'leads'), where('status', '!=', 'DISTRIBUIDO')) : null), [firestore]);
+  const leadsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'leads'), where('status', '!=', 'CONVERTIDO')) : null), [firestore]);
   const { data: leadsData, isLoading: isLoadingLeads } = useCollection<Lead>(leadsQuery);
 
   const clientsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'clients'), limit(500)) : null), [firestore]);
@@ -819,62 +760,23 @@ export default function LeadsPage() {
   const filteredLeads = React.useMemo(() => {
     if (!leadsData) return [];
     let list = [...leadsData].sort((a, b) => b.updatedAt.seconds - a.updatedAt.seconds);
-    
-    if (userProfile?.role === 'lawyer') {
-        list = list.filter(l => l.lawyerId === userProfile.id);
-    }
-    
+    if (userProfile?.role === 'lawyer') list = list.filter(l => l.lawyerId === userProfile.id);
     if (!searchTerm.trim()) return list;
     const q = searchTerm.toLowerCase();
-    return list.filter(l => 
-      l.title.toLowerCase().includes(q) || 
-      clientsMap.get(l.clientId)?.firstName.toLowerCase().includes(q) ||
-      clientsMap.get(l.clientId)?.lastName?.toLowerCase().includes(q)
-    );
+    return list.filter(l => l.title.toLowerCase().includes(q) || clientsMap.get(l.clientId)?.firstName.toLowerCase().includes(q));
   }, [leadsData, searchTerm, clientsMap, userProfile]);
-
-  const stats = React.useMemo(() => {
-    return {
-      total: filteredLeads.length,
-      urgent: filteredLeads.filter(l => l.isUrgent).length,
-      ready: filteredLeads.filter(l => l.status === 'PRONTO').length,
-    };
-  }, [filteredLeads]);
 
   const handleDragEnd = async (event: any) => {
     const { active, over } = event;
     if (!over) return;
-
     const leadId = active.id;
     const newStatus = over.id as LeadStatus;
     const lead = leadsData?.find(l => l.id === leadId);
-
     if (lead && lead.status !== newStatus && STAGES.includes(newStatus)) {
-      if (newStatus === 'CONTRATUAL' || newStatus === 'PRONTO') {
-        const client = clientsMap.get(lead.clientId);
-        if (client) {
-          const isPJ = client.clientType === 'Pessoa Jurídica';
-          const hasDocument = !!client.document;
-          const hasAddress = !!client.address?.street && !!client.address?.zipCode;
-          const hasRG = isPJ || !!client.rg;
-
-          if (!hasDocument || !hasAddress || !hasRG) {
-            toast({
-              variant: 'destructive',
-              title: 'Impedimento: Dados Faltantes',
-              description: 'Preencha RG, CPF e Endereço do cliente para avançar.',
-            });
-            return;
-          }
-        }
-      }
-
       try {
         await updateLeadStatus(leadId, newStatus);
         toast({ title: `Lead movido para ${stageConfig[newStatus].label}` });
-      } catch (e: any) {
-        toast({ variant: 'destructive', title: 'Erro ao mover', description: e.message });
-      }
+      } catch (e: any) { toast({ variant: 'destructive', title: 'Erro ao mover' }); }
     }
   };
 
@@ -884,119 +786,37 @@ export default function LeadsPage() {
     try {
       const result = await convertLeadToProcess(selectedLead.id, data);
       if (result.success) {
-        toast({ title: 'Processo Protocolado!', description: 'O lead foi migrado para processos ativos.' });
+        toast({ title: 'Processo Protocolado!', description: 'Migrado para processos ativos.' });
         setIsConversionOpen(false);
         setIsDetailsOpen(false);
       }
-    } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Erro na conversão', description: e.message });
-    } finally {
-      setIsProcessing(null);
-    }
+    } catch (e: any) { toast({ variant: 'destructive', title: 'Erro', description: e.message }); } finally { setIsProcessing(null); }
   };
 
   return (
     <div className="flex flex-col gap-8 pb-10">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <div className="h-14 w-14 rounded-2xl bg-primary/10 border-2 border-primary/20 flex items-center justify-center shadow-xl">
-            <Target className="h-8 w-8 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-3xl font-black tracking-tight font-headline text-white leading-tight">CRM & Triagem Jurídica</h1>
-            <p className="text-sm text-slate-500 font-medium">Pipeline de prospecção e conversão de elite.</p>
-          </div>
+          <div className="h-14 w-14 rounded-2xl bg-primary/10 border-2 border-primary/20 flex items-center justify-center shadow-xl"><Target className="h-8 w-8 text-primary" /></div>
+          <div><h1 className="text-3xl font-black font-headline text-white">CRM Jurídico & Triagem</h1><p className="text-sm text-slate-500">Linha de produção e conversão de elite.</p></div>
         </div>
         <div className="flex items-center gap-3">
-          <div className="relative w-64 group">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 group-focus-within:text-primary transition-colors" />
-            <Input 
-              placeholder="Pesquisar leads..." 
-              className="pl-10 bg-[#0f172a] border-white/5 h-11 text-sm focus:border-primary/50" 
-              value={searchTerm} 
-              onChange={e => setSearchTerm(e.target.value)} 
-            />
-          </div>
-          <Button onClick={() => setIsNewLeadOpen(true)} className="bg-primary text-primary-foreground font-black uppercase text-[11px] tracking-widest h-11 px-8 shadow-xl shadow-primary/20 hover:scale-[1.02] transition-all">
-            <PlusCircle className="mr-2 h-4 w-4" /> Novo Lead
-          </Button>
+          <div className="relative w-64 group"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" /><Input placeholder="Pesquisar leads..." className="pl-10 bg-[#0f172a] border-white/5 h-11 text-sm" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} /></div>
+          <Button onClick={() => setIsNewLeadOpen(true)} className="bg-primary text-primary-foreground font-black uppercase text-[11px] tracking-widest h-11 px-8 shadow-xl shadow-primary/20 transition-all"><PlusCircle className="mr-2 h-4 w-4" /> Novo Lead</Button>
         </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="bg-white/[0.02] border-white/5">
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="h-10 w-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400">
-              <Activity className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Leads Ativos</p>
-              <p className="text-2xl font-black text-white">{stats.total}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-rose-500/[0.02] border-rose-500/10">
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="h-10 w-10 rounded-xl bg-rose-500/10 flex items-center justify-center text-rose-500">
-              <Flame className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-[10px] font-black uppercase text-rose-500 tracking-widest">Urgentes</p>
-              <p className="text-2xl font-black text-white">{stats.urgent}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-emerald-500/[0.02] border-emerald-500/10">
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="h-10 w-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400">
-              <CheckCircle2 className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-[10px] font-black uppercase text-emerald-500 tracking-widest">Prontos p/ Protocolo</p>
-              <p className="text-2xl font-black text-white">{stats.ready}</p>
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <div className="flex gap-6 overflow-x-auto pb-6 no-scrollbar min-h-[650px]">
           {STAGES.map(stage => (
-            <KanbanColumn 
-              key={stage} 
-              id={stage} 
-              stage={stage}
-              leads={filteredLeads.filter(l => l.status === stage)}
-              clientsMap={clientsMap}
-              staffMap={staffMap}
-              onCardClick={(l: Lead) => { setSelectedLead(l); setIsDetailsOpen(true); }}
-            />
+            <KanbanColumn key={stage} id={stage} stage={stage} leads={filteredLeads.filter(l => l.status === stage)} clientsMap={clientsMap} staffMap={staffMap} onCardClick={(l: Lead) => { setSelectedLead(l); setIsDetailsOpen(true); }} />
           ))}
         </div>
       </DndContext>
 
-      <LeadDetailsSheet 
-        lead={selectedLead} 
-        client={selectedLead ? clientsMap.get(selectedLead.clientId) : undefined}
-        open={isDetailsOpen} 
-        onOpenChange={setIsDetailsOpen}
-        onProtocolClick={(l) => { setSelectedLead(l); setIsConversionOpen(true); }}
-        isProcessing={isProcessing === selectedLead?.id}
-      />
-
-      <NewLeadSheet 
-        open={isNewLeadOpen} 
-        onOpenChange={setIsNewLeadOpen} 
-        lawyers={lawyers} 
-        onCreated={() => {}} 
-      />
-
-      <LeadConversionDialog 
-        lead={selectedLead}
-        open={isConversionOpen}
-        onOpenChange={setIsConversionOpen}
-        onConfirm={handleConfirmProtocol}
-      />
+      <LeadDetailsSheet lead={selectedLead} client={selectedLead ? clientsMap.get(selectedLead.clientId) : undefined} open={isDetailsOpen} onOpenChange={setIsDetailsOpen} onProtocolClick={(l) => { setSelectedLead(l); setIsConversionOpen(true); }} />
+      <NewLeadSheet open={isNewLeadOpen} onOpenChange={setIsNewLeadOpen} lawyers={lawyers} onCreated={() => {}} />
+      <LeadConversionDialog lead={selectedLead} open={isConversionOpen} onOpenChange={setIsConversionOpen} onConfirm={handleConfirmProtocol} />
     </div>
   );
 }

@@ -97,7 +97,7 @@ export type TeamParticipant = {
   percentage: number;
 };
 
-export type LeadStatus = 'NOVO' | 'ENTREVISTA' | 'DOCUMENTACAO' | 'CONTRATUAL' | 'PRONTO' | 'DISTRIBUIDO' | 'ABANDONADO';
+export type LeadStatus = 'NOVO' | 'ATENDIMENTO' | 'BUROCRACIA' | 'CONTRATUAL' | 'DISTRIBUICAO' | 'CONVERTIDO' | 'ABANDONADO';
 export type LeadPriority = 'BAIXA' | 'MEDIA' | 'ALTA' | 'CRITICA';
 
 export type Lead = {
@@ -115,6 +115,8 @@ export type Lead = {
   description?: string;
   driveFolderId?: string;
   opposingParties?: OpposingParty[];
+  // Controle de sub-etapas (checklists)
+  completedTasks?: string[]; 
   createdAt: Timestamp;
   updatedAt: Timestamp;
 };
@@ -170,11 +172,9 @@ export type Hearing = {
   hasFollowUp?: boolean;
   googleCalendarEventId?: string;
   createdAt?: Timestamp;
-  // Campos de notificação do cliente
   clientNotified?: boolean;
   notificationMethod?: NotificationMethod;
   notificationDate?: Timestamp;
-  // Novos campos de reagendamento
   rescheduledToId?: string;
   rescheduleReason?: string;
 };
