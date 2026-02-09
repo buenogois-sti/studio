@@ -42,7 +42,6 @@ import {
   Timer,
   Building,
   Hash,
-  Stethoscope,
   ClipboardList
 } from 'lucide-react';
 import { 
@@ -72,6 +71,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
 import { format, formatDistanceToNow, differenceInHours } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { useSession } from 'next-auth/react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -103,13 +103,12 @@ import { Separator } from '@/components/ui/separator';
 import { LocationSearch } from '@/components/shared/LocationSearch';
 import { v4 as uuidv4 } from 'uuid';
 import { listFiles } from '@/lib/drive-actions';
-import { useSession } from 'next-auth/react';
-import { Skeleton } from '@/components/ui/skeleton';
 import { syncLeadToDrive } from '@/lib/drive';
 import { extractProtocolData } from '@/ai/flows/extract-protocol-data-flow';
 import { Progress } from '@/components/ui/progress';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const STAGES: LeadStatus[] = ['NOVO', 'ATENDIMENTO', 'BUROCRACIA', 'CONTRATUAL', 'DISTRIBUICAO'];
 
@@ -245,7 +244,7 @@ function LeadConversionDialog({
     } catch (e) {
       toast({ variant: 'destructive', title: 'Falha na IA', description: 'Não foi possível ler o histórico para sugestões.' });
     } finally {
-      setIsParsingAI(false);
+      setIsPreFilling(false);
     }
   };
 
@@ -699,7 +698,7 @@ function LeadDetailsSheet({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="sm:max-w-2xl bg-[#020617] border-white/10 text-white p-0 flex flex-col h-[100vh] overflow-hidden shadow-2xl">
-        <SheetHeader className="p-8 border-b border-white/5 bg-white/[0.02] shrink-0">
+        <SheetHeader className="p-8 border-b border-white/5 bg-white/[0.02] shrink-0 text-left">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <Badge variant="outline" className={cn("text-[10px] font-black uppercase h-6 px-3 border-2 transition-all", stage.color)}>
@@ -717,8 +716,8 @@ function LeadDetailsSheet({
               </Button>
             )}
           </div>
-          <SheetTitle className="text-3xl font-black font-headline text-white leading-tight uppercase tracking-tight">{lead.title}</SheetTitle>
-          <SheetDescription className="text-slate-400 mt-2 font-medium">Gestão de micro-etapas e triagem de documentos pré-processuais.</SheetDescription>
+          <SheetTitle className="text-3xl font-black font-headline text-white leading-tight uppercase tracking-tight text-left">{lead.title}</SheetTitle>
+          <SheetDescription className="text-slate-400 mt-2 font-medium text-left">Gestão de micro-etapas e triagem de documentos pré-processuais.</SheetDescription>
         </SheetHeader>
 
         <ScrollArea className="flex-1">
@@ -737,12 +736,6 @@ function LeadDetailsSheet({
                       <Input 
                         placeholder="Aguardando resposta do cliente..." 
                         className="bg-black/40 border-white/5 h-10 text-xs focus:border-amber-500/50"
-                        onBlur={(e) => {
-                          if (e.target.value) {
-                            // Registro automático na timeline como nota de triagem
-                            handleAddNote(); // Simplificado aqui para o exemplo
-                          }
-                        }}
                       />
                     </div>
                   ))}
@@ -940,8 +933,8 @@ function NewLeadSheet({ open, onOpenChange, lawyers, onCreated }: { open: boolea
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="sm:max-w-xl bg-[#020617] border-white/10 text-white p-0 flex flex-col h-full shadow-2xl">
-        <SheetHeader className="p-8 border-b border-white/5 bg-white/[0.02] shrink-0">
-          <SheetTitle className="text-3xl font-black font-headline text-white flex items-center gap-4 tracking-tight uppercase">
+        <SheetHeader className="p-8 border-b border-white/5 bg-white/[0.02] shrink-0 text-left">
+          <SheetTitle className="text-3xl font-black font-headline text-white flex items-center gap-4 tracking-tight uppercase text-left">
             <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center border-2 border-primary/20">
               <PlusCircle className="h-6 w-6 text-primary" />
             </div>
@@ -1016,7 +1009,7 @@ function NewLeadSheet({ open, onOpenChange, lawyers, onCreated }: { open: boolea
 
 export default function LeadsPage() {
   const { firestore, user } = useFirebase();
-  const { data: sessionData } = useSession();
+  const { data: session } = useSession();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = React.useState('');
   const [isNewLeadOpen, setIsNewLeadOpen] = React.useState(false);
@@ -1135,28 +1128,28 @@ export default function LeadsPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 px-1 animate-in fade-in slide-in-from-top-4 duration-700">
-        <Card className="bg-[#0f172a] border-white/5 group hover:border-blue-500/30 transition-all">
+        <Card className="bg-[#0f172a] border-white/5 group hover:border-blue-500/30 transition-all shadow-none">
           <CardHeader className="p-5 flex items-center gap-5">
             <div className="h-12 w-12 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 group-hover:scale-110 transition-transform"><TrendingUp className="h-6 w-6" /></div>
-            <div><p className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em]">Fluxo Operacional</p><p className="text-lg font-black text-white">{stats.highDemand}</p></div>
+            <div className="text-left"><p className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] text-left">Fluxo Operacional</p><p className="text-lg font-black text-white text-left">{stats.highDemand}</p></div>
           </CardHeader>
         </Card>
-        <Card className="bg-[#0f172a] border-white/5 group hover:border-rose-500/30 transition-all">
+        <Card className="bg-[#0f172a] border-white/5 group hover:border-rose-500/30 transition-all shadow-none">
           <CardHeader className="p-5 flex items-center gap-5">
             <div className="h-12 w-12 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 group-hover:scale-110 transition-transform"><Timer className="h-6 w-6" /></div>
-            <div><p className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em]">Maior Retenção</p><p className="text-lg font-black text-white">{stats.slowestStage}</p></div>
+            <div className="text-left"><p className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] text-left">Maior Retenção</p><p className="text-lg font-black text-white text-left">{stats.slowestStage}</p></div>
           </CardHeader>
         </Card>
-        <Card className="bg-[#0f172a] border-white/5 group hover:border-amber-500/30 transition-all">
+        <Card className="bg-[#0f172a] border-white/5 group hover:border-amber-500/30 transition-all shadow-none">
           <CardHeader className="p-5 flex items-center gap-5">
             <div className="h-12 w-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 group-hover:scale-110 transition-transform"><Flame className="h-6 w-6" /></div>
-            <div><p className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em]">Prioritários</p><p className="text-lg font-black text-white">{stats.urgent}</p></div>
+            <div className="text-left"><p className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] text-left">Prioritários</p><p className="text-lg font-black text-white text-left">{stats.urgent}</p></div>
           </CardHeader>
         </Card>
-        <Card className="bg-[#0f172a] border-white/5 group hover:border-emerald-500/30 transition-all">
+        <Card className="bg-[#0f172a] border-white/5 group hover:border-emerald-500/30 transition-all shadow-none">
           <CardHeader className="p-5 flex items-center gap-5">
             <div className="h-12 w-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 group-hover:scale-110 transition-transform"><FolderKanban className="h-6 w-6" /></div>
-            <div><p className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em]">Prontos p/ Guia</p><p className="text-lg font-black text-white">{stats.ready}</p></div>
+            <div className="text-left"><p className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] text-left">Prontos p/ Guia</p><p className="text-lg font-black text-white text-left">{stats.ready}</p></div>
           </CardHeader>
         </Card>
       </div>
