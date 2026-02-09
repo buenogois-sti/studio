@@ -10,13 +10,15 @@ import {
 } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
 
-const docCache = new Map<string, {
+interface DocCacheEntry {
   unsubscribe: () => void;
   listeners: Set<(data: any, error: any, loading: boolean) => void>;
   lastData: any | null;
   lastError: any | null;
   isLoading: boolean;
-}>();
+}
+
+const docCache = new Map<string, DocCacheEntry>();
 
 type WithId<T> = T & { id: string };
 
@@ -65,10 +67,10 @@ export function useDoc<T = any>(
       const listeners = new Set<(data: any, error: any, loading: boolean) => void>();
       listeners.add(onUpdate);
 
-      const entry = {
+      const entry: DocCacheEntry = {
         listeners,
-        lastData: null,
-        lastError: null,
+        lastData: null as any | null,
+        lastError: null as any | null,
         isLoading: true,
         unsubscribe: () => {}
       };

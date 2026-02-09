@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -332,7 +331,6 @@ function LeadCard({ lead, client, lawyer, onClick }: { lead: Lead; client?: Clie
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: lead.id });
   const style = { transform: CSS.Translate.toString(transform), transition };
   
-  // Segurança contra dados nulos ou indefinidos
   const priority = priorityConfig[lead.priority as LeadPriority] || priorityConfig.MEDIA;
   const stage = stageConfig[lead.status] || stageConfig.NOVO;
   
@@ -544,7 +542,6 @@ function LeadDetailsSheet({
 
         <ScrollArea className="flex-1">
           <div className="p-6 space-y-10 pb-20">
-            {/* Checklist Produtivo */}
             <section className="space-y-4">
               <div className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-500 tracking-[0.2em]">
                 <Activity className="h-3.5 w-3.5" /> Checklist da Etapa: {stage.label}
@@ -584,7 +581,6 @@ function LeadDetailsSheet({
               </div>
             </section>
 
-            {/* Réus (Polo Passivo) */}
             <section className="space-y-4">
               <div className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-500 tracking-[0.2em]">
                 <Scale className="h-3.5 w-3.5" /> Polo Passivo (Reclamadas)

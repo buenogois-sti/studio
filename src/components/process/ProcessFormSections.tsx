@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState } from 'react';
@@ -296,7 +295,7 @@ export function PartiesSection({ control, partyFields, onAddParty, onRemoveParty
                               className="h-11 bg-black/20 border-white/10"
                               onKeyDown={(e) => e.stopPropagation()}
                               {...nameField}
-                              value={nameField.value as string || ''}
+                              value={nameField.value as any}
                             />
                           </FormControl>
                           <FormMessage />
@@ -317,7 +316,7 @@ export function PartiesSection({ control, partyFields, onAddParty, onRemoveParty
                               className="h-11 bg-black/20 border-white/10 font-mono"
                               onKeyDown={(e) => e.stopPropagation()}
                               {...docField}
-                              value={docField.value as string || ''}
+                              value={docField.value as any}
                             />
                           </FormControl>
                         </FormItem>
@@ -350,7 +349,7 @@ export function PartiesSection({ control, partyFields, onAddParty, onRemoveParty
                               className="pl-10 h-10 text-xs bg-black/20" 
                               {...emailField} 
                               onKeyDown={(e) => e.stopPropagation()} 
-                              value={emailField.value as string || ''}
+                              value={emailField.value as any}
                             />
                           </div>
                         </FormControl>
@@ -371,7 +370,7 @@ export function PartiesSection({ control, partyFields, onAddParty, onRemoveParty
                               className="pl-10 h-10 text-xs bg-black/20" 
                               {...phoneField} 
                               onKeyDown={(e) => e.stopPropagation()} 
-                              value={phoneField.value as string || ''}
+                              value={phoneField.value as any}
                             />
                           </div>
                         </FormControl>
@@ -396,7 +395,7 @@ export function PartiesSection({ control, partyFields, onAddParty, onRemoveParty
                                 {...cepField} 
                                 onKeyDown={(e) => e.stopPropagation()} 
                                 maxLength={9}
-                                value={cepField.value as string || ''}
+                                value={cepField.value as any}
                               />
                               <button 
                                 type="button" 
@@ -426,7 +425,7 @@ export function PartiesSection({ control, partyFields, onAddParty, onRemoveParty
                                 className="pl-10 min-h-[80px] text-xs bg-black/20 resize-none pt-2" 
                                 {...addrField} 
                                 onKeyDown={(e) => e.stopPropagation()} 
-                                value={addrField.value as string || ''}
+                                value={addrField.value as any}
                               />
                             </div>
                           </FormControl>
@@ -448,7 +447,7 @@ export function PartiesSection({ control, partyFields, onAddParty, onRemoveParty
                           className="h-10 text-xs bg-black/20" 
                           {...obsField} 
                           onKeyDown={(e) => e.stopPropagation()} 
-                          value={obsField.value as string || ''}
+                          value={obsField.value as any}
                         />
                       </FormControl>
                     </FormItem>
