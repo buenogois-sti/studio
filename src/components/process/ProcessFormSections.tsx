@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState } from 'react';
@@ -78,9 +79,9 @@ interface ClientsSectionProps {
 export function ClientsSection({ control, onClientSelect }: ClientsSectionProps) {
   const [showCreateModal, setShowCreateModal] = useState(false);
   
-  const { fields: secondaryFields, append: addSecondary, remove: removeSecondary } = useFieldArray<ProcessFormValues, any>({
+  const { fields: secondaryFields, append: addSecondary, remove: removeSecondary } = useFieldArray<ProcessFormValues>({
     control,
-    name: 'secondaryClientIds' as any,
+    name: 'secondaryClientIds',
   });
 
   const clientId = useWatch({ control, name: 'clientId' });

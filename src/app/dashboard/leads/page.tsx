@@ -200,7 +200,7 @@ function LeadConversionDialog({
     } catch (e) {
       toast({ variant: 'destructive', title: 'Falha na IA', description: 'Não foi possível ler o histórico para sugestões.' });
     } finally {
-      setIsParsingAI(false);
+      setIsPreFilling(false);
     }
   };
 
@@ -331,8 +331,10 @@ function LeadConversionDialog({
 function LeadCard({ lead, client, lawyer, onClick }: { lead: Lead; client?: Client; lawyer?: Staff; onClick: () => void }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: lead.id });
   const style = { transform: CSS.Translate.toString(transform), transition };
-  const priority = priorityConfig[lead.priority as LeadPriority];
-  const stage = stageConfig[lead.status];
+  
+  // Segurança contra dados nulos ou indefinidos
+  const priority = priorityConfig[lead.priority as LeadPriority] || priorityConfig.MEDIA;
+  const stage = stageConfig[lead.status] || stageConfig.NOVO;
   
   const completedCount = lead.completedTasks?.length || 0;
   const totalTasks = stage.tasks.length;
@@ -420,7 +422,7 @@ function LeadCard({ lead, client, lawyer, onClick }: { lead: Lead; client?: Clie
 
 function KanbanColumn({ id, stage, leads, clientsMap, staffMap, onCardClick }: { id: string; stage: string; leads: Lead[]; clientsMap: Map<string, Client>; staffMap: Map<string, Staff>; onCardClick: (l: Lead) => void }) {
   const { setNodeRef } = useSortable({ id });
-  const config = stageConfig[stage as LeadStatus];
+  const config = stageConfig[stage as LeadStatus] || stageConfig.NOVO;
 
   return (
     <div ref={setNodeRef} className="flex flex-col gap-4 min-w-[300px] w-full max-w-[320px] bg-white/[0.01] p-4 rounded-3xl border border-white/5 transition-colors hover:bg-white/[0.02]">
@@ -521,7 +523,7 @@ function LeadDetailsSheet({
   };
 
   if (!lead) return null;
-  const stage = stageConfig[lead.status];
+  const stage = stageConfig[lead.status] || stageConfig.NOVO;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -808,8 +810,8 @@ export default function LeadsPage() {
       total: leadsData.length,
       urgent: leadsData.filter(l => l.isUrgent).length,
       ready: leadsData.filter(l => l.status === 'DISTRIBUICAO').length,
-      slowestStage: avgTimes[0] ? stageConfig[avgTimes[0].stage as LeadStatus].label : '---',
-      highDemand: highDemand ? stageConfig[highDemand[0] as LeadStatus].label : '---'
+      slowestStage: avgTimes[0] ? (stageConfig[avgTimes[0].stage as LeadStatus]?.label || '---') : '---',
+      highDemand: highDemand ? (stageConfig[highDemand[0] as LeadStatus]?.label || '---') : '---'
     };
   }, [leadsData]);
 
@@ -822,7 +824,7 @@ export default function LeadsPage() {
     if (lead && lead.status !== newStatus && STAGES.includes(newStatus)) {
       try {
         await updateLeadStatus(leadId, newStatus);
-        toast({ title: `Lead movido para ${stageConfig[newStatus].label}` });
+        toast({ title: `Lead movido para ${stageConfig[newStatus]?.label || newStatus}` });
       } catch (e: any) { toast({ variant: 'destructive', title: 'Erro ao mover' }); }
     }
   };
@@ -853,7 +855,6 @@ export default function LeadsPage() {
         </div>
       </div>
 
-      {/* Monitor de Performance */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 animate-in fade-in duration-500">
         <Card className="bg-[#0f172a] border-white/5">
           <CardContent className="p-4 flex items-center gap-4">
