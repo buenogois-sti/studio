@@ -9,6 +9,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/options';
 import { createNotification } from './notification-actions';
 import { v4 as uuidv4 } from 'uuid';
+import { revalidatePath } from 'next/cache';
 
 interface CreateEventData {
   processId: string;
@@ -82,6 +83,8 @@ export async function createFinancialEventAndTitles(data: CreateEventData) {
 
   try {
     await batch.commit();
+    revalidatePath('/dashboard/financeiro');
+    revalidatePath('/dashboard/repasses');
     return { success: true };
   } catch (error: any) {
     throw new Error("Erro ao salvar transações financeiras.");
@@ -117,6 +120,8 @@ export async function updateFinancialTitleStatus(titleId: string, status: 'PAGO'
         }
 
         await batch.commit();
+        revalidatePath('/dashboard/financeiro');
+        revalidatePath('/dashboard/repasses');
         return { success: true };
     } catch (error: any) {
         throw new Error(error.message);
@@ -161,6 +166,8 @@ export async function processRepasse(staffId: string, creditIds: string[], total
     href: '/dashboard/repasses'
   });
 
+  revalidatePath('/dashboard/financeiro');
+  revalidatePath('/dashboard/repasses');
   return { success: true };
 }
 
@@ -173,6 +180,7 @@ export async function createFinancialTitle(data: Partial<FinancialTitle>) {
           clientId = p.data()?.clientId;
         }
         await firestoreAdmin.collection('financial_titles').add({ ...data, clientId, updatedAt: FieldValue.serverTimestamp() });
+        revalidatePath('/dashboard/financeiro');
         return { success: true };
     } catch (error: any) {
         throw new Error(error.message);
@@ -183,6 +191,7 @@ export async function deleteStaffCredit(staffId: string, creditId: string) {
   if (!firestoreAdmin) throw new Error("Servidor inacessível.");
   try {
     await firestoreAdmin.collection(`staff/${staffId}/credits`).doc(creditId).delete();
+    revalidatePath('/dashboard/repasses');
     return { success: true };
   } catch (error: any) {
     throw new Error(error.message);
@@ -193,6 +202,7 @@ export async function updateStaffCredit(staffId: string, creditId: string, data:
   if (!firestoreAdmin) throw new Error("Servidor inacessível.");
   try {
     await firestoreAdmin.collection(`staff/${staffId}/credits`).doc(creditId).update(data);
+    revalidatePath('/dashboard/repasses');
     return { success: true };
   } catch (error: any) {
     throw new Error(error.message);
@@ -207,6 +217,7 @@ export async function addManualStaffCredit(staffId: string, data: Partial<StaffC
       status: data.status || 'DISPONIVEL',
       date: Timestamp.now(),
     });
+    revalidatePath('/dashboard/repasses');
     return { success: true };
   } catch (error: any) {
     throw new Error(error.message);
@@ -225,6 +236,7 @@ export async function updateCreditForecast(staffId: string, creditIds: string[],
   });
 
   await batch.commit();
+  revalidatePath('/dashboard/repasses');
   return { success: true };
 }
 
@@ -249,6 +261,7 @@ export async function requestCreditUnlock(staffId: string, creditId: string, rea
       });
     }
     
+    revalidatePath('/dashboard/repasses');
     return { success: true };
   } catch (error: any) {
     throw new Error(error.message);
@@ -284,6 +297,7 @@ export async function processLatePaymentRoutine(titleId: string) {
       updatedAt: FieldValue.serverTimestamp()
     });
 
+    revalidatePath('/dashboard/financeiro');
     return { success: true };
   } catch (error: any) {
     throw new Error(error.message);
@@ -311,5 +325,6 @@ export async function launchPayroll() {
     }
   }
 
+  revalidatePath('/dashboard/repasses');
   return { success: true, count };
 }

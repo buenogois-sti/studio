@@ -5,12 +5,12 @@ import { copyFile } from './drive-actions';
 import { syncProcessToDrive, getGoogleApiClientsForUser } from './drive';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/options';
-import { createNotification } from './notification-actions';
 import { extractFileId } from './utils';
 import { Timestamp, FieldValue } from 'firebase-admin/firestore';
 import { v4 as uuidv4 } from 'uuid';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { revalidatePath } from 'next/cache';
 
 async function ensureSubfolder(drive: any, parentId: string, folderName: string): Promise<string> {
     const res = await drive.files.list({
@@ -42,7 +42,6 @@ async function replacePlaceholdersInDoc(docsApi: any, fileId: string, dataMap: R
     if (requests.length === 0) return;
     
     try {
-        console.log(`[DocsAutomation] Iniciando substituição para o doc: ${fileId}`);
         await docsApi.documents.batchUpdate({ 
             documentId: fileId, 
             requestBody: { requests } 
@@ -53,20 +52,14 @@ async function replacePlaceholdersInDoc(docsApi: any, fileId: string, dataMap: R
     }
 }
 
-/**
- * Aplica negrito a textos específicos dentro do documento.
- * Utilizado para dar destaque a nomes, documentos e números de processo.
- */
 async function applyBoldToTexts(docsApi: any, fileId: string, texts: string[]) {
     if (!texts || texts.length === 0) return;
     
     try {
-        // Precisamos obter o conteúdo atual para encontrar os índices de início e fim
         const docRes = await docsApi.documents.get({ documentId: fileId });
         const content = docRes.data.body?.content || [];
         const requests: any[] = [];
 
-        // Filtra textos nulos ou muito curtos
         const targets = [...new Set(texts.filter(t => t && t.length > 2))];
 
         for (const structuralElement of content) {
@@ -100,7 +93,6 @@ async function applyBoldToTexts(docsApi: any, fileId: string, texts: string[]) {
         }
 
         if (requests.length > 0) {
-            console.log(`[DocsAutomation] Aplicando negrito em ${requests.length} ocorrências.`);
             await docsApi.documents.batchUpdate({ 
                 documentId: fileId, 
                 requestBody: { requests } 
@@ -144,7 +136,7 @@ export async function draftDocument(
 ): Promise<{ success: boolean; url?: string; error?: string }> {
     if (!firestoreAdmin) throw new Error("Servidor indisponível.");
     const session = await getServerSession(authOptions);
-  if (!session) throw new Error("Não autorizado.");
+    if (!session) throw new Error("Não autorizado.");
 
     try {
         const [apiClients, processDoc, settingsDoc] = await Promise.all([
@@ -198,7 +190,6 @@ export async function draftDocument(
         const staffAddr = fmtAddr(staffData?.address);
         const clientFull = `${clientData.firstName} ${clientData.lastName || ''}`.trim();
 
-        // Qualificação Composta
         let clientQual = '';
         if (clientData.clientType === 'Pessoa Jurídica') {
             clientQual = `${clientFull}, inscrita no CNPJ sob o nº ${clientData.document || '---'}, com sede na ${clientAddr}`;
@@ -231,10 +222,8 @@ export async function draftDocument(
             'DATA_HOJE': format(new Date(), "dd/MM/yyyy"),
         };
 
-        // 1. Realiza a substituição dos placeholders
         await replacePlaceholdersInDoc(docs, copiedFile.id, dataMap);
 
-        // 2. Aplica negrito em informações estratégicas (valores reais inseridos)
         const boldTargets = [
             clientFull,
             clientData.document,
@@ -256,6 +245,7 @@ export async function draftDocument(
             updatedAt: FieldValue.serverTimestamp()
         });
 
+        revalidatePath(`/dashboard/processos`);
         return { success: true, url: copiedFile.webViewLink! };
     } catch (error: any) {
         console.error("[draftDocument] Erro crítico:", error);

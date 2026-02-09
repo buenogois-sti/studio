@@ -2,6 +2,7 @@
 import { firestoreAdmin } from '@/firebase/admin';
 import type { Client } from './types';
 import { firestore } from 'firebase-admin';
+import { revalidatePath } from 'next/cache';
 
 /**
  * Serializa um snapshot do Firestore para o tipo Client com proteções contra campos nulos.
@@ -56,6 +57,11 @@ export async function createClient(data: Partial<Client>): Promise<{ success: bo
             createdAt: firestore.FieldValue.serverTimestamp(),
             updatedAt: firestore.FieldValue.serverTimestamp(),
         });
+        
+        // Invalida o cache para atualizar a lista de clientes e o dashboard
+        revalidatePath('/dashboard/clientes');
+        revalidatePath('/dashboard');
+        
         return { success: true, id: docRef.id };
     } catch (error: any) {
         console.error("[createClient] Error:", error);
@@ -71,7 +77,7 @@ export async function searchClients(query: string): Promise<Client[]> {
         const cleanQuery = query.trim();
         const docOnlyQuery = cleanQuery.replace(/\D/g, '');
 
-        // 1. Tenta busca exata por documento (Muito mais rápido)
+        // 1. Tenta busca exata por documento
         if (docOnlyQuery.length >= 11) {
             const exactMatch = await firestoreAdmin.collection('clients')
                 .where('document', '==', cleanQuery)
@@ -84,10 +90,10 @@ export async function searchClients(query: string): Promise<Client[]> {
             }
         }
 
-        // 2. Fallback para busca textual (Limitada para evitar congelamento)
+        // 2. Fallback para busca textual limitada
         const clientsSnapshot = await firestoreAdmin.collection('clients')
             .orderBy('updatedAt', 'desc')
-            .limit(100) // Limite de varredura para performance
+            .limit(100)
             .get();
         
         const textQuery = cleanQuery.toLowerCase();
@@ -133,6 +139,7 @@ export async function bulkCreateClients(clients: Partial<Client>[]): Promise<{ s
         });
 
         await batch.commit();
+        revalidatePath('/dashboard/clientes');
         return { success: true, count: clients.length };
     } catch (error: any) {
         return { success: false, count: 0, error: error.message };
