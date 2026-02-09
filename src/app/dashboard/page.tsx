@@ -136,8 +136,6 @@ const AIAdvisor = React.memo(({ stats, activities, isLoading, role }: { stats: a
 });
 AIAdvisor.displayName = 'AIAdvisor';
 
-// --- VIEW COMPONENTS MEMOIZADOS ---
-
 const AdminDashboard = React.memo(({ stats, isLoading, logsData, hearingsData, chartData }: any) => (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -344,7 +342,7 @@ function ChartCard({ data, title }: any) {
 // --- MAIN PAGE ---
 
 export default function Dashboard() {
-  const { firestore } = useFirebase();
+  const { firestore, user } = useFirebase();
   const { data: session, status } = useSession();
 
   // Estabiliza a data de início do mês para evitar re-subscriptions cíclicas no Firebase
@@ -406,7 +404,7 @@ export default function Dashboard() {
     };
     
     if (!processesData) return s;
-    const now = new Date();
+    const now = startOfDay(new Date());
 
     if (role === 'admin' || role === 'financial') {
       titlesData?.forEach(t => {

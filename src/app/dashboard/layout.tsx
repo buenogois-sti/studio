@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -23,7 +24,6 @@ import {
 } from '@/components/ui/sidebar';
 import { Logo } from '@/components/logo';
 import { UserNav } from '@/components/user-nav';
-import { Input } from '@/components/ui/input';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -34,13 +34,10 @@ import {
 } from '@/components/ui/breadcrumb';
 
 import {
-  Home,
-  Users,
   FolderKanban,
   Calendar,
   DollarSign,
   Settings,
-  Search,
   Briefcase,
   AlertCircle,
   Loader2,
@@ -52,7 +49,8 @@ import {
   Wallet,
   Zap,
   CheckSquare,
-  LayoutDashboard
+  LayoutDashboard,
+  Users
 } from 'lucide-react';
 import type { UserProfile } from '@/lib/types';
 import {
@@ -125,58 +123,12 @@ const BreadcrumbMap: { [key: string]: string } = {
   '/dashboard/checklists': 'Checklists Operacionais',
 };
 
-function AccessDenied() {
-  return (
-    <div className="flex flex-1 h-full items-center justify-center rounded-lg border border-dashed border-border/50 bg-card/20 shadow-sm">
-      <div className="flex flex-col items-center gap-2 text-center">
-        <AlertCircle className="h-16 w-16 text-destructive" />
-        <h1 className="text-2xl font-bold tracking-tight font-headline mt-4 text-white">Acesso Negado</h1>
-        <p className="text-sm text-muted-foreground max-w-sm">
-          Você não tem permissão para visualizar esta página. Por favor, selecione um perfil com acesso ou
-          contate um administrador.
-        </p>
-        <Button asChild className="mt-4">
-          <Link href="/dashboard">Voltar para o Dashboard</Link>
-        </Button>
-      </div>
-    </div>
-  );
-}
-
 function InnerLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const router = useRouter();
     const { data: session, status } = useSession();
     const { firestore } = useFirebase();
     const { toast } = useToast();
-
-    React.useEffect(() => {
-        if (session?.error && !session.error.startsWith('ServerConfigError:')) {
-            let title = 'Erro de Sessão';
-            let description = 'Ocorreu um erro inesperado na sua sessão.';
-            let shouldSignOut = false;
-
-            if (session.error === 'RefreshAccessTokenError') {
-                title = 'Sessão Expirada';
-                description = 'Sua sessão expirou e não foi possível renová-la. Por favor, faça login novamente.';
-                shouldSignOut = true;
-            } else if (session.error === 'DatabaseError') {
-                title = 'Erro de Banco de Dados';
-                description = 'Não foi possível acessar seus dados de perfil. Verifique a configuração do servidor.';
-            }
-            
-            toast({
-                variant: 'destructive',
-                title: title,
-                description: description,
-                duration: 10000,
-            });
-
-            if (shouldSignOut) {
-                signOut({ callbackUrl: '/login' });
-            }
-        }
-    }, [session, toast]);
 
     const userProfileRef = useMemoFirebase(
         () => (firestore && session?.user?.id ? doc(firestore, 'users', session.user.id) : null),
@@ -262,7 +214,7 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
                               asChild
                               isActive={pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href))}
                               tooltip={item.label}
-                              className="data-[active=true]:bg-primary/10 data-[active=true]:text-primary text-slate-400 hover:text-white transition-colors h-10"
+                              className="data-[active=true]:bg-primary/10 data-[active=true]:text-primary text-slate-400 hover:text-white transition-all h-10"
                             >
                               <Link href={item.href}>
                                 <item.icon />
