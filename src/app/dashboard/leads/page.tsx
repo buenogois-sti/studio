@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -41,7 +42,8 @@ import {
   Timer,
   Building,
   Hash,
-  ClipboardList
+  ClipboardList,
+  ChevronRight
 } from 'lucide-react';
 import { 
   DndContext, 
@@ -108,6 +110,7 @@ import { Progress } from '@/components/ui/progress';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 const STAGES: LeadStatus[] = ['NOVO', 'ATENDIMENTO', 'BUROCRACIA', 'CONTRATUAL', 'DISTRIBUICAO'];
 
@@ -722,21 +725,73 @@ function LeadDetailsSheet({
                 <div className="flex items-center gap-2 text-[10px] font-black uppercase text-amber-400 tracking-widest">
                   <ClipboardList className="h-3.5 w-3.5" /> Entrevista de Triagem
                 </div>
-                <div className="grid grid-cols-1 gap-4 bg-amber-500/[0.02] border border-amber-500/10 p-4 rounded-2xl">
+                <div className="grid grid-cols-1 gap-4">
                   {activeInterview ? (
-                    activeInterview.items.map((item) => (
-                      <div key={item.id} className="space-y-1.5">
-                        <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">{item.label} {item.required && '*'}</Label>
-                        <Textarea 
-                          placeholder="Resposta..." 
-                          className="bg-black/40 border-white/5 text-xs rounded-lg min-h-[60px]"
-                          defaultValue={lead.interviewAnswers?.[item.id] || ''}
-                          onBlur={(e) => handleSaveInterviewAnswer(item.id, e.target.value)}
-                        />
-                      </div>
-                    ))
+                    activeInterview.items.map((item) => {
+                      const currentAnswer = lead.interviewAnswers?.[item.id] || '';
+                      return (
+                        <div key={item.id} className="space-y-3 p-5 rounded-2xl bg-white/[0.03] border border-white/5 group hover:border-primary/20 transition-all">
+                          <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest block mb-2 group-hover:text-primary transition-colors">{item.label} {item.required && '*'}</Label>
+                          
+                          {item.type === 'YES_NO' ? (
+                            <RadioGroup 
+                              value={currentAnswer} 
+                              onValueChange={(val) => handleSaveInterviewAnswer(item.id, val)}
+                              className="flex flex-wrap gap-4"
+                            >
+                              <div 
+                                className={cn(
+                                  "flex items-center space-x-3 px-5 py-3 rounded-xl border-2 transition-all cursor-pointer",
+                                  currentAnswer === 'SIM' ? "bg-emerald-500/10 border-emerald-500/50" : "bg-black/20 border-transparent hover:border-white/10"
+                                )} 
+                                onClick={() => handleSaveInterviewAnswer(item.id, 'SIM')}
+                              >
+                                <RadioGroupItem value="SIM" id={`q-sim-${item.id}`} className="border-emerald-500 text-emerald-500" />
+                                <Label htmlFor={`q-sim-${item.id}`} className="text-xs font-black text-emerald-400 cursor-pointer tracking-widest">SIM</Label>
+                              </div>
+                              <div 
+                                className={cn(
+                                  "flex items-center space-x-3 px-5 py-3 rounded-xl border-2 transition-all cursor-pointer",
+                                  currentAnswer === 'NAO' ? "bg-rose-500/10 border-rose-500/50" : "bg-black/20 border-transparent hover:border-white/10"
+                                )} 
+                                onClick={() => handleSaveInterviewAnswer(item.id, 'NAO')}
+                              >
+                                <RadioGroupItem value="NAO" id={`q-nao-${item.id}`} className="border-rose-500 text-rose-500" />
+                                <Label htmlFor={`q-nao-${item.id}`} className="text-xs font-black text-rose-400 cursor-pointer tracking-widest">NÃO</Label>
+                              </div>
+                            </RadioGroup>
+                          ) : item.type === 'YES_NO_MAYBE' ? (
+                            <RadioGroup 
+                              value={currentAnswer} 
+                              onValueChange={(val) => handleSaveInterviewAnswer(item.id, val)}
+                              className="flex flex-wrap gap-3"
+                            >
+                              <div className={cn("flex items-center space-x-2 px-4 py-2 rounded-lg border", currentAnswer === 'SIM' ? "bg-emerald-500/10 border-emerald-500/40" : "bg-black/20 border-transparent")} onClick={() => handleSaveInterviewAnswer(item.id, 'SIM')}>
+                                <RadioGroupItem value="SIM" id={`qm-sim-${item.id}`} />
+                                <Label htmlFor={`qm-sim-${item.id}`} className="text-[10px] font-bold text-emerald-400">SIM</Label>
+                              </div>
+                              <div className={cn("flex items-center space-x-2 px-4 py-2 rounded-lg border", currentAnswer === 'NAO' ? "bg-rose-500/10 border-rose-500/40" : "bg-black/20 border-transparent")} onClick={() => handleSaveInterviewAnswer(item.id, 'NAO')}>
+                                <RadioGroupItem value="NAO" id={`qm-nao-${item.id}`} />
+                                <Label htmlFor={`qm-nao-${item.id}`} className="text-[10px] font-bold text-rose-400">NÃO</Label>
+                              </div>
+                              <div className={cn("flex items-center space-x-2 px-4 py-2 rounded-lg border", currentAnswer === 'PARCIAL' ? "bg-amber-500/10 border-amber-500/40" : "bg-black/20 border-transparent")} onClick={() => handleSaveInterviewAnswer(item.id, 'PARCIAL')}>
+                                <RadioGroupItem value="PARCIAL" id={`qm-parcial-${item.id}`} />
+                                <Label htmlFor={`qm-parcial-${item.id}`} className="text-[10px] font-bold text-amber-400">PARCIAL</Label>
+                              </div>
+                            </RadioGroup>
+                          ) : (
+                            <Textarea 
+                              placeholder="Digite o relato detalhado..." 
+                              className="bg-black/40 border-white/5 text-sm rounded-xl min-h-[100px] leading-relaxed"
+                              defaultValue={currentAnswer}
+                              onBlur={(e) => handleSaveInterviewAnswer(item.id, e.target.value)}
+                            />
+                          )}
+                        </div>
+                      );
+                    })
                   ) : (
-                    <div className="text-center py-10 opacity-40">
+                    <div className="text-center py-10 opacity-40 bg-white/[0.02] border border-dashed border-white/10 rounded-2xl">
                       <p className="text-xs font-bold uppercase text-slate-500">Nenhuma entrevista configurada para {lead.legalArea}.</p>
                       <p className="text-[10px] mt-1 uppercase text-slate-600">Configure em Checklists &gt; Entrevistas.</p>
                     </div>
@@ -750,15 +805,18 @@ function LeadDetailsSheet({
                 <History className="h-3.5 w-3.5 text-primary" /> Histórico & Notas
               </div>
               <div className="space-y-4">
-                <div className="flex gap-2">
-                  <Textarea 
-                    placeholder="Registre pontos relevantes da triagem..." 
-                    className="bg-black/40 border border-white/10 text-xs h-20 rounded-xl" 
-                    value={newNote} 
-                    onChange={e => setNewNote(e.target.value)} 
-                  />
-                  <Button className="h-20" onClick={handleAddNote} disabled={isSaving || !newNote.trim()}>
-                    {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                <div className="flex gap-2 items-end">
+                  <div className="flex-1 space-y-1.5">
+                    <Label className="text-[9px] font-bold uppercase text-slate-600 ml-1">Nova anotação</Label>
+                    <Textarea 
+                      placeholder="Registre pontos relevantes da triagem..." 
+                      className="bg-black/40 border border-white/10 text-sm h-24 rounded-2xl" 
+                      value={newNote} 
+                      onChange={e => setNewNote(e.target.value)} 
+                    />
+                  </div>
+                  <Button className="h-24 px-6 rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/20" onClick={handleAddNote} disabled={isSaving || !newNote.trim()}>
+                    {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-5 w-5" />}
                   </Button>
                 </div>
               </div>
@@ -819,7 +877,7 @@ function NewLeadSheet({ open, onOpenChange, lawyers, onCreated }: { open: boolea
                 <FormField control={form.control} name="title" render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-1">Título da Demanda *</FormLabel>
-                    <Input placeholder="Ex: Revisional de Horas Extras..." className="bg-black/40 border-white/10 h-11 rounded-lg font-bold" {...field} />
+                    <Input placeholder="Ex: Revisional de Horas Extras..." className="h-11 bg-black/40 border-white/10 rounded-lg font-bold" {...field} />
                     <FormMessage />
                   </FormItem>
                 )} />
