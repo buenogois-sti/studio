@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -673,7 +672,6 @@ function LeadDetailsSheet({
   const handleSaveInterviewAnswer = async (questionId: string, answer: string) => {
     if (!lead || !firestore) return;
     try {
-      const answers = lead.interviewAnswers || {};
       await updateDoc(doc(firestore, 'leads', lead.id), {
         [`interviewAnswers.${questionId}`]: answer,
         updatedAt: Timestamp.now()
@@ -837,7 +835,7 @@ function LeadDetailsSheet({
                   ) : (
                     <div className="text-center py-10 opacity-40">
                       <p className="text-xs font-bold uppercase tracking-widest text-slate-500">Nenhuma entrevista personalizada para {lead.legalArea}.</p>
-                      <p className="text-[10px] mt-1 uppercase">Configure em Checklists > Entrevistas.</p>
+                      <p className="text-[10px] mt-1 uppercase">Configure em Checklists &gt; Entrevistas.</p>
                     </div>
                   )}
                 </div>
@@ -866,7 +864,7 @@ function LeadDetailsSheet({
                     <div key={f.id} className="flex items-center justify-between p-4 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] bg-black/40 border-2 border-white/5 hover:border-primary/30 transition-all group">
                       <div className="flex items-center gap-3 sm:gap-5 min-w-0">
                         <div className="h-9 w-9 sm:h-12 sm:w-12 rounded-lg sm:rounded-2xl bg-white/5 flex items-center justify-center border-2 border-white/10 group-hover:bg-primary/10 transition-colors shrink-0">
-                          {f.iconLink ? <img src={f.iconLink} className="h-5 w-5 sm:h-6 sm:w-6" /> : <FileText className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />}
+                          {f.iconLink ? <img src={f.iconLink} alt="icon" className="h-5 w-5 sm:h-6 sm:w-6" /> : <FileText className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />}
                         </div>
                         <div className="flex flex-col min-w-0">
                           <span className="text-[11px] sm:text-sm font-bold text-slate-200 group-hover:text-white truncate max-w-[140px] sm:max-w-[180px]">{f.name}</span>
@@ -1096,14 +1094,14 @@ export default function LeadsPage() {
       avg: times.reduce((a, b) => a + b, 0) / times.length
     })).sort((a, b) => b.avg - a.avg);
 
-    const highDemand = Object.entries(stageCounts).sort((a, b) => b[1] - a[1])[0];
+    const highDemandStage = Object.entries(stageCounts).sort((a, b) => b[1] - a[1])[0];
 
     return {
       total: leadsData.length,
       urgent: leadsData.filter(l => l.isUrgent).length,
       ready: leadsData.filter(l => l.status === 'DISTRIBUICAO').length,
       slowestStage: avgTimes[0] ? (stageConfig[avgTimes[0].stage as LeadStatus]?.label || '---') : '---',
-      highDemand: highDemand ? (stageConfig[highDemand[0] as LeadStatus]?.label || '---') : '---'
+      highDemand: highDemandStage ? (stageConfig[highDemandStage[0] as LeadStatus]?.label || '---') : '---'
     };
   }, [leadsData]);
 
