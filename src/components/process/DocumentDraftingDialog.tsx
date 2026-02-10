@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection } from 'firebase/firestore';
-import type { DocumentTemplate, Process } from '@/lib/types';
+import type { DocumentTemplate, Process, Lead } from '@/lib/types';
 import { 
   FileText, 
   Loader2, 
@@ -32,18 +32,22 @@ import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
 
 interface DocumentDraftingDialogProps {
-  process: Process | null;
+  process?: Process | null;
+  lead?: Lead | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-export function DocumentDraftingDialog({ process, open, onOpenChange }: DocumentDraftingDialogProps) {
+export function DocumentDraftingDialog({ process, lead, open, onOpenChange }: DocumentDraftingDialogProps) {
   const { firestore } = useFirebase();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = React.useState('');
   const [isDrafting, setIsDrafting] = React.useState<string | null>(null);
   const [generatedUrl, setGeneratedUrl] = React.useState<string | null>(null);
   const [lastTemplateName, setLastTemplateName] = React.useState('');
+
+  const target = process || lead;
+  const isLead = !!lead;
 
   const templatesQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'document_templates') : null), [firestore]);
   const { data: templates, isLoading } = useCollection<DocumentTemplate>(templatesQuery);
@@ -57,13 +61,13 @@ export function DocumentDraftingDialog({ process, open, onOpenChange }: Document
   }, [templates, searchTerm]);
 
   const handleSelectTemplate = async (template: DocumentTemplate) => {
-    if (!process) return;
+    if (!target) return;
     setIsDrafting(template.id);
     setGeneratedUrl(null);
     setLastTemplateName(template.name);
     
     try {
-        const result = await draftDocument(process.id, template.templateFileId, template.name, template.category);
+        const result = await draftDocument(target.id, template.templateFileId, template.name, template.category, isLead);
         if (result.success && result.url) {
             setGeneratedUrl(result.url);
             toast({
@@ -104,7 +108,7 @@ export function DocumentDraftingDialog({ process, open, onOpenChange }: Document
             <div>
               <DialogTitle className="text-xl font-black font-headline">Gerador de Rascunhos</DialogTitle>
               <DialogDescription className="text-slate-400">
-                Processando inteligência documental para: <span className="text-white font-bold">{process?.name}</span>
+                Processando inteligência documental para: <span className="text-white font-bold">{target?.title || target?.name}</span>
               </DialogDescription>
             </div>
           </div>
@@ -122,7 +126,7 @@ export function DocumentDraftingDialog({ process, open, onOpenChange }: Document
               <div className="space-y-2">
                 <h3 className="text-xl font-black text-white tracking-tighter uppercase">Processando Automação</h3>
                 <p className="text-sm text-slate-400 max-w-xs mx-auto">
-                  Estamos copiando o modelo, preenchendo as tags de qualificação e organizando na pasta do processo...
+                  Estamos copiando o modelo, preenchendo as tags de qualificação e organizando na pasta do {isLead ? 'lead' : 'processo'}...
                 </p>
               </div>
             </div>

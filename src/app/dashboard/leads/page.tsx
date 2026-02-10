@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -44,7 +43,8 @@ import {
   Hash,
   ClipboardList,
   ChevronRight,
-  ArrowUpRight
+  ArrowUpRight,
+  FilePlus2
 } from 'lucide-react';
 import { 
   DndContext, 
@@ -112,6 +112,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { DocumentDraftingDialog } from '@/components/process/DocumentDraftingDialog';
 
 const STAGES: LeadStatus[] = ['NOVO', 'ATENDIMENTO', 'BUROCRACIA', 'CONTRATUAL', 'DISTRIBUICAO'];
 
@@ -240,7 +241,7 @@ function LeadConversionDialog({
     } catch (e) {
       toast({ variant: 'destructive', title: 'Falha na IA', description: 'Não foi possível ler o histórico para sugestões.' });
     } finally {
-      setIsPreFilling(false);
+      setIsParsingAI(false);
     }
   };
 
@@ -593,6 +594,7 @@ function LeadDetailsSheet({
   const [isSaving, setIsSaving] = React.useState(false);
   const [isAdvancing, setIsAdvancing] = React.useState(false);
   const [newNote, setNewNote] = React.useState('');
+  const [isDraftingOpen, setIsDraftingOpen] = React.useState(false);
 
   const interviewQuery = useMemoFirebase(
     () => (firestore && lead ? query(collection(firestore, 'checklist_templates'), where('category', '==', 'Entrevista de Triagem'), where('legalArea', '==', lead.legalArea), limit(1)) : null),
@@ -685,6 +687,15 @@ function LeadDetailsSheet({
                 </Badge>
               )}
             </div>
+            {lead.status === 'CONTRATUAL' && (
+              <Button 
+                size="sm" 
+                className="bg-primary text-primary-foreground font-black uppercase text-[9px] h-9 px-4 gap-2"
+                onClick={() => setIsDraftingOpen(true)}
+              >
+                <FilePlus2 className="h-3.5 w-3.5" /> Gerar Contratos/Procurações
+              </Button>
+            )}
             {lead.status === 'DISTRIBUICAO' && (
               <Button size="sm" className="bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase text-[9px] h-9 px-4" onClick={() => onProtocolClick(lead)}>
                 Protocolar
@@ -729,12 +740,15 @@ function LeadDetailsSheet({
                     <div 
                       key={task} 
                       className={cn(
-                        "flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer",
+                        "flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer group",
                         isDone ? "bg-emerald-500/[0.03] border-emerald-500/20" : "bg-white/[0.02] border-white/5 hover:border-primary/30"
                       )} 
                       onClick={() => handleToggleTask(task)}
                     >
-                      <div className={cn("h-5 w-5 rounded-lg border flex items-center justify-center transition-all", isDone ? "bg-emerald-500 border-emerald-500 text-white" : "border-white/10")}>
+                      <div className={cn(
+                        "h-5 w-5 rounded-lg border flex items-center justify-center transition-all",
+                        isDone ? "bg-emerald-500 border-emerald-500 text-white" : "border-white/10 group-hover:border-primary/50"
+                      )}>
                         {isDone && <Check className="h-3 w-3 stroke-[3]" />}
                       </div>
                       <span className={cn("text-xs font-bold tracking-tight", isDone ? "text-emerald-400/70" : "text-slate-200")}>{task}</span>
@@ -816,8 +830,8 @@ function LeadDetailsSheet({
                     })
                   ) : (
                     <div className="text-center py-10 opacity-40 bg-white/[0.02] border border-dashed border-white/10 rounded-2xl">
-                      <p className="text-xs font-bold uppercase text-slate-500">Nenhuma entrevista configurada para {lead.legalArea}.</p>
-                      <p className="text-[10px] mt-1 uppercase text-slate-600">Configure em Checklists &gt; Entrevistas.</p>
+                      <p className="text-xs font-bold uppercase text-slate-500">Nenhuma entrevista personalizada para {lead.legalArea}.</p>
+                      <p className="text-[10px] mt-1 uppercase">Configure em Checklists &gt; Entrevistas.</p>
                     </div>
                   )}
                 </div>
@@ -867,7 +881,7 @@ function LeadDetailsSheet({
                   : "bg-white/5 text-slate-500 border border-white/10"
               )}
               onClick={handleAdvanceStage}
-              disabled={isAdvancing}
+              disabled={isAdvancing || !isReadyToAdvance}
             >
               {isAdvancing ? (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -882,6 +896,11 @@ function LeadDetailsSheet({
             </Button>
           </div>
         </SheetFooter>
+        <DocumentDraftingDialog 
+          lead={lead} 
+          open={isDraftingOpen} 
+          onOpenChange={setIsDraftingOpen} 
+        />
       </SheetContent>
     </Sheet>
   );

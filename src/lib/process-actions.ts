@@ -1,9 +1,8 @@
-
 'use server';
 import { firestoreAdmin } from '@/firebase/admin';
-import type { Process, DocumentTemplate, TimelineEvent, Client, Staff } from './types';
+import type { Process, DocumentTemplate, TimelineEvent, Client, Staff, Lead } from './types';
 import { copyFile } from './drive-actions';
-import { syncProcessToDrive, getGoogleApiClientsForUser } from './drive';
+import { syncProcessToDrive, getGoogleApiClientsForUser, syncLeadToDrive } from './drive';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/options';
 import { extractFileId } from './utils';
@@ -131,31 +130,41 @@ export async function searchProcesses(query: string): Promise<Process[]> {
 }
 
 export async function draftDocument(
-    processId: string, 
+    targetId: string, 
     templateIdOrLink: string, 
     documentName: string,
-    category: string
+    category: string,
+    isLead: boolean = false
 ): Promise<{ success: boolean; url?: string; error?: string }> {
     if (!firestoreAdmin) throw new Error("Servidor indisponível.");
     const session = await getServerSession(authOptions);
     if (!session) throw new Error("Não autorizado.");
 
     try {
-        const [apiClients, processDoc, settingsDoc] = await Promise.all([
+        const collectionName = isLead ? 'leads' : 'processes';
+        const [apiClients, targetDoc, settingsDoc] = await Promise.all([
             getGoogleApiClientsForUser(),
-            firestoreAdmin.collection('processes').doc(processId).get(),
+            firestoreAdmin.collection(collectionName).doc(targetId).get(),
             firestoreAdmin.collection('system_settings').doc('general').get()
         ]);
 
-        if (!processDoc.exists) throw new Error("Processo não encontrado.");
-        const processData = processDoc.data() as Process;
+        if (!targetDoc.exists) throw new Error(`${isLead ? 'Lead' : 'Processo'} não encontrado.`);
+        const targetData = targetDoc.data() as any;
 
-        const syncResult = await syncProcessToDrive(processId);
-        if (!syncResult.success) throw new Error(`Falha ao organizar pastas: ${syncResult.error}`);
+        // Garantir sincronização do Drive
+        if (isLead) {
+            await syncLeadToDrive(targetId);
+        } else {
+            await syncProcessToDrive(targetId);
+        }
+
+        // Recarregar dados para obter o driveFolderId atualizado
+        const updatedTargetDoc = await firestoreAdmin.collection(collectionName).doc(targetId).get();
+        const updatedData = updatedTargetDoc.data() as any;
 
         const { drive, docs } = apiClients;
-        const physicalFolderId = processData.driveFolderId;
-        if (!physicalFolderId) throw new Error("Pasta do processo não disponível.");
+        const physicalFolderId = updatedData.driveFolderId;
+        if (!physicalFolderId) throw new Error("Pasta de destino no Drive não disponível.");
 
         // Lógica de destino baseada em palavras-chave para Contratos e Procurações
         const isContractOrPoA = ['procuração', 'contrato', 'substabelecimento', 'honorar'].some(
@@ -170,10 +179,11 @@ export async function draftDocument(
             'sentença': '02 - Decisões e Sentenças',
         };
         
-        let targetFolderName = '01 - Petições';
+        let targetFolderName = isLead ? '08 - Modelos e Documentos Gerados' : '01 - Petições';
+        
         if (isContractOrPoA) {
-            targetFolderName = '02 - Contratos e Procurações';
-        } else {
+            targetFolderName = isLead ? '02 - Contratos e Procurações' : '02 - Contratos e Procurações';
+        } else if (!isLead) {
             targetFolderName = Object.entries(categoryMap).find(
                 ([key]) => category.toLowerCase().includes(key) || documentName.toLowerCase().includes(key)
             )?.[1] || '01 - Petições';
@@ -182,8 +192,8 @@ export async function draftDocument(
         const targetFolderId = await ensureSubfolder(drive, physicalFolderId, targetFolderName);
 
         const [clientDoc, staffDoc] = await Promise.all([
-            firestoreAdmin.collection('clients').doc(processData.clientId).get(),
-            processData.leadLawyerId ? firestoreAdmin.collection('staff').doc(processData.leadLawyerId).get() : Promise.resolve(null)
+            firestoreAdmin.collection('clients').doc(targetData.clientId).get(),
+            targetData.lawyerId || targetData.leadLawyerId ? firestoreAdmin.collection('staff').doc(targetData.lawyerId || targetData.leadLawyerId).get() : Promise.resolve(null)
         ]);
 
         const clientData = clientDoc.data() as Client;
@@ -191,7 +201,7 @@ export async function draftDocument(
         const officeData = settingsDoc.data();
 
         const cleanTemplateId = extractFileId(templateIdOrLink);
-        const newFileName = `${documentName} - ${processData.name}`;
+        const newFileName = `${documentName} - ${targetData.title || targetData.name}`;
         
         const copiedFile = await copyFile(cleanTemplateId, newFileName, targetFolderId);
         if (!copiedFile.id) throw new Error("Falha ao criar cópia do modelo.");
@@ -223,9 +233,9 @@ export async function draftDocument(
             'CLIENTE_CPF_CNPJ': clientData.document || '---',
             'CLIENTE_RG': clientData.rg || '---',
             'CLIENTE_ENDERECO_COMPLETO': clientAddr,
-            'PROCESSO_NUMERO': processData.processNumber || 'Pendente',
-            'PROCESSO_VARA': processData.courtBranch || '---',
-            'RECLAMADA_NOME': processData.opposingParties?.[0]?.name || '---',
+            'PROCESSO_NUMERO': targetData.processNumber || 'Pendente',
+            'PROCESSO_VARA': targetData.courtBranch || '---',
+            'RECLAMADA_NOME': targetData.opposingParties?.[0]?.name || '---',
             'ADVOGADO_LIDER_NOME': staffFull,
             'ADVOGADO_LIDER_OAB': staffData?.oabNumber || '---',
             'ADVOGADO_LIDER_QUALIFICACAO_COMPLETA': lawyerQual,
@@ -241,23 +251,32 @@ export async function draftDocument(
             clientData.document,
             staffFull,
             staffData?.oabNumber,
-            processData.processNumber
+            targetData.processNumber
         ].filter(Boolean) as string[];
 
         await applyBoldToTexts(docs, copiedFile.id, boldTargets);
 
-        await firestoreAdmin.collection('processes').doc(processId).update({
-            timeline: FieldValue.arrayUnion({
-                id: uuidv4(),
-                type: 'petition',
-                description: `DOCUMENTO GERADO: "${documentName}". Destaques aplicados automaticamente.`,
-                date: Timestamp.now(),
-                authorName: session.user.name || 'Sistema'
-            }),
-            updatedAt: FieldValue.serverTimestamp()
-        });
+        const timelineEvent = {
+            id: uuidv4(),
+            type: 'petition',
+            description: `DOCUMENTO GERADO: "${documentName}". Destaques aplicados automaticamente.`,
+            date: Timestamp.now(),
+            authorName: session.user.name || 'Sistema'
+        };
 
-        revalidatePath(`/dashboard/processos`);
+        if (isLead) {
+            await firestoreAdmin.collection('leads').doc(targetId).update({
+                timeline: FieldValue.arrayUnion(timelineEvent),
+                updatedAt: FieldValue.serverTimestamp()
+            });
+        } else {
+            await firestoreAdmin.collection('processes').doc(targetId).update({
+                timeline: FieldValue.arrayUnion(timelineEvent),
+                updatedAt: FieldValue.serverTimestamp()
+            });
+        }
+
+        revalidatePath(isLead ? '/dashboard/leads' : '/dashboard/processos');
         return { success: true, url: copiedFile.webViewLink! };
     } catch (error: any) {
         console.error("[draftDocument] Erro crítico:", error);
