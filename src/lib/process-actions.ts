@@ -61,7 +61,8 @@ async function applyBoldToTexts(docsApi: any, fileId: string, texts: string[]) {
         const content = docRes.data.body?.content || [];
         const requests: any[] = [];
 
-        const targets = [...new Set(targets = texts.filter(t => t && t.length > 2))];
+        let targets = texts.filter(t => t && t.length > 2);
+        targets = [...new Set(targets)];
 
         for (const structuralElement of content) {
             const paragraph = structuralElement.paragraph;

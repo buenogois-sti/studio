@@ -255,7 +255,7 @@ function LeadConversionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-4xl max-w-[95vw] bg-[#020617] border-white/10 text-white shadow-2xl h-[90vh] flex flex-col p-0 overflow-hidden">
+      <DialogContent className="sm:max-w-3xl max-w-[90vw] bg-[#020617] border-white/10 text-white shadow-2xl h-[90vh] flex flex-col p-0 overflow-hidden">
         <DialogHeader className="p-4 sm:p-6 border-b border-white/5 bg-white/5 shrink-0">
           <div className="flex items-center justify-between gap-2">
             <DialogTitle className="flex items-center gap-2 text-white font-headline text-lg sm:text-2xl">
@@ -793,7 +793,7 @@ function LeadDetailsSheet({
             </section>
 
             {/* Entrevista de Triagem */}
-            {lead.status === 'NOVO' && (
+            lead.status === 'NOVO' && (
               <section className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-500">
                 <div className="flex items-center justify-between px-1">
                   <div className="flex items-center gap-2 text-[10px] font-black uppercase text-amber-400 tracking-widest">
@@ -815,25 +815,7 @@ function LeadDetailsSheet({
                             defaultValue={lead.interviewAnswers?.[item.id] || ''}
                             onBlur={(e) => handleSaveInterviewAnswer(item.id, e.target.value)}
                           />
-                        ) : (
-                          <Input 
-                            placeholder="Resposta..." 
-                            className="bg-black/40 border-white/5 h-9 text-xs rounded-lg focus:border-amber-500/50 transition-all"
-                            defaultValue={lead.interviewAnswers?.[item.id] || ''}
-                            onBlur={(e) => handleSaveInterviewAnswer(item.id, e.target.value)}
-                          />
-                        )}
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-center py-6 opacity-40">
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Nenhuma entrevista personalizada para {lead.legalArea}.</p>
-                      <p className="text-[9px] mt-1 uppercase">Configure em Checklists &rarr; Entrevistas.</p>
-                    </div>
-                  )}
-                </div>
-              </section>
-            )}
+                        // ...existing code...
 
             {/* Timeline Compacta */}
             <section className="space-y-4">
@@ -850,45 +832,9 @@ function LeadDetailsSheet({
                       onChange={e => setNewNote(e.target.value)} 
                     />
                   </div>
-                  <Button 
-                    className={cn(
-                      "h-20 w-12 rounded-xl transition-all shrink-0",
-                      newNote.trim() ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20" : "bg-white/5 text-slate-600"
-                    )} 
-                    onClick={handleAddNote} 
-                    disabled={!newNote.trim()}
-                  >
-                    <Plus className="h-5 w-5" />
+                  <Button>
+                    {/* ...existing code... */}
                   </Button>
-                </div>
-                
-                <div className="space-y-4 relative before:absolute before:inset-0 before:ml-4 before:-translate-x-px before:h-full before:w-0.5 before:bg-gradient-to-b before:from-primary/30 before:via-border/40 before:to-transparent">
-                  {(lead as any).timeline?.sort((a: any, b: any) => b.date.seconds - a.date.seconds).map((event: any) => (
-                    <div key={event.id} className="flex gap-4 items-start group relative">
-                      <div className="h-8 w-8 rounded-lg bg-[#020617] border border-primary/30 flex items-center justify-center shrink-0 z-10 shadow group-hover:border-primary transition-colors">
-                        <MessageSquare className="h-3.5 w-3.5 text-primary" />
-                      </div>
-                      <div className="flex-1 p-3 rounded-xl bg-white/[0.02] border border-white/5 hover:border-white/10 transition-all shadow-xl">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-[9px] font-black uppercase text-primary tracking-widest">{event.authorName}</span>
-                          <span className="text-[8px] text-slate-500 font-mono">{format(event.date.toDate(), 'dd/MM/yy HH:mm')}</span>
-                        </div>
-                        <p className="text-[11px] text-slate-200 leading-relaxed font-medium">{event.description}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </section>
-          </div>
-        </ScrollArea>
-      </SheetContent>
-    </Sheet>
-  );
-}
-
-function NewLeadSheet({ open, onOpenChange, lawyers, onCreated }: { open: boolean; onOpenChange: (o: boolean) => void; lawyers: Staff[]; onCreated: () => void }) {
-  const [isSaving, setIsSaving] = React.useState(false);
   const [showClientModal, setShowClientModal] = React.useState(false);
   const { toast } = useToast();
 
@@ -1083,8 +1029,8 @@ export default function LeadsPage() {
   };
 
   return (
-    <div className="flex flex-col gap-6 sm:gap-8 pb-10">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-1">
+    <div className="flex flex-col gap-6 sm:gap-10 pb-10">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 px-1">
         <div className="flex items-center gap-4">
           <div className="h-12 w-12 rounded-2xl bg-primary/10 border border-primary/30 flex items-center justify-center shadow-lg shrink-0">
             <Target className="h-6 w-6 text-primary" />
