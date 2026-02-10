@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -262,11 +261,11 @@ function LeadConversionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-4xl bg-[#020617] border-white/10 text-white shadow-2xl h-[90vh] flex flex-col p-0 overflow-hidden">
-        <DialogHeader className="p-6 border-b border-white/5 bg-white/5 shrink-0">
-          <div className="flex items-center justify-between">
-            <DialogTitle className="flex items-center gap-2 text-white font-headline text-2xl">
-              <ArrowRightLeft className="h-7 w-7 text-emerald-500" />
+      <DialogContent className="sm:max-w-4xl max-w-[95vw] bg-[#020617] border-white/10 text-white shadow-2xl h-[90vh] flex flex-col p-0 overflow-hidden">
+        <DialogHeader className="p-4 sm:p-6 border-b border-white/5 bg-white/5 shrink-0">
+          <div className="flex items-center justify-between gap-2">
+            <DialogTitle className="flex items-center gap-2 text-white font-headline text-lg sm:text-2xl">
+              <ArrowRightLeft className="h-5 w-5 sm:h-7 sm:w-7 text-emerald-500" />
               Distribuição Processual
             </DialogTitle>
             <Button 
@@ -274,34 +273,35 @@ function LeadConversionDialog({
               size="sm" 
               onClick={handlePreFill}
               disabled={isPreFilling}
-              className="h-9 border-primary/30 text-primary hover:bg-primary/10 text-[11px] font-black uppercase gap-2"
+              className="h-8 sm:h-9 border-primary/30 text-primary hover:bg-primary/10 text-[9px] sm:text-[11px] font-black uppercase gap-1 sm:gap-2"
             >
-              {isPreFilling ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
-              Pré-preencher (IA)
+              {isPreFilling ? <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <Bot className="h-3 w-3 sm:h-4 sm:w-4" />}
+              <span className="hidden sm:inline">Sugestão (IA)</span>
+              <span className="sm:hidden">IA</span>
             </Button>
           </div>
-          <DialogDescription className="text-slate-400 mt-2">
+          <DialogDescription className="text-slate-400 mt-1 sm:mt-2 text-xs sm:text-sm">
             Finalize os dados para integrar o lead ao sistema de processos ativos.
           </DialogDescription>
         </DialogHeader>
 
         <ScrollArea className="flex-1">
           <Form {...form}>
-            <form id="conversion-form" onSubmit={form.handleSubmit(onConfirm)} className="p-8 space-y-10">
+            <form id="conversion-form" onSubmit={form.handleSubmit(onConfirm)} className="p-4 sm:p-8 space-y-8 sm:space-y-10">
               
-              <div className="space-y-6">
-                <div className="flex items-center gap-2 text-[12px] font-black uppercase text-primary tracking-[0.25em]">
-                  <FolderKanban className="h-5 w-5" /> Dados da Ação
+              <div className="space-y-4 sm:space-y-6">
+                <div className="flex items-center gap-2 text-[10px] sm:text-[12px] font-black uppercase text-primary tracking-[0.2em] sm:tracking-[0.25em]">
+                  <FolderKanban className="h-4 w-4 sm:h-5 sm:w-5" /> Dados da Ação
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-8">
                   <FormField
                     control={form.control}
                     name="processNumber"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-[11px] font-black uppercase text-slate-500 tracking-widest">Número do Processo (CNJ) *</FormLabel>
+                        <FormLabel className="text-[10px] sm:text-[11px] font-black uppercase text-slate-500 tracking-widest">Número do Processo (CNJ) *</FormLabel>
                         <FormControl>
-                          <Input placeholder="0000000-00.0000.0.00.0000" className="bg-black/40 border-white/10 h-12 font-mono tracking-widest text-base" {...field} />
+                          <Input placeholder="0000000-00.0000.0.00.0000" className="bg-black/40 border-white/10 h-10 sm:h-12 font-mono tracking-widest text-sm sm:text-base" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -313,13 +313,13 @@ function LeadConversionDialog({
                     name="caseValue"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-[11px] font-black uppercase text-slate-500 tracking-widest">Valor da Causa (R$) *</FormLabel>
+                        <FormLabel className="text-[10px] sm:text-[11px] font-black uppercase text-slate-500 tracking-widest">Valor da Causa (R$) *</FormLabel>
                         <FormControl>
                           <div className="relative">
-                            <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-emerald-500" />
+                            <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-emerald-500" />
                             <Input 
                               placeholder="0,00" 
-                              className="pl-10 bg-black/40 border-white/10 h-12 font-bold text-lg"
+                              className="pl-10 bg-black/40 border-white/10 h-10 sm:h-12 font-bold text-base sm:text-lg"
                               value={formatCurrencyBRL(field.value)}
                               onChange={(e) => handleCurrencyChange(e.target.value)}
                             />
@@ -335,7 +335,7 @@ function LeadConversionDialog({
                     name="court"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-[11px] font-black uppercase text-slate-500 tracking-widest">Fórum / Comarca *</FormLabel>
+                        <FormLabel className="text-[10px] sm:text-[11px] font-black uppercase text-slate-500 tracking-widest">Fórum / Comarca *</FormLabel>
                         <FormControl>
                           <LocationSearch value={field.value} onSelect={field.onChange} placeholder="Pesquisar tribunal..." />
                         </FormControl>
@@ -349,9 +349,9 @@ function LeadConversionDialog({
                     name="courtBranch"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-[11px] font-black uppercase text-slate-500 tracking-widest">Vara / Câmara *</FormLabel>
+                        <FormLabel className="text-[10px] sm:text-[11px] font-black uppercase text-slate-500 tracking-widest">Vara / Câmara *</FormLabel>
                         <FormControl>
-                          <Input placeholder="Ex: 2ª Vara do Trabalho de SBC" className="bg-black/40 border-white/10 h-12" {...field} />
+                          <Input placeholder="Ex: 2ª Vara do Trabalho de SBC" className="bg-black/40 border-white/10 h-10 sm:h-12" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -363,10 +363,10 @@ function LeadConversionDialog({
                     name="leadLawyerId"
                     render={({ field }) => (
                       <FormItem className="md:col-span-2">
-                        <FormLabel className="text-[11px] font-black uppercase text-slate-500 tracking-widest">Advogado Responsável (Equipe)</FormLabel>
+                        <FormLabel className="text-[10px] sm:text-[11px] font-black uppercase text-slate-500 tracking-widest">Advogado Responsável (Equipe)</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
-                            <SelectTrigger className="h-12 bg-black/40 border-white/10">
+                            <SelectTrigger className="h-10 sm:h-12 bg-black/40 border-white/10">
                               <SelectValue placeholder="Selecione o titular..." />
                             </SelectTrigger>
                           </FormControl>
@@ -387,44 +387,44 @@ function LeadConversionDialog({
 
               <Separator className="bg-white/5" />
 
-              <div className="space-y-6">
+              <div className="space-y-4 sm:space-y-6">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-[12px] font-black uppercase text-rose-400 tracking-[0.25em]">
-                    <Building className="h-5 w-5" /> Qualificação do Réu (Polo Passivo)
+                  <div className="flex items-center gap-2 text-[10px] sm:text-[12px] font-black uppercase text-rose-400 tracking-[0.2em] sm:tracking-[0.25em]">
+                    <Building className="h-4 w-4 sm:h-5 sm:w-5" /> Qualificação do Réu
                   </div>
                   <Button 
                     type="button" 
                     variant="ghost" 
                     size="sm" 
                     onClick={() => append({ name: '', document: '', address: '' })}
-                    className="h-9 text-[11px] font-black uppercase text-primary hover:bg-primary/10"
+                    className="h-8 text-[9px] sm:text-[11px] font-black uppercase text-primary hover:bg-primary/10"
                   >
-                    <Plus className="h-4 w-4 mr-2" /> Adicionar Outro Réu
+                    <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> <span className="hidden sm:inline">Adicionar Outro Réu</span><span className="sm:hidden">Novo Réu</span>
                   </Button>
                 </div>
 
-                <div className="grid gap-6">
+                <div className="grid gap-4 sm:gap-6">
                   {fields.map((field, index) => (
-                    <div key={field.id} className="p-8 rounded-[2rem] bg-white/[0.02] border-2 border-white/5 space-y-6 relative group hover:border-rose-500/20 transition-all duration-300">
+                    <div key={field.id} className="p-4 sm:p-8 rounded-[1.5rem] sm:rounded-[2rem] bg-white/[0.02] border-2 border-white/5 space-y-4 sm:space-y-6 relative group hover:border-rose-500/20 transition-all duration-300">
                       <Button 
                         type="button" 
                         variant="ghost" 
                         size="icon" 
                         onClick={() => remove(index)}
                         disabled={fields.length === 1}
-                        className="absolute top-6 right-6 h-9 w-9 text-rose-500/50 hover:text-rose-500 hover:bg-rose-500/10 rounded-full"
+                        className="absolute top-4 right-4 sm:top-6 sm:right-6 h-8 w-8 sm:h-9 sm:w-9 text-rose-500/50 hover:text-rose-500 hover:bg-rose-500/10 rounded-full"
                       >
-                        <X className="h-5 w-5" />
+                        <X className="h-4 w-4 sm:h-5 sm:w-5" />
                       </Button>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                         <FormField
                           control={form.control}
                           name={`opposingParties.${index}.name` as any}
                           render={({ field: nameField }) => (
                             <FormItem>
-                              <FormLabel className="text-[10px] font-black uppercase text-slate-500">Razão Social / Nome Completo *</FormLabel>
-                              <FormControl><Input placeholder="Ex: Empresa de Transportes LTDA" className="bg-black/40 border-white/5 h-11" {...nameField} /></FormControl>
+                              <FormLabel className="text-[9px] sm:text-[10px] font-black uppercase text-slate-500">Razão Social / Nome Completo *</FormLabel>
+                              <FormControl><Input placeholder="Ex: Empresa de Transportes LTDA" className="bg-black/40 border-white/5 h-10 sm:h-11" {...nameField} /></FormControl>
                               <FormMessage />
                             </FormItem>
                           )}
@@ -434,8 +434,8 @@ function LeadConversionDialog({
                           name={`opposingParties.${index}.document` as any}
                           render={({ field: docField }) => (
                             <FormItem>
-                              <FormLabel className="text-[10px] font-black uppercase text-slate-500">CNPJ / CPF</FormLabel>
-                              <FormControl><Input placeholder="00.000.000/0000-00" className="bg-black/40 border-white/5 h-11 font-mono" {...docField} /></FormControl>
+                              <FormLabel className="text-[9px] sm:text-[10px] font-black uppercase text-slate-500">CNPJ / CPF</FormLabel>
+                              <FormControl><Input placeholder="00.000.000/0000-00" className="bg-black/40 border-white/5 h-10 sm:h-11 font-mono" {...docField} /></FormControl>
                             </FormItem>
                           )}
                         />
@@ -445,11 +445,11 @@ function LeadConversionDialog({
                         name={`opposingParties.${index}.address` as any}
                         render={({ field: addrField }) => (
                           <FormItem>
-                            <FormLabel className="text-[10px] font-black uppercase text-slate-500">Endereço Completo</FormLabel>
+                            <FormLabel className="text-[9px] sm:text-[10px] font-black uppercase text-slate-500">Endereço Completo</FormLabel>
                             <FormControl>
                               <div className="relative">
-                                <MapPin className="absolute left-3 top-3 h-4 w-4 text-slate-600" />
-                                <Textarea placeholder="Rua, número, bairro, cidade - UF..." className="pl-10 min-h-[100px] bg-black/40 border-white/5 resize-none text-sm leading-relaxed" {...addrField} />
+                                <MapPin className="absolute left-3 top-3 h-3.5 w-3.5 sm:h-4 sm:w-4 text-slate-600" />
+                                <Textarea placeholder="Rua, número, bairro, cidade - UF..." className="pl-10 min-h-[80px] sm:min-h-[100px] bg-black/40 border-white/5 resize-none text-xs sm:text-sm leading-relaxed" {...addrField} />
                               </div>
                             </FormControl>
                           </FormItem>
@@ -463,14 +463,14 @@ function LeadConversionDialog({
           </Form>
         </ScrollArea>
 
-        <DialogFooter className="p-8 border-t border-white/5 bg-white/5 shrink-0 gap-4">
+        <DialogFooter className="p-4 sm:p-8 border-t border-white/5 bg-white/5 shrink-0 gap-3 sm:gap-4 flex-col sm:flex-row">
           <DialogClose asChild>
-            <Button variant="ghost" className="text-slate-400 font-bold uppercase text-[12px] tracking-widest px-8">Cancelar</Button>
+            <Button variant="ghost" className="text-slate-400 font-bold uppercase text-[10px] sm:text-[12px] tracking-widest px-4 sm:px-8 h-10 sm:h-14">Cancelar</Button>
           </DialogClose>
           <Button 
             type="submit" 
             form="conversion-form"
-            className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase tracking-widest text-[12px] h-14 shadow-2xl shadow-emerald-900/30"
+            className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase tracking-widest text-[10px] sm:text-[12px] h-10 sm:h-14 shadow-2xl shadow-emerald-900/30"
           >
             Finalizar Distribuição & Criar Processo
           </Button>
@@ -510,38 +510,38 @@ function LeadCard({ lead, client, lawyer, onClick }: { lead: Lead; client?: Clie
         lead.isUrgent && "border-rose-500/20 ring-1 ring-rose-500/10"
       )}
     >
-      <div className="p-4 space-y-4">
+      <div className="p-3 sm:p-4 space-y-3 sm:space-y-4">
         <div className="flex items-start justify-between">
-          <div className="flex flex-wrap gap-1.5">
-            <Badge variant="outline" className={cn("text-[8px] font-black uppercase border-none px-1.5 h-4.5", priority.color)}>
+          <div className="flex flex-wrap gap-1">
+            <Badge variant="outline" className={cn("text-[7px] sm:text-[8px] font-black uppercase border-none px-1 h-4", priority.color)}>
               {priority.label}
             </Badge>
-            <Badge variant="outline" className="text-[8px] font-black uppercase bg-white/5 text-primary border-primary/20 px-1.5 h-4.5">
+            <Badge variant="outline" className="text-[7px] sm:text-[8px] font-black uppercase bg-white/5 text-primary border-primary/20 px-1 h-4">
               {lead.legalArea}
             </Badge>
           </div>
           <div className={cn(
-            "flex items-center gap-1 text-[8px] font-black uppercase tracking-tighter transition-colors",
+            "flex items-center gap-1 text-[7px] sm:text-[8px] font-black uppercase tracking-tighter transition-colors",
             hoursInStage > 24 ? "text-rose-500 animate-pulse" : hoursInStage > 12 ? "text-amber-500" : "text-slate-500"
           )}>
-            <Clock className="h-3 w-3" /> {hoursInStage}h na fase
+            <Clock className="h-2.5 w-2.5 sm:h-3 sm:w-3" /> {hoursInStage}h na fase
           </div>
         </div>
         
-        <h4 className="text-base font-black text-white group-hover/card:text-primary transition-colors line-clamp-2 leading-tight min-h-[40px] uppercase tracking-tight">
+        <h4 className="text-sm sm:text-base font-black text-white group-hover/card:text-primary transition-colors line-clamp-2 leading-tight min-h-[36px] sm:min-h-[40px] uppercase tracking-tight">
           {lead.title}
         </h4>
 
         {totalTasks > 0 && (
-          <div className="space-y-2 pt-1">
-            <div className="flex items-center justify-between text-[8px] font-black uppercase text-slate-500 tracking-[0.15em]">
-              <span className="flex items-center gap-1.5">
-                <ShieldCheck className={cn("h-3 w-3", progress === 100 ? "text-emerald-500" : "text-slate-600")} />
+          <div className="space-y-1.5 sm:space-y-2 pt-0.5 sm:pt-1">
+            <div className="flex items-center justify-between text-[7px] sm:text-[8px] font-black uppercase text-slate-500 tracking-[0.1em] sm:tracking-[0.15em]">
+              <span className="flex items-center gap-1">
+                <ShieldCheck className={cn("h-2.5 w-2.5 sm:h-3 sm:w-3", progress === 100 ? "text-emerald-500" : "text-slate-600")} />
                 Produção {completedCount}/{totalTasks}
               </span>
               <span className={cn(progress === 100 ? "text-emerald-500" : "text-white")}>{Math.round(progress)}%</span>
             </div>
-            <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+            <div className="h-1 sm:h-1.5 bg-white/5 rounded-full overflow-hidden">
               <div 
                 className={cn(
                   "h-full transition-all duration-500 rounded-full",
@@ -553,30 +553,30 @@ function LeadCard({ lead, client, lawyer, onClick }: { lead: Lead; client?: Clie
           </div>
         )}
 
-        <div className="flex items-center gap-3 p-3 rounded-2xl bg-black/30 border border-white/5 group-hover/card:border-primary/20 transition-all duration-300">
-          <div className="h-9 w-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0 shadow-inner">
-            <UserCircle className="h-5 w-5 text-blue-400" />
+        <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-xl sm:rounded-2xl bg-black/30 border border-white/5 group-hover/card:border-primary/20 transition-all duration-300">
+          <div className="h-7 w-7 sm:h-9 sm:w-9 rounded-lg sm:rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0 shadow-inner">
+            <UserCircle className="h-4 w-4 sm:h-5 sm:w-5 text-blue-400" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-xs font-black text-slate-200 truncate leading-none mb-1">{client?.firstName} {client?.lastName}</p>
-            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest flex items-center gap-1">
-              <TrendingUp className="h-2.5 w-2.5 text-primary" /> {lead.captureSource}
+            <p className="text-[10px] sm:text-xs font-black text-slate-200 truncate leading-none mb-0.5 sm:mb-1">{client?.firstName} {client?.lastName}</p>
+            <p className="text-[7px] sm:text-[9px] text-slate-500 font-bold uppercase tracking-widest flex items-center gap-1">
+              <TrendingUp className="h-2 w-2 sm:h-2.5 sm:w-2.5 text-primary" /> {lead.captureSource}
             </p>
           </div>
         </div>
       </div>
 
-      <div className="px-4 py-3 border-t border-white/5 bg-white/[0.02] flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-primary text-[9px] font-black border border-primary/20 shadow-sm">
+      <div className="px-3 sm:px-4 py-2 sm:py-3 border-t border-white/5 bg-white/[0.02] flex items-center justify-between">
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          <div className="h-5 w-5 sm:h-6 sm:w-6 rounded-full bg-primary/10 flex items-center justify-center text-primary text-[8px] sm:text-[9px] font-black border border-primary/20 shadow-sm">
             {lawyer?.firstName?.charAt(0)}
           </div>
-          <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter truncate max-w-[80px]">
+          <span className="text-[8px] sm:text-[10px] font-black text-slate-400 uppercase tracking-tighter truncate max-w-[60px] sm:max-w-[80px]">
             {lawyer?.firstName}
           </span>
         </div>
-        <div className="flex items-center gap-1.5 text-[9px] text-slate-600 font-black uppercase tracking-widest">
-          <RefreshCw className="h-3 w-3" /> {formatDistanceToNow(lead.updatedAt.toDate(), { locale: ptBR, addSuffix: false })}
+        <div className="flex items-center gap-1 text-[7px] sm:text-[9px] text-slate-600 font-black uppercase tracking-widest">
+          <RefreshCw className="h-2.5 w-2.5 sm:h-3 sm:w-3" /> {formatDistanceToNow(lead.updatedAt.toDate(), { locale: ptBR, addSuffix: false })}
         </div>
       </div>
     </Card>
@@ -588,17 +588,17 @@ function KanbanColumn({ id, stage, leads, clientsMap, staffMap, onCardClick }: {
   const config = stageConfig[stage as LeadStatus] || stageConfig.NOVO;
 
   return (
-    <div ref={setNodeRef} className="flex flex-col gap-4 min-w-[320px] w-full max-w-[340px] bg-white/[0.01] p-4 rounded-[2rem] border border-white/5 transition-colors hover:bg-white/[0.02] h-full">
-      <div className="flex items-center justify-between px-3 mb-2 pb-2 border-b border-white/5">
-        <div className="flex items-center gap-3">
-          <div className={cn("h-3 w-3 rounded-full shadow-[0_0_12px] shadow-current animate-pulse", config.color.split(' ')[1])} />
-          <h3 className="text-[12px] font-black uppercase tracking-[0.25em] text-white/90">{config.label}</h3>
+    <div ref={setNodeRef} className="flex flex-col gap-3 sm:gap-4 min-w-[280px] sm:min-w-[320px] w-full max-w-[340px] bg-white/[0.01] p-3 sm:p-4 rounded-[1.5rem] sm:rounded-[2rem] border border-white/5 transition-colors hover:bg-white/[0.02] h-full overflow-hidden">
+      <div className="flex items-center justify-between px-2 sm:px-3 mb-1 sm:mb-2 pb-2 border-b border-white/5">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className={cn("h-2.5 w-2.5 sm:h-3 sm:w-3 rounded-full shadow-[0_0_12px] shadow-current animate-pulse", config.color.split(' ')[1])} />
+          <h3 className="text-[10px] sm:text-[12px] font-black uppercase tracking-[0.2em] sm:tracking-[0.25em] text-white/90">{config.label}</h3>
         </div>
-        <Badge variant="secondary" className="bg-white/5 text-slate-500 text-[11px] font-black px-2.5 h-6 border-none rounded-lg shadow-inner">{leads.length}</Badge>
+        <Badge variant="secondary" className="bg-white/5 text-slate-500 text-[9px] sm:text-[11px] font-black px-2 h-5 sm:h-6 border-none rounded-lg shadow-inner">{leads.length}</Badge>
       </div>
       
-      <ScrollArea className="flex-1 h-full pr-2">
-        <div className="flex flex-col gap-4 pb-10">
+      <ScrollArea className="flex-1 h-full pr-1 sm:pr-2">
+        <div className="flex flex-col gap-3 sm:gap-4 pb-10 sm:pb-20">
           <SortableContext items={leads.map(l => l.id)} strategy={verticalListSortingStrategy}>
             {leads.map((lead: Lead) => (
               <LeadCard 
@@ -611,13 +611,13 @@ function KanbanColumn({ id, stage, leads, clientsMap, staffMap, onCardClick }: {
             ))}
           </SortableContext>
           {leads.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-24 opacity-20 border-2 border-dashed border-white/5 rounded-[2rem] group transition-all hover:opacity-30">
-              <div className="h-16 w-16 rounded-full bg-white/5 flex items-center justify-center mb-4">
-                <Target className="h-8 w-8 text-slate-500" />
+            <div className="flex flex-col items-center justify-center py-16 sm:py-24 opacity-20 border-2 border-dashed border-white/5 rounded-[1.5rem] sm:rounded-[2rem] group transition-all hover:opacity-30">
+              <div className="h-12 w-12 sm:h-16 sm:w-16 rounded-full bg-white/5 flex items-center justify-center mb-3 sm:mb-4">
+                <Target className="h-6 w-6 sm:h-8 sm:w-8 text-slate-500" />
               </div>
               <div className="text-center space-y-1">
-                <p className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">Esteira Vazia</p>
-                <p className="text-[9px] text-slate-600 font-bold uppercase">Aguardando demandas</p>
+                <p className="text-[9px] sm:text-[11px] font-black uppercase tracking-[0.15em] sm:tracking-[0.2em] text-slate-400">Esteira Vazia</p>
+                <p className="text-[7px] sm:text-[9px] text-slate-600 font-bold uppercase">Aguardando demandas</p>
               </div>
             </div>
           )}
@@ -697,48 +697,48 @@ function LeadDetailsSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="sm:max-w-4xl bg-[#020617] border-white/10 text-white p-0 flex flex-col h-[100vh] overflow-hidden shadow-2xl">
-        <SheetHeader className="p-8 border-b border-white/5 bg-white/[0.02] shrink-0 text-left">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <Badge variant="outline" className={cn("text-[11px] font-black uppercase h-7 px-4 border-2 transition-all", stage.color)}>
-                <stage.icon className="h-4 w-4 mr-2" /> {stage.label}
+      <SheetContent className="sm:max-w-4xl max-w-[100vw] bg-[#020617] border-white/10 text-white p-0 flex flex-col h-[100vh] overflow-hidden shadow-2xl">
+        <SheetHeader className="p-4 sm:p-8 border-b border-white/5 bg-white/[0.02] shrink-0 text-left">
+          <div className="flex items-center justify-between mb-4 sm:mb-6">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <Badge variant="outline" className={cn("text-[9px] sm:text-[11px] font-black uppercase h-6 sm:h-7 px-2 sm:px-4 border-2 transition-all", stage.color)}>
+                <stage.icon className="h-3 w-3 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" /> {stage.label}
               </Badge>
               {isReadyToAdvance && (
-                <Badge className="bg-emerald-600 text-white font-black text-[10px] uppercase tracking-widest animate-in zoom-in h-7 px-4 shadow-lg shadow-emerald-900/40">
-                  <CheckCircle2 className="h-4 w-4 mr-2" /> Fase Concluída
+                <Badge className="bg-emerald-600 text-white font-black text-[8px] sm:text-[10px] uppercase tracking-widest animate-in zoom-in h-6 sm:h-7 px-2 sm:px-4 shadow-lg shadow-emerald-900/40">
+                  <CheckCircle2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" /> <span className="hidden sm:inline">Fase Concluída</span><span className="sm:hidden">OK</span>
                 </Badge>
               )}
             </div>
             {lead.status === 'DISTRIBUICAO' && (
-              <Button size="lg" className="bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase text-[11px] h-11 px-8 shadow-2xl shadow-emerald-900/30" onClick={() => onProtocolClick(lead)}>
-                <RefreshCw className="h-4 w-4 mr-2" /> Protocolar Agora
+              <Button size="sm" className="bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase text-[9px] sm:text-[11px] h-9 sm:h-11 px-4 sm:px-8 shadow-2xl shadow-emerald-900/30" onClick={() => onProtocolClick(lead)}>
+                <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" /> Protocolar
               </Button>
             )}
           </div>
-          <SheetTitle className="text-5xl font-black font-headline text-white leading-tight uppercase tracking-tight text-left mb-2">{lead.title}</SheetTitle>
-          <SheetDescription className="text-slate-400 text-base font-medium text-left">Gestão de micro-etapas e triagem de documentos pré-processuais.</SheetDescription>
+          <SheetTitle className="text-2xl sm:text-5xl font-black font-headline text-white leading-tight uppercase tracking-tight text-left mb-1 sm:mb-2">{lead.title}</SheetTitle>
+          <SheetDescription className="text-slate-400 text-xs sm:text-base font-medium text-left">Gestão de micro-etapas e triagem de documentos pré-processuais.</SheetDescription>
         </SheetHeader>
 
         <ScrollArea className="flex-1">
-          <div className="p-10 space-y-16 pb-32">
+          <div className="p-4 sm:p-10 space-y-10 sm:space-y-16 pb-32">
             
-            <section className="space-y-8">
+            <section className="space-y-4 sm:space-y-8">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3 text-[12px] font-black uppercase text-slate-500 tracking-[0.25em]">
-                  <Activity className="h-5 w-5 text-primary" /> Checklist da Etapa: {stage.label}
+                <div className="flex items-center gap-2 sm:gap-3 text-[10px] sm:text-[12px] font-black uppercase text-slate-500 tracking-[0.2em] sm:tracking-[0.25em]">
+                  <Activity className="h-4 w-4 sm:h-5 sm:w-5 text-primary" /> Checklist: {stage.label}
                 </div>
-                <span className="text-[11px] font-black text-white bg-white/5 px-3 py-1.5 rounded-xl border border-white/10">{completedCount}/{totalTasks} Concluído</span>
+                <span className="text-[9px] sm:text-[11px] font-black text-white bg-white/5 px-2 sm:py-1.5 py-1 rounded-lg sm:rounded-xl border border-white/10">{completedCount}/{totalTasks}</span>
               </div>
               
-              <div className="grid gap-4">
+              <div className="grid gap-3 sm:gap-4">
                 {stage.tasks.map(task => {
                   const isDone = lead.completedTasks?.includes(task);
                   return (
                     <div 
                       key={task} 
                       className={cn(
-                        "flex items-center gap-6 p-6 rounded-[2rem] border-2 transition-all duration-300 group cursor-pointer",
+                        "flex items-center gap-4 sm:gap-6 p-4 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] border-2 transition-all duration-300 group cursor-pointer",
                         isDone 
                           ? "bg-emerald-500/[0.03] border-emerald-500/20" 
                           : "bg-white/[0.03] border-white/5 hover:border-primary/30 hover:bg-white/[0.05]"
@@ -746,44 +746,44 @@ function LeadDetailsSheet({
                       onClick={() => handleToggleTask(task)}
                     >
                       <div className={cn(
-                        "h-8 w-8 rounded-2xl border-2 flex items-center justify-center transition-all shadow-inner",
+                        "h-6 w-6 sm:h-8 sm:w-8 rounded-xl sm:rounded-2xl border-2 flex items-center justify-center transition-all shadow-inner",
                         isDone ? "bg-emerald-500 border-emerald-500 text-white" : "border-white/10 group-hover:border-primary/50"
                       )}>
-                        {isDone && <Check className="h-4 w-4 stroke-[3]" />}
+                        {isDone && <Check className="h-3 w-3 sm:h-4 sm:w-4 stroke-[3]" />}
                       </div>
                       <span className={cn(
-                        "text-lg font-bold tracking-tight flex-1",
+                        "text-sm sm:text-lg font-bold tracking-tight flex-1",
                         isDone ? "text-emerald-400/70 line-through" : "text-slate-200"
                       )}>
                         {task}
                       </span>
-                      {!isDone && <ArrowRight className="h-5 w-5 text-white/5 group-hover:text-primary transition-colors opacity-0 group-hover:opacity-100" />}
+                      {!isDone && <ArrowRight className="h-4 w-4 sm:h-5 sm:w-5 text-white/5 group-hover:text-primary transition-colors opacity-0 group-hover:opacity-100" />}
                     </div>
                   );
                 })}
               </div>
             </section>
 
-            <section className="space-y-8">
-              <div className="flex items-center gap-3 text-[12px] font-black uppercase text-slate-500 tracking-[0.25em]">
-                <UserCircle className="h-5 w-5 text-blue-400" /> Cliente de Triagem
+            <section className="space-y-4 sm:space-y-8">
+              <div className="flex items-center gap-2 sm:gap-3 text-[10px] sm:text-[12px] font-black uppercase text-slate-500 tracking-[0.2em] sm:tracking-[0.25em]">
+                <UserCircle className="h-4 w-4 sm:h-5 sm:w-5 text-blue-400" /> Cliente de Triagem
               </div>
-              <div className="p-10 rounded-[3rem] bg-gradient-to-br from-white/[0.02] to-white/[0.05] border-2 border-white/5 flex flex-col md:flex-row items-center gap-10 shadow-2xl relative overflow-hidden group">
-                <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
-                  <Bot className="h-32 w-32 text-primary" />
+              <div className="p-6 sm:p-10 rounded-[2rem] sm:rounded-[3rem] bg-gradient-to-br from-white/[0.02] to-white/[0.05] border-2 border-white/5 flex flex-col md:flex-row items-center gap-6 sm:gap-10 shadow-2xl relative overflow-hidden group">
+                <div className="absolute top-0 right-0 p-4 sm:p-8 opacity-5 group-hover:opacity-10 transition-opacity">
+                  <Bot className="h-24 w-24 sm:h-32 sm:w-32 text-primary" />
                 </div>
-                <div className="h-28 w-28 rounded-[2.5rem] bg-blue-500/10 flex items-center justify-center border-2 border-blue-500/20 shrink-0 shadow-2xl">
-                  <UserCircle className="h-16 w-16 text-blue-400" />
+                <div className="h-20 w-20 sm:h-28 sm:w-28 rounded-[1.5rem] sm:rounded-[2.5rem] bg-blue-500/10 flex items-center justify-center border-2 border-blue-500/20 shrink-0 shadow-2xl">
+                  <UserCircle className="h-10 w-10 sm:h-16 sm:w-16 text-blue-400" />
                 </div>
                 <div className="min-w-0 flex-1 relative z-10 text-center md:text-left">
-                  <h4 className="text-4xl font-black text-white truncate tracking-tighter mb-4">{client?.firstName} {client?.lastName}</h4>
-                  <div className="flex flex-wrap justify-center md:justify-start gap-8 mt-2">
-                    <div className="flex items-center gap-3 text-base text-slate-400 font-bold group/link cursor-pointer hover:text-white transition-colors">
-                      <div className="h-9 w-9 rounded-xl bg-white/5 flex items-center justify-center border border-white/10 group-hover/link:border-primary/50"><Mail className="h-4 w-4 text-primary" /></div>
+                  <h4 className="text-2xl sm:text-4xl font-black text-white truncate tracking-tighter mb-2 sm:mb-4">{client?.firstName} {client?.lastName}</h4>
+                  <div className="flex flex-wrap justify-center md:justify-start gap-4 sm:gap-8 mt-2">
+                    <div className="flex items-center gap-2 sm:gap-3 text-xs sm:text-base text-slate-400 font-bold group/link cursor-pointer hover:text-white transition-colors">
+                      <div className="h-7 w-7 sm:h-9 sm:w-9 rounded-lg sm:rounded-xl bg-white/5 flex items-center justify-center border border-white/10 group-hover/link:border-primary/50"><Mail className="h-3 w-3 sm:h-4 sm:w-4 text-primary" /></div>
                       {client?.email || 'N/A'}
                     </div>
-                    <div className="flex items-center gap-3 text-base text-slate-400 font-bold group/link cursor-pointer hover:text-white transition-colors">
-                      <div className="h-9 w-9 rounded-xl bg-white/5 flex items-center justify-center border border-white/10 group-hover/link:border-emerald-500/50"><Smartphone className="h-4 w-4 text-emerald-500" /></div>
+                    <div className="flex items-center gap-2 sm:gap-3 text-xs sm:text-base text-slate-400 font-bold group/link cursor-pointer hover:text-white transition-colors">
+                      <div className="h-7 w-7 sm:h-9 sm:w-9 rounded-lg sm:rounded-xl bg-white/5 flex items-center justify-center border border-white/10 group-hover/link:border-emerald-500/50"><Smartphone className="h-3 w-3 sm:h-4 sm:w-4 text-emerald-500" /></div>
                       {client?.mobile || 'N/A'}
                     </div>
                   </div>
@@ -791,19 +791,18 @@ function LeadDetailsSheet({
               </div>
             </section>
 
-            {/* Triagem Técnica Especializada */}
             {lead.status === 'NOVO' && interviewQuestions.length > 0 && (
-              <section className="space-y-8 animate-in fade-in slide-in-from-top-4 duration-500">
-                <div className="flex items-center gap-3 text-[12px] font-black uppercase text-amber-400 tracking-[0.25em]">
-                  <ClipboardList className="h-5 w-5" /> Entrevista de Triagem: {lead.legalArea}
+              <section className="space-y-4 sm:space-y-8 animate-in fade-in slide-in-from-top-4 duration-500">
+                <div className="flex items-center gap-2 sm:gap-3 text-[10px] sm:text-[12px] font-black uppercase text-amber-400 tracking-[0.2em] sm:tracking-[0.25em]">
+                  <ClipboardList className="h-4 w-4 sm:h-5 sm:w-5" /> Entrevista de Triagem
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-amber-500/[0.03] border-2 border-amber-500/10 p-10 rounded-[3rem]">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 bg-amber-500/[0.03] border-2 border-amber-500/10 p-6 sm:p-10 rounded-[2rem] sm:rounded-[3rem]">
                   {interviewQuestions.map((q, i) => (
-                    <div key={i} className="space-y-3">
-                      <Label className="text-[11px] font-black uppercase text-slate-500 tracking-widest ml-1">{q}</Label>
+                    <div key={i} className="space-y-2 sm:space-y-3">
+                      <Label className="text-[9px] sm:text-[11px] font-black uppercase text-slate-500 tracking-widest ml-1">{q}</Label>
                       <Input 
                         placeholder="Resposta do cliente..." 
-                        className="bg-black/40 border-white/5 h-12 text-sm rounded-xl focus:border-amber-500/50 transition-all"
+                        className="bg-black/40 border-white/5 h-10 sm:h-12 text-xs sm:text-sm rounded-lg sm:rounded-xl focus:border-amber-500/50 transition-all"
                       />
                     </div>
                   ))}
@@ -811,88 +810,88 @@ function LeadDetailsSheet({
               </section>
             )}
 
-            <section className="space-y-8">
+            <section className="space-y-4 sm:space-y-8">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3 text-[12px] font-black uppercase text-slate-500 tracking-[0.25em]">
-                  <FileText className="h-5 w-5 text-primary" /> Evidências e Documentos
+                <div className="flex items-center gap-2 sm:gap-3 text-[10px] sm:text-[12px] font-black uppercase text-slate-500 tracking-[0.2em] sm:tracking-[0.25em]">
+                  <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-primary" /> Evidências e Documentos
                 </div>
                 {lead.driveFolderId && (
-                  <Button variant="ghost" size="sm" className="h-9 text-[11px] font-black uppercase text-primary hover:bg-primary/10 gap-3 border-2 border-primary/20 rounded-2xl px-6" asChild>
-                    <a href={`https://drive.google.com/drive/folders/${lead.driveFolderId}`} target="_blank"><ExternalLink className="h-4 w-4" /> Abrir Drive Central</a>
+                  <Button variant="ghost" size="sm" className="h-8 sm:h-9 text-[9px] sm:text-[11px] font-black uppercase text-primary hover:bg-primary/10 gap-2 sm:gap-3 border-2 border-primary/20 rounded-xl sm:rounded-2xl px-3 sm:px-6" asChild>
+                    <a href={`https://drive.google.com/drive/folders/${lead.driveFolderId}`} target="_blank"><ExternalLink className="h-3 w-3 sm:h-4 sm:w-4" /> Drive</a>
                   </Button>
                 )}
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                 {isLoadingFiles ? (
                   <>
-                    <Skeleton className="h-20 w-full bg-white/5 rounded-[2rem]" />
-                    <Skeleton className="h-20 w-full bg-white/5 rounded-[2rem]" />
+                    <Skeleton className="h-16 sm:h-20 w-full bg-white/5 rounded-[1.5rem] sm:rounded-[2rem]" />
+                    <Skeleton className="h-16 sm:h-20 w-full bg-white/5 rounded-[1.5rem] sm:rounded-[2rem]" />
                   </>
                 ) : files.length > 0 ? (
                   files.map(f => (
-                    <div key={f.id} className="flex items-center justify-between p-6 rounded-[2rem] bg-black/40 border-2 border-white/5 hover:border-primary/30 transition-all group">
-                      <div className="flex items-center gap-5">
-                        <div className="h-12 w-12 rounded-2xl bg-white/5 flex items-center justify-center border-2 border-white/10 group-hover:bg-primary/10 transition-colors">
-                          {f.iconLink ? <img src={f.iconLink} className="h-6 w-6" /> : <FileText className="h-6 w-6 text-primary" />}
+                    <div key={f.id} className="flex items-center justify-between p-4 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] bg-black/40 border-2 border-white/5 hover:border-primary/30 transition-all group">
+                      <div className="flex items-center gap-3 sm:gap-5 min-w-0">
+                        <div className="h-9 w-9 sm:h-12 sm:w-12 rounded-lg sm:rounded-2xl bg-white/5 flex items-center justify-center border-2 border-white/10 group-hover:bg-primary/10 transition-colors shrink-0">
+                          {f.iconLink ? <img src={f.iconLink} className="h-5 w-5 sm:h-6 sm:w-6" /> : <FileText className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />}
                         </div>
                         <div className="flex flex-col min-w-0">
-                          <span className="text-sm font-bold text-slate-200 group-hover:text-white truncate max-w-[180px]">{f.name}</span>
-                          <span className="text-[10px] text-slate-500 font-mono uppercase tracking-widest">{f.mimeType?.split('.').pop()}</span>
+                          <span className="text-[11px] sm:text-sm font-bold text-slate-200 group-hover:text-white truncate max-w-[140px] sm:max-w-[180px]">{f.name}</span>
+                          <span className="text-[8px] sm:text-[10px] text-slate-500 font-mono uppercase tracking-widest">{f.mimeType?.split('.').pop()}</span>
                         </div>
                       </div>
-                      <Button variant="ghost" size="icon" className="h-11 w-11 rounded-2xl hover:bg-white/10" asChild>
-                        <a href={f.webViewLink} target="_blank" title="Download"><Download className="h-5 w-5 text-slate-400 group-hover:text-primary" /></a>
+                      <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-11 sm:w-11 rounded-lg sm:rounded-2xl hover:bg-white/10" asChild>
+                        <a href={f.webViewLink} target="_blank" title="Abrir"><Download className="h-4 w-4 sm:h-5 sm:w-5 text-slate-400 group-hover:text-primary" /></a>
                       </Button>
                     </div>
                   ))
                 ) : (
-                  <div className="col-span-full text-center py-20 border-2 border-dashed border-white/5 rounded-[3rem] opacity-30 flex flex-col items-center gap-4">
-                    <FileUp className="h-12 w-12 text-slate-500" />
-                    <p className="text-[12px] font-black uppercase tracking-[0.25em] text-slate-400">Sem arquivos anexados</p>
+                  <div className="col-span-full text-center py-16 sm:py-20 border-2 border-dashed border-white/5 rounded-[2rem] sm:rounded-[3rem] opacity-30 flex flex-col items-center gap-3 sm:gap-4">
+                    <FileUp className="h-10 w-10 sm:h-12 sm:w-12 text-slate-500" />
+                    <p className="text-[10px] sm:text-[12px] font-black uppercase tracking-[0.2em] sm:tracking-[0.25em] text-slate-400">Sem arquivos anexados</p>
                   </div>
                 )}
               </div>
             </section>
 
-            <section className="space-y-8">
-              <div className="flex items-center gap-3 text-[12px] font-black uppercase text-slate-500 tracking-[0.25em]">
-                <History className="h-5 w-5 text-primary" /> Timeline de Atendimento
+            <section className="space-y-6 sm:space-y-8">
+              <div className="flex items-center gap-2 sm:gap-3 text-[10px] sm:text-[12px] font-black uppercase text-slate-500 tracking-[0.2em] sm:tracking-[0.25em]">
+                <History className="h-4 w-4 sm:h-5 sm:w-5 text-primary" /> Timeline de Atendimento
               </div>
-              <div className="space-y-10">
-                <div className="flex gap-4 items-end">
-                  <div className="flex-1 space-y-3">
-                    <Label className="text-[11px] font-black uppercase text-slate-500 tracking-widest ml-2">Nova Anotação Estratégica</Label>
+              <div className="space-y-8 sm:space-y-10">
+                <div className="flex gap-3 sm:gap-4 items-end">
+                  <div className="flex-1 space-y-2 sm:space-y-3">
+                    <Label className="text-[9px] sm:text-[11px] font-black uppercase text-slate-500 tracking-widest ml-2">Nova Anotação</Label>
                     <Textarea 
-                      placeholder="Registre pontos relevantes da entrevista ou ordens da banca..." 
-                      className="bg-black/40 border-2 border-white/10 text-base h-32 rounded-[2.5rem] p-8 resize-none focus:border-primary transition-all shadow-inner leading-relaxed" 
+                      placeholder="Registre pontos relevantes da triagem..." 
+                      className="bg-black/40 border-2 border-white/10 text-xs sm:text-base h-24 sm:h-32 rounded-[1.5rem] sm:rounded-[2.5rem] p-4 sm:p-8 resize-none focus:border-primary transition-all shadow-inner leading-relaxed" 
                       value={newNote} 
                       onChange={e => setNewNote(e.target.value)} 
                     />
                   </div>
                   <Button 
                     className={cn(
-                      "h-32 w-20 rounded-[2.5rem] transition-all",
+                      "h-24 sm:h-32 w-14 sm:w-20 rounded-[1.5rem] sm:rounded-[2.5rem] transition-all shrink-0",
                       newNote.trim() ? "bg-primary text-primary-foreground shadow-2xl shadow-primary/30" : "bg-white/5 text-slate-600"
                     )} 
                     onClick={handleAddNote} 
                     disabled={!newNote.trim()}
                   >
-                    <Plus className="h-8 w-8" />
+                    <Plus className="h-6 w-6 sm:h-8 sm:w-8" />
                   </Button>
                 </div>
                 
-                <div className="space-y-8 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px before:h-full before:w-0.5 before:bg-gradient-to-b before:from-primary/30 before:via-border/40 before:to-transparent">
+                <div className="space-y-6 sm:space-y-8 relative before:absolute before:inset-0 before:ml-4 sm:before:ml-5 before:-translate-x-px before:h-full before:w-0.5 before:bg-gradient-to-b before:from-primary/30 before:via-border/40 before:to-transparent">
                   {(lead as any).timeline?.sort((a: any, b: any) => b.date.seconds - a.date.seconds).map((event: any) => (
-                    <div key={event.id} className="flex gap-8 items-start group relative animate-in slide-in-from-left-2">
-                      <div className="h-10 w-10 rounded-2xl bg-[#020617] border-2 border-primary/30 flex items-center justify-center shrink-0 z-10 shadow-lg group-hover:border-primary transition-colors">
-                        <MessageSquare className="h-4 w-4 text-primary" />
+                    <div key={event.id} className="flex gap-4 sm:gap-8 items-start group relative animate-in slide-in-from-left-2">
+                      <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl sm:rounded-2xl bg-[#020617] border-2 border-primary/30 flex items-center justify-center shrink-0 z-10 shadow-lg group-hover:border-primary transition-colors">
+                        <MessageSquare className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
                       </div>
-                      <div className="flex-1 space-y-3 p-8 rounded-[2.5rem] bg-white/[0.03] border-2 border-white/5 hover:border-white/10 transition-all shadow-2xl">
+                      <div className="flex-1 space-y-2 sm:space-y-3 p-5 sm:p-8 rounded-[1.5rem] sm:rounded-[2.5rem] bg-white/[0.03] border-2 border-white/5 hover:border-white/10 transition-all shadow-2xl">
                         <div className="flex items-center justify-between">
-                          <span className="text-[11px] font-black uppercase text-primary tracking-widest">{event.authorName}</span>
-                          <span className="text-[10px] text-slate-500 font-mono">{format(event.date.toDate(), 'dd/MM/yy HH:mm')}</span>
+                          <span className="text-[9px] sm:text-[11px] font-black uppercase text-primary tracking-widest">{event.authorName}</span>
+                          <span className="text-[8px] sm:text-[10px] text-slate-500 font-mono">{format(event.date.toDate(), 'dd/MM/yy HH:mm')}</span>
                         </div>
-                        <p className="text-base text-slate-200 leading-relaxed font-medium">{event.description}</p>
+                        <p className="text-xs sm:text-base text-slate-200 leading-relaxed font-medium">{event.description}</p>
                       </div>
                     </div>
                   ))}
@@ -932,48 +931,48 @@ function NewLeadSheet({ open, onOpenChange, lawyers, onCreated }: { open: boolea
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="sm:max-w-3xl bg-[#020617] border-white/10 text-white p-0 flex flex-col h-full shadow-2xl">
-        <SheetHeader className="p-8 border-b border-white/5 bg-white/[0.02] shrink-0 text-left">
-          <SheetTitle className="text-4xl font-black font-headline text-white flex items-center gap-5 tracking-tight uppercase text-left">
-            <div className="h-14 w-14 rounded-[1.5rem] bg-primary/10 flex items-center justify-center border-2 border-primary/20 shadow-2xl shadow-primary/10">
-              <PlusCircle className="h-7 w-7 text-primary" />
+      <SheetContent className="sm:max-w-3xl max-w-[100vw] bg-[#020617] border-white/10 text-white p-0 flex flex-col h-full shadow-2xl">
+        <SheetHeader className="p-6 sm:p-8 border-b border-white/5 bg-white/[0.02] shrink-0 text-left">
+          <SheetTitle className="text-2xl sm:text-4xl font-black font-headline text-white flex items-center gap-3 sm:gap-5 tracking-tight uppercase text-left">
+            <div className="h-10 w-10 sm:h-14 w-14 rounded-lg sm:rounded-[1.5rem] bg-primary/10 flex items-center justify-center border-2 border-primary/20 shadow-2xl shadow-primary/10 shrink-0">
+              <PlusCircle className="h-5 w-5 sm:h-7 sm:w-7 text-primary" />
             </div>
             Novo Atendimento
           </SheetTitle>
         </SheetHeader>
         <ScrollArea className="flex-1">
-          <div className="p-10">
+          <div className="p-6 sm:p-10">
             <Form {...form}>
-              <form id="new-lead-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-10">
+              <form id="new-lead-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 sm:space-y-10">
                 <FormField control={form.control} name="clientId" render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-[12px] font-black uppercase text-slate-500 tracking-[0.25em] ml-2">Cliente Principal *</FormLabel>
+                    <FormLabel className="text-[10px] sm:text-[12px] font-black uppercase text-slate-500 tracking-[0.2em] sm:tracking-[0.25em] ml-1 sm:ml-2">Cliente Principal *</FormLabel>
                     <ClientSearchInput selectedClientId={field.value} onSelect={(c) => field.onChange(c.id)} onCreateNew={() => setShowClientModal(true)} />
                     <FormMessage />
                   </FormItem>
                 )} />
                 <FormField control={form.control} name="title" render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-[12px] font-black uppercase text-slate-500 tracking-[0.25em] ml-2">Título da Demanda *</FormLabel>
-                    <Input placeholder="Ex: Revisional de Horas Extras - Empresa X" className="bg-black/40 border-2 border-white/5 h-14 rounded-2xl text-lg font-bold focus:border-primary/50 transition-all shadow-inner" {...field} />
+                    <FormLabel className="text-[10px] sm:text-[12px] font-black uppercase text-slate-500 tracking-[0.2em] sm:tracking-[0.25em] ml-1 sm:ml-2">Título da Demanda *</FormLabel>
+                    <Input placeholder="Ex: Revisional de Horas Extras..." className="bg-black/40 border-2 border-white/5 h-12 sm:h-14 rounded-xl sm:rounded-2xl text-base sm:text-lg font-bold focus:border-primary/50 transition-all shadow-inner" {...field} />
                     <FormMessage />
                   </FormItem>
                 )} />
-                <div className="grid grid-cols-2 gap-8">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8">
                   <FormField control={form.control} name="lawyerId" render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-[12px] font-black uppercase text-slate-500 tracking-[0.25em] ml-2">Responsável *</FormLabel>
+                      <FormLabel className="text-[10px] sm:text-[12px] font-black uppercase text-slate-500 tracking-[0.2em] sm:tracking-[0.25em] ml-1 sm:ml-2">Responsável *</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl><SelectTrigger className="bg-black/40 border-2 border-white/5 h-14 rounded-2xl"><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
+                        <FormControl><SelectTrigger className="bg-black/40 border-2 border-white/5 h-12 sm:h-14 rounded-xl sm:rounded-2xl"><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
                         <SelectContent className="bg-[#0f172a] border-white/10 text-white">{lawyers.map(l => <SelectItem key={l.id} value={l.id} className="font-bold">Dr(a). {l.firstName}</SelectItem>)}</SelectContent>
                       </Select>
                     </FormItem>
                   )} />
                   <FormField control={form.control} name="legalArea" render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-[12px] font-black uppercase text-slate-500 tracking-[0.25em] ml-2">Área Jurídica *</FormLabel>
+                      <FormLabel className="text-[10px] sm:text-[12px] font-black uppercase text-slate-500 tracking-[0.2em] sm:tracking-[0.25em] ml-1 sm:ml-2">Área Jurídica *</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl><SelectTrigger className="bg-black/40 border-2 border-white/5 h-14 rounded-2xl"><SelectValue /></SelectTrigger></FormControl>
+                        <FormControl><SelectTrigger className="bg-black/40 border-2 border-white/5 h-12 sm:h-14 rounded-xl sm:rounded-2xl"><SelectValue /></SelectTrigger></FormControl>
                         <SelectContent className="bg-[#0f172a] border-white/10 text-white">
                           {['Trabalhista', 'Cível', 'Previdenciário', 'Família'].map(area => <SelectItem key={area} value={area} className="font-bold">{area}</SelectItem>)}
                         </SelectContent>
@@ -983,19 +982,19 @@ function NewLeadSheet({ open, onOpenChange, lawyers, onCreated }: { open: boolea
                 </div>
                 <FormField control={form.control} name="description" render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-[12px] font-black uppercase text-slate-500 tracking-[0.25em] ml-2">Relato Inicial / Briefing</FormLabel>
-                    <Textarea className="bg-black/40 border-2 border-white/5 h-48 rounded-[2.5rem] p-8 resize-none shadow-inner leading-relaxed text-base font-medium focus:border-primary/50 transition-all" placeholder="Descreva os fatos principais narrados pelo cliente..." {...field} />
+                    <FormLabel className="text-[10px] sm:text-[12px] font-black uppercase text-slate-500 tracking-[0.2em] sm:tracking-[0.25em] ml-1 sm:ml-2">Relato Inicial / Briefing</FormLabel>
+                    <Textarea className="bg-black/40 border-2 border-white/5 h-32 sm:h-48 rounded-[1.5rem] sm:rounded-[2.5rem] p-4 sm:p-8 resize-none shadow-inner leading-relaxed text-sm sm:text-base font-medium focus:border-primary/50 transition-all" placeholder="Descreva os fatos principais narrados pelo cliente..." {...field} />
                   </FormItem>
                 )} />
               </form>
             </Form>
           </div>
         </ScrollArea>
-        <SheetFooter className="p-10 border-t border-white/5 bg-white/[0.02] gap-6 shrink-0">
-          <Button variant="ghost" className="text-slate-400 font-bold uppercase text-[12px] tracking-widest px-10 h-14" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button type="submit" form="new-lead-form" disabled={isSaving} className="flex-1 bg-primary text-primary-foreground font-black uppercase tracking-widest text-[12px] h-14 rounded-[1.5rem] shadow-2xl shadow-primary/30 hover:scale-[1.02] active:scale-95 transition-all">
-            {isSaving ? <Loader2 className="h-6 w-6 animate-spin mr-4" /> : <Target className="h-6 w-6 mr-4" />} 
-            Criar Lead & Abrir Pasta
+        <SheetFooter className="p-6 sm:p-10 border-t border-white/5 bg-white/[0.02] gap-4 sm:gap-6 shrink-0 flex-row">
+          <Button variant="ghost" className="flex-1 text-slate-400 font-bold uppercase text-[10px] sm:text-[12px] tracking-widest px-4 sm:px-10 h-12 sm:h-14" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button type="submit" form="new-lead-form" disabled={isSaving} className="flex-[2] bg-primary text-primary-foreground font-black uppercase tracking-widest text-[10px] sm:text-[12px] h-12 sm:h-14 rounded-xl sm:rounded-[1.5rem] shadow-2xl shadow-primary/30 hover:scale-[1.02] active:scale-95 transition-all">
+            {isSaving ? <Loader2 className="h-4 w-4 sm:h-6 sm:w-6 animate-spin mr-2 sm:mr-4" /> : <Target className="h-4 w-4 sm:h-6 sm:w-6 mr-2 sm:mr-4" />} 
+            Criar Lead
           </Button>
         </SheetFooter>
         <ClientCreationModal open={showClientModal} onOpenChange={setShowClientModal} onClientCreated={(c) => form.setValue('clientId', c.id)} />
@@ -1102,57 +1101,57 @@ export default function LeadsPage() {
   };
 
   return (
-    <div className="flex flex-col gap-10 pb-10">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-1">
-        <div className="flex items-center gap-5">
-          <div className="h-16 w-16 rounded-[2rem] bg-primary/10 border-2 border-primary/30 flex items-center justify-center shadow-2xl shadow-primary/10 animate-in zoom-in duration-500">
-            <Target className="h-9 w-9 text-primary" />
+    <div className="flex flex-col gap-6 sm:gap-10 pb-10">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 sm:gap-6 px-1">
+        <div className="flex items-center gap-3 sm:gap-5">
+          <div className="h-12 w-12 sm:h-16 sm:w-16 rounded-xl sm:rounded-[2rem] bg-primary/10 border-2 border-primary/30 flex items-center justify-center shadow-2xl shadow-primary/10 animate-in zoom-in duration-500 shrink-0">
+            <Target className="h-6 w-6 sm:h-9 sm:w-9 text-primary" />
           </div>
           <div>
-            <h1 className="text-4xl font-black font-headline text-white tracking-tight uppercase">CRM & Triagem Jurídica</h1>
-            <p className="text-sm text-slate-500 font-bold uppercase tracking-widest mt-1">Esteira de Produção e Controle de Qualidade Bueno Gois</p>
+            <h1 className="text-2xl sm:text-4xl font-black font-headline text-white tracking-tight uppercase">CRM Jurídico</h1>
+            <p className="text-[10px] sm:text-sm text-slate-500 font-bold uppercase tracking-widest mt-0.5 sm:mt-1">Esteira Bueno Gois</p>
           </div>
         </div>
-        <div className="flex items-center gap-4">
-          <div className="relative w-72 group">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
+          <div className="relative flex-1 sm:w-72 group">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 group-focus-within:text-primary transition-colors" />
-            <Input placeholder="Pesquisar leads ou clientes..." className="pl-11 bg-[#0f172a] border-white/5 border-2 h-12 text-sm rounded-2xl focus:border-primary/50 transition-all" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+            <Input placeholder="Pesquisar..." className="pl-11 bg-[#0f172a] border-white/5 border-2 h-10 sm:h-12 text-sm rounded-xl sm:rounded-2xl focus:border-primary/50 transition-all" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
           </div>
-          <Button onClick={() => setIsNewLeadOpen(true)} className="bg-primary text-primary-foreground font-black uppercase text-[11px] tracking-[0.2em] h-12 px-10 rounded-2xl shadow-2xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all">
-            <PlusCircle className="mr-2 h-5 w-5" /> Iniciar Lead
+          <Button onClick={() => setIsNewLeadOpen(true)} className="bg-primary text-primary-foreground font-black uppercase text-[9px] sm:text-[11px] tracking-[0.15em] sm:tracking-[0.2em] h-10 sm:h-12 px-6 sm:px-10 rounded-xl sm:rounded-2xl shadow-2xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all">
+            <PlusCircle className="mr-2 h-4 w-4 sm:h-5 sm:w-5" /> Novo Lead
           </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 px-1 animate-in fade-in slide-in-from-top-4 duration-700">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-6 px-1 animate-in fade-in slide-in-from-top-4 duration-700">
         <Card className="bg-[#0f172a] border-white/5 group hover:border-blue-500/30 transition-all shadow-none">
-          <CardHeader className="p-5 flex items-center gap-5">
-            <div className="h-12 w-12 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 group-hover:scale-110 transition-transform"><TrendingUp className="h-6 w-6" /></div>
-            <div className="text-left"><p className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] text-left">Fluxo Operacional</p><p className="text-lg font-black text-white text-left">{stats.highDemand}</p></div>
+          <CardHeader className="p-3 sm:p-5 flex items-center gap-3 sm:gap-5 flex-row">
+            <div className="h-8 w-8 sm:h-12 sm:w-12 rounded-lg sm:rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 shrink-0"><TrendingUp className="h-4 w-4 sm:h-6 sm:w-6" /></div>
+            <div className="min-w-0"><p className="text-[7px] sm:text-[10px] font-black uppercase text-slate-500 tracking-widest truncate">Demanda</p><p className="text-sm sm:text-lg font-black text-white truncate">{stats.highDemand}</p></div>
           </CardHeader>
         </Card>
         <Card className="bg-[#0f172a] border-white/5 group hover:border-rose-500/30 transition-all shadow-none">
-          <CardHeader className="p-5 flex items-center gap-5">
-            <div className="h-12 w-12 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 group-hover:scale-110 transition-transform"><Timer className="h-6 w-6" /></div>
-            <div className="text-left"><p className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] text-left">Maior Retenção</p><p className="text-lg font-black text-white text-left">{stats.slowestStage}</p></div>
+          <CardHeader className="p-3 sm:p-5 flex items-center gap-3 sm:gap-5 flex-row">
+            <div className="h-8 w-8 sm:h-12 sm:w-12 rounded-lg sm:rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 shrink-0"><Timer className="h-4 w-4 sm:h-6 sm:w-6" /></div>
+            <div className="min-w-0"><p className="text-[7px] sm:text-[10px] font-black uppercase text-slate-500 tracking-widest truncate">Retenção</p><p className="text-sm sm:text-lg font-black text-white truncate">{stats.slowestStage}</p></div>
           </CardHeader>
         </Card>
         <Card className="bg-[#0f172a] border-white/5 group hover:border-amber-500/30 transition-all shadow-none">
-          <CardHeader className="p-5 flex items-center gap-5">
-            <div className="h-12 w-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 group-hover:scale-110 transition-transform"><Flame className="h-6 w-6" /></div>
-            <div className="text-left"><p className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] text-left">Prioritários</p><p className="text-lg font-black text-white text-left">{stats.urgent}</p></div>
+          <CardHeader className="p-3 sm:p-5 flex items-center gap-3 sm:gap-5 flex-row">
+            <div className="h-8 w-8 sm:h-12 sm:w-12 rounded-lg sm:rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0"><Flame className="h-4 w-4 sm:h-6 sm:w-6" /></div>
+            <div className="min-w-0"><p className="text-[7px] sm:text-[10px] font-black uppercase text-slate-500 tracking-widest truncate">Críticos</p><p className="text-sm sm:text-lg font-black text-white truncate">{stats.urgent}</p></div>
           </CardHeader>
         </Card>
         <Card className="bg-[#0f172a] border-white/5 group hover:border-emerald-500/30 transition-all shadow-none">
-          <CardHeader className="p-5 flex items-center gap-5">
-            <div className="h-12 w-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 group-hover:scale-110 transition-transform"><FolderKanban className="h-6 w-6" /></div>
-            <div className="text-left"><p className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] text-left">Prontos p/ Guia</p><p className="text-lg font-black text-white text-left">{stats.ready}</p></div>
+          <CardHeader className="p-3 sm:p-5 flex items-center gap-3 sm:gap-5 flex-row">
+            <div className="h-8 w-8 sm:h-12 sm:w-12 rounded-lg sm:rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0"><FolderKanban className="h-4 w-4 sm:h-6 sm:w-6" /></div>
+            <div className="min-w-0"><p className="text-[7px] sm:text-[10px] font-black uppercase text-slate-500 tracking-widest truncate">Prontos</p><p className="text-sm sm:text-lg font-black text-white truncate">{stats.ready}</p></div>
           </CardHeader>
         </Card>
       </div>
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-        <div className="flex gap-8 overflow-x-auto pb-12 px-1 no-scrollbar min-h-[700px] scroll-smooth">
+        <div className="flex gap-4 sm:gap-8 overflow-x-auto pb-12 px-1 no-scrollbar min-h-[600px] scroll-smooth">
           {STAGES.map(stage => (
             <KanbanColumn key={stage} id={stage} stage={stage} leads={filteredLeads.filter(l => l.status === stage)} clientsMap={clientsMap} staffMap={staffMap} onCardClick={(l: Lead) => { setSelectedLead(l); setIsDetailsOpen(true); }} />
           ))}
