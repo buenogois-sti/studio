@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -12,7 +13,6 @@ import {
   Clock, 
   UserCircle,
   FolderKanban,
-  ArrowRightLeft,
   AlertCircle,
   Scale,
   ArrowRight,
@@ -23,27 +23,17 @@ import {
   UserPlus,
   ShieldCheck,
   FileText,
-  MapPin,
   Smartphone,
   History,
   MessageSquare,
   Plus,
-  ExternalLink,
-  DollarSign,
   Activity,
-  FileUp,
-  Mail,
   Check,
   Bot,
   RefreshCw,
-  TrendingUp,
-  Timer,
-  Building,
-  ClipboardList,
-  ChevronRight,
-  FilePlus2,
   CalendarDays,
-  Video
+  Video,
+  FilePlus2
 } from 'lucide-react';
 import { 
   DndContext, 
@@ -52,17 +42,17 @@ import {
   PointerSensor, 
   useSensor, 
   useSensors,
-} from '@dnd-kit/core';
+} from '@radix-ui/react-dnd-kit-core';
 import { 
   SortableContext, 
   sortableKeyboardCoordinates, 
   verticalListSortingStrategy,
   useSortable
-} from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
+} from '@radix-ui/react-dnd-kit-sortable';
+import { CSS } from '@radix-ui/react-dnd-kit-utilities';
 
 import { useFirebase, useCollection, useMemoFirebase, useDoc } from '@/firebase';
-import { collection, query, orderBy, doc, Timestamp, limit, updateDoc, where, arrayUnion } from 'firebase/firestore';
+import { collection, query, orderBy, doc, Timestamp, limit, updateDoc, where, arrayUnion, arrayRemove } from 'firebase/firestore';
 import type { Lead, Client, Staff, LeadStatus, LeadPriority, UserProfile, TimelineEvent, OpposingParty, ChecklistTemplate } from '@/lib/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -90,7 +80,7 @@ import {
   DialogFooter,
   DialogClose,
 } from '@/components/ui/dialog';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -101,10 +91,8 @@ import { ClientCreationModal } from '@/components/process/ClientCreationModal';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet';
 import { Separator } from '@/components/ui/separator';
-import { LocationSearch } from '@/components/shared/LocationSearch';
 import { v4 as uuidv4 } from 'uuid';
 import { syncLeadToDrive } from '@/lib/drive';
-import { extractProtocolData } from '@/ai/flows/extract-protocol-data-flow';
 import { Progress } from '@/components/ui/progress';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -475,17 +463,20 @@ function LeadDetailsSheet({
     const completed = lead.completedTasks || [];
     const isCompleted = completed.includes(task);
     
-    // Especial: se for agendamento de entrevista, abre o modal
     if (task === 'Agendamento de entrevista' && !isCompleted) {
       setIsSchedulingOpen(true);
       return;
     }
 
-    const updated = isCompleted ? completed.filter(t => t !== task) : [...completed, task];
-    
     try {
-      await updateDoc(doc(firestore, 'leads', lead.id), { completedTasks: updated, updatedAt: Timestamp.now() });
-    } catch (e: any) { toast({ variant: 'destructive', title: 'Erro ao atualizar tarefa' }); }
+      const leadRef = doc(firestore, 'leads', lead.id);
+      await updateDoc(leadRef, { 
+        completedTasks: isCompleted ? arrayRemove(task) : arrayUnion(task), 
+        updatedAt: Timestamp.now() 
+      });
+    } catch (e: any) { 
+      toast({ variant: 'destructive', title: 'Erro ao atualizar tarefa' }); 
+    }
   };
 
   const handleSaveInterviewAnswer = async (questionId: string, answer: string) => {
@@ -511,7 +502,7 @@ function LeadDetailsSheet({
     setIsAdvancing(true);
     try {
       await updateLeadStatus(lead.id, nextStatus);
-      toast({ title: 'Lead Avançado!', description: `Membro movido para a fase de ${stageConfig[nextStatus].label}.` });
+      toast({ title: 'Lead Avançado!', description: `Movido para a fase de ${stageConfig[nextStatus].label}.` });
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Erro', description: error.message });
     } finally {
@@ -568,11 +559,6 @@ function LeadDetailsSheet({
                 onClick={() => setIsDraftingOpen(true)}
               >
                 <FilePlus2 className="h-3.5 w-3.5" /> Gerar Contratos/Procurações
-              </Button>
-            )}
-            {lead.status === 'DISTRIBUICAO' && (
-              <Button size="sm" className="bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase text-[9px] h-9 px-4" onClick={() => onProtocolClick(lead)}>
-                Protocolar
               </Button>
             )}
           </div>
@@ -679,25 +665,6 @@ function LeadDetailsSheet({
                               >
                                 <RadioGroupItem value="NAO" id={`q-nao-${item.id}`} className="border-rose-500 text-rose-500" />
                                 <Label htmlFor={`q-nao-${item.id}`} className="text-xs font-black text-rose-400 cursor-pointer tracking-widest">NÃO</Label>
-                              </div>
-                            </RadioGroup>
-                          ) : item.type === 'YES_NO_MAYBE' ? (
-                            <RadioGroup 
-                              value={currentAnswer} 
-                              onValueChange={(val) => handleSaveInterviewAnswer(item.id, val)}
-                              className="flex flex-wrap gap-3"
-                            >
-                              <div className={cn("flex items-center space-x-2 px-4 py-2 rounded-lg border", currentAnswer === 'SIM' ? "bg-emerald-500/10 border-emerald-500/40" : "bg-black/20 border-transparent")} onClick={() => handleSaveInterviewAnswer(item.id, 'SIM')}>
-                                <RadioGroupItem value="SIM" id={`qm-sim-${item.id}`} />
-                                <Label htmlFor={`qm-sim-${item.id}`} className="text-[10px] font-bold text-emerald-400">SIM</Label>
-                              </div>
-                              <div className={cn("flex items-center space-x-2 px-4 py-2 rounded-lg border", currentAnswer === 'NAO' ? "bg-rose-500/10 border-rose-500/40" : "bg-black/20 border-transparent")} onClick={() => handleSaveInterviewAnswer(item.id, 'NAO')}>
-                                <RadioGroupItem value="NAO" id={`qm-nao-${item.id}`} />
-                                <Label htmlFor={`qm-nao-${item.id}`} className="text-[10px] font-bold text-rose-400">NÃO</Label>
-                              </div>
-                              <div className={cn("flex items-center space-x-2 px-4 py-2 rounded-lg border", currentAnswer === 'PARCIAL' ? "bg-amber-500/10 border-amber-500/40" : "bg-black/20 border-transparent")} onClick={() => handleSaveInterviewAnswer(item.id, 'PARCIAL')}>
-                                <RadioGroupItem value="PARCIAL" id={`qm-parcial-${item.id}`} />
-                                <Label htmlFor={`qm-parcial-${item.id}`} className="text-[10px] font-bold text-amber-400">PARCIAL</Label>
                               </div>
                             </RadioGroup>
                           ) : (
@@ -892,6 +859,102 @@ function NewLeadSheet({ open, onOpenChange, lawyers, onCreated }: { open: boolea
   );
 }
 
+function LeadConversionDialog({ lead, open, onOpenChange, onConfirm, lawyers }: { lead: Lead | null; open: boolean; onOpenChange: (o: boolean) => void; onConfirm: (data: any) => void; lawyers: Staff[] }) {
+  const [isAnalyzing, setIsAnalyzing] = React.useState(false);
+  const { toast } = useToast();
+  
+  const form = useForm<z.infer<typeof conversionSchema>>({
+    resolver: zodResolver(conversionSchema),
+    defaultValues: { processNumber: '', court: '', courtBranch: '', caseValue: 0, leadLawyerId: '', opposingParties: [{ name: '', document: '', address: '' }] }
+  });
+
+  const { fields, append, remove } = useFieldArray({ control: form.control, name: "opposingParties" });
+
+  React.useEffect(() => {
+    if (lead && open) {
+      form.setValue('leadLawyerId', lead.lawyerId);
+      form.setValue('caseValue', 0);
+    }
+  }, [lead, open, form]);
+
+  const handleAIAnalysis = async () => {
+    if (!lead) return;
+    setIsAnalyzing(true);
+    try {
+      const result = await extractProtocolData({
+        leadTitle: lead.title,
+        leadDescription: lead.description || '',
+        timelineNotes: lead.timeline?.map(e => e.description) || []
+      });
+      if (result) {
+        form.setValue('processNumber', result.suggestedProcessNumber);
+        form.setValue('court', result.suggestedCourt);
+        form.setValue('courtBranch', result.suggestedCourtBranch);
+        form.setValue('caseValue', result.suggestedCaseValue);
+        toast({ title: 'Análise Concluída!', description: result.reasoning });
+      }
+    } catch (e) { toast({ variant: 'destructive', title: 'Falha na IA', description: 'Não foi possível extrair dados automáticos.' }); } finally { setIsAnalyzing(false); }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-3xl max-w-[95vw] bg-[#020617] border-white/10 text-white p-0 h-[90vh] flex flex-col shadow-2xl">
+        <DialogHeader className="p-6 border-b border-white/5 bg-white/5 shrink-0">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="h-12 w-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center">
+                <FolderKanban className="h-6 w-6 text-primary" />
+              </div>
+              <div className="text-left">
+                <DialogTitle className="text-xl font-black font-headline">Distribuição Processual</DialogTitle>
+                <DialogDescription className="text-slate-400">Converta o lead em um processo ativo na pauta do escritório.</DialogDescription>
+              </div>
+            </div>
+            <Button variant="outline" size="sm" onClick={handleAIAnalysis} disabled={isAnalyzing} className="h-10 border-primary/20 text-primary gap-2 font-bold px-4">
+              {isAnalyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />} Sugestão IA
+            </Button>
+          </div>
+        </DialogHeader>
+        <ScrollArea className="flex-1">
+          <div className="p-6">
+            <Form {...form}>
+              <form id="conversion-form" onSubmit={form.handleSubmit(onConfirm)} className="space-y-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FormField control={form.control} name="processNumber" render={({ field }) => (
+                    <FormItem><FormLabel className="text-[10px] font-black uppercase text-slate-500">Número CNJ *</FormLabel><FormControl><Input placeholder="0000000-00.0000.0.00.0000" className="bg-black/40 border-white/10 font-mono" {...field} /></FormControl><FormMessage /></FormItem>
+                  )} />
+                  <FormField control={form.control} name="caseValue" render={({ field }) => (
+                    <FormItem><FormLabel className="text-[10px] font-black uppercase text-slate-500">Valor da Causa *</FormLabel><FormControl><div className="relative"><DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-emerald-500" /><Input type="number" step="0.01" className="bg-black/40 border-white/10 pl-9 font-bold" {...field} /></div></FormControl><FormMessage /></FormItem>
+                  )} />
+                  <FormField control={form.control} name="court" render={({ field }) => (
+                    <FormItem><FormLabel className="text-[10px] font-black uppercase text-slate-500">Tribunal / Fórum *</FormLabel><FormControl><Input placeholder="Ex: TRT2 - São Bernardo do Campo" className="bg-black/40 border-white/10" {...field} /></FormControl><FormMessage /></FormItem>
+                  )} />
+                  <FormField control={form.control} name="courtBranch" render={({ field }) => (
+                    <FormItem><FormLabel className="text-[10px] font-black uppercase text-slate-500">Vara / Câmara *</FormLabel><FormControl><Input placeholder="Ex: 2ª Vara do Trabalho" className="bg-black/40 border-white/10" {...field} /></FormControl><FormMessage /></FormItem>
+                  )} />
+                </div>
+                <FormField control={form.control} name="leadLawyerId" render={({ field }) => (
+                  <FormItem><FormLabel className="text-[10px] font-black uppercase text-slate-500">Advogado Responsável (Requalificação) *</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger className="bg-black/40 border-white/10 h-12 text-base font-bold"><SelectValue placeholder="Selecione o titular do caso..." /></SelectTrigger></FormControl><SelectContent className="bg-[#0f172a] border-white/10 text-white">{lawyers.map(l => <SelectItem key={l.id} value={l.id} className="font-bold">Dr(a). {l.firstName}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
+                )} />
+                <div className="space-y-4 pt-4 border-t border-white/5">
+                  <div className="flex items-center justify-between"><FormLabel className="text-[10px] font-black uppercase text-slate-500">Qualificação dos Réus *</FormLabel><Button type="button" variant="ghost" size="sm" onClick={() => append({ name: '', document: '', address: '' })} className="text-primary font-bold uppercase text-[9px] h-7 gap-1"><Plus className="h-3 w-3" /> Adicionar Réu</Button></div>
+                  <div className="grid gap-4">{fields.map((field, index) => (
+                    <div key={field.id} className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-4 animate-in slide-in-from-right-2">
+                      <div className="flex gap-4"><FormField control={form.control} name={`opposingParties.${index}.name` as any} render={({ field: nameF }) => (<FormItem className="flex-1"><FormControl><Input placeholder="Nome do Réu..." className="bg-black/20 border-white/5" {...nameF} /></FormControl></FormItem>)} /><Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} className="text-rose-500 hover:bg-rose-500/10 h-10 w-10 shrink-0"><Trash2 className="h-4 w-4" /></Button></div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4"><FormField control={form.control} name={`opposingParties.${index}.document` as any} render={({ field: docF }) => (<FormItem><FormControl><Input placeholder="CNPJ/CPF..." className="bg-black/20 border-white/5 font-mono text-xs" {...docF} /></FormControl></FormItem>)} /><FormField control={form.control} name={`opposingParties.${index}.address` as any} render={({ field: addrF }) => (<FormItem><FormControl><Input placeholder="Endereço Completo..." className="bg-black/20 border-white/5 text-xs" {...addrF} /></FormControl></FormItem>)} /></div>
+                    </div>
+                  ))}</div>
+                </div>
+              </form>
+            </Form>
+          </div>
+        </ScrollArea>
+        <DialogFooter className="p-6 border-t border-white/5 bg-white/5 shrink-0 gap-3"><DialogClose asChild><Button variant="ghost" className="flex-1 text-slate-400 font-bold uppercase text-[10px] tracking-widest h-12">Cancelar</Button></DialogClose><Button type="submit" form="conversion-form" className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase tracking-widest text-[10px] h-12 shadow-xl shadow-emerald-900/20">Protocolar e Migrar</Button></DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function LeadsPage() {
   const { firestore, user } = useFirebase();
   const { toast } = useToast();
@@ -909,6 +972,11 @@ export default function LeadsPage() {
 
   const leadsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'leads'), where('status', '!=', 'CONVERTIDO')) : null), [firestore]);
   const { data: leadsData } = useCollection<Lead>(leadsQuery);
+
+  const freshSelectedLead = React.useMemo(() => {
+    if (!selectedLead || !leadsData) return selectedLead;
+    return leadsData.find(l => l.id === selectedLead.id) || selectedLead;
+  }, [selectedLead, leadsData]);
 
   const clientsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'clients'), limit(500)) : null), [firestore]);
   const { data: clientsData } = useCollection<Client>(clientsQuery);
@@ -942,7 +1010,7 @@ export default function LeadsPage() {
     }
   };
 
-  const handleConfirmProtocol = async (data: z.infer<typeof conversionSchema>) => {
+  const handleConfirmProtocol = async (data: any) => {
     if (!selectedLead) return;
     setIsProcessing(selectedLead.id);
     try {
@@ -994,9 +1062,15 @@ export default function LeadsPage() {
         </div>
       </DndContext>
 
-      <LeadDetailsSheet lead={selectedLead} client={selectedLead ? clientsMap.get(selectedLead.clientId) : undefined} open={isDetailsOpen} onOpenChange={setIsDetailsOpen} onProtocolClick={(l) => { setSelectedLead(l); setIsConversionOpen(true); }} />
+      <LeadDetailsSheet 
+        lead={freshSelectedLead} 
+        client={freshSelectedLead ? clientsMap.get(freshSelectedLead.clientId) : undefined} 
+        open={isDetailsOpen} 
+        onOpenChange={setIsDetailsOpen} 
+        onProtocolClick={(l) => { setSelectedLead(l); setIsConversionOpen(true); }} 
+      />
       <NewLeadSheet open={isNewLeadOpen} onOpenChange={setIsNewLeadOpen} lawyers={lawyers} onCreated={() => {}} />
-      <LeadConversionDialog lead={selectedLead} open={isConversionOpen} onOpenChange={setIsConversionOpen} onConfirm={handleConfirmProtocol} lawyers={lawyers} />
+      <LeadConversionDialog lead={freshSelectedLead} open={isConversionOpen} onOpenChange={setIsConversionOpen} onConfirm={handleConfirmProtocol} lawyers={lawyers} />
     </div>
   );
 }
