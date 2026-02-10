@@ -71,7 +71,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
-import { format, formatDistanceToNow, differenceInHours } from 'date-fns';
+import { format, formatDistanceToNow, differenceInHours, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useSession } from 'next-auth/react';
 import {
