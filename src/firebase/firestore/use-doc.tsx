@@ -12,8 +12,8 @@ import { FirestorePermissionError } from '@/firebase/errors';
 
 interface DocCacheEntry<T = any> {
   unsubscribe: () => void;
-  listeners: Set<(data: WithId<T> | null, error: any, loading: boolean) => void>;
-  lastData: WithId<T> | null;
+  listeners: Set<(data: (T & { id: string }) | null, error: any, loading: boolean) => void>;
+  lastData: (T & { id: string }) | null;
   lastError: any | null;
   isLoading: boolean;
 }

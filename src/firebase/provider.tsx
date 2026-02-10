@@ -63,12 +63,23 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
         return;
       }
 
-      signInWithCustomToken(auth, session.customToken).then(() => {
-        console.log('[Firebase Auth] ✅ Autenticação realizada com sucesso.');
+      console.log('[Firebase Auth] Intentando autenticação com Custom Token...');
+      console.log('[Firebase Auth] Project ID Cliente:', firebaseConfig.projectId);
+
+      signInWithCustomToken(auth, session.customToken).then((userCredential) => {
+        console.log('[Firebase Auth] ✅ Autenticação realizada com sucesso:', userCredential.user.email);
         lastTokenRef.current = session.customToken!;
       }).catch((error: any) => {
         const errorCode = error?.code || 'UNKNOWN_ERROR';
         console.error('[Firebase Auth] ❌ Falha na autenticação do token customizado:', errorCode);
+        console.error('[Firebase Auth] Mensagem:', error.message);
+        
+        if (errorCode === 'auth/invalid-custom-token') {
+          console.error('[Firebase Auth] PROJECT ID MISMATCH DETECTED. O servidor gerou um token para um projeto diferente do configurado no cliente.');
+          console.error('[Firebase Auth] SERVER PROJECT:', auth.app.options.projectId);
+          console.error('[Firebase Auth] CLIENT PROJECT:', firebaseConfig.projectId);
+        }
+        
         setUserAuthState((state) => ({ ...state, userError: error, isUserLoading: false }));
       });
     } else if (sessionStatus === 'unauthenticated') {

@@ -1,4 +1,4 @@
-'use client';
+'use server';
 
 import * as React from 'react';
 import { 
@@ -219,7 +219,7 @@ function LeadConversionDialog({
     if (!lead) return;
     setIsPreFilling(true);
     try {
-      const timelineNotes = (lead as any).timeline?.map((e: any) => e.description) || [];
+      const timelineNotes = lead.description ? [lead.description] : [];
       const result = await extractProtocolData({
         leadTitle: lead.title,
         leadDescription: lead.description || '',
@@ -254,11 +254,11 @@ function LeadConversionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-3xl max-w-[90vw] bg-[#020617] border-white/10 text-white shadow-2xl h-[90vh] flex flex-col p-0 overflow-hidden">
-        <DialogHeader className="p-4 sm:p-6 border-b border-white/5 bg-white/5 shrink-0">
-          <div className="flex items-center justify-between gap-2">
-            <DialogTitle className="flex items-center gap-2 text-white font-headline text-lg sm:text-2xl">
-              <ArrowRightLeft className="h-5 w-5 sm:h-7 sm:w-7 text-emerald-500" />
+      <DialogContent className="sm:max-w-3xl max-w-[95vw] bg-[#020617] border-white/10 text-white shadow-2xl h-[90vh] flex flex-col p-0 overflow-hidden">
+        <DialogHeader className="p-6 border-b border-white/5 bg-white/5 shrink-0">
+          <div className="flex items-center justify-between gap-4">
+            <DialogTitle className="flex items-center gap-2 text-white font-headline text-xl">
+              <ArrowRightLeft className="h-6 w-6 text-emerald-500" />
               Distribuição Processual
             </DialogTitle>
             <Button 
@@ -266,26 +266,26 @@ function LeadConversionDialog({
               size="sm" 
               onClick={handlePreFill}
               disabled={isPreFilling}
-              className="h-8 sm:h-9 border-primary/30 text-primary hover:bg-primary/10 text-[9px] sm:text-[11px] font-black uppercase gap-1 sm:gap-2"
+              className="h-9 border-primary/30 text-primary hover:bg-primary/10 text-[11px] font-black uppercase gap-2"
             >
-              {isPreFilling ? <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <Bot className="h-3 w-3 sm:h-4 sm:w-4" />}
+              {isPreFilling ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
               Sugestão IA
             </Button>
           </div>
-          <DialogDescription className="text-slate-400 mt-1 text-xs sm:text-sm">
+          <DialogDescription className="text-slate-400 mt-1">
             Finalize os dados para integrar o lead ao sistema de processos ativos.
           </DialogDescription>
         </DialogHeader>
 
         <ScrollArea className="flex-1">
           <Form {...form}>
-            <form id="conversion-form" onSubmit={form.handleSubmit(onConfirm)} className="p-4 sm:p-8 space-y-8 sm:space-y-10">
+            <form id="conversion-form" onSubmit={form.handleSubmit(onConfirm)} className="p-8 space-y-10">
               
-              <div className="space-y-4 sm:space-y-6">
-                <div className="flex items-center gap-2 text-[10px] sm:text-[12px] font-black uppercase text-primary tracking-[0.2em]">
+              <div className="space-y-6">
+                <div className="flex items-center gap-2 text-[12px] font-black uppercase text-primary tracking-[0.2em]">
                   <FolderKanban className="h-4 w-4" /> Dados da Ação
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <FormField
                     control={form.control}
                     name="processNumber"
@@ -354,9 +354,9 @@ function LeadConversionDialog({
 
               <Separator className="bg-white/5" />
 
-              <div className="space-y-4 sm:space-y-6">
+              <div className="space-y-6">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-[10px] sm:text-[12px] font-black uppercase text-rose-400 tracking-[0.2em]">
+                  <div className="flex items-center gap-2 text-[12px] font-black uppercase text-rose-400 tracking-[0.2em]">
                     <Building className="h-4 w-4" /> Qualificação do Réu
                   </div>
                   <Button 
@@ -427,7 +427,7 @@ function LeadConversionDialog({
           </Form>
         </ScrollArea>
 
-        <DialogFooter className="p-4 sm:p-6 border-t border-white/5 bg-white/5 shrink-0 gap-3">
+        <DialogFooter className="p-6 border-t border-white/5 bg-white/5 shrink-0 gap-3">
           <DialogClose asChild>
             <Button variant="ghost" className="text-slate-400 font-bold uppercase text-[10px] tracking-widest h-12">Cancelar</Button>
           </DialogClose>
@@ -474,18 +474,18 @@ function LeadCard({ lead, client, lawyer, onClick }: { lead: Lead; client?: Clie
         lead.isUrgent && "border-rose-500/20 ring-1 ring-rose-500/10"
       )}
     >
-      <div className="p-3 sm:p-4 space-y-3">
+      <div className="p-4 space-y-3">
         <div className="flex items-start justify-between">
           <div className="flex flex-wrap gap-1">
-            <Badge variant="outline" className={cn("text-[7px] sm:text-[8px] font-black uppercase border-none px-1 h-4", priority.color)}>
+            <Badge variant="outline" className={cn("text-[8px] font-black uppercase border-none px-1 h-4", priority.color)}>
               {priority.label}
             </Badge>
-            <Badge variant="outline" className="text-[7px] sm:text-[8px] font-black uppercase bg-white/5 text-primary border-primary/20 px-1 h-4">
+            <Badge variant="outline" className="text-[8px] font-black uppercase bg-white/5 text-primary border-primary/20 px-1 h-4">
               {lead.legalArea}
             </Badge>
           </div>
           <div className={cn(
-            "flex items-center gap-1 text-[7px] sm:text-[8px] font-black uppercase tracking-tighter",
+            "flex items-center gap-1 text-[8px] font-black uppercase tracking-tighter",
             hoursInStage > 24 ? "text-rose-500 animate-pulse" : hoursInStage > 12 ? "text-amber-500" : "text-slate-500"
           )}>
             <Clock className="h-2.5 w-2.5" /> {hoursInStage}h
@@ -586,8 +586,7 @@ function LeadDetailsSheet({
   const { firestore } = useFirebase();
   const { data: session } = useSession();
   const { toast } = useToast();
-  const [files, setFiles] = React.useState<any[]>([]);
-  const [isLoadingFiles, setIsLoadingFiles] = React.useState(false);
+  const [isSaving, setIsSaving] = React.useState(false);
   const [newNote, setNewNote] = React.useState('');
 
   const interviewQuery = useMemoFirebase(
@@ -596,17 +595,6 @@ function LeadDetailsSheet({
   );
   const { data: interviewTemplates } = useCollection<ChecklistTemplate>(interviewQuery);
   const activeInterview = interviewTemplates?.[0];
-
-  const fetchFiles = React.useCallback(async () => {
-    if (!lead?.driveFolderId) return;
-    setIsLoadingFiles(true);
-    try {
-      const driveFiles = await listFiles(lead.driveFolderId);
-      setFiles(driveFiles);
-    } catch (e) { console.error(e); } finally { setIsLoadingFiles(false); }
-  }, [lead?.driveFolderId]);
-
-  React.useEffect(() => { if (open && lead) fetchFiles(); }, [open, lead, fetchFiles]);
 
   const handleToggleTask = async (task: string) => {
     if (!lead || !firestore) return;
@@ -631,6 +619,7 @@ function LeadDetailsSheet({
 
   const handleAddNote = async () => {
     if (!newNote.trim() || !lead || !firestore || !session?.user?.name) return;
+    setIsSaving(true);
     try {
       const event: TimelineEvent = {
         id: uuidv4(),
@@ -645,7 +634,7 @@ function LeadDetailsSheet({
       });
       setNewNote('');
       toast({ title: 'Nota adicionada!' });
-    } catch (e: any) { toast({ variant: 'destructive', title: 'Erro', description: e.message }); }
+    } catch (e: any) { toast({ variant: 'destructive', title: 'Erro', description: e.message }); } finally { setIsSaving(false); }
   };
 
   if (!lead) return null;
@@ -729,7 +718,7 @@ function LeadDetailsSheet({
             </section>
 
             {lead.status === 'NOVO' && (
-              <section className="space-y-4 animate-in fade-in slide-in-from-top-2">
+              <section className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-500">
                 <div className="flex items-center gap-2 text-[10px] font-black uppercase text-amber-400 tracking-widest">
                   <ClipboardList className="h-3.5 w-3.5" /> Entrevista de Triagem
                 </div>
@@ -749,7 +738,7 @@ function LeadDetailsSheet({
                   ) : (
                     <div className="text-center py-10 opacity-40">
                       <p className="text-xs font-bold uppercase text-slate-500">Nenhuma entrevista configurada para {lead.legalArea}.</p>
-                      <p className="text-[10px] mt-1 uppercase">Configure em Checklists &gt; Entrevistas.</p>
+                      <p className="text-[10px] mt-1 uppercase text-slate-600">Configure em Checklists &gt; Entrevistas.</p>
                     </div>
                   )}
                 </div>
@@ -758,7 +747,7 @@ function LeadDetailsSheet({
 
             <section className="space-y-4">
               <div className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-500 tracking-widest px-1">
-                <History className="h-3.5 w-3.5 text-primary" /> Histórico
+                <History className="h-3.5 w-3.5 text-primary" /> Histórico & Notas
               </div>
               <div className="space-y-4">
                 <div className="flex gap-2">
