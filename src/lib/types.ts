@@ -117,6 +117,7 @@ export type Lead = {
   opposingParties?: OpposingParty[];
   completedTasks?: string[]; 
   stageEntryDates?: Record<string, Timestamp>;
+  interviewAnswers?: Record<string, string>;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 };
@@ -381,6 +382,7 @@ export type ChecklistTemplate = {
   description: string;
   category: string;
   items: ChecklistItem[];
+  legalArea?: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
   createdBy: string;

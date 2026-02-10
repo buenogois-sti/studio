@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -61,7 +62,7 @@ import { CSS } from '@dnd-kit/utilities';
 
 import { useFirebase, useCollection, useMemoFirebase, useDoc } from '@/firebase';
 import { collection, query, orderBy, doc, Timestamp, limit, updateDoc, where, arrayUnion } from 'firebase/firestore';
-import type { Lead, Client, Staff, LeadStatus, LeadPriority, UserProfile, TimelineEvent, OpposingParty } from '@/lib/types';
+import type { Lead, Client, Staff, LeadStatus, LeadPriority, UserProfile, TimelineEvent, OpposingParty, ChecklistTemplate } from '@/lib/types';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -151,13 +152,6 @@ const priorityConfig: Record<LeadPriority, { label: string; color: string; icon:
   MEDIA: { label: 'Média', color: 'text-blue-400 bg-blue-500/10 border-blue-500/20', icon: Info },
   ALTA: { label: 'Alta', color: 'text-orange-400 bg-orange-500/10 border-orange-500/20', icon: AlertCircle },
   CRITICA: { label: 'Crítica', color: 'text-rose-500 bg-rose-500/10 border-rose-500/20', icon: Flame },
-};
-
-const AREA_INTERVIEW_QUESTIONS: Record<string, string[]> = {
-  'Trabalhista': ['Data de admissão e demissão', 'Último salário base', 'Jornada de trabalho (Horários)', 'Função exercida', 'Motivo da saída', 'Existência de horas extras?'],
-  'Cível': ['Descrição detalhada dos fatos', 'Data do evento danoso', 'Valor estimado do dano', 'Existência de contrato?', 'Testemunhas presenciais?'],
-  'Previdenciário': ['Nº PIS/NIT/PASEP', 'Tempo de contribuição estimado', 'Tipo de benefício pretendido', 'Data do requerimento administrativo', 'Motivo do indeferimento'],
-  'Família': ['Grau de parentesco', 'Existência de menores?', 'Valor pretendido (Alimentos)', 'Bens a partilhar?'],
 };
 
 const leadFormSchema = z.object({
@@ -647,6 +641,13 @@ function LeadDetailsSheet({
   const [isLoadingFiles, setIsLoadingFiles] = React.useState(false);
   const [newNote, setNewNote] = React.useState('');
 
+  const interviewQuery = useMemoFirebase(
+    () => (firestore && lead ? query(collection(firestore, 'checklist_templates'), where('category', '==', 'Entrevista de Triagem'), where('legalArea', '==', lead.legalArea), limit(1)) : null),
+    [firestore, lead?.legalArea]
+  );
+  const { data: interviewTemplates } = useCollection<ChecklistTemplate>(interviewQuery);
+  const activeInterview = interviewTemplates?.[0];
+
   const fetchFiles = React.useCallback(async () => {
     if (!lead?.driveFolderId) return;
     setIsLoadingFiles(true);
@@ -667,6 +668,17 @@ function LeadDetailsSheet({
     try {
       await updateDoc(doc(firestore, 'leads', lead.id), { completedTasks: updated, updatedAt: Timestamp.now() });
     } catch (e: any) { toast({ variant: 'destructive', title: 'Erro ao atualizar tarefa' }); }
+  };
+
+  const handleSaveInterviewAnswer = async (questionId: string, answer: string) => {
+    if (!lead || !firestore) return;
+    try {
+      const answers = lead.interviewAnswers || {};
+      await updateDoc(doc(firestore, 'leads', lead.id), {
+        [`interviewAnswers.${questionId}`]: answer,
+        updatedAt: Timestamp.now()
+      });
+    } catch (e: any) { console.error(e); }
   };
 
   const handleAddNote = async () => {
@@ -693,7 +705,6 @@ function LeadDetailsSheet({
   const completedCount = lead.completedTasks?.length || 0;
   const totalTasks = stage.tasks.length;
   const isReadyToAdvance = totalTasks > 0 && completedCount === totalTasks;
-  const interviewQuestions = AREA_INTERVIEW_QUESTIONS[lead.legalArea] || [];
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -791,21 +802,44 @@ function LeadDetailsSheet({
               </div>
             </section>
 
-            {lead.status === 'NOVO' && interviewQuestions.length > 0 && (
+            {lead.status === 'NOVO' && (
               <section className="space-y-4 sm:space-y-8 animate-in fade-in slide-in-from-top-4 duration-500">
-                <div className="flex items-center gap-2 sm:gap-3 text-[10px] sm:text-[12px] font-black uppercase text-amber-400 tracking-[0.2em] sm:tracking-[0.25em]">
-                  <ClipboardList className="h-4 w-4 sm:h-5 sm:w-5" /> Entrevista de Triagem
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 sm:gap-3 text-[10px] sm:text-[12px] font-black uppercase text-amber-400 tracking-[0.2em] sm:tracking-[0.25em]">
+                    <ClipboardList className="h-4 w-4 sm:h-5 sm:w-5" /> {activeInterview ? `Entrevista: ${activeInterview.legalArea}` : 'Entrevista de Triagem'}
+                  </div>
+                  {!activeInterview && (
+                    <Badge variant="outline" className="text-[8px] font-bold border-white/10 text-slate-500 uppercase">Usando Padrão do Sistema</Badge>
+                  )}
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 bg-amber-500/[0.03] border-2 border-amber-500/10 p-6 sm:p-10 rounded-[2rem] sm:rounded-[3rem]">
-                  {interviewQuestions.map((q, i) => (
-                    <div key={i} className="space-y-2 sm:space-y-3">
-                      <Label className="text-[9px] sm:text-[11px] font-black uppercase text-slate-500 tracking-widest ml-1">{q}</Label>
-                      <Input 
-                        placeholder="Resposta do cliente..." 
-                        className="bg-black/40 border-white/5 h-10 sm:h-12 text-xs sm:text-sm rounded-lg sm:rounded-xl focus:border-amber-500/50 transition-all"
-                      />
+                <div className="grid grid-cols-1 gap-4 sm:gap-6 bg-amber-500/[0.03] border-2 border-amber-500/10 p-6 sm:p-10 rounded-[2rem] sm:rounded-[3rem]">
+                  {activeInterview ? (
+                    activeInterview.items.map((item) => (
+                      <div key={item.id} className="space-y-2 sm:space-y-3">
+                        <Label className="text-[9px] sm:text-[11px] font-black uppercase text-slate-500 tracking-widest ml-1">{item.label} {item.required && '*'}</Label>
+                        {item.type === 'TEXT' ? (
+                          <Textarea 
+                            placeholder="Resposta..." 
+                            className="bg-black/40 border-white/5 text-xs sm:text-sm rounded-lg sm:rounded-xl focus:border-amber-500/50 transition-all min-h-[80px]"
+                            defaultValue={lead.interviewAnswers?.[item.id] || ''}
+                            onBlur={(e) => handleSaveInterviewAnswer(item.id, e.target.value)}
+                          />
+                        ) : (
+                          <Input 
+                            placeholder="Resposta..." 
+                            className="bg-black/40 border-white/5 h-10 sm:h-12 text-xs sm:text-sm rounded-lg sm:rounded-xl focus:border-amber-500/50 transition-all"
+                            defaultValue={lead.interviewAnswers?.[item.id] || ''}
+                            onBlur={(e) => handleSaveInterviewAnswer(item.id, e.target.value)}
+                          />
+                        )}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-10 opacity-40">
+                      <p className="text-xs font-bold uppercase tracking-widest text-slate-500">Nenhuma entrevista personalizada para {lead.legalArea}.</p>
+                      <p className="text-[10px] mt-1 uppercase">Configure em Checklists > Entrevistas.</p>
                     </div>
-                  ))}
+                  )}
                 </div>
               </section>
             )}
@@ -974,7 +1008,7 @@ function NewLeadSheet({ open, onOpenChange, lawyers, onCreated }: { open: boolea
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl><SelectTrigger className="bg-black/40 border-2 border-white/5 h-12 sm:h-14 rounded-xl sm:rounded-2xl"><SelectValue /></SelectTrigger></FormControl>
                         <SelectContent className="bg-[#0f172a] border-white/10 text-white">
-                          {['Trabalhista', 'Cível', 'Previdenciário', 'Família'].map(area => <SelectItem key={area} value={area} className="font-bold">{area}</SelectItem>)}
+                          {['Trabalhista', 'Cível', 'Previdenciário', 'Família', 'Outro'].map(area => <SelectItem key={area} value={area} className="font-bold">{area}</SelectItem>)}
                         </SelectContent>
                       </Select>
                     </FormItem>

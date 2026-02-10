@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -26,7 +27,8 @@ import {
   FolderKanban,
   ExternalLink,
   Calculator,
-  Printer
+  Printer,
+  Scale
 } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy, limit, Timestamp } from 'firebase/firestore';
@@ -144,7 +146,7 @@ export default function ChecklistsPage() {
             </TabsTrigger>
           </TabsList>
           
-          <div className="relative w-full max-w-sm">
+          <div className="relative w-full max-sm:w-full max-w-sm">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input 
               placeholder="Pesquisar..." 
@@ -166,7 +168,14 @@ export default function ChecklistsPage() {
                 <Card key={template.id} className="bg-[#0f172a] border-white/5 border-2 hover:border-primary/20 transition-all group overflow-hidden">
                   <CardHeader className="pb-2">
                     <div className="flex items-start justify-between">
-                      <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 text-[9px] font-black uppercase tracking-widest">{template.category}</Badge>
+                      <div className="flex flex-wrap gap-1.5">
+                        <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 text-[9px] font-black uppercase tracking-widest">{template.category}</Badge>
+                        {template.legalArea && (
+                          <Badge variant="secondary" className="bg-blue-500/10 text-blue-400 border-none text-[9px] font-black uppercase tracking-widest">
+                            {template.legalArea}
+                          </Badge>
+                        )}
+                      </div>
                       {isAdmin && (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -304,6 +313,7 @@ function ChecklistEditorDialog({ open, onOpenChange, template }: { open: boolean
   const [title, setTitle] = React.useState('');
   const [description, setDescription] = React.useState('');
   const [category, setCategory] = React.useState('Operacional');
+  const [legalArea, setLegalArea] = React.useState<string | undefined>(undefined);
   const [items, setItems] = React.useState<ChecklistItem[]>([]);
   const { toast } = useToast();
 
@@ -312,11 +322,13 @@ function ChecklistEditorDialog({ open, onOpenChange, template }: { open: boolean
       setTitle(template.title);
       setDescription(template.description);
       setCategory(template.category);
+      setLegalArea(template.legalArea);
       setItems(template.items);
     } else if (!template && open) {
       setTitle('');
       setDescription('');
       setCategory('Operacional');
+      setLegalArea(undefined);
       setItems([]);
     }
   }, [template, open]);
@@ -351,6 +363,7 @@ function ChecklistEditorDialog({ open, onOpenChange, template }: { open: boolean
         title,
         description,
         category,
+        legalArea,
         items
       });
       toast({ title: 'Modelo Salvo!', description: 'O checklist já está disponível para uso.' });
@@ -375,8 +388,8 @@ function ChecklistEditorDialog({ open, onOpenChange, template }: { open: boolean
 
         <ScrollArea className="flex-1">
           <div className="p-6 space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="md:col-span-2 space-y-2">
                 <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Título do Checklist *</Label>
                 <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="Ex: Protocolo de Inicial Trabalhista" className="h-11 bg-black/40 border-white/10 focus:border-primary transition-all" />
               </div>
@@ -389,12 +402,33 @@ function ChecklistEditorDialog({ open, onOpenChange, template }: { open: boolean
                   <SelectContent className="bg-[#0f172a] text-white border-white/10 shadow-2xl">
                     <SelectItem value="Operacional">⭐ Operacional</SelectItem>
                     <SelectItem value="Financeiro">💰 Financeiro</SelectItem>
+                    <SelectItem value="Entrevista de Triagem">💬 Entrevista de Triagem</SelectItem>
                     <SelectItem value="Comercial">📢 Comercial</SelectItem>
                     <SelectItem value="Gestão">🛡️ Gestão</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              <div className="md:col-span-2 space-y-2">
+
+              {category === 'Entrevista de Triagem' && (
+                <div className="md:col-span-3 space-y-2 animate-in slide-in-from-top-2">
+                  <Label className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-2">
+                    <Scale className="h-3 w-3" /> Área Jurídica Vinculada
+                  </Label>
+                  <Select value={legalArea} onValueChange={setLegalArea}>
+                    <SelectTrigger className="h-11 bg-primary/5 border-primary/20 text-primary">
+                      <SelectValue placeholder="Selecione a área para vincular esta entrevista..." />
+                    </SelectTrigger>
+                    <SelectContent className="bg-[#0f172a] text-white border-white/10">
+                      {['Trabalhista', 'Cível', 'Previdenciário', 'Família', 'Outro'].map(area => (
+                        <SelectItem key={area} value={area}>{area}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[9px] text-slate-500 italic mt-1">Este formulário aparecerá automaticamente ao triar novos leads desta área.</p>
+                </div>
+              )}
+
+              <div className="md:col-span-3 space-y-2">
                 <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Descrição / Finalidade</Label>
                 <Textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Descreva quando e por quem este checklist deve ser executado..." className="bg-black/40 border-white/10 h-24 resize-none" />
               </div>
