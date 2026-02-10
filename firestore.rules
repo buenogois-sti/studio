@@ -2,7 +2,7 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // --- Funções Auxiliares ---
+    // --- Funções Auxiliares de Elite ---
     function isAuthenticated() {
       return request.auth != null && request.auth.uid != null;
     }
@@ -19,12 +19,21 @@ service cloud.firestore {
       return isOneOfRoles(['admin']);
     }
 
+    function isFinancial() {
+      return isOneOfRoles(['financial']);
+    }
+
+    function isStaff() {
+      return isOneOfRoles(['admin', 'lawyer', 'assistant', 'financial']);
+    }
+
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
     // --- Regras por Coleção ---
     
+    // Perfil de Usuário
     match /users/{userId} {
       allow read: if isAuthenticated();
       allow update: if isOwner(userId) || isAdmin();
@@ -41,110 +50,88 @@ service cloud.firestore {
       }
     }
 
-    match /reimbursements/{reimbursementId} {
-      allow read: if isAuthenticated() && (
-        isOneOfRoles(['admin', 'financial']) || 
-        (resource.data.userId == request.auth.uid) ||
-        (request.resource.data.userId == request.auth.uid)
-      );
-      
-      allow create: if isAuthenticated();
-      
-      allow update, delete: if isAuthenticated() && (
-        isOneOfRoles(['admin', 'financial']) || 
-        (resource.data.userId == request.auth.uid)
-      );
-    }
-
+    // CRM & Gestão de Clientes
     match /clients/{clientId} {
-      allow read: if isAuthenticated();
+      allow read: if isStaff();
       allow create, update: if isOneOfRoles(['admin', 'lawyer', 'assistant']);
       allow delete: if isAdmin();
     }
 
-    match /processes/{processId} {
-      allow read: if isAuthenticated();
-      allow create, update: if isOneOfRoles(['admin', 'lawyer', 'assistant']);
-      allow delete: if isAdmin();
-    }
-
+    // Gestão de Leads (Triagem)
     match /leads/{leadId} {
-      allow read: if isAuthenticated() && (
-        isOneOfRoles(['admin', 'assistant']) || 
-        (resource.data.lawyerId == request.auth.uid) ||
-        (request.resource.data.lawyerId == request.auth.uid)
-      );
-      
-      allow create: if isAuthenticated();
-      
-      allow update: if isAuthenticated() && (
-        isOneOfRoles(['admin', 'assistant']) || 
-        (resource.data.lawyerId == request.auth.uid)
-      );
-      
+      allow read: if isOneOfRoles(['admin', 'assistant', 'financial']) || 
+                  (resource.data.lawyerId == request.auth.uid);
+      allow create, update: if isOneOfRoles(['admin', 'lawyer', 'assistant']);
       allow delete: if isAdmin();
     }
 
-    match /hearings/{hearingId} {
-      allow read: if isAuthenticated();
+    // Processos Judiciais
+    match /processes/{processId} {
+      allow read: if isStaff();
       allow create, update: if isOneOfRoles(['admin', 'lawyer', 'assistant']);
+      allow delete: if isAdmin();
+    }
+
+    // Agenda: Audiências e Prazos
+    match /hearings/{hearingId} {
+      allow read: if isStaff();
+      allow write: if isOneOfRoles(['admin', 'lawyer', 'assistant']);
       allow delete: if isAdmin();
     }
 
     match /deadlines/{deadlineId} {
-      allow read: if isAuthenticated();
-      allow create, update: if isOneOfRoles(['admin', 'lawyer', 'assistant']);
+      allow read: if isStaff();
+      allow write: if isOneOfRoles(['admin', 'lawyer', 'assistant']);
       allow delete: if isAdmin();
     }
 
+    // FINANCEIRO CENTRAL (Crítico)
     match /financial_events/{eventId} {
-      allow read: if isAuthenticated();
-      allow write: if isOneOfRoles(['admin', 'financial']);
+      allow read, write: if isAdmin() || isFinancial();
     }
 
     match /financial_titles/{titleId} {
-      allow read: if isAuthenticated();
-      allow write: if isOneOfRoles(['admin', 'financial']);
+      allow read, write: if isAdmin() || isFinancial();
+    }
+
+    // Reembolsos (Privacidade do Colaborador)
+    match /reimbursements/{reimbursementId} {
+      allow read: if isAdmin() || isFinancial() || resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated();
+      allow update: if isAdmin() || isFinancial();
+      allow delete: if isAdmin() || (resource.data.userId == request.auth.uid && resource.data.status == 'SOLICITADO');
     }
     
+    // Equipe & Repasses
     match /staff/{staffId} {
-      allow read: if isAuthenticated();
+      allow read: if isStaff();
       allow write: if isAdmin();
 
       match /credits/{creditId} {
-        allow read: if isAuthenticated();
-        allow write: if isOneOfRoles(['admin', 'financial']);
+        allow read: if isAdmin() || isFinancial() || isOwner(staffId);
+        allow write: if isAdmin() || isFinancial();
       }
     }
 
+    // Bibliotecas e Configurações
     match /document_templates/{templateId} {
-      allow read: if isAuthenticated();
+      allow read: if isStaff();
       allow write: if isAdmin();
     }
 
     match /checklist_templates/{templateId} {
-      allow read: if isAuthenticated();
+      allow read: if isStaff();
       allow write: if isAdmin();
     }
 
     match /checklist_executions/{executionId} {
-      allow read: if isAuthenticated();
+      allow read: if isStaff();
       allow create: if isAuthenticated();
       allow update, delete: if isAdmin();
     }
 
-    match /system_settings/general {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
-    match /system_settings/seo {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
     match /system_settings/{settingId} {
-      allow read: if isAuthenticated();
+      allow read: if isStaff();
       allow write: if isAdmin();
     }
   }

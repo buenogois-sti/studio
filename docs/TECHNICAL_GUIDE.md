@@ -29,82 +29,64 @@ Este documento detalha a arquitetura, módulos, páginas e componentes do sistem
 - **Funcionalidades**:
     - Listagem em Grid/Tabela com cálculo de integridade cadastral.
     - Importação de base via arquivos VCF (vCard).
-- **Componentes Chave**:
-    - `ClientForm`: Captura dados pessoais, bancários e de endereço (via ViaCEP).
-    - `ClientDetailsSheet`: Ficha completa com ações rápidas (WhatsApp, E-mail, Cópia de dados).
 
 ### 2.3 Processos (`/dashboard/processos`)
 - **Módulo**: Gestão de Contencioso.
 - **Funcionalidades**:
     - Menu de ações contextuais por processo.
     - Sincronização automática de pastas no Google Drive.
-- **Componentes Chave**:
-    - `ProcessForm`: Formulário em 6 etapas (Autores, Réus, Dados, Juízo, Equipe, Estratégia).
-    - `ProcessTimelineSheet`: Linha do tempo cronológica de eventos e decisões.
-    - `LegalDeadlineDialog`: Lançamento de prazos fatais com motor de contagem (Úteis vs Corridos).
 
 ### 2.4 Audiências (`/dashboard/audiencias`)
 - **Módulo**: Agenda Jurídica Integrada.
 - **Funcionalidades**:
     - Sincronização bidirecional com Google Agenda.
-    - Visão Mensal: Calendário interativo para gestão de carga mensal.
     - Regra de Negócio: O campo "Local" é resumido e a "Descrição" contém o template completo com link direto para o WhatsApp do cliente.
 
-### 2.5 Prazos (`/dashboard/prazos`)
-- **Módulo**: Controle de Obrigações Fatais.
-- **Funcionalidades**:
-    - Agenda específica de protocolos e manifestações.
-    - Integração Google Agenda com alertas de 24h e 12h.
-    - Exibe contagem regressiva de dias úteis (CPC).
-
-### 2.6 Financeiro (`/dashboard/financeiro`)
-- **Módulo**: Controle de Caixa e Repasses.
-- **Funcionalidade**: 
-    - **Contas a Pagar/Receber**: Gestão de títulos operacionais.
-    - **Repasses**: Aba dedicada para conciliação de honorários devidos à equipe (Sucumbência, Produção, Quota Litis).
-    - **Relatórios**: Painel consolidado de BI com fluxo de caixa e lucro líquido.
-
-### 2.7 Reembolsos (`/dashboard/reembolsos`)
-- **Módulo**: Gestão de Despesas de Equipe.
-- **Lógica de Permissão**: 
-    - Colaboradores veem apenas seus pedidos.
-    - Financeiro/Admin tem CRUD total e fluxo de aprovação/pagamento.
-
 ---
 
-## 🧩 3. Componentes de UI e Lógica
+## 🔐 5. Matriz de Permissões e Restrições
 
-### 3.1 `LegalDeadlineDialog`
-- **Lógica de Contagem**: Implementa as regras do CPC/CLT.
-- **Modos**: 
-    - `useful`: Pula finais de semana (Processual).
-    - `calendar`: Conta todos os dias (Material/CDC).
-- **Google Sync**: Dispara notificações críticas (24h/12h) no calendário do advogado.
+O LexFlow opera com quatro níveis de acesso rigorosamente controlados via Firebase Security Rules:
 
-### 3.2 `RepassesTab` (Módulo Financeiro)
-- **Cálculo Automático**: Percorre a subcoleção de créditos dos advogados.
-- **Status `DISPONIVEL`**: Apenas valores liberados (após recebimento do cliente) aparecem para o saque financeiro.
+### 5.1 Administrador (`admin`)
+- **Acesso**: Total e irrestrito.
+- **Privilégios Únicos**:
+    - Exclusão permanente de clientes e processos.
+    - Gestão da equipe (Staff) e alteração de perfis de acesso.
+    - Configurações do sistema e inicialização da estrutura de pastas.
+    - Visualização de todos os repasses e faturamento total da banca.
 
-### 3.3 `WhatsAppFloating`
-- **UX**: Widget persistente na landing page com simulação de digitação para aumentar conversão de leads.
+### 5.2 Financeiro (`financial`)
+- **Acesso**: Foco em caixa e controladoria.
+- **Permissões**:
+    - Gestão completa de `Faturamento` (Entradas e Saídas).
+    - Aprovação e liquidação de `Reembolsos`.
+    - Processamento de `Repasses` e folha de pagamento.
+    - Visualização de relatórios de BI Financeiro.
+- **Restrições**: Não pode alterar perfis de usuários ou excluir dados estruturais (processos).
 
----
+### 5.3 Advogado (`lawyer`)
+- **Acesso**: Operacional e estratégico de casos.
+- **Permissões**:
+    - Criação e edição de `Clientes`, `Processos` e `Leads`.
+    - Agendamento de `Audiências` e `Prazos`.
+    - Visualização de sua própria carteira de honorários liberados.
+- **Restrições**: 
+    - **Financeiro**: Não vê o faturamento global da banca, apenas seus próprios créditos.
+    - **Privacidade**: Não vê a remuneração ou saldo de outros advogados.
+    - **Segurança**: Não pode excluir registros (apenas arquivar).
 
-## ⚙️ 4. Regras de Negócio Críticas
-
-### 4.1 Remuneração de Advogados
-Ao cadastrar um membro da equipe como "Advogado", o sistema aplica uma das 5 regras:
-1. **Sucumbência**: Percentual fixo entre escritório e associado.
-2. **Produção**: Tabela de preços por ato (Petições, Diligências).
-3. **Quota Litis**: Participação no êxito final.
-4. **Fixo Mensal**: Pro-labore recorrente.
-5. **Audiencista**: Valor fixo por audiência confirmada como realizada.
-
-### 4.2 Segurança de Dados (Firestore Rules)
-- **Hierarquia**: Admin > Financeiro > Advogado > Assistente.
-- **Filtragem por UID**: Em Reembolsos e Notificações, usuários comuns são impedidos de ler documentos que não contenham seu `userId`, garantindo total privacidade.
+### 5.4 Secretaria / Assistente (`assistant`)
+- **Acesso**: Apoio administrativo e triagem.
+- **Permissões**:
+    - Gestão total do `CRM (Leads)` e triagem inicial.
+    - Cadastro de dados burocráticos em processos.
+    - Consulta ao `Acervo de Modelos` e `Arquivo Digital`.
+- **Restrições**:
+    - **Zero Financeiro**: Não possui acesso ao módulo de faturamento, repasses ou valores de honorários.
+    - **Segurança**: Não altera configurações críticas do sistema.
 
 ---
 
 **Última Atualização**: Fevereiro/2026  
-**Status**: Produção / Premium Dark Theme
+**Status**: Produção / Matriz de Segurança Ativa
