@@ -43,7 +43,8 @@ import {
   Building,
   Hash,
   ClipboardList,
-  ChevronRight
+  ChevronRight,
+  ArrowUpRight
 } from 'lucide-react';
 import { 
   DndContext, 
@@ -590,6 +591,7 @@ function LeadDetailsSheet({
   const { data: session } = useSession();
   const { toast } = useToast();
   const [isSaving, setIsSaving] = React.useState(false);
+  const [isAdvancing, setIsAdvancing] = React.useState(false);
   const [newNote, setNewNote] = React.useState('');
 
   const interviewQuery = useMemoFirebase(
@@ -620,6 +622,27 @@ function LeadDetailsSheet({
     } catch (e: any) { console.error(e); }
   };
 
+  const handleAdvanceStage = async () => {
+    if (!lead || isAdvancing) return;
+    
+    const currentIndex = STAGES.indexOf(lead.status);
+    if (currentIndex === -1 || currentIndex === STAGES.length - 1) {
+      if (lead.status === 'DISTRIBUICAO') onProtocolClick(lead);
+      return;
+    }
+
+    const nextStatus = STAGES[currentIndex + 1];
+    setIsAdvancing(true);
+    try {
+      await updateLeadStatus(lead.id, nextStatus);
+      toast({ title: 'Lead Avançado!', description: `Membro movido para a fase de ${stageConfig[nextStatus].label}.` });
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Erro', description: error.message });
+    } finally {
+      setIsAdvancing(false);
+    }
+  };
+
   const handleAddNote = async () => {
     if (!newNote.trim() || !lead || !firestore || !session?.user?.name) return;
     setIsSaving(true);
@@ -645,6 +668,7 @@ function LeadDetailsSheet({
   const completedCount = lead.completedTasks?.length || 0;
   const totalTasks = stage.tasks.length;
   const isReadyToAdvance = totalTasks > 0 && completedCount === totalTasks;
+  const nextStage = STAGES[STAGES.indexOf(lead.status) + 1];
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -823,6 +847,41 @@ function LeadDetailsSheet({
             </section>
           </div>
         </ScrollArea>
+
+        {/* Rodapé de Ações de Elite */}
+        <SheetFooter className="p-6 border-t border-white/5 bg-white/[0.02] shrink-0 flex items-center justify-between gap-4">
+          <Button 
+            variant="ghost" 
+            className="text-slate-400 font-bold uppercase text-[10px] tracking-widest h-12"
+            onClick={() => onOpenChange(false)}
+          >
+            Fechar
+          </Button>
+          
+          <div className="flex gap-3 flex-1 justify-end">
+            <Button
+              className={cn(
+                "h-12 px-8 font-black uppercase tracking-widest text-[10px] rounded-xl transition-all duration-500",
+                isReadyToAdvance 
+                  ? "bg-primary text-primary-foreground shadow-[0_0_30px_rgba(245,208,48,0.3)] hover:scale-105" 
+                  : "bg-white/5 text-slate-500 border border-white/10"
+              )}
+              onClick={handleAdvanceStage}
+              disabled={isAdvancing}
+            >
+              {isAdvancing ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : lead.status === 'DISTRIBUICAO' ? (
+                <CheckCircle2 className="h-4 w-4 mr-2 text-emerald-500" />
+              ) : (
+                <ArrowRight className="h-4 w-4 mr-2" />
+              )}
+              {lead.status === 'DISTRIBUICAO' 
+                ? 'Protocolar Processo' 
+                : `Avançar para ${nextStage ? stageConfig[nextStage].label : 'Próxima Etapa'}`}
+            </Button>
+          </div>
+        </SheetFooter>
       </SheetContent>
     </Sheet>
   );
