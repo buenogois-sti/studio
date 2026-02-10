@@ -1,3 +1,4 @@
+
 'use client';
     
 import { useState, useEffect } from 'react';
@@ -10,15 +11,15 @@ import {
 } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
 
-interface DocCacheEntry<T = any> {
+interface DocCacheEntry {
   unsubscribe: () => void;
-  listeners: Set<(data: (T & { id: string }) | null, error: any, loading: boolean) => void>;
-  lastData: (T & { id: string }) | null;
+  listeners: Set<(data: any, error: any, loading: boolean) => void>;
+  lastData: any;
   lastError: any | null;
   isLoading: boolean;
 }
 
-const docCache = new Map<string, DocCacheEntry<any>>();
+const docCache = new Map<string, DocCacheEntry>();
 
 type WithId<T> = T & { id: string };
 
@@ -64,10 +65,10 @@ export function useDoc<T = any>(
     };
 
     if (!cacheEntry) {
-      const listeners = new Set<(data: WithId<T> | null, error: any, loading: boolean) => void>();
+      const listeners = new Set<(data: any, error: any, loading: boolean) => void>();
       listeners.add(onUpdate);
 
-      const entry: DocCacheEntry<T> = {
+      const entry: DocCacheEntry = {
         listeners,
         lastData: null,
         lastError: null,

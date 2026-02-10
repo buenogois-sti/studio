@@ -1,4 +1,5 @@
 
+'use server';
 'use client';
 
 import * as React from 'react';
@@ -33,7 +34,9 @@ import {
   RefreshCw,
   CalendarDays,
   Video,
-  FilePlus2
+  FilePlus2,
+  ClipboardList,
+  DollarSign
 } from 'lucide-react';
 import { 
   DndContext, 
@@ -42,14 +45,15 @@ import {
   PointerSensor, 
   useSensor, 
   useSensors,
-} from '@radix-ui/react-dnd-kit-core';
+  DragEndEvent
+} from '@dnd-kit/core';
 import { 
   SortableContext, 
   sortableKeyboardCoordinates, 
   verticalListSortingStrategy,
   useSortable
-} from '@radix-ui/react-dnd-kit-sortable';
-import { CSS } from '@radix-ui/react-dnd-kit-utilities';
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 import { useFirebase, useCollection, useMemoFirebase, useDoc } from '@/firebase';
 import { collection, query, orderBy, doc, Timestamp, limit, updateDoc, where, arrayUnion, arrayRemove } from 'firebase/firestore';
@@ -80,7 +84,7 @@ import {
   DialogFooter,
   DialogClose,
 } from '@/components/ui/dialog';
-import { useForm } from 'react-hook-form';
+import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -98,6 +102,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { DocumentDraftingDialog } from '@/components/process/DocumentDraftingDialog';
+import { extractProtocolData } from '@/ai/flows/extract-protocol-data-flow';
 
 const STAGES: LeadStatus[] = ['NOVO', 'ATENDIMENTO', 'BUROCRACIA', 'CONTRATUAL', 'DISTRIBUICAO'];
 
@@ -336,10 +341,10 @@ function LeadCard({ lead, client, lawyer, onClick }: { lead: Lead; client?: Clie
       <div className="p-4 space-y-3">
         <div className="flex items-start justify-between">
           <div className="flex flex-wrap gap-1">
-            <Badge variant="outline" className={cn("text-[8px] font-black uppercase border-none px-1 h-4", priority.color)}>
+            <Badge variant="outline" className={cn("text-[8px] font-black uppercase border-none px-1.5 h-4.5", priority.color)}>
               {priority.label}
             </Badge>
-            <Badge variant="outline" className="text-[8px] font-black uppercase bg-white/5 text-primary border-primary/20 px-1 h-4">
+            <Badge variant="outline" className="text-[8px] font-black uppercase bg-white/5 text-primary border-primary/20 px-1.5 h-4.5">
               {lead.legalArea}
             </Badge>
           </div>
@@ -397,11 +402,10 @@ function LeadCard({ lead, client, lawyer, onClick }: { lead: Lead; client?: Clie
 }
 
 function KanbanColumn({ id, stage, leads, clientsMap, staffMap, onCardClick }: { id: string; stage: string; leads: Lead[]; clientsMap: Map<string, Client>; staffMap: Map<string, Staff>; onCardClick: (l: Lead) => void }) {
-  const { setNodeRef } = useSortable({ id });
   const config = stageConfig[stage as LeadStatus] || stageConfig.NOVO;
 
   return (
-    <div ref={setNodeRef} className="flex flex-col gap-3 min-w-[280px] w-full max-w-[320px] bg-white/[0.01] p-3 rounded-[1.5rem] border border-white/5 h-full overflow-hidden">
+    <div className="flex flex-col gap-3 min-w-[280px] w-full max-w-[320px] bg-white/[0.01] p-3 rounded-[1.5rem] border border-white/5 h-full overflow-hidden">
       <div className="flex items-center justify-between px-2 mb-1 pb-2 border-b border-white/5">
         <div className="flex items-center gap-2">
           <div className={cn("h-2 w-2 rounded-full animate-pulse", config.color.split(' ')[1])} />
@@ -996,10 +1000,10 @@ export default function LeadsPage() {
     return list.filter(l => l.title.toLowerCase().includes(q) || clientsMap.get(l.clientId)?.firstName.toLowerCase().includes(q));
   }, [leadsData, searchTerm, clientsMap, userProfile]);
 
-  const handleDragEnd = async (event: any) => {
+  const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over) return;
-    const leadId = active.id;
+    const leadId = active.id as string;
     const newStatus = over.id as LeadStatus;
     const lead = leadsData?.find(l => l.id === leadId);
     if (lead && lead.status !== newStatus && STAGES.includes(newStatus)) {
@@ -1010,7 +1014,7 @@ export default function LeadsPage() {
     }
   };
 
-  const handleConfirmProtocol = async (data: any) => {
+  const handleConfirmProtocol = async (data: z.infer<typeof conversionSchema>) => {
     if (!selectedLead) return;
     setIsProcessing(selectedLead.id);
     try {
