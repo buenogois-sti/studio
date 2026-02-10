@@ -1,4 +1,4 @@
-'use server';
+'use client';
 
 import * as React from 'react';
 import { 
@@ -868,7 +868,7 @@ function NewLeadSheet({ open, onOpenChange, lawyers, onCreated }: { open: boolea
   );
 }
 
-export default async function LeadsPage() {
+export default function LeadsPage() {
   const { firestore, user } = useFirebase();
   const { data: session } = useSession();
   const { toast } = useToast();
