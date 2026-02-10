@@ -1,4 +1,3 @@
-
 'use server';
 
 import { firestoreAdmin } from '@/firebase/admin';
@@ -9,6 +8,9 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/options';
 import { createNotification } from './notification-actions';
 import { revalidatePath } from 'next/cache';
 import { v4 as uuidv4 } from 'uuid';
+import { getGoogleApiClientsForUser } from './drive';
+import { formatISO, format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 /**
  * Cria um novo lead na pauta de triagem com tarefas iniciais concluídas.
@@ -47,7 +49,7 @@ export async function createLead(data: {
       description: data.description || '',
       status: 'NOVO' as LeadStatus,
       opposingParties: [],
-      completedTasks: ['Captar contatos'], 
+      completedTasks: [], 
       stageEntryDates: {
         'NOVO': now
       },
@@ -162,5 +164,95 @@ export async function convertLeadToProcess(leadId: string, data: {
   } catch (error: any) {
     console.error('[convertLeadToProcess] Error:', error);
     throw new Error(error.message || 'Falha ao converter lead.');
+  }
+}
+
+/**
+ * Agenda uma entrevista de atendimento no Google Agenda do advogado.
+ */
+export async function scheduleLeadInterview(leadId: string, data: {
+  date: string;
+  time: string;
+  location: string;
+  notes?: string;
+}) {
+  if (!firestoreAdmin) throw new Error('Servidor indisponível.');
+  const session = await getServerSession(authOptions);
+  if (!session) throw new Error('Não autenticado.');
+
+  try {
+    const leadRef = firestoreAdmin.collection('leads').doc(leadId);
+    const leadDoc = await leadRef.get();
+    const leadData = leadDoc.data() as Lead;
+
+    if (!leadDoc.exists) throw new Error('Lead não encontrado.');
+
+    const clientDoc = await firestoreAdmin.collection('clients').doc(leadData.clientId).get();
+    const clientData = clientDoc.data();
+
+    const { calendar } = await getGoogleApiClientsForUser();
+    
+    const startDateTime = new Date(`${data.date}T${data.time}`);
+    const endDateTime = new Date(startDateTime.getTime() + 60 * 60 * 1000); // 1h de duração
+
+    const eventDescription = [
+      `📅 ENTREVISTA TÉCNICA DE TRIAGEM`,
+      `Lead: ${leadData.title}`,
+      `Cliente: ${clientData?.firstName} ${clientData?.lastName || ''}`,
+      `WhatsApp: ${clientData?.mobile || 'N/A'}`,
+      `Área: ${leadData.legalArea}`,
+      ``,
+      `📍 Local/Modo: ${data.location}`,
+      `📝 Observações do Agendamento:`,
+      `${data.notes || 'Sem observações.'}`,
+      ``,
+      `🔗 Link LexFlow: https://buenogois.com.br/dashboard/leads`,
+      `🔐 ID Interno: ${leadId}`
+    ].join('\n');
+
+    const calendarEvent = {
+      summary: `💬 Entrevista: ${clientData?.firstName} | ${leadData.title}`,
+      location: data.location,
+      description: eventDescription,
+      start: { dateTime: formatISO(startDateTime), timeZone: 'America/Sao_Paulo' },
+      end: { dateTime: formatISO(endDateTime), timeZone: 'America/Sao_Paulo' },
+      reminders: {
+        useDefault: false,
+        overrides: [
+          { method: 'popup', minutes: 60 },
+          { method: 'email', minutes: 1440 }
+        ],
+      },
+    };
+
+    const createdEvent = await calendar.events.insert({
+      calendarId: 'primary',
+      requestBody: calendarEvent,
+    });
+
+    const timelineEvent: TimelineEvent = {
+      id: uuidv4(),
+      type: 'system',
+      description: `ENTREVISTA AGENDADA: Para o dia ${format(startDateTime, 'dd/MM/yy')} às ${data.time}. Local: ${data.location}. Evento criado na agenda Google.`,
+      date: Timestamp.now() as any,
+      authorName: session.user.name || 'Sistema'
+    };
+
+    const completedTasks = leadData.completedTasks || [];
+    if (!completedTasks.includes('Agendamento de entrevista')) {
+      completedTasks.push('Agendamento de entrevista');
+    }
+
+    await leadRef.update({
+      timeline: FieldValue.arrayUnion(timelineEvent),
+      completedTasks,
+      updatedAt: FieldValue.serverTimestamp()
+    });
+
+    revalidatePath('/dashboard/leads');
+    return { success: true, googleEventId: createdEvent.data.id };
+  } catch (error: any) {
+    console.error('[scheduleLeadInterview] Error:', error);
+    throw new Error(error.message || 'Falha ao agendar compromisso.');
   }
 }

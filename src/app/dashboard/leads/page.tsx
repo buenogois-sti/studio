@@ -33,18 +33,17 @@ import {
   Activity,
   FileUp,
   Mail,
-  Download,
   Check,
   Bot,
   RefreshCw,
   TrendingUp,
   Timer,
   Building,
-  Hash,
   ClipboardList,
   ChevronRight,
-  ArrowUpRight,
-  FilePlus2
+  FilePlus2,
+  CalendarDays,
+  Video
 } from 'lucide-react';
 import { 
   DndContext, 
@@ -65,13 +64,13 @@ import { CSS } from '@dnd-kit/utilities';
 import { useFirebase, useCollection, useMemoFirebase, useDoc } from '@/firebase';
 import { collection, query, orderBy, doc, Timestamp, limit, updateDoc, where, arrayUnion } from 'firebase/firestore';
 import type { Lead, Client, Staff, LeadStatus, LeadPriority, UserProfile, TimelineEvent, OpposingParty, ChecklistTemplate } from '@/lib/types';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
-import { format, formatDistanceToNow, differenceInHours, startOfDay } from 'date-fns';
+import { format, formatDistanceToNow, differenceInHours } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useSession } from 'next-auth/react';
 import {
@@ -96,7 +95,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Textarea } from '@/components/ui/textarea';
-import { createLead, updateLeadStatus, convertLeadToProcess } from '@/lib/lead-actions';
+import { createLead, updateLeadStatus, convertLeadToProcess, scheduleLeadInterview } from '@/lib/lead-actions';
 import { ClientSearchInput } from '@/components/process/ClientSearchInput';
 import { ClientCreationModal } from '@/components/process/ClientCreationModal';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -104,13 +103,11 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFo
 import { Separator } from '@/components/ui/separator';
 import { LocationSearch } from '@/components/shared/LocationSearch';
 import { v4 as uuidv4 } from 'uuid';
-import { listFiles } from '@/lib/drive-actions';
 import { syncLeadToDrive } from '@/lib/drive';
 import { extractProtocolData } from '@/ai/flows/extract-protocol-data-flow';
 import { Progress } from '@/components/ui/progress';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Skeleton } from '@/components/ui/skeleton';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { DocumentDraftingDialog } from '@/components/process/DocumentDraftingDialog';
 
@@ -182,268 +179,137 @@ const conversionSchema = z.object({
   })).min(1, 'Pelo menos um réu deve ser qualificado.'),
 });
 
-function LeadConversionDialog({ 
+const scheduleInterviewSchema = z.object({
+  date: z.string().min(1, 'Selecione a data.'),
+  time: z.string().min(1, 'Selecione o horário.'),
+  location: z.string().min(1, 'Selecione o local/modo.'),
+  notes: z.string().optional(),
+});
+
+function ScheduleInterviewDialog({ 
   lead, 
   open, 
-  onOpenChange, 
-  onConfirm,
-  lawyers
+  onOpenChange,
+  onSuccess
 }: { 
   lead: Lead | null; 
   open: boolean; 
   onOpenChange: (o: boolean) => void;
-  onConfirm: (data: z.infer<typeof conversionSchema>) => void;
-  lawyers: Staff[];
+  onSuccess: () => void;
 }) {
-  const [isPreFilling, setIsPreFilling] = React.useState(false);
+  const [isSaving, setIsSaving] = React.useState(false);
   const { toast } = useToast();
-  const form = useForm<z.infer<typeof conversionSchema>>({
-    resolver: zodResolver(conversionSchema),
+  const form = useForm<z.infer<typeof scheduleInterviewSchema>>({
+    resolver: zodResolver(scheduleInterviewSchema),
     defaultValues: {
-      processNumber: '',
-      court: '',
-      courtBranch: '',
-      caseValue: 0,
-      leadLawyerId: '',
-      opposingParties: [{ name: '', document: '', address: '' }]
+      date: format(new Date(), 'yyyy-MM-dd'),
+      time: '09:00',
+      location: 'Sede - Bueno Gois Advogados',
+      notes: ''
     }
   });
 
-  const { fields, append, remove } = useFieldArray({
-    control: form.control,
-    name: 'opposingParties'
-  });
-
-  React.useEffect(() => {
-    if (lead && open) {
-      form.setValue('leadLawyerId', lead.lawyerId);
-    }
-  }, [lead, open, form]);
-
-  const handlePreFill = async () => {
+  const onSubmit = async (values: z.infer<typeof scheduleInterviewSchema>) => {
     if (!lead) return;
-    setIsPreFilling(true);
+    setIsSaving(true);
     try {
-      const timelineNotes = lead.description ? [lead.description] : [];
-      const result = await extractProtocolData({
-        leadTitle: lead.title,
-        leadDescription: lead.description || '',
-        timelineNotes
-      });
-
-      if (result) {
-        form.setValue('processNumber', result.suggestedProcessNumber || '');
-        form.setValue('court', result.suggestedCourt || '');
-        form.setValue('courtBranch', result.suggestedCourtBranch || '');
-        form.setValue('caseValue', result.suggestedCaseValue || 0);
-        toast({ title: 'Dados sugeridos!', description: result.reasoning });
-      }
-    } catch (e) {
-      toast({ variant: 'destructive', title: 'Falha na IA', description: 'Não foi possível ler o histórico para sugestões.' });
+      await scheduleLeadInterview(lead.id, values);
+      toast({ title: 'Entrevista Agendada!', description: 'O compromisso foi salvo na sua agenda Google.' });
+      onSuccess();
+      onOpenChange(false);
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Falha no agendamento', description: e.message });
     } finally {
-      setIsParsingAI(false);
+      setIsSaving(false);
     }
-  };
-
-  const formatCurrencyBRL = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
-  };
-
-  const handleCurrencyChange = (raw: string) => {
-    const digits = raw.replace(/\D/g, '');
-    const numericValue = Number(digits) / 100;
-    form.setValue('caseValue', numericValue);
   };
 
   if (!lead) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-3xl max-w-[95vw] bg-[#020617] border-white/10 text-white shadow-2xl h-[90vh] flex flex-col p-0 overflow-hidden">
-        <DialogHeader className="p-6 border-b border-white/5 bg-white/5 shrink-0">
-          <div className="flex items-center justify-between gap-4">
-            <DialogTitle className="flex items-center gap-2 text-white font-headline text-xl">
-              <ArrowRightLeft className="h-6 w-6 text-emerald-500" />
-              Distribuição Processual
-            </DialogTitle>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={handlePreFill}
-              disabled={isPreFilling}
-              className="h-9 border-primary/30 text-primary hover:bg-primary/10 text-[11px] font-black uppercase gap-2"
-            >
-              {isPreFilling ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
-              Sugestão IA
-            </Button>
-          </div>
-          <DialogDescription className="text-slate-400 mt-1">
-            Finalize os dados para integrar o lead ao sistema de processos ativos.
+      <DialogContent className="sm:max-w-md bg-[#020617] border-white/10 text-white shadow-2xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <CalendarDays className="h-5 w-5 text-primary" /> Agendar Entrevista Técnica
+          </DialogTitle>
+          <DialogDescription className="text-slate-400">
+            O compromisso será sincronizado com o Google Agenda do responsável.
           </DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="flex-1">
-          <Form {...form}>
-            <form id="conversion-form" onSubmit={form.handleSubmit(onConfirm)} className="p-8 space-y-10">
-              
-              <div className="space-y-6">
-                <div className="flex items-center gap-2 text-[12px] font-black uppercase text-primary tracking-[0.2em]">
-                  <FolderKanban className="h-4 w-4" /> Dados da Ação
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <FormField
-                    control={form.control}
-                    name="processNumber"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Número do Processo (CNJ) *</FormLabel>
-                        <FormControl>
-                          <Input placeholder="0000000-00.0000.0.00.0000" className="bg-black/40 border-white/10 h-10 font-mono tracking-widest text-sm" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-4">
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="date"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-[10px] font-black uppercase text-slate-500">Data</FormLabel>
+                    <FormControl><Input type="date" className="bg-black/40 border-white/10 h-10" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="time"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-[10px] font-black uppercase text-slate-500">Horário</FormLabel>
+                    <FormControl><Input type="time" className="bg-black/40 border-white/10 h-10" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
-                  <FormField
-                    control={form.control}
-                    name="caseValue"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Valor da Causa (R$) *</FormLabel>
-                        <FormControl>
-                          <div className="relative">
-                            <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-emerald-500" />
-                            <Input 
-                              placeholder="0,00" 
-                              className="pl-10 bg-black/40 border-white/10 h-10 font-bold"
-                              value={formatCurrencyBRL(field.value)}
-                              onChange={(e) => handleCurrencyChange(e.target.value)}
-                            />
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+            <FormField
+              control={form.control}
+              name="location"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-[10px] font-black uppercase text-slate-500">Local / Modo de Atendimento</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger className="bg-black/40 border-white/10 h-10">
+                        <SelectValue />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent className="bg-[#0f172a] text-white">
+                      <SelectItem value="Sede - Bueno Gois Advogados">🏢 Presencial na Sede</SelectItem>
+                      <SelectItem value="Reunião Online (Google Meet)">🎥 Reunião Online (Meet)</SelectItem>
+                      <SelectItem value="Atendimento via WhatsApp Video">📱 WhatsApp Vídeo</SelectItem>
+                      <SelectItem value="Diligência Externa">🚗 Diligência Externa</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </FormItem>
+              )}
+            />
 
-                  <FormField
-                    control={form.control}
-                    name="court"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Fórum / Comarca *</FormLabel>
-                        <FormControl>
-                          <LocationSearch value={field.value} onSelect={field.onChange} placeholder="Pesquisar tribunal..." />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+            <FormField
+              control={form.control}
+              name="notes"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-[10px] font-black uppercase text-slate-500">Notas Adicionais</FormLabel>
+                  <FormControl>
+                    <Textarea placeholder="Ex: Cliente virá com as CTPS originais..." className="bg-black/40 border-white/10 text-xs resize-none h-20" {...field} />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
 
-                  <FormField
-                    control={form.control}
-                    name="courtBranch"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Vara / Câmara *</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Ex: 2ª Vara do Trabalho de SBC" className="bg-black/40 border-white/10 h-10" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              </div>
-
-              <Separator className="bg-white/5" />
-
-              <div className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-[12px] font-black uppercase text-rose-400 tracking-[0.2em]">
-                    <Building className="h-4 w-4" /> Qualificação do Réu
-                  </div>
-                  <Button 
-                    type="button" 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => append({ name: '', document: '', address: '' })}
-                    className="h-8 text-[9px] font-black uppercase text-primary"
-                  >
-                    <Plus className="h-3 w-3 mr-1" /> Novo Réu
-                  </Button>
-                </div>
-
-                <div className="grid gap-4">
-                  {fields.map((field, index) => (
-                    <div key={field.id} className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-4 relative group hover:border-rose-500/20">
-                      <Button 
-                        type="button" 
-                        variant="ghost" 
-                        size="icon" 
-                        onClick={() => remove(index)}
-                        disabled={fields.length === 1}
-                        className="absolute top-2 right-2 h-7 w-7 text-rose-500/50 hover:text-rose-500"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <FormField
-                          control={form.control}
-                          name={`opposingParties.${index}.name` as any}
-                          render={({ field: nameField }) => (
-                            <FormItem>
-                              <FormLabel className="text-[9px] font-black uppercase text-slate-500">Razão Social / Nome *</FormLabel>
-                              <FormControl><Input placeholder="Empresa LTDA" className="bg-black/40 border-white/5 h-10" {...nameField} /></FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name={`opposingParties.${index}.document` as any}
-                          render={({ field: docField }) => (
-                            <FormItem>
-                              <FormLabel className="text-[9px] font-black uppercase text-slate-500">CNPJ / CPF</FormLabel>
-                              <FormControl><Input placeholder="00.000.000/0000-00" className="bg-black/40 border-white/5 h-10 font-mono" {...docField} /></FormControl>
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-                      <FormField
-                        control={form.control}
-                        name={`opposingParties.${index}.address` as any}
-                        render={({ field: addrField }) => (
-                          <FormItem>
-                            <FormLabel className="text-[9px] font-black uppercase text-slate-500">Endereço Completo</FormLabel>
-                            <FormControl>
-                              <Textarea placeholder="Rua, número, bairro, cidade - UF..." className="min-h-[60px] bg-black/40 border-white/5 resize-none text-xs" {...addrField} />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </form>
-          </Form>
-        </ScrollArea>
-
-        <DialogFooter className="p-6 border-t border-white/5 bg-white/5 shrink-0 gap-3">
-          <DialogClose asChild>
-            <Button variant="ghost" className="text-slate-400 font-bold uppercase text-[10px] tracking-widest h-12">Cancelar</Button>
-          </DialogClose>
-          <Button 
-            type="submit" 
-            form="conversion-form"
-            className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase tracking-widest text-[10px] h-12"
-          >
-            Protocolar Processo
-          </Button>
-        </DialogFooter>
+            <DialogFooter className="pt-4">
+              <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={isSaving}>Cancelar</Button>
+              <Button type="submit" disabled={isSaving} className="bg-primary text-primary-foreground font-black uppercase tracking-widest text-[10px]">
+                {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ShieldCheck className="h-4 w-4 mr-2" />}
+                Confirmar Agendamento
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
       </DialogContent>
     </Dialog>
   );
@@ -454,9 +320,9 @@ function LeadCard({ lead, client, lawyer, onClick }: { lead: Lead; client?: Clie
   const style = { transform: CSS.Translate.toString(transform), transition };
   
   const priority = priorityConfig[lead.priority as LeadPriority] || priorityConfig.MEDIA;
-  const stage = stageConfig[lead.status] || stageConfig.NOVO;
   
   const completedCount = lead.completedTasks?.length || 0;
+  const stage = stageConfig[lead.status] || stageConfig.NOVO;
   const totalTasks = stage.tasks.length;
   const progress = totalTasks > 0 ? (completedCount / totalTasks) * 100 : 0;
 
@@ -595,6 +461,7 @@ function LeadDetailsSheet({
   const [isAdvancing, setIsAdvancing] = React.useState(false);
   const [newNote, setNewNote] = React.useState('');
   const [isDraftingOpen, setIsDraftingOpen] = React.useState(false);
+  const [isSchedulingOpen, setIsSchedulingOpen] = React.useState(false);
 
   const interviewQuery = useMemoFirebase(
     () => (firestore && lead ? query(collection(firestore, 'checklist_templates'), where('category', '==', 'Entrevista de Triagem'), where('legalArea', '==', lead.legalArea), limit(1)) : null),
@@ -607,6 +474,13 @@ function LeadDetailsSheet({
     if (!lead || !firestore) return;
     const completed = lead.completedTasks || [];
     const isCompleted = completed.includes(task);
+    
+    // Especial: se for agendamento de entrevista, abre o modal
+    if (task === 'Agendamento de entrevista' && !isCompleted) {
+      setIsSchedulingOpen(true);
+      return;
+    }
+
     const updated = isCompleted ? completed.filter(t => t !== task) : [...completed, task];
     
     try {
@@ -736,22 +610,31 @@ function LeadDetailsSheet({
               <div className="grid gap-2">
                 {stage.tasks.map(task => {
                   const isDone = lead.completedTasks?.includes(task);
+                  const isScheduling = task === 'Agendamento de entrevista';
                   return (
                     <div 
                       key={task} 
                       className={cn(
-                        "flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer group",
+                        "flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer group",
                         isDone ? "bg-emerald-500/[0.03] border-emerald-500/20" : "bg-white/[0.02] border-white/5 hover:border-primary/30"
                       )} 
                       onClick={() => handleToggleTask(task)}
                     >
-                      <div className={cn(
-                        "h-5 w-5 rounded-lg border flex items-center justify-center transition-all",
-                        isDone ? "bg-emerald-500 border-emerald-500 text-white" : "border-white/10 group-hover:border-primary/50"
-                      )}>
-                        {isDone && <Check className="h-3 w-3 stroke-[3]" />}
+                      <div className="flex items-center gap-3">
+                        <div className={cn(
+                          "h-5 w-5 rounded-lg border flex items-center justify-center transition-all",
+                          isDone ? "bg-emerald-500 border-emerald-500 text-white" : "border-white/10 group-hover:border-primary/50"
+                        )}>
+                          {isDone && <Check className="h-3 w-3 stroke-[3]" />}
+                        </div>
+                        <span className={cn("text-xs font-bold tracking-tight", isDone ? "text-emerald-400/70" : "text-slate-200")}>{task}</span>
                       </div>
-                      <span className={cn("text-xs font-bold tracking-tight", isDone ? "text-emerald-400/70" : "text-slate-200")}>{task}</span>
+                      
+                      {isScheduling && !isDone && (
+                        <div className="flex items-center gap-1.5 text-[9px] font-black text-primary uppercase animate-pulse">
+                          <Video className="h-3.5 w-3.5" /> Abrir Agenda
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -862,7 +745,6 @@ function LeadDetailsSheet({
           </div>
         </ScrollArea>
 
-        {/* Rodapé de Ações de Elite */}
         <SheetFooter className="p-6 border-t border-white/5 bg-white/[0.02] shrink-0 flex items-center justify-between gap-4">
           <Button 
             variant="ghost" 
@@ -900,6 +782,12 @@ function LeadDetailsSheet({
           lead={lead} 
           open={isDraftingOpen} 
           onOpenChange={setIsDraftingOpen} 
+        />
+        <ScheduleInterviewDialog
+          lead={lead}
+          open={isSchedulingOpen}
+          onOpenChange={setIsSchedulingOpen}
+          onSuccess={() => {}}
         />
       </SheetContent>
     </Sheet>
@@ -1006,7 +894,6 @@ function NewLeadSheet({ open, onOpenChange, lawyers, onCreated }: { open: boolea
 
 export default function LeadsPage() {
   const { firestore, user } = useFirebase();
-  const { data: session } = useSession();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = React.useState('');
   const [isNewLeadOpen, setIsNewLeadOpen] = React.useState(false);
@@ -1021,7 +908,7 @@ export default function LeadsPage() {
   const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
 
   const leadsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'leads'), where('status', '!=', 'CONVERTIDO')) : null), [firestore]);
-  const { data: leadsData, isLoading: isLoadingLeads } = useCollection<Lead>(leadsQuery);
+  const { data: leadsData } = useCollection<Lead>(leadsQuery);
 
   const clientsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'clients'), limit(500)) : null), [firestore]);
   const { data: clientsData } = useCollection<Client>(clientsQuery);
@@ -1040,39 +927,6 @@ export default function LeadsPage() {
     const q = searchTerm.toLowerCase();
     return list.filter(l => l.title.toLowerCase().includes(q) || clientsMap.get(l.clientId)?.firstName.toLowerCase().includes(q));
   }, [leadsData, searchTerm, clientsMap, userProfile]);
-
-  const stats = React.useMemo(() => {
-    if (!leadsData) return { total: 0, urgent: 0, ready: 0, slowestStage: '---', highDemand: '---' };
-    
-    const now = new Date();
-    const stageTimes: Record<string, number[]> = {};
-    const stageCounts: Record<string, number> = {};
-
-    leadsData.forEach(l => {
-      stageCounts[l.status] = (stageCounts[l.status] || 0) + 1;
-      const entryDate = l.stageEntryDates?.[l.status]?.toDate();
-      if (entryDate) {
-        const hours = Math.abs(differenceInHours(now, entryDate));
-        if (!stageTimes[l.status]) stageTimes[l.status] = [];
-        stageTimes[l.status].push(hours);
-      }
-    });
-
-    const avgTimes = Object.entries(stageTimes).map(([stage, times]) => ({
-      stage,
-      avg: times.reduce((a, b) => a + b, 0) / times.length
-    })).sort((a, b) => b.avg - a.avg);
-
-    const highDemandStage = Object.entries(stageCounts).sort((a, b) => b[1] - a[1])[0];
-
-    return {
-      total: leadsData.length,
-      urgent: leadsData.filter(l => l.isUrgent).length,
-      ready: leadsData.filter(l => l.status === 'DISTRIBUICAO').length,
-      slowestStage: avgTimes[0] ? (stageConfig[avgTimes[0].stage as LeadStatus]?.label || '---') : '---',
-      highDemand: highDemandStage ? (stageConfig[highDemandStage[0] as LeadStatus]?.label || '---') : '---'
-    };
-  }, [leadsData]);
 
   const handleDragEnd = async (event: any) => {
     const { active, over } = event;
@@ -1124,29 +978,18 @@ export default function LeadsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 px-1">
-        <Card className="bg-[#0f172a] border-white/5 shadow-none p-4 flex items-center gap-4">
-          <div className="h-10 w-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 shrink-0"><TrendingUp className="h-5 w-5" /></div>
-          <div className="min-w-0"><p className="text-[8px] font-black uppercase text-slate-500 tracking-widest truncate">Demanda</p><p className="text-sm font-black text-white truncate">{stats.highDemand}</p></div>
-        </Card>
-        <Card className="bg-[#0f172a] border-white/5 shadow-none p-4 flex items-center gap-4">
-          <div className="h-10 w-10 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 shrink-0"><Timer className="h-5 w-5" /></div>
-          <div className="min-w-0"><p className="text-[8px] font-black uppercase text-slate-500 tracking-widest truncate">Retenção</p><p className="text-sm font-black text-white truncate">{stats.slowestStage}</p></div>
-        </Card>
-        <Card className="bg-[#0f172a] border-white/5 shadow-none p-4 flex items-center gap-4">
-          <div className="h-10 w-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0"><Flame className="h-5 w-5" /></div>
-          <div className="min-w-0"><p className="text-[8px] font-black uppercase text-slate-500 tracking-widest truncate">Críticos</p><p className="text-sm font-black text-white truncate">{stats.urgent}</p></div>
-        </Card>
-        <Card className="bg-[#0f172a] border-white/5 shadow-none p-4 flex items-center gap-4">
-          <div className="h-10 w-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0"><FolderKanban className="h-5 w-5" /></div>
-          <div className="min-w-0"><p className="text-[8px] font-black uppercase text-slate-500 tracking-widest truncate">Prontos</p><p className="text-sm font-black text-white truncate">{stats.ready}</p></div>
-        </Card>
-      </div>
-
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <div className="flex gap-6 overflow-x-auto pb-8 px-1 no-scrollbar min-h-[500px]">
           {STAGES.map(stage => (
-            <KanbanColumn key={stage} id={stage} stage={stage} leads={filteredLeads.filter(l => l.status === stage)} clientsMap={clientsMap} staffMap={staffMap} onCardClick={(l: Lead) => { setSelectedLead(l); setIsDetailsOpen(true); }} />
+            <KanbanColumn 
+              key={stage} 
+              id={stage} 
+              stage={stage} 
+              leads={filteredLeads.filter(l => l.status === stage)} 
+              clientsMap={clientsMap} 
+              staffMap={staffMap} 
+              onCardClick={(l: Lead) => { setSelectedLead(l); setIsDetailsOpen(true); }} 
+            />
           ))}
         </div>
       </DndContext>
