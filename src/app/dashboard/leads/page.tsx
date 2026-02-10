@@ -868,7 +868,7 @@ function NewLeadSheet({ open, onOpenChange, lawyers, onCreated }: { open: boolea
   );
 }
 
-export default function LeadsPage() {
+export default async function LeadsPage() {
   const { firestore, user } = useFirebase();
   const { data: session } = useSession();
   const { toast } = useToast();
