@@ -1,4 +1,3 @@
-
 'use client';
     
 import { useState, useEffect } from 'react';
@@ -91,10 +90,10 @@ export function useDoc<T = any>(
           const errorToReport = new FirestorePermissionError({
             operation: 'get',
             path: key,
-          });
-          entry.lastError = errorToReport as any;
+          }) as any;
+          entry.lastError = errorToReport;
           entry.isLoading = false;
-          entry.listeners.forEach(l => l(entry.lastData, errorToReport as any, false));
+          entry.listeners.forEach(l => l(entry.lastData, errorToReport, false));
         }
       );
 
