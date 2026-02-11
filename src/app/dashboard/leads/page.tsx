@@ -314,9 +314,11 @@ function LeadCard({ lead, client, lawyer, onClick }: { lead: Lead; client?: Clie
   
   const priority = priorityConfig[lead.priority as LeadPriority] || priorityConfig.MEDIA;
   
-  const completedCount = lead.completedTasks?.length || 0;
   const stage = stageConfig[lead.status] || stageConfig.NOVO;
-  const totalTasks = stage.tasks.length;
+  const currentStageTasks = stage.tasks;
+  const completedInCurrentStage = lead.completedTasks?.filter(t => currentStageTasks.includes(t)) || [];
+  const completedCount = completedInCurrentStage.length;
+  const totalTasks = currentStageTasks.length;
   const progress = totalTasks > 0 ? (completedCount / totalTasks) * 100 : 0;
 
   const hoursInStage = React.useMemo(() => {
@@ -535,9 +537,13 @@ function LeadDetailsSheet({
   };
 
   if (!lead) return null;
+  
   const stage = stageConfig[lead.status] || stageConfig.NOVO;
-  const completedCount = lead.completedTasks?.length || 0;
-  const totalTasks = stage.tasks.length;
+  const currentStageTasks = stage.tasks;
+  const completedInCurrentStage = lead.completedTasks?.filter(t => currentStageTasks.includes(t)) || [];
+  const completedCount = completedInCurrentStage.length;
+  const totalTasks = currentStageTasks.length;
+  
   const isReadyToAdvance = totalTasks > 0 && completedCount === totalTasks;
   const nextStage = STAGES[STAGES.indexOf(lead.status) + 1];
 
@@ -725,28 +731,28 @@ function LeadDetailsSheet({
             Fechar
           </Button>
           
-          <div className="flex gap-3 flex-1 justify-end">
-            <Button
-              className={cn(
-                "h-12 px-8 font-black uppercase tracking-widest text-[10px] rounded-xl transition-all duration-500",
-                isReadyToAdvance 
-                  ? "bg-primary text-primary-foreground shadow-[0_0_30px_rgba(245,208,48,0.3)] hover:scale-105" 
-                  : "bg-white/5 text-slate-500 border border-white/10"
-              )}
-              onClick={handleAdvanceStage}
-              disabled={isAdvancing || !isReadyToAdvance}
-            >
-              {isAdvancing ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : lead.status === 'DISTRIBUICAO' ? (
-                <CheckCircle2 className="h-4 w-4 mr-2 text-emerald-500" />
-              ) : (
-                <ArrowRight className="h-4 w-4 mr-2" />
-              )}
-              {lead.status === 'DISTRIBUICAO' 
-                ? 'Protocolar Processo' 
-                : `Avançar para ${nextStage ? stageConfig[nextStage as LeadStatus].label : 'Próxima Etapa'}`}
-            </Button>
+          <div className="flex gap-3 flex-1 justify-end min-h-[48px]">
+            {isReadyToAdvance && (
+              <Button
+                className={cn(
+                  "h-12 px-8 font-black uppercase tracking-widest text-[10px] rounded-xl transition-all duration-500 animate-in zoom-in slide-in-from-right-4",
+                  "bg-primary text-primary-foreground shadow-[0_0_30px_rgba(245,208,48,0.3)] hover:scale-105"
+                )}
+                onClick={handleAdvanceStage}
+                disabled={isAdvancing}
+              >
+                {isAdvancing ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : lead.status === 'DISTRIBUICAO' ? (
+                  <CheckCircle2 className="h-4 w-4 mr-2 text-emerald-500" />
+                ) : (
+                  <ArrowRight className="h-4 w-4 mr-2" />
+                )}
+                {lead.status === 'DISTRIBUICAO' 
+                  ? 'Protocolar Processo' 
+                  : `Avançar para ${nextStage ? stageConfig[nextStage as LeadStatus].label : 'Próxima Etapa'}`}
+              </Button>
+            )}
           </div>
         </SheetFooter>
         <DocumentDraftingDialog 
