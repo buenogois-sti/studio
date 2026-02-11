@@ -340,63 +340,78 @@ function LeadCard({ lead, client, lawyer, onClick }: { lead: Lead; client?: Clie
         lead.isUrgent && "border-rose-500/20 ring-1 ring-rose-500/10"
       )}
     >
-      <div className="p-4 space-y-3">
-        <div className="flex items-start justify-between">
-          <div className="flex flex-wrap gap-1">
-            <Badge variant="outline" className={cn("text-[8px] font-black uppercase border-none px-1.5 h-4.5", priority.color)}>
+      <div className="p-4 space-y-4">
+        {/* Header com Tags */}
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex flex-wrap gap-1.5 flex-1">
+            <Badge variant="outline" className={cn("text-[9px] font-black uppercase border-none px-2 h-5 shrink-0", priority.color)}>
               {priority.label}
             </Badge>
-            <Badge variant="outline" className="text-[8px] font-black uppercase bg-white/5 text-primary border-primary/20 px-1.5 h-4.5">
+            <Badge variant="outline" className="text-[9px] font-black uppercase bg-white/5 text-primary border-primary/20 px-2 h-5 shrink-0">
               {lead.legalArea}
             </Badge>
           </div>
           <div className={cn(
-            "flex items-center gap-1 text-[8px] font-black uppercase tracking-tighter",
+            "flex items-center gap-1 text-[9px] font-black uppercase tracking-tighter shrink-0 mt-0.5",
             hoursInStage > 24 ? "text-rose-500 animate-pulse" : hoursInStage > 12 ? "text-amber-500" : "text-slate-500"
           )}>
-            <Clock className="h-2.5 w-2.5" /> {hoursInStage}h
+            <Clock className="h-3 w-3" /> {hoursInStage}h
           </div>
         </div>
         
-        <h4 className="text-sm font-black text-white group-hover/card:text-primary transition-colors line-clamp-2 leading-tight min-h-[32px] uppercase">
+        {/* Título do Lead */}
+        <h4 className="text-sm font-black text-white group-hover/card:text-primary transition-colors line-clamp-2 leading-tight uppercase tracking-tight min-h-[32px]">
           {lead.title}
         </h4>
 
+        {/* Produção / Progresso */}
         {totalTasks > 0 && (
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between text-[7px] font-black uppercase text-slate-500">
-              <span className="flex items-center gap-1">
-                <ShieldCheck className={cn("h-2.5 w-2.5", progress === 100 ? "text-emerald-500" : "text-slate-600")} />
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-[9px] font-black uppercase tracking-widest">
+              <span className="flex items-center gap-1.5 text-slate-400">
+                <ShieldCheck className={cn("h-3 w-3", progress === 100 ? "text-emerald-500" : "text-slate-600")} />
                 Produção {completedCount}/{totalTasks}
               </span>
-              <span className={cn(progress === 100 ? "text-emerald-500" : "text-white")}>{Math.round(progress)}%</span>
+              <span className={cn("tabular-nums", progress === 100 ? "text-emerald-500" : "text-white")}>
+                {Math.round(progress)}%
+              </span>
             </div>
-            <Progress value={progress} className="h-1 bg-white/5" />
+            <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+              <div 
+                className={cn("h-full transition-all duration-500", progress === 100 ? "bg-emerald-500" : "bg-primary")}
+                style={{ width: `${progress}%` }}
+              />
+            </div>
           </div>
         )}
 
-        <div className="flex items-center gap-2 p-2 rounded-xl bg-black/30 border border-white/5">
-          <div className="h-7 w-7 rounded-lg bg-blue-500/10 flex items-center justify-center shrink-0">
-            <UserCircle className="h-4 w-4 text-blue-400" />
+        {/* Cliente Box */}
+        <div className="flex items-center gap-3 p-3 rounded-2xl bg-black/30 border border-white/5">
+          <div className="h-8 w-8 rounded-xl bg-blue-500/10 flex items-center justify-center shrink-0 border border-blue-500/20">
+            <UserCircle className="h-5 w-5 text-blue-400" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-[10px] font-black text-slate-200 truncate leading-none">{client?.firstName} {client?.lastName}</p>
-            <p className="text-[7px] text-slate-500 font-bold uppercase mt-0.5">{lead.captureSource}</p>
+            <p className="text-[11px] font-black text-slate-200 truncate leading-tight uppercase">
+              {client?.firstName} {client?.lastName}
+            </p>
+            <p className="text-[8px] text-slate-500 font-bold uppercase mt-0.5 tracking-widest">{lead.captureSource}</p>
           </div>
         </div>
       </div>
 
-      <div className="px-3 py-2 border-t border-white/5 bg-white/[0.02] flex items-center justify-between">
-        <div className="flex items-center gap-1.5">
-          <div className="h-5 w-5 rounded-full bg-primary/10 flex items-center justify-center text-primary text-[8px] font-black border border-primary/20">
+      {/* Footer do Card */}
+      <div className="px-4 py-3 border-t border-white/5 bg-white/[0.02] flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-primary text-[9px] font-black border border-primary/20">
             {lawyer?.firstName?.charAt(0)}
           </div>
-          <span className="text-[8px] font-black text-slate-400 uppercase tracking-tighter truncate max-w-[60px]">
+          <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter truncate max-w-[80px]">
             {lawyer?.firstName}
           </span>
         </div>
-        <div className="flex items-center gap-1 text-[7px] text-slate-600 font-black uppercase tracking-widest">
-          <RefreshCw className="h-2.5 w-2.5" /> {formatDistanceToNow(lead.updatedAt.toDate(), { locale: ptBR, addSuffix: false })}
+        <div className="flex items-center gap-1.5 text-[8px] text-slate-600 font-black uppercase tracking-[0.1em]">
+          <RefreshCw className="h-3 w-3" /> 
+          {formatDistanceToNow(lead.updatedAt.toDate(), { locale: ptBR, addSuffix: false })}
         </div>
       </div>
     </Card>
@@ -407,17 +422,17 @@ function KanbanColumn({ id, stage, leads, clientsMap, staffMap, onCardClick }: {
   const config = stageConfig[stage as LeadStatus] || stageConfig.NOVO;
 
   return (
-    <div className="flex flex-col gap-3 min-w-[280px] w-full max-w-[320px] bg-white/[0.01] p-3 rounded-[1.5rem] border border-white/5 h-full overflow-hidden">
-      <div className="flex items-center justify-between px-2 mb-1 pb-2 border-b border-white/5">
-        <div className="flex items-center gap-2">
-          <div className={cn("h-2 w-2 rounded-full animate-pulse", config.color.split(' ')[1])} />
-          <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-white/90">{config.label}</h3>
+    <div className="flex flex-col gap-4 min-w-[300px] w-full max-w-[340px] bg-white/[0.01] p-4 rounded-[2rem] border border-white/5 h-full overflow-hidden shadow-inner">
+      <div className="flex items-center justify-between px-2 mb-2 pb-3 border-b border-white/5">
+        <div className="flex items-center gap-2.5">
+          <div className={cn("h-2.5 w-2.5 rounded-full animate-pulse", config.color.split(' ')[1])} />
+          <h3 className="text-[11px] font-black uppercase tracking-[0.25em] text-white/90">{config.label}</h3>
         </div>
-        <Badge variant="secondary" className="bg-white/5 text-slate-500 text-[9px] font-black h-5 border-none">{leads.length}</Badge>
+        <Badge variant="secondary" className="bg-white/5 text-slate-500 text-[10px] font-black h-6 border-none px-2.5">{leads.length}</Badge>
       </div>
       
-      <ScrollArea className="flex-1 h-full">
-        <div className="flex flex-col gap-3 pb-10">
+      <ScrollArea className="flex-1 h-full pr-1">
+        <div className="flex flex-col gap-4 pb-16">
           <SortableContext items={leads.map(l => l.id)} strategy={verticalListSortingStrategy}>
             {leads.map((lead: Lead) => (
               <LeadCard 
@@ -1060,7 +1075,7 @@ export default function LeadsPage() {
       </div>
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-        <div className="flex gap-6 overflow-x-auto pb-8 px-1 no-scrollbar min-h-[500px]">
+        <div className="flex gap-6 overflow-x-auto pb-8 px-1 no-scrollbar min-h-[600px]">
           {STAGES.map(stage => (
             <KanbanColumn 
               key={stage} 
