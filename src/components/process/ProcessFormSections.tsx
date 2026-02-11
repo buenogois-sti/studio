@@ -79,7 +79,7 @@ interface ClientsSectionProps {
 export function ClientsSection({ control, onClientSelect }: ClientsSectionProps) {
   const [showCreateModal, setShowCreateModal] = useState(false);
   
-  const { fields: secondaryFields, append: addSecondary, remove: removeSecondary } = useFieldArray<ProcessFormValues>({
+  const { fields: secondaryFields, append: addSecondary, remove: removeSecondary } = useFieldArray<any>({
     control,
     name: 'secondaryClientIds',
   });

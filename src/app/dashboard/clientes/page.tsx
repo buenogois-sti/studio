@@ -161,7 +161,7 @@ export default function ClientsPage() {
   const handleEdit = React.useCallback((client: Client) => { setEditingClient(client); setIsSheetOpen(true); }, []);
   const handleViewDetails = React.useCallback((client: Client) => { setSelectedClientForDetails(client); setIsDetailsOpen(true); }, []);
 
-  const confirmDelete = async () => {
+  const handleDelete = async () => {
     if (!firestore || !clientToDelete || isDeleting) return;
     setIsDeleting(true);
     try {
@@ -173,7 +173,7 @@ export default function ClientsPage() {
     } finally { setIsDeleting(false); }
   };
 
-  const confirmDeactivate = async () => {
+  const handleDeactivate = async () => {
     if (!firestore || !clientToDeactivate || isDeactivating) return;
     setIsDeactivating(true);
     try {
@@ -551,7 +551,7 @@ export default function ClientsPage() {
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-2">
             <AlertDialogCancel className="bg-transparent border-white/10 text-slate-400 hover:text-white" disabled={isDeactivating}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDeactivate} disabled={isDeactivating} className="bg-amber-600 text-white hover:bg-amber-700 font-bold border-none">
+            <AlertDialogAction onClick={handleDeactivate} disabled={isDeactivating} className="bg-amber-600 text-white hover:bg-amber-700 font-bold border-none">
               {isDeactivating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Confirmar Desativação'}
             </AlertDialogAction>
           </AlertDialogFooter>

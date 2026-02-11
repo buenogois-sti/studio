@@ -95,10 +95,9 @@ export function DocumentDraftingDialog({ process, lead, open, onOpenChange }: Do
     setLastTemplateName('');
   };
 
-  // Helper to get display name from either Process or Lead
   const getTargetDisplayName = () => {
     if (!target) return '';
-    return 'title' in target ? target.title : target.name;
+    return 'title' in target ? (target as Lead).title : (target as Process).name;
   };
 
   return (
