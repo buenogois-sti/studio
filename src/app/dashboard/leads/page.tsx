@@ -36,29 +36,16 @@ import {
   FilePlus2,
   ClipboardList,
   DollarSign,
-  Mail
+  Mail,
+  ChevronLeft,
+  ChevronRight,
+  ArrowUpRight
 } from 'lucide-react';
-import { 
-  DndContext, 
-  closestCenter, 
-  KeyboardSensor, 
-  PointerSensor, 
-  useSensor, 
-  useSensors,
-  DragEndEvent
-} from '@dnd-kit/core';
-import { 
-  SortableContext, 
-  sortableKeyboardCoordinates, 
-  verticalListSortingStrategy,
-  useSortable
-} from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 
 import { useFirebase, useCollection, useMemoFirebase, useDoc } from '@/firebase';
 import { collection, query, orderBy, doc, Timestamp, limit, updateDoc, where, arrayUnion, arrayRemove } from 'firebase/firestore';
 import type { Lead, Client, Staff, LeadStatus, LeadPriority, UserProfile, TimelineEvent, OpposingParty, ChecklistTemplate } from '@/lib/types';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -103,6 +90,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { DocumentDraftingDialog } from '@/components/process/DocumentDraftingDialog';
 import { extractProtocolData } from '@/ai/flows/extract-protocol-data-flow';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
 const STAGES: LeadStatus[] = ['NOVO', 'ATENDIMENTO', 'BUROCRACIA', 'CONTRATUAL', 'DISTRIBUICAO'];
 
@@ -305,148 +301,6 @@ function ScheduleInterviewDialog({
         </Form>
       </DialogContent>
     </Dialog>
-  );
-}
-
-function LeadCard({ lead, client, lawyer, onClick }: { lead: Lead; client?: Client; lawyer?: Staff; onClick: () => void }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: lead.id });
-  const style = { transform: CSS.Translate.toString(transform), transition };
-  
-  const priority = priorityConfig[lead.priority as LeadPriority] || priorityConfig.MEDIA;
-  
-  const stage = stageConfig[lead.status] || stageConfig.NOVO;
-  const currentStageTasks = stage.tasks;
-  const completedInCurrentStage = lead.completedTasks?.filter(t => currentStageTasks.includes(t)) || [];
-  const completedCount = completedInCurrentStage.length;
-  const totalTasks = currentStageTasks.length;
-  const progress = totalTasks > 0 ? (completedCount / totalTasks) * 100 : 0;
-
-  const hoursInStage = React.useMemo(() => {
-    const entryDate = lead.stageEntryDates?.[lead.status];
-    if (!entryDate) return 0;
-    return Math.abs(differenceInHours(new Date(), entryDate.toDate()));
-  }, [lead.status, lead.stageEntryDates]);
-
-  return (
-    <Card 
-      ref={setNodeRef} 
-      style={style} 
-      {...attributes} 
-      {...listeners}
-      onClick={onClick}
-      className={cn(
-        "bg-[#0f172a] border-white/5 border-2 hover:border-primary/40 transition-all cursor-grab active:cursor-grabbing group/card shadow-lg p-0 overflow-hidden",
-        isDragging && "opacity-50 border-primary scale-105 z-50",
-        lead.isUrgent && "border-rose-500/20 ring-1 ring-rose-500/10"
-      )}
-    >
-      <div className="p-4 space-y-4">
-        {/* Header com Tags */}
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex flex-wrap gap-1.5 flex-1">
-            <Badge variant="outline" className={cn("text-[9px] font-black uppercase border-none px-2 h-5 shrink-0", priority.color)}>
-              {priority.label}
-            </Badge>
-            <Badge variant="outline" className="text-[9px] font-black uppercase bg-white/5 text-primary border-primary/20 px-2 h-5 shrink-0">
-              {lead.legalArea}
-            </Badge>
-          </div>
-          <div className={cn(
-            "flex items-center gap-1 text-[9px] font-black uppercase tracking-tighter shrink-0 mt-0.5",
-            hoursInStage > 24 ? "text-rose-500 animate-pulse" : hoursInStage > 12 ? "text-amber-500" : "text-slate-500"
-          )}>
-            <Clock className="h-3 w-3" /> {hoursInStage}h
-          </div>
-        </div>
-        
-        {/* Título do Lead */}
-        <h4 className="text-sm font-black text-white group-hover/card:text-primary transition-colors line-clamp-2 leading-tight uppercase tracking-tight min-h-[32px]">
-          {lead.title}
-        </h4>
-
-        {/* Produção / Progresso */}
-        {totalTasks > 0 && (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-[9px] font-black uppercase tracking-widest">
-              <span className="flex items-center gap-1.5 text-slate-400">
-                <ShieldCheck className={cn("h-3 w-3", progress === 100 ? "text-emerald-500" : "text-slate-600")} />
-                Produção {completedCount}/{totalTasks}
-              </span>
-              <span className={cn("tabular-nums", progress === 100 ? "text-emerald-500" : "text-white")}>
-                {Math.round(progress)}%
-              </span>
-            </div>
-            <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
-              <div 
-                className={cn("h-full transition-all duration-500", progress === 100 ? "bg-emerald-500" : "bg-primary")}
-                style={{ width: `${progress}%` }}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Cliente Box */}
-        <div className="flex items-center gap-3 p-3 rounded-2xl bg-black/30 border border-white/5">
-          <div className="h-8 w-8 rounded-xl bg-blue-500/10 flex items-center justify-center shrink-0 border border-blue-500/20">
-            <UserCircle className="h-5 w-5 text-blue-400" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-black text-slate-200 truncate leading-tight uppercase">
-              {client?.firstName} {client?.lastName}
-            </p>
-            <p className="text-[8px] text-slate-500 font-bold uppercase mt-0.5 tracking-widest">{lead.captureSource}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Footer do Card */}
-      <div className="px-4 py-3 border-t border-white/5 bg-white/[0.02] flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-primary text-[9px] font-black border border-primary/20">
-            {lawyer?.firstName?.charAt(0)}
-          </div>
-          <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter truncate max-w-[80px]">
-            {lawyer?.firstName}
-          </span>
-        </div>
-        <div className="flex items-center gap-1.5 text-[8px] text-slate-600 font-black uppercase tracking-[0.1em]">
-          <RefreshCw className="h-3 w-3" /> 
-          {formatDistanceToNow(lead.updatedAt.toDate(), { locale: ptBR, addSuffix: false })}
-        </div>
-      </div>
-    </Card>
-  );
-}
-
-function KanbanColumn({ id, stage, leads, clientsMap, staffMap, onCardClick }: { id: string; stage: string; leads: Lead[]; clientsMap: Map<string, Client>; staffMap: Map<string, Staff>; onCardClick: (l: Lead) => void }) {
-  const config = stageConfig[stage as LeadStatus] || stageConfig.NOVO;
-
-  return (
-    <div className="flex flex-col gap-4 min-w-[300px] w-full max-w-[340px] bg-white/[0.01] p-4 rounded-[2rem] border border-white/5 h-full overflow-hidden shadow-inner">
-      <div className="flex items-center justify-between px-2 mb-2 pb-3 border-b border-white/5">
-        <div className="flex items-center gap-2.5">
-          <div className={cn("h-2.5 w-2.5 rounded-full animate-pulse", config.color.split(' ')[1])} />
-          <h3 className="text-[11px] font-black uppercase tracking-[0.25em] text-white/90">{config.label}</h3>
-        </div>
-        <Badge variant="secondary" className="bg-white/5 text-slate-500 text-[10px] font-black h-6 border-none px-2.5">{leads.length}</Badge>
-      </div>
-      
-      <ScrollArea className="flex-1 h-full pr-1">
-        <div className="flex flex-col gap-4 pb-16">
-          <SortableContext items={leads.map(l => l.id)} strategy={verticalListSortingStrategy}>
-            {leads.map((lead: Lead) => (
-              <LeadCard 
-                key={lead.id} 
-                lead={lead} 
-                client={clientsMap.get(lead.clientId)} 
-                lawyer={staffMap.get(lead.lawyerId)}
-                onClick={() => onCardClick(lead)}
-              />
-            ))}
-          </SortableContext>
-        </div>
-      </ScrollArea>
-    </div>
   );
 }
 
@@ -987,24 +841,18 @@ export default function LeadsPage() {
   const { firestore, user } = useFirebase();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = React.useState('');
+  const [activeTab, setActiveTab] = React.useState<LeadStatus>('NOVO');
   const [isNewLeadOpen, setIsNewLeadOpen] = React.useState(false);
   const [selectedLeadId, setSelectedLeadId] = React.useState<string | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = React.useState(false);
   const [isConversionOpen, setIsConversionOpen] = React.useState(false);
   const [isProcessing, setIsProcessing] = React.useState<string | null>(null);
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
-
   const userProfileRef = useMemoFirebase(() => (firestore && user?.uid ? doc(firestore, 'users', user.uid) : null), [firestore, user?.uid]);
   const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
 
   const leadsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'leads'), where('status', '!=', 'CONVERTIDO')) : null), [firestore]);
-  const { data: leadsData } = useCollection<Lead>(leadsQuery);
-
-  const activeLead = React.useMemo(() => {
-    if (!selectedLeadId || !leadsData) return null;
-    return leadsData.find(l => l.id === selectedLeadId) || null;
-  }, [selectedLeadId, leadsData]);
+  const { data: leadsData, isLoading: isLoadingLeads } = useCollection<Lead>(leadsQuery);
 
   const clientsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'clients'), limit(500)) : null), [firestore]);
   const { data: clientsData } = useCollection<Client>(clientsQuery);
@@ -1015,28 +863,28 @@ export default function LeadsPage() {
   const lawyers = staffData?.filter(s => s.role === 'lawyer' || s.role === 'partner') || [];
   const staffMap = React.useMemo(() => new Map(staffData?.map(s => [s.id, s])), [staffData]);
 
+  const activeLead = React.useMemo(() => {
+    if (!selectedLeadId || !leadsData) return null;
+    return leadsData.find(l => l.id === selectedLeadId) || null;
+  }, [selectedLeadId, leadsData]);
+
   const filteredLeads = React.useMemo(() => {
     if (!leadsData) return [];
     let list = [...leadsData].sort((a, b) => b.updatedAt.seconds - a.updatedAt.seconds);
+    
     if (userProfile?.role === 'lawyer') list = list.filter(l => l.lawyerId === userProfile.id);
-    if (!searchTerm.trim()) return list;
-    const q = searchTerm.toLowerCase();
-    return list.filter(l => l.title.toLowerCase().includes(q) || clientsMap.get(l.clientId)?.firstName.toLowerCase().includes(q));
-  }, [leadsData, searchTerm, clientsMap, userProfile]);
-
-  const handleDragEnd = async (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over) return;
-    const leadId = active.id as string;
-    const newStatus = over.id as LeadStatus;
-    const lead = leadsData?.find(l => l.id === leadId);
-    if (lead && lead.status !== newStatus && STAGES.includes(newStatus)) {
-      try {
-        await updateLeadStatus(leadId, newStatus);
-        toast({ title: `Lead movido para ${stageConfig[newStatus]?.label || newStatus}` });
-      } catch (e: any) { toast({ variant: 'destructive', title: 'Erro ao mover' }); }
+    
+    if (searchTerm.trim()) {
+      const q = searchTerm.toLowerCase();
+      list = list.filter(l => 
+        l.title.toLowerCase().includes(q) || 
+        clientsMap.get(l.clientId)?.firstName.toLowerCase().includes(q) ||
+        clientsMap.get(l.clientId)?.document?.includes(q)
+      );
     }
-  };
+
+    return list;
+  }, [leadsData, searchTerm, clientsMap, userProfile]);
 
   const handleConfirmProtocol = async (data: z.infer<typeof conversionSchema>) => {
     if (!activeLead) return;
@@ -1048,47 +896,167 @@ export default function LeadsPage() {
         setIsConversionOpen(false);
         setIsDetailsOpen(false);
       }
-    } catch (e: any) { toast({ variant: 'destructive', title: 'Erro', description: e.message }); } finally { setIsProcessing(null); }
+    } catch (e: any) { 
+      toast({ variant: 'destructive', title: 'Erro', description: e.message }); 
+    } finally { 
+      setIsProcessing(null); 
+    }
   };
 
+  const isLoading = isLoadingLeads;
+
   return (
-    <div className="flex flex-col gap-6 sm:gap-10 pb-10">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 px-1">
-        <div className="flex items-center gap-4">
-          <div className="h-12 w-12 rounded-2xl bg-primary/10 border border-primary/30 flex items-center justify-center shadow-lg shrink-0">
-            <Target className="h-6 w-6 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-black font-headline text-white tracking-tight uppercase">CRM Jurídico</h1>
-            <p className="text-[10px] sm:text-xs text-slate-500 font-bold uppercase tracking-widest mt-0.5">Esteira de Produção Bueno Gois</p>
-          </div>
+    <div className="flex flex-col gap-8 pb-10">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div>
+          <h1 className="text-3xl font-black tracking-tight font-headline text-white flex items-center gap-3">
+            <Zap className="h-8 w-8 text-primary" />
+            Cockpit de Leads
+          </h1>
+          <p className="text-sm text-muted-foreground">Triagem e conversão estratégica Bueno Gois.</p>
         </div>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-          <div className="relative flex-1 sm:w-64">
+          <div className="relative flex-1 sm:w-80">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-            <Input placeholder="Pesquisar..." className="pl-9 bg-[#0f172a] border-white/10 h-10 text-sm rounded-lg" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+            <Input 
+              placeholder="Busque pelo ID, nome ou CPF..." 
+              className="pl-9 pr-20 bg-[#0f172a] border-white/10 h-11 text-sm rounded-xl text-white" 
+              value={searchTerm} 
+              onChange={e => setSearchTerm(e.target.value)} 
+            />
+            {searchTerm && (
+              <button 
+                onClick={() => setSearchTerm('')} 
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-black uppercase text-primary hover:text-white transition-colors"
+              >
+                Limpar
+              </button>
+            )}
           </div>
-          <Button onClick={() => setIsNewLeadOpen(true)} className="bg-primary text-primary-foreground font-black uppercase text-[10px] tracking-widest h-10 px-6 rounded-lg shadow-lg shadow-primary/20">
+          <Button onClick={() => setIsNewLeadOpen(true)} className="bg-primary text-primary-foreground font-black uppercase text-[10px] tracking-widest h-11 px-8 rounded-xl shadow-lg shadow-primary/20">
             <PlusCircle className="mr-2 h-4 w-4" /> Novo Lead
           </Button>
         </div>
       </div>
 
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-        <div className="flex gap-6 overflow-x-auto pb-8 px-1 no-scrollbar min-h-[600px]">
-          {STAGES.map(stage => (
-            <KanbanColumn 
-              key={stage} 
-              id={stage} 
-              stage={stage} 
-              leads={filteredLeads.filter(l => l.status === stage)} 
-              clientsMap={clientsMap} 
-              staffMap={staffMap} 
-              onCardClick={(l: Lead) => { setSelectedLeadId(l.id); setIsDetailsOpen(true); }} 
-            />
-          ))}
-        </div>
-      </DndContext>
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as LeadStatus)} className="w-full">
+        <TabsList className="bg-[#0f172a] p-1 border border-white/5 mb-8 h-12 flex overflow-x-auto no-scrollbar justify-start gap-1">
+          {STAGES.map(stage => {
+            const config = stageConfig[stage];
+            const count = leadsData?.filter(l => l.status === stage).length || 0;
+            return (
+              <TabsTrigger 
+                key={stage} 
+                value={stage} 
+                className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold px-6 h-10 shrink-0 rounded-lg transition-all"
+              >
+                <config.icon className="h-3.5 w-3.5" />
+                {config.label}
+                <Badge variant="secondary" className="ml-1.5 px-1.5 h-4 text-[9px] bg-white/10 border-none text-inherit">{count}</Badge>
+              </TabsTrigger>
+            );
+          })}
+        </TabsList>
+
+        <TabsContent value={activeTab} className="animate-in fade-in duration-500">
+          <Card className="bg-[#0f172a] border-white/5 overflow-hidden shadow-2xl">
+            <Table>
+              <TableHeader className="bg-white/5">
+                <TableRow className="border-white/10 hover:bg-transparent">
+                  <TableHead className="text-[10px] font-black uppercase text-slate-500 px-6 py-4">ID / Pedido</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase text-slate-500">Data Entrada</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase text-slate-500">Origem / Cliente</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase text-slate-500">Área / Adv</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase text-slate-500 text-center">Produção</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase text-slate-500 text-right px-6">Gestão</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  [...Array(5)].map((_, i) => (
+                    <TableRow key={i} className="border-white/5">
+                      <TableCell colSpan={6} className="p-6"><Skeleton className="h-10 w-full bg-white/5" /></TableCell>
+                    </TableRow>
+                  ))
+                ) : filteredLeads.filter(l => l.status === activeTab).length > 0 ? (
+                  filteredLeads.filter(l => l.status === activeTab).map(lead => {
+                    const client = clientsMap.get(lead.clientId);
+                    const lawyer = staffMap.get(lead.lawyerId);
+                    const stage = stageConfig[lead.status];
+                    const completedTasks = lead.completedTasks || [];
+                    const currentStageTasks = stage.tasks;
+                    const completedInStage = completedTasks.filter(t => currentStageTasks.includes(t)).length;
+                    const progress = currentStageTasks.length > 0 ? (completedInStage / currentStageTasks.length) * 100 : 0;
+
+                    return (
+                      <TableRow 
+                        key={lead.id} 
+                        className="border-white/5 hover:bg-white/5 transition-colors group cursor-pointer"
+                        onClick={() => { setSelectedLeadId(lead.id); setIsDetailsOpen(true); }}
+                      >
+                        <TableCell className="px-6 py-5 font-mono text-[11px] text-primary font-black">
+                          #{lead.id.substring(0, 6).toUpperCase()}
+                        </TableCell>
+                        <TableCell className="text-xs text-slate-400">
+                          <div className="flex flex-col">
+                            <span className="font-bold text-slate-200">{format(lead.createdAt.toDate(), 'dd/MM/yyyy')}</span>
+                            <span className="text-[10px] opacity-50">{format(lead.createdAt.toDate(), 'HH:mm:ss')}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <div className="h-9 w-9 rounded-full bg-blue-500/10 flex items-center justify-center border border-blue-500/20 text-blue-400">
+                              <UserCircle className="h-5 w-5" />
+                            </div>
+                            <div className="flex flex-col max-w-[200px]">
+                              <span className="font-bold text-white truncate uppercase text-xs">{client?.firstName} {client?.lastName}</span>
+                              <span className="text-[9px] text-slate-500 font-mono">{client?.document || 'N/A'}</span>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span className="text-[10px] font-black uppercase text-primary">{lead.legalArea}</span>
+                            <span className="text-[10px] text-slate-400 font-bold">{lawyer?.firstName || 'Pendente'}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center w-[180px]">
+                          <div className="flex flex-col gap-1.5 items-center">
+                            <div className="flex items-center justify-between w-full text-[9px] font-black uppercase text-slate-500">
+                              <span>{completedInStage}/{currentStageTasks.length}</span>
+                              <span className={cn(progress === 100 ? "text-emerald-500" : "text-white")}>{Math.round(progress)}%</span>
+                            </div>
+                            <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
+                              <div 
+                                className={cn("h-full transition-all duration-500", progress === 100 ? "bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]" : "bg-primary")}
+                                style={{ width: `${progress}%` }}
+                              />
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right px-6">
+                          <Button variant="ghost" size="icon" className="text-white/20 group-hover:text-primary transition-colors">
+                            <ArrowUpRight className="h-5 w-5" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={6} className="h-60 text-center opacity-30 italic text-slate-500">
+                      <div className="flex flex-col items-center gap-3">
+                        <Activity className="h-12 w-12" />
+                        <p className="font-black uppercase tracking-widest text-[10px]">Nenhum pedido nesta fase</p>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       <LeadDetailsSheet 
         lead={activeLead} 
@@ -1097,7 +1065,9 @@ export default function LeadsPage() {
         onOpenChange={setIsDetailsOpen} 
         onProtocolClick={(l) => { setSelectedLeadId(l.id); setIsConversionOpen(true); }} 
       />
+      
       <NewLeadSheet open={isNewLeadOpen} onOpenChange={setIsNewLeadOpen} lawyers={lawyers} onCreated={() => {}} />
+      
       <LeadConversionDialog lead={activeLead} open={isConversionOpen} onOpenChange={setIsConversionOpen} onConfirm={handleConfirmProtocol} lawyers={lawyers} />
     </div>
   );
