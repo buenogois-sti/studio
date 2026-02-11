@@ -418,32 +418,37 @@ function NewTitleDialog({ onCreated }: { onCreated: () => void }) {
       }
     }}>
       <DialogTrigger asChild>
-        <Button className="gap-2 bg-primary text-primary-foreground font-bold h-10 px-6">
+        <Button className="gap-2 bg-primary text-primary-foreground font-bold h-10 px-6 shadow-lg shadow-primary/20">
           <PlusCircle className="h-4 w-4" />
           Novo Lançamento
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md bg-card border-border h-[90vh] flex flex-col p-0 overflow-hidden shadow-2xl">
-        <DialogHeader className="p-6 border-b border-white/5 shrink-0">
-          <DialogTitle className="text-white">Novo Título Financeiro</DialogTitle>
-          <DialogDescription className="text-slate-400">Lançamento manual de entrada ou saída.</DialogDescription>
+      <DialogContent className="sm:max-w-xl bg-[#020617] border-white/10 h-[90vh] flex flex-col p-0 overflow-hidden shadow-2xl">
+        <DialogHeader className="p-6 border-b border-white/5 bg-white/5 shrink-0">
+          <DialogTitle className="text-xl font-black font-headline text-white">Novo Título Financeiro</DialogTitle>
+          <DialogDescription className="text-slate-400">Lançamento manual de entrada ou saída para controle de caixa.</DialogDescription>
         </DialogHeader>
         
         <ScrollArea className="flex-1">
           <Form {...form}>
-            <form id="new-title-form" onSubmit={form.handleSubmit(onSubmit)} className="p-6 space-y-6">
-              <div className="grid grid-cols-2 gap-4">
+            <form id="new-title-form" onSubmit={form.handleSubmit(onSubmit)} className="p-6 space-y-8">
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField
                   control={form.control}
                   name="type"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-white">Tipo</FormLabel>
+                      <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Tipo de Operação *</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl><SelectTrigger className="bg-background border-border shadow-none"><SelectValue /></SelectTrigger></FormControl>
-                        <SelectContent>
-                          <SelectItem value="RECEITA">Entrada (Receita)</SelectItem>
-                          <SelectItem value="DESPESA">Saída (Despesa)</SelectItem>
+                        <FormControl>
+                          <SelectTrigger className="bg-black/40 border-white/10 h-11 focus:border-primary transition-all">
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent className="bg-[#0f172a] border-white/10 text-white">
+                          <SelectItem value="RECEITA">💰 Entrada (Receita)</SelectItem>
+                          <SelectItem value="DESPESA">💸 Saída (Despesa)</SelectItem>
                         </SelectContent>
                       </Select>
                     </FormItem>
@@ -454,16 +459,28 @@ function NewTitleDialog({ onCreated }: { onCreated: () => void }) {
                   name="origin"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-white">Categoria</FormLabel>
+                      <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Categoria / Origem *</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl><SelectTrigger className="bg-background border-border shadow-none"><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
-                        <SelectContent>
-                          <SelectItem value="ALUGUEL_CONTAS">Aluguel / Contas</SelectItem>
-                          <SelectItem value="HONORARIOS_CONTRATUAIS">Honorários</SelectItem>
-                          <SelectItem value="SUCUMBENCIA">Sucumbência</SelectItem>
-                          <SelectItem value="SALARIOS_PROLABORE">Salários/Pró-Labore</SelectItem>
-                          <SelectItem value="INFRAESTRUTURA_TI">TI/Software</SelectItem>
-                          <SelectItem value="OUTRAS_DESPESAS">Outros</SelectItem>
+                        <FormControl>
+                          <SelectTrigger className="bg-black/40 border-white/10 h-11 focus:border-primary transition-all">
+                            <SelectValue placeholder="Selecione..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent className="bg-[#0f172a] border-white/10 text-white">
+                          <DropdownMenuLabel className="text-[10px] uppercase text-muted-foreground p-2">Escritório (Fixos)</DropdownMenuLabel>
+                          <SelectItem value="ALUGUEL_CONTAS">🏢 Aluguel / Contas de Consumo</SelectItem>
+                          <SelectItem value="SALARIOS_PROLABORE">👨‍⚖️ Salários / Pró-Labore</SelectItem>
+                          <SelectItem value="INFRAESTRUTURA_TI">💻 TI / Software / Cloud</SelectItem>
+                          
+                          <DropdownMenuSeparator className="bg-white/5" />
+                          <DropdownMenuLabel className="text-[10px] uppercase text-muted-foreground p-2">Jurídico (Variáveis)</DropdownMenuLabel>
+                          <SelectItem value="HONORARIOS_CONTRATUAIS">⚖️ Honorários Contratuais</SelectItem>
+                          <SelectItem value="SUCUMBENCIA">🏆 Honorários de Sucumbência</SelectItem>
+                          <SelectItem value="ACORDO">🤝 Acordo / Liquidação</SelectItem>
+                          <SelectItem value="CUSTAS_PROCESSUAIS">📄 Custas Judiciais</SelectItem>
+                          
+                          <DropdownMenuSeparator className="bg-white/5" />
+                          <SelectItem value="OUTRAS_DESPESAS">📦 Outras Operações</SelectItem>
                         </SelectContent>
                       </Select>
                     </FormItem>
@@ -471,47 +488,51 @@ function NewTitleDialog({ onCreated }: { onCreated: () => void }) {
                 />
               </div>
 
-              <div className="space-y-2">
-                <FormLabel className="text-white">Vincular a um Processo (Opcional)</FormLabel>
+              <div className="space-y-3">
+                <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
+                  <FolderKanban className="h-3.5 w-3.5 text-primary" /> Vínculo Processual (Opcional)
+                </FormLabel>
                 {selectedProcess ? (
-                  <div className="flex items-center justify-between p-3 rounded-lg border-2 border-primary/30 bg-primary/5">
-                    <div className="flex items-center gap-2 overflow-hidden">
-                      <FolderKanban className="h-4 w-4 text-primary shrink-0" />
+                  <div className="flex items-center justify-between p-4 rounded-2xl border-2 border-primary/30 bg-primary/5 animate-in zoom-in-95">
+                    <div className="flex items-center gap-3 overflow-hidden">
+                      <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20 shrink-0">
+                        <Scale className="h-5 w-5 text-primary" />
+                      </div>
                       <div className="min-w-0">
-                        <p className="text-xs font-bold text-white truncate">{selectedProcess.name}</p>
-                        <p className="text-[10px] text-muted-foreground font-mono">{selectedProcess.processNumber}</p>
+                        <p className="text-sm font-bold text-white truncate">{selectedProcess.name}</p>
+                        <p className="text-[10px] text-primary/60 font-mono tracking-widest">{selectedProcess.processNumber || 'Sem Nº CNJ'}</p>
                       </div>
                     </div>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-white" onClick={() => setSelectedProcess(null)}>
+                    <Button variant="ghost" size="icon" className="h-10 w-10 text-slate-500 hover:text-white rounded-xl" onClick={() => setSelectedProcess(null)}>
                       <X className="h-4 w-4" />
                     </Button>
                   </div>
                 ) : (
                   <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
                     <Input 
-                      className="bg-background border-border pl-9 h-11" 
-                      placeholder="Pesquisar processo..." 
+                      className="bg-black/40 border-white/10 pl-10 h-12 rounded-xl focus:border-primary transition-all" 
+                      placeholder="Pesquisar processo para vincular..." 
                       value={processSearch}
                       onChange={(e) => setProcessSearch(e.target.value)}
                     />
                     {isSearchingProcess && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-primary" />}
                     {processResults.length > 0 && (
-                      <div className="absolute top-full left-0 right-0 mt-1 bg-[#0f172a] border border-border rounded-lg shadow-2xl z-50 overflow-hidden">
-                        <ScrollArea className="max-h-[200px]">
+                      <div className="absolute top-full left-0 right-0 mt-2 bg-[#0f172a] border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2">
+                        <ScrollArea className="max-h-[250px]">
                           {processResults.map(p => (
                             <button
                               key={p.id}
                               type="button"
-                              className="w-full text-left p-3 hover:bg-white/5 transition-colors border-b border-white/5 last:border-0"
+                              className="w-full text-left p-4 hover:bg-white/5 transition-all border-b border-white/5 last:border-0 group"
                               onClick={() => {
                                 setSelectedProcess(p);
                                 setProcessResults([]);
                                 setProcessSearch('');
                               }}
                             >
-                              <p className="text-xs font-bold text-white truncate">{p.name}</p>
-                              <p className="text-[9px] text-muted-foreground font-mono">{p.processNumber}</p>
+                              <p className="text-sm font-bold text-white group-hover:text-primary transition-colors truncate">{p.name}</p>
+                              <p className="text-[10px] text-slate-500 font-mono uppercase mt-0.5">{p.processNumber || 'Nº não informado'}</p>
                             </button>
                           ))}
                         </ScrollArea>
@@ -526,19 +547,61 @@ function NewTitleDialog({ onCreated }: { onCreated: () => void }) {
                 name="description"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-white">Descrição</FormLabel>
-                    <FormControl><Input className="bg-background border-border h-11" placeholder="Ex: Honorários Processo X" {...field} /></FormControl>
+                    <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Descrição do Lançamento *</FormLabel>
+                    <FormControl>
+                      <Input className="h-12 bg-black/40 border-white/10 rounded-xl font-bold" placeholder="Ex: Honorários Contratuais 1ª Instância" {...field} />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
-              {/* Recorrência */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 rounded-3xl bg-primary/5 border-2 border-primary/20">
+                <FormField
+                  control={form.control}
+                  name="value"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-[10px] font-black uppercase text-primary tracking-widest">Valor do Título (R$) *</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-primary font-black text-sm">R$</span>
+                          <Input 
+                            className="bg-black/40 border-primary/20 pl-10 h-12 text-lg font-black text-white rounded-xl focus:border-primary" 
+                            type="text"
+                            value={formatCurrencyValue(field.value)}
+                            onChange={(e) => handleValueChange(e, field.onChange)}
+                          />
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="dueDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Vencimento da Parcela *</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                          <Input type="date" className="bg-black/40 border-white/10 h-12 pl-10 text-white rounded-xl" {...field} />
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Seção de Recorrência */}
               <div className="space-y-4 pt-2">
-                <div className="flex items-center justify-between p-4 rounded-xl bg-primary/5 border border-primary/20">
+                <div className="flex items-center justify-between p-5 rounded-2xl bg-white/5 border border-white/10">
                   <div className="space-y-0.5">
-                    <FormLabel className="text-white">Lançar Recorrência?</FormLabel>
-                    <p className="text-[10px] text-slate-500 font-bold uppercase">Repetir para os próximos meses</p>
+                    <FormLabel className="text-white font-black text-sm">Habilitar Recorrência?</FormLabel>
+                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">O sistema gerará os próximos meses automaticamente</p>
                   </div>
                   <FormField
                     control={form.control}
@@ -560,70 +623,47 @@ function NewTitleDialog({ onCreated }: { onCreated: () => void }) {
                     control={form.control}
                     name="months"
                     render={({ field }) => (
-                      <FormItem className="animate-in slide-in-from-top-2">
-                        <FormLabel className="text-white">Duração (Meses)</FormLabel>
+                      <FormItem className="animate-in slide-in-from-top-2 duration-500 bg-black/40 p-6 rounded-2xl border border-primary/20 shadow-inner">
+                        <FormLabel className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-2">
+                          <CalendarDays className="h-4 w-4" /> Duração da Recorrência (Meses)
+                        </FormLabel>
                         <FormControl>
-                          <div className="relative">
+                          <div className="relative pt-2">
                             <Input 
                               type="number" 
                               min="2" 
                               max="24" 
-                              className="bg-background border-border h-11 pl-9" 
+                              className="h-12 bg-[#020617] border-primary/30 text-white text-lg font-black text-center pr-12" 
                               {...field} 
                             />
-                            <CalendarDays className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                            <span className="absolute right-4 top-[60%] -translate-y-1/2 text-[10px] font-black text-slate-500 uppercase">Meses</span>
                           </div>
                         </FormControl>
+                        <p className="text-[10px] text-slate-500 italic mt-2">Serão gerados {field.value} títulos idênticos com vencimentos mensais.</p>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
                 )}
               </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="value"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-white">Valor (R$) *</FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-bold">R$</span>
-                          <Input 
-                            className="bg-background border-border pl-9 h-11" 
-                            type="text"
-                            value={formatCurrencyValue(field.value)}
-                            onChange={(e) => handleValueChange(e, field.onChange)}
-                          />
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="dueDate"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-white">Vencimento</FormLabel>
-                      <FormControl><Input type="date" className="bg-background border-border h-11 text-white" {...field} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
             </form>
           </Form>
         </ScrollArea>
 
-        <DialogFooter className="p-6 border-t border-white/5 bg-white/5 shrink-0 gap-2">
-          <DialogClose asChild><Button variant="outline" type="button" className="text-white">Cancelar</Button></DialogClose>
-          <Button type="submit" form="new-title-form" disabled={isSaving}>
-            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Salvar Lançamento
+        <DialogFooter className="p-6 border-t border-white/5 bg-white/5 shrink-0 gap-3">
+          <DialogClose asChild>
+            <Button variant="ghost" type="button" className="text-slate-400 font-bold uppercase text-[10px] tracking-widest h-12">
+              Cancelar
+            </Button>
+          </DialogClose>
+          <Button 
+            type="submit" 
+            form="new-title-form" 
+            disabled={isSaving} 
+            className="flex-1 bg-primary text-primary-foreground font-black uppercase tracking-widest text-[11px] h-12 shadow-xl shadow-primary/20 hover:scale-[1.02] transition-all"
+          >
+            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
+            Confirmar Lançamento
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -698,7 +738,7 @@ export default function FinanceiroPage() {
         };
       }
       
-      const isOverdue = t.status !== 'PAGO' && isBefore(t.dueDate instanceof Timestamp ? t.dueDate.toDate() : new Date(t.dueDate), now);
+      const isOverdue = t.status !== 'PAGO' && isBefore(t.dueDate instanceof Timestamp ? t.dueDate.toDate() : new Date(t.dueDate as any), now);
       if (isOverdue) groups[key].hasOverdue = true;
 
       groups[key].titles.push(t);
@@ -881,7 +921,7 @@ export default function FinanceiroPage() {
                     </TableHeader>
                     <TableBody>
                       {group.titles.map(t => {
-                        const isOverdue = t.status !== 'PAGO' && isBefore(t.dueDate instanceof Timestamp ? t.dueDate.toDate() : new Date(t.dueDate), startOfDay(new Date()));
+                        const isOverdue = t.status !== 'PAGO' && isBefore(t.dueDate instanceof Timestamp ? t.dueDate.toDate() : new Date(t.dueDate as any), startOfDay(new Date()));
                         return (
                           <TableRow key={t.id} className={cn(
                             "border-white/5 hover:bg-white/5 transition-colors",
@@ -891,7 +931,7 @@ export default function FinanceiroPage() {
                               <span className={cn("font-bold text-xs", isOverdue ? "text-rose-400" : "text-slate-200")}>{t.description}</span>
                             </TableCell>
                             <TableCell className={cn("text-[10px] font-mono", isOverdue ? "text-rose-500 font-black" : "text-slate-400")}>
-                              {format(t.dueDate instanceof Timestamp ? t.dueDate.toDate() : new Date(t.dueDate), 'dd/MM/yyyy')}
+                              {format(t.dueDate instanceof Timestamp ? t.dueDate.toDate() : new Date(t.dueDate as any), 'dd/MM/yyyy')}
                             </TableCell>
                             <TableCell className="text-center">
                               <Badge variant="outline" className={cn(
