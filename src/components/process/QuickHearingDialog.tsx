@@ -80,6 +80,7 @@ export function QuickHearingDialog({ process, open, onOpenChange, onSuccess }: Q
       location: '',
       courtBranch: '',
       responsibleParty: '',
+      notes: '',
       clientNotified: false,
       notificationMethod: 'whatsapp',
     }

@@ -347,7 +347,9 @@ function NewTitleDialog({ onCreated }: { onCreated: () => void }) {
   const form = useForm<z.infer<typeof titleFormSchema>>({
     resolver: zodResolver(titleFormSchema),
     defaultValues: {
+      description: '',
       type: 'RECEITA',
+      origin: 'OUTRAS_DESPESAS',
       status: 'PENDENTE',
       value: 0,
       dueDate: format(new Date(), 'yyyy-MM-dd'),
@@ -383,10 +385,11 @@ function NewTitleDialog({ onCreated }: { onCreated: () => void }) {
   };
 
   const formatCurrencyValue = (value: number) => {
+    if (typeof value !== 'number') return '0,00';
     return new Intl.NumberFormat('pt-BR', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
-    }).format(value || 0);
+    }).format(value);
   };
 
   const onSubmit = async (values: z.infer<typeof titleFormSchema>) => {
@@ -441,7 +444,7 @@ function NewTitleDialog({ onCreated }: { onCreated: () => void }) {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Tipo de Operação *</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger className="bg-black/40 border-white/10 h-11 focus:border-primary transition-all">
                             <SelectValue />
@@ -461,7 +464,7 @@ function NewTitleDialog({ onCreated }: { onCreated: () => void }) {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Categoria / Origem *</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger className="bg-black/40 border-white/10 h-11 focus:border-primary transition-all">
                             <SelectValue placeholder="Selecione..." />
