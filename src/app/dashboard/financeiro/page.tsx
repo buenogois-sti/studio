@@ -1,3 +1,4 @@
+
 'use client';
 import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -41,7 +42,8 @@ import {
   Gavel,
   History,
   CalendarDays,
-  ShieldCheck
+  ShieldCheck,
+  Bot
 } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, Timestamp, query, orderBy, deleteDoc, doc, getDocs, where, limit } from 'firebase/firestore';
@@ -106,6 +108,7 @@ const titleFormSchema = z.object({
   dueDate: z.string().min(1, 'Data de vencimento obrigatória'),
   status: z.enum(['PENDENTE', 'PAGO', 'ATRASADO']).default('PENDENTE'),
   processId: z.string().optional(),
+  clientId: z.string().optional(),
   recurring: z.boolean().default(false),
   months: z.coerce.number().min(1).max(24).default(1),
 });
@@ -354,6 +357,7 @@ function NewTitleDialog({ onCreated }: { onCreated: () => void }) {
       value: 0,
       dueDate: format(new Date(), 'yyyy-MM-dd'),
       processId: '',
+      clientId: '',
       recurring: false,
       months: 1,
     }
@@ -395,10 +399,14 @@ function NewTitleDialog({ onCreated }: { onCreated: () => void }) {
   const onSubmit = async (values: z.infer<typeof titleFormSchema>) => {
     setIsSaving(true);
     try {
-      await createFinancialTitle({
+      // Sanitização explícita para evitar 'undefined' no Firestore
+      const payload = {
         ...values,
-        processId: selectedProcess?.id || undefined,
-      });
+        processId: selectedProcess?.id || '',
+        clientId: selectedProcess?.clientId || '',
+      };
+
+      await createFinancialTitle(payload);
       toast({ title: values.recurring ? 'Lançamentos Recorrentes Criados!' : 'Lançamento realizado!' });
       form.reset();
       setSelectedProcess(null);
@@ -406,7 +414,7 @@ function NewTitleDialog({ onCreated }: { onCreated: () => void }) {
       onCreated();
       setOpen(false);
     } catch (error: any) {
-      toast({ variant: 'destructive', title: 'Erro', description: error.message });
+      toast({ variant: 'destructive', title: 'Erro ao Lançar', description: error.message });
     } finally {
       setIsSaving(false);
     }
@@ -429,7 +437,7 @@ function NewTitleDialog({ onCreated }: { onCreated: () => void }) {
       </DialogTrigger>
       <DialogContent className="sm:max-w-xl bg-[#020617] border-white/10 h-[90vh] flex flex-col p-0 overflow-hidden shadow-2xl">
         <DialogHeader className="p-6 border-b border-white/5 bg-white/5 shrink-0">
-          <DialogTitle className="text-xl font-black font-headline text-white">Novo Título Financeiro</DialogTitle>
+          <DialogTitle className="text-xl font-black font-headline text-white uppercase tracking-tight">Novo Título Financeiro</DialogTitle>
           <DialogDescription className="text-slate-400">Lançamento manual de entrada ou saída para controle de caixa.</DialogDescription>
         </DialogHeader>
         
@@ -502,7 +510,7 @@ function NewTitleDialog({ onCreated }: { onCreated: () => void }) {
                       <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20 shrink-0">
                         <Scale className="h-5 w-5 text-primary" />
                       </div>
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <p className="text-sm font-bold text-white truncate">{selectedProcess.name}</p>
                         <p className="text-[10px] text-primary/60 font-mono tracking-widest">{selectedProcess.processNumber || 'Sem Nº CNJ'}</p>
                       </div>
@@ -515,14 +523,14 @@ function NewTitleDialog({ onCreated }: { onCreated: () => void }) {
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
                     <Input 
-                      className="bg-black/40 border-white/10 pl-10 h-12 rounded-xl focus:border-primary transition-all" 
+                      className="bg-black/40 border-white/10 pl-10 h-12 rounded-xl focus:border-primary transition-all text-sm" 
                       placeholder="Pesquisar processo para vincular..." 
                       value={processSearch}
                       onChange={(e) => setProcessSearch(e.target.value)}
                     />
                     {isSearchingProcess && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-primary" />}
                     {processResults.length > 0 && (
-                      <div className="absolute top-full left-0 right-0 mt-2 bg-[#0f172a] border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2">
+                      <div className="absolute top-full left-0 right-0 mt-2 bg-[#0f172a] border border-white/10 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-50 overflow-hidden animate-in fade-in slide-in-from-top-2">
                         <ScrollArea className="max-h-[250px]">
                           {processResults.map(p => (
                             <button
@@ -553,7 +561,7 @@ function NewTitleDialog({ onCreated }: { onCreated: () => void }) {
                   <FormItem>
                     <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Descrição do Lançamento *</FormLabel>
                     <FormControl>
-                      <Input className="h-12 bg-black/40 border-white/10 rounded-xl font-bold" placeholder="Ex: Honorários Contratuais 1ª Instância" {...field} value={field.value || ''} />
+                      <Input className="h-12 bg-black/40 border-white/10 rounded-xl font-bold" placeholder="Ex: Honorários Contratuais 1ª Instância" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -591,7 +599,7 @@ function NewTitleDialog({ onCreated }: { onCreated: () => void }) {
                       <FormControl>
                         <div className="relative">
                           <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-                          <Input type="date" className="bg-black/40 border-white/10 h-12 pl-10 text-white rounded-xl" {...field} value={field.value || ''} />
+                          <Input type="date" className="bg-black/40 border-white/10 h-12 pl-10 text-white rounded-xl" {...field} />
                         </div>
                       </FormControl>
                       <FormMessage />
@@ -600,7 +608,6 @@ function NewTitleDialog({ onCreated }: { onCreated: () => void }) {
                 />
               </div>
 
-              {/* Seção de Recorrência */}
               <div className="space-y-4 pt-2">
                 <div className="flex items-center justify-between p-5 rounded-2xl bg-white/5 border border-white/10">
                   <div className="space-y-0.5">
@@ -639,12 +646,16 @@ function NewTitleDialog({ onCreated }: { onCreated: () => void }) {
                               max="24" 
                               className="h-12 bg-[#020617] border-primary/30 text-white text-lg font-black text-center pr-12" 
                               {...field} 
-                              value={field.value || 1}
                             />
                             <span className="absolute right-4 top-[60%] -translate-y-1/2 text-[10px] font-black text-slate-500 uppercase">Meses</span>
                           </div>
                         </FormControl>
-                        <p className="text-[10px] text-slate-500 italic mt-2">Serão gerados {field.value} títulos idênticos com vencimentos mensais.</p>
+                        <div className="flex items-start gap-2 mt-3 p-3 bg-primary/10 rounded-lg border border-primary/20">
+                          <Bot className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                          <p className="text-[10px] text-slate-300 leading-relaxed uppercase font-bold">
+                            A inteligência financeira da Bueno Gois criará {field.value} lançamentos automáticos com vencimentos escalonados.
+                          </p>
+                        </div>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -737,7 +748,7 @@ export default function FinanceiroPage() {
           process: t.processId ? processesMap.get(t.processId) : undefined, 
           titles: [], 
           total: 0, 
-          paid: 0,
+          paid: 0, 
           pending: 0,
           hasOverdue: false
         };

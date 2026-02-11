@@ -1,3 +1,4 @@
+
 'use server';
 import { firestoreAdmin } from '@/firebase/admin';
 import type { FinancialTitle, Process, FinancialEvent, Staff, StaffCredit, TimelineEvent } from './types';
@@ -176,16 +177,17 @@ export async function createFinancialTitle(data: Partial<FinancialTitle> & { rec
         const batch = firestoreAdmin.batch();
         const { recurring, months = 1, ...baseData } = data;
         
-        let clientId = baseData.clientId;
-        if (baseData.processId && !clientId) {
+        let resolvedClientId = baseData.clientId || null;
+        if (baseData.processId && !resolvedClientId) {
           const p = await firestoreAdmin.collection('processes').doc(baseData.processId).get();
-          clientId = p.data()?.clientId;
+          resolvedClientId = p.data()?.clientId || null;
         }
 
         const initialDateValue = baseData.dueDate;
         let initialDueDate: Date;
 
         if (typeof initialDateValue === 'string') {
+          // Garante que a data seja interpretada corretamente no fuso horário local
           initialDueDate = new Date(initialDateValue + 'T12:00:00');
         } else if (initialDateValue && typeof initialDateValue === 'object' && 'seconds' in initialDateValue) {
           initialDueDate = new Timestamp((initialDateValue as any).seconds, (initialDateValue as any).nanoseconds).toDate();
@@ -203,13 +205,21 @@ export async function createFinancialTitle(data: Partial<FinancialTitle> & { rec
                 ? `${baseData.description} (${i + 1}/${count})` 
                 : baseData.description;
 
-            batch.set(titleRef, { 
-                ...baseData, 
-                description,
-                clientId, 
+            // Construção explícita do payload para evitar propriedades 'undefined'
+            const payload: any = {
+                description: description || 'Lançamento sem descrição',
+                type: baseData.type || 'RECEITA',
+                origin: baseData.origin || 'OUTRAS_DESPESAS',
+                value: baseData.value || 0,
+                status: baseData.status || 'PENDENTE',
                 dueDate: Timestamp.fromDate(currentDueDate),
-                updatedAt: FieldValue.serverTimestamp() 
-            });
+                updatedAt: FieldValue.serverTimestamp()
+            };
+
+            if (baseData.processId) payload.processId = baseData.processId;
+            if (resolvedClientId) payload.clientId = resolvedClientId;
+
+            batch.set(titleRef, payload);
         }
 
         await batch.commit();
