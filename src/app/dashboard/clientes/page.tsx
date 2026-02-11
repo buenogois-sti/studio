@@ -379,44 +379,90 @@ export default function ClientsPage() {
                 <Table>
                   <TableHeader>
                     <TableRow className="border-white/5 hover:bg-transparent bg-white/5">
-                      <TableHead className="w-[350px] text-slate-500 font-black uppercase text-[10px] tracking-widest px-6">Identificação do Cliente</TableHead>
+                      <TableHead className="w-[300px] text-slate-500 font-black uppercase text-[10px] tracking-widest px-6">Identificação</TableHead>
                       <TableHead className="text-center text-slate-500 font-black uppercase text-[10px] tracking-widest">Status</TableHead>
-                      <TableHead className="text-slate-500 font-black uppercase text-[10px] tracking-widest">Documento</TableHead>
+                      <TableHead className="text-slate-500 font-black uppercase text-[10px] tracking-widest">Contato</TableHead>
+                      <TableHead className="text-slate-500 font-black uppercase text-[10px] tracking-widest">Especialidade</TableHead>
+                      <TableHead className="text-center text-slate-500 font-black uppercase text-[10px] tracking-widest">Casos</TableHead>
+                      <TableHead className="text-right text-slate-500 font-black uppercase text-[10px] tracking-widest">Integridade</TableHead>
                       <TableHead className="text-right text-slate-500 font-black uppercase text-[10px] tracking-widest px-6">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {paginatedClients.map((client) => (
-                      <TableRow key={client.id} className="border-white/5 hover:bg-white/5 transition-colors group">
-                        <TableCell className="px-6">
-                          <div className="flex items-center gap-3">
-                            <div className="h-9 w-9 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-black text-xs">
-                              {client.firstName.charAt(0)}{client.lastName?.charAt(0)}
+                    {paginatedClients.map((client) => {
+                      const processesCount = processesByClientMap.get(client.id) || 0;
+                      const integrity = clientIntegrityMap.get(client.id) || 0;
+                      const statusInfo = STATUS_CONFIG[client.status || 'active'];
+                      
+                      return (
+                        <TableRow key={client.id} className="border-white/5 hover:bg-white/5 transition-colors group">
+                          <TableCell className="px-6">
+                            <div className="flex items-center gap-3">
+                              <div className="h-9 w-9 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-black text-xs">
+                                {client.firstName.charAt(0)}{client.lastName?.charAt(0)}
+                              </div>
+                              <div className="flex flex-col">
+                                <span className="font-bold text-sm text-white group-hover:text-primary transition-colors cursor-pointer" onClick={() => handleViewDetails(client)}>{`${client.firstName} ${client.lastName}`}</span>
+                                <span className="text-[9px] text-slate-500 font-mono">{client.document || 'DOC. NÃO INFORMADO'}</span>
+                              </div>
                             </div>
-                            <div className="flex flex-col">
-                              <span className="font-bold text-sm text-white group-hover:text-primary transition-colors">{`${client.firstName} ${client.lastName}`}</span>
-                              <span className="text-[10px] text-slate-500 lowercase">{client.email}</span>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant="outline" className={cn("text-[9px] font-bold uppercase", statusInfo.color)}>
+                              {statusInfo.label}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-7 w-7 text-emerald-500 hover:bg-emerald-500/10 rounded-full" 
+                                asChild 
+                                disabled={!client.mobile}
+                              >
+                                <a href={`https://wa.me/${client.mobile?.replace(/\D/g, '')}`} target="_blank">
+                                  <MessageSquare className="h-3.5 w-3.5" />
+                                </a>
+                              </Button>
+                              <span className="text-[10px] text-slate-400 font-mono">{client.mobile || '---'}</span>
                             </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Badge variant="outline" className={cn("text-[9px] font-bold uppercase", STATUS_CONFIG[client.status || 'active'].color)}>
-                            {STATUS_CONFIG[client.status || 'active'].label}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="font-mono text-xs text-slate-400">{client.document}</TableCell>
-                        <TableCell className="text-right px-6">
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              onClick={() => handleViewDetails(client)} 
-                              className="text-primary hover:bg-primary/10 rounded-full"
-                            >
-                              <ArrowUpRight className="h-4 w-4" />
-                            </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="secondary" className="bg-blue-500/10 text-blue-400 border-none text-[9px] font-black uppercase tracking-widest px-2">
+                              {client.legalArea || 'Geral'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <div className="flex items-center justify-center gap-1.5">
+                              <FolderKanban className="h-3 w-3 text-primary" />
+                              <span className="text-xs font-black text-white">{processesCount}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right pr-6 min-w-[120px]">
+                            <div className="flex flex-col gap-1 items-end">
+                              <span className={cn("text-[10px] font-black", integrity < 80 ? "text-amber-400" : "text-emerald-400")}>{integrity}%</span>
+                              <div className="h-1 w-16 bg-white/5 rounded-full overflow-hidden">
+                                <div 
+                                  className={cn("h-full transition-all", integrity < 50 ? "bg-rose-500" : integrity < 80 ? "bg-amber-500" : "bg-emerald-500")}
+                                  style={{ width: `${integrity}%` }}
+                                />
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right px-6">
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                onClick={() => handleViewDetails(client)} 
+                                className="text-primary hover:bg-primary/10 rounded-full"
+                              >
+                                <ArrowUpRight className="h-4 w-4" />
+                              </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </CardContent>
@@ -522,7 +568,7 @@ export default function ClientsPage() {
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-2">
             <AlertDialogCancel className="bg-transparent border-white/10 text-slate-400 hover:text-white" disabled={isDeleting}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} disabled={isDeleting} className="bg-rose-600 text-white hover:bg-rose-700 font-bold border-none">
+            <AlertDialogAction onClick={handleDelete} disabled={isDeleting} className="bg-rose-600 text-white hover:bg-rose-700 font-bold border-none">
               {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Confirmar Exclusão'}
             </AlertDialogAction>
           </AlertDialogFooter>
