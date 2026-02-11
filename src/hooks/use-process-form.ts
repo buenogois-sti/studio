@@ -9,7 +9,7 @@ import type { Process } from '@/lib/types';
 export const processSchema = z.object({
   clientId: z.string().min(1, 'Selecione um cliente principal.'),
   clientRole: z.enum(['Polo Ativo', 'Polo Passivo'], { required_error: 'Selecione o papel do cliente.' }),
-  secondaryClientIds: z.array(z.string()).default([]),
+  secondaryClientIds: z.array(z.object({ id: z.string() })).default([]),
   name: z.string()
     .min(3, 'O título deve ter no mínimo 3 caracteres.')
     .max(200, 'O título deve ter no máximo 200 caracteres.'),
@@ -77,7 +77,7 @@ export const useProcessForm = (process?: Process | null, onSave?: () => void) =>
     return {
       clientId: process.clientId || '',
       clientRole: normalizeClientRole(process.clientRole),
-      secondaryClientIds: process.secondaryClientIds || [],
+      secondaryClientIds: (process.secondaryClientIds || []).map(id => ({ id })),
       name: process.name || '',
       processNumber: process.processNumber || '',
       status: process.status || 'Ativo',
@@ -131,8 +131,10 @@ export const useProcessForm = (process?: Process | null, onSave?: () => void) =>
 
     try {
       let savedProcessId = process?.id;
+      // Convert secondaryClientIds back to string array for Firestore
       const data = {
         ...values,
+        secondaryClientIds: values.secondaryClientIds.map(item => item.id),
         updatedAt: serverTimestamp(),
       };
 

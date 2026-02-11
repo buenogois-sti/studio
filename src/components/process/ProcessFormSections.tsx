@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState } from 'react';
@@ -160,7 +161,7 @@ export function ClientsSection({ control, onClientSelect }: ClientsSectionProps)
                 type="button"
                 variant="ghost"
                 size="sm"
-                onClick={() => addSecondary('')}
+                onClick={() => addSecondary({ id: '' })}
                 className="h-8 text-[10px] font-black uppercase text-primary hover:bg-primary/10"
               >
                 <UserPlus className="h-3 w-3 mr-1.5" /> Adicionar Outro
@@ -173,7 +174,7 @@ export function ClientsSection({ control, onClientSelect }: ClientsSectionProps)
                   <div className="flex-1">
                     <FormField
                       control={control}
-                      name={`secondaryClientIds.${index}` as any}
+                      name={`secondaryClientIds.${index}.id` as any}
                       render={({ field: subField }) => (
                         <ClientSearchInput 
                           selectedClientId={subField.value} 

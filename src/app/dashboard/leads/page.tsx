@@ -1,5 +1,4 @@
 
-'use server';
 'use client';
 
 import * as React from 'react';
@@ -36,7 +35,8 @@ import {
   Video,
   FilePlus2,
   ClipboardList,
-  DollarSign
+  DollarSign,
+  Mail
 } from 'lucide-react';
 import { 
   DndContext, 
@@ -129,7 +129,7 @@ const stageConfig: Record<LeadStatus, { label: string; color: string; icon: any;
     label: 'Contratual', 
     color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20', 
     icon: ShieldCheck, 
-    tasks: ['Emissão dos contratos/procuração', 'Assinatura colhida (Contrato)', 'Assinatura colhida (Procuração)', 'Check de integridade documental'] 
+    tasks: ['Emissão dos contratos/procuração', 'Asssignature colhida (Contrato)', 'Asssignature colhida (Procuração)', 'Check de integridade documental'] 
   },
   DISTRIBUICAO: { 
     label: 'Distribuição', 
@@ -745,7 +745,7 @@ function LeadDetailsSheet({
               )}
               {lead.status === 'DISTRIBUICAO' 
                 ? 'Protocolar Processo' 
-                : `Avançar para ${nextStage ? stageConfig[nextStage].label : 'Próxima Etapa'}`}
+                : `Avançar para ${nextStage ? stageConfig[nextStage as LeadStatus].label : 'Próxima Etapa'}`}
             </Button>
           </div>
         </SheetFooter>
@@ -888,7 +888,7 @@ function LeadConversionDialog({ lead, open, onOpenChange, onConfirm, lawyers }: 
       const result = await extractProtocolData({
         leadTitle: lead.title,
         leadDescription: lead.description || '',
-        timelineNotes: lead.timeline?.map(e => e.description) || []
+        timelineNotes: lead.timeline?.map((e: TimelineEvent) => e.description) || []
       });
       if (result) {
         form.setValue('processNumber', result.suggestedProcessNumber);
@@ -938,7 +938,10 @@ function LeadConversionDialog({ lead, open, onOpenChange, onConfirm, lawyers }: 
                   )} />
                 </div>
                 <FormField control={form.control} name="leadLawyerId" render={({ field }) => (
-                  <FormItem><FormLabel className="text-[10px] font-black uppercase text-slate-500">Advogado Responsável (Requalificação) *</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger className="bg-black/40 border-white/10 h-12 text-base font-bold"><SelectValue placeholder="Selecione o titular do caso..." /></SelectTrigger></FormControl><SelectContent className="bg-[#0f172a] border-white/10 text-white">{lawyers.map(l => <SelectItem key={l.id} value={l.id} className="font-bold">Dr(a). {l.firstName}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
+                  <FormItem><FormLabel className="text-[10px] font-black uppercase text-slate-500">Advogado Responsável (Requalificação) *</FormLabel><Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl><SelectTrigger className="bg-black/40 border-white/10 h-12 text-base font-bold"><SelectValue placeholder="Selecione o titular do caso..." /></SelectTrigger></FormControl>
+                    <SelectContent className="bg-[#0f172a] border-white/10 text-white">{lawyers.map(l => <SelectItem key={l.id} value={l.id} className="font-bold">Dr(a). {l.firstName}</SelectItem>)}</SelectContent>
+                  </Select><FormMessage /></FormItem>
                 )} />
                 <div className="space-y-4 pt-4 border-t border-white/5">
                   <div className="flex items-center justify-between"><FormLabel className="text-[10px] font-black uppercase text-slate-500">Qualificação dos Réus *</FormLabel><Button type="button" variant="ghost" size="sm" onClick={() => append({ name: '', document: '', address: '' })} className="text-primary font-bold uppercase text-[9px] h-7 gap-1"><Plus className="h-3 w-3" /> Adicionar Réu</Button></div>
@@ -964,7 +967,7 @@ export default function LeadsPage() {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = React.useState('');
   const [isNewLeadOpen, setIsNewLeadOpen] = React.useState(false);
-  const [selectedLead, setSelectedLead] = React.useState<Lead | null>(null);
+  const [selectedLeadId, setSelectedLeadId] = React.useState<string | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = React.useState(false);
   const [isConversionOpen, setIsConversionOpen] = React.useState(false);
   const [isProcessing, setIsProcessing] = React.useState<string | null>(null);
@@ -977,10 +980,10 @@ export default function LeadsPage() {
   const leadsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'leads'), where('status', '!=', 'CONVERTIDO')) : null), [firestore]);
   const { data: leadsData } = useCollection<Lead>(leadsQuery);
 
-  const freshSelectedLead = React.useMemo(() => {
-    if (!selectedLead || !leadsData) return selectedLead;
-    return leadsData.find(l => l.id === selectedLead.id) || selectedLead;
-  }, [selectedLead, leadsData]);
+  const activeLead = React.useMemo(() => {
+    if (!selectedLeadId || !leadsData) return null;
+    return leadsData.find(l => l.id === selectedLeadId) || null;
+  }, [selectedLeadId, leadsData]);
 
   const clientsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'clients'), limit(500)) : null), [firestore]);
   const { data: clientsData } = useCollection<Client>(clientsQuery);
@@ -1015,10 +1018,10 @@ export default function LeadsPage() {
   };
 
   const handleConfirmProtocol = async (data: z.infer<typeof conversionSchema>) => {
-    if (!selectedLead) return;
-    setIsProcessing(selectedLead.id);
+    if (!activeLead) return;
+    setIsProcessing(activeLead.id);
     try {
-      const result = await convertLeadToProcess(selectedLead.id, data);
+      const result = await convertLeadToProcess(activeLead.id, data);
       if (result.success) {
         toast({ title: 'Processo Protocolado!', description: 'Migrado para processos ativos.' });
         setIsConversionOpen(false);
@@ -1060,21 +1063,21 @@ export default function LeadsPage() {
               leads={filteredLeads.filter(l => l.status === stage)} 
               clientsMap={clientsMap} 
               staffMap={staffMap} 
-              onCardClick={(l: Lead) => { setSelectedLead(l); setIsDetailsOpen(true); }} 
+              onCardClick={(l: Lead) => { setSelectedLeadId(l.id); setIsDetailsOpen(true); }} 
             />
           ))}
         </div>
       </DndContext>
 
       <LeadDetailsSheet 
-        lead={freshSelectedLead} 
-        client={freshSelectedLead ? clientsMap.get(freshSelectedLead.clientId) : undefined} 
+        lead={activeLead} 
+        client={activeLead ? clientsMap.get(activeLead.clientId) : undefined} 
         open={isDetailsOpen} 
         onOpenChange={setIsDetailsOpen} 
-        onProtocolClick={(l) => { setSelectedLead(l); setIsConversionOpen(true); }} 
+        onProtocolClick={(l) => { setSelectedLeadId(l.id); setIsConversionOpen(true); }} 
       />
       <NewLeadSheet open={isNewLeadOpen} onOpenChange={setIsNewLeadOpen} lawyers={lawyers} onCreated={() => {}} />
-      <LeadConversionDialog lead={freshSelectedLead} open={isConversionOpen} onOpenChange={setIsConversionOpen} onConfirm={handleConfirmProtocol} lawyers={lawyers} />
+      <LeadConversionDialog lead={activeLead} open={isConversionOpen} onOpenChange={setIsConversionOpen} onConfirm={handleConfirmProtocol} lawyers={lawyers} />
     </div>
   );
 }

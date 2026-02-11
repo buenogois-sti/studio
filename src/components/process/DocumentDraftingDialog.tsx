@@ -1,3 +1,4 @@
+
 'use client';
 import * as React from 'react';
 import {
@@ -94,6 +95,12 @@ export function DocumentDraftingDialog({ process, lead, open, onOpenChange }: Do
     setLastTemplateName('');
   };
 
+  // Helper to get display name from either Process or Lead
+  const getTargetDisplayName = () => {
+    if (!target) return '';
+    return 'title' in target ? target.title : target.name;
+  };
+
   return (
     <Dialog open={open} onOpenChange={(o) => {
       onOpenChange(o);
@@ -108,7 +115,7 @@ export function DocumentDraftingDialog({ process, lead, open, onOpenChange }: Do
             <div>
               <DialogTitle className="text-xl font-black font-headline">Gerador de Rascunhos</DialogTitle>
               <DialogDescription className="text-slate-400">
-                Processando inteligência documental para: <span className="text-white font-bold">{target?.title || target?.name}</span>
+                Processando inteligência documental para: <span className="text-white font-bold">{getTargetDisplayName()}</span>
               </DialogDescription>
             </div>
           </div>

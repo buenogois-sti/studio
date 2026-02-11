@@ -118,6 +118,7 @@ export type Lead = {
   completedTasks?: string[]; 
   stageEntryDates?: Record<string, Timestamp>;
   interviewAnswers?: Record<string, string>;
+  timeline?: TimelineEvent[];
   createdAt: Timestamp;
   updatedAt: Timestamp;
 };
