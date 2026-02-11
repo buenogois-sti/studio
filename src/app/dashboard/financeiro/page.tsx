@@ -40,7 +40,8 @@ import {
   MessageSquare,
   Gavel,
   History,
-  CalendarDays
+  CalendarDays,
+  ShieldCheck
 } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, Timestamp, query, orderBy, deleteDoc, doc, getDocs, where, limit } from 'firebase/firestore';
