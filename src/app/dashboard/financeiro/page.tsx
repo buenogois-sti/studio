@@ -39,7 +39,8 @@ import {
   Flame,
   MessageSquare,
   Gavel,
-  History
+  History,
+  CalendarDays
 } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, Timestamp, query, orderBy, deleteDoc, doc, getDocs, where, limit } from 'firebase/firestore';
@@ -77,6 +78,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
 import Link from 'next/link';
 import { searchProcesses } from '@/lib/process-actions';
 
@@ -103,6 +105,8 @@ const titleFormSchema = z.object({
   dueDate: z.string().min(1, 'Data de vencimento obrigatória'),
   status: z.enum(['PENDENTE', 'PAGO', 'ATRASADO']).default('PENDENTE'),
   processId: z.string().optional(),
+  recurring: z.boolean().default(false),
+  months: z.coerce.number().min(1).max(24).default(1),
 });
 
 function ClientReceiptDialog({ 
@@ -302,7 +306,7 @@ function ClientReceiptDialog({
                 </div>
 
                 <div className="pt-16 flex flex-col items-center gap-12">
-                  <p className="text-sm font-bold text-slate-900">São Bernardo do Campo, {format(paymentDate, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}</p>
+                  <p className="text-sm font-bold text-slate-900">São Bernardo do Campo, {format(paymentDate || new Date(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}</p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-20 w-full pt-10">
                     <div className="text-center space-y-2">
                       <div className="w-full border-t border-slate-900" />
@@ -347,6 +351,8 @@ function NewTitleDialog({ onCreated }: { onCreated: () => void }) {
       value: 0,
       dueDate: format(new Date(), 'yyyy-MM-dd'),
       processId: '',
+      recurring: false,
+      months: 1,
     }
   });
 
@@ -387,10 +393,9 @@ function NewTitleDialog({ onCreated }: { onCreated: () => void }) {
     try {
       await createFinancialTitle({
         ...values,
-        dueDate: new Date(values.dueDate),
         processId: selectedProcess?.id || undefined,
       });
-      toast({ title: 'Lançamento realizado!' });
+      toast({ title: values.recurring ? 'Lançamentos Recorrentes Criados!' : 'Lançamento realizado!' });
       form.reset();
       setSelectedProcess(null);
       setProcessSearch('');
@@ -426,7 +431,7 @@ function NewTitleDialog({ onCreated }: { onCreated: () => void }) {
         
         <ScrollArea className="flex-1">
           <Form {...form}>
-            <form id="new-title-form" onSubmit={form.handleSubmit(onSubmit)} className="p-6 space-y-4">
+            <form id="new-title-form" onSubmit={form.handleSubmit(onSubmit)} className="p-6 space-y-6">
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
@@ -453,10 +458,10 @@ function NewTitleDialog({ onCreated }: { onCreated: () => void }) {
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl><SelectTrigger className="bg-background border-border shadow-none"><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
                         <SelectContent>
+                          <SelectItem value="ALUGUEL_CONTAS">Aluguel / Contas</SelectItem>
                           <SelectItem value="HONORARIOS_CONTRATUAIS">Honorários</SelectItem>
                           <SelectItem value="SUCUMBENCIA">Sucumbência</SelectItem>
                           <SelectItem value="SALARIOS_PROLABORE">Salários/Pró-Labore</SelectItem>
-                          <SelectItem value="ALUGUEL_CONTAS">Aluguel/Contas</SelectItem>
                           <SelectItem value="INFRAESTRUTURA_TI">TI/Software</SelectItem>
                           <SelectItem value="OUTRAS_DESPESAS">Outros</SelectItem>
                         </SelectContent>
@@ -527,6 +532,55 @@ function NewTitleDialog({ onCreated }: { onCreated: () => void }) {
                   </FormItem>
                 )}
               />
+
+              {/* Recorrência */}
+              <div className="space-y-4 pt-2">
+                <div className="flex items-center justify-between p-4 rounded-xl bg-primary/5 border border-primary/20">
+                  <div className="space-y-0.5">
+                    <FormLabel className="text-white">Lançar Recorrência?</FormLabel>
+                    <p className="text-[10px] text-slate-500 font-bold uppercase">Repetir para os próximos meses</p>
+                  </div>
+                  <FormField
+                    control={form.control}
+                    name="recurring"
+                    render={({ field }) => (
+                      <FormControl>
+                        <Switch 
+                          checked={field.value} 
+                          onCheckedChange={field.onChange} 
+                          className="data-[state=checked]:bg-primary"
+                        />
+                      </FormControl>
+                    )}
+                  />
+                </div>
+
+                {form.watch('recurring') && (
+                  <FormField
+                    control={form.control}
+                    name="months"
+                    render={({ field }) => (
+                      <FormItem className="animate-in slide-in-from-top-2">
+                        <FormLabel className="text-white">Duração (Meses)</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <Input 
+                              type="number" 
+                              min="2" 
+                              max="24" 
+                              className="bg-background border-border h-11 pl-9" 
+                              {...field} 
+                            />
+                            <CalendarDays className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
@@ -950,7 +1004,7 @@ export default function FinanceiroPage() {
                   <TableRow key={t.id} className="border-white/5 hover:bg-white/5 transition-colors">
                     <TableCell className="px-6 font-bold text-white text-sm">{t.description}</TableCell>
                     <TableCell className="text-xs text-slate-400 font-mono">
-                      {format(t.dueDate instanceof Timestamp ? t.dueDate.toDate() : new Date(t.dueDate), 'dd/MM/yyyy')}
+                      {format(t.dueDate instanceof Timestamp ? t.dueDate.toDate() : new Date(t.dueDate as any), 'dd/MM/yyyy')}
                     </TableCell>
                     <TableCell className="text-center">
                       <Badge variant="outline" className={cn("text-[9px] font-black uppercase px-2 h-6 border-none", t.status === 'PAGO' ? 'bg-rose-500/20 text-rose-400' : 'bg-amber-500/20 text-amber-400')}>

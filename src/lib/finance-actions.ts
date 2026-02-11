@@ -171,18 +171,46 @@ export async function processRepasse(staffId: string, creditIds: string[], total
   return { success: true };
 }
 
-export async function createFinancialTitle(data: Partial<FinancialTitle>) {
+export async function createFinancialTitle(data: Partial<FinancialTitle> & { recurring?: boolean, months?: number }) {
     if (!firestoreAdmin) throw new Error("Servidor inacessível.");
     try {
-        let clientId = data.clientId;
-        if (data.processId && !clientId) {
-          const p = await firestoreAdmin.collection('processes').doc(data.processId).get();
+        const batch = firestoreAdmin.batch();
+        const { recurring, months = 1, ...baseData } = data;
+        
+        let clientId = baseData.clientId;
+        if (baseData.processId && !clientId) {
+          const p = await firestoreAdmin.collection('processes').doc(baseData.processId).get();
           clientId = p.data()?.clientId;
         }
-        await firestoreAdmin.collection('financial_titles').add({ ...data, clientId, updatedAt: FieldValue.serverTimestamp() });
+
+        const initialDueDate = typeof baseData.dueDate === 'string' 
+            ? new Date(baseData.dueDate + 'T12:00:00')
+            : (baseData.dueDate instanceof Timestamp ? baseData.dueDate.toDate() : new Date(baseData.dueDate as any));
+
+        const count = recurring ? Math.min(Math.max(months, 1), 24) : 1;
+
+        for (let i = 0; i < count; i++) {
+            const titleRef = firestoreAdmin.collection('financial_titles').doc();
+            const currentDueDate = addMonths(initialDueDate, i);
+            
+            const description = recurring && count > 1 
+                ? `${baseData.description} (${i + 1}/${count})` 
+                : baseData.description;
+
+            batch.set(titleRef, { 
+                ...baseData, 
+                description,
+                clientId, 
+                dueDate: Timestamp.fromDate(currentDueDate),
+                updatedAt: FieldValue.serverTimestamp() 
+            });
+        }
+
+        await batch.commit();
         revalidatePath('/dashboard/financeiro');
         return { success: true };
     } catch (error: any) {
+        console.error('[createFinancialTitle] Error:', error);
         throw new Error(error.message);
     }
 }
