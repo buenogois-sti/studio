@@ -51,7 +51,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
-import { format, formatDistanceToNow, differenceInHours } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useSession } from 'next-auth/react';
 import {
@@ -91,6 +91,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { DocumentDraftingDialog } from '@/components/process/DocumentDraftingDialog';
 import { extractProtocolData } from '@/ai/flows/extract-protocol-data-flow';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
   TableBody,
@@ -135,13 +136,6 @@ const stageConfig: Record<LeadStatus, { label: string; color: string; icon: any;
   },
   CONVERTIDO: { label: 'Convertido', color: 'bg-slate-500/10 text-slate-400 border-slate-500/20', icon: CheckCircle2, tasks: [] },
   ABANDONADO: { label: 'Abandonado', color: 'bg-rose-500/10 text-rose-400 border-rose-500/20', icon: AlertCircle, tasks: [] },
-};
-
-const priorityConfig: Record<LeadPriority, { label: string; color: string; icon: any }> = {
-  BAIXA: { label: 'Baixa', color: 'text-slate-400 bg-slate-500/10 border-slate-500/20', icon: Info },
-  MEDIA: { label: 'Média', color: 'text-blue-400 bg-blue-500/10 border-blue-500/20', icon: Info },
-  ALTA: { label: 'Alta', color: 'text-orange-400 bg-orange-500/10 border-orange-500/20', icon: AlertCircle },
-  CRITICA: { label: 'Crítica', color: 'text-rose-500 bg-rose-500/10 border-rose-500/20', icon: Flame },
 };
 
 const leadFormSchema = z.object({
