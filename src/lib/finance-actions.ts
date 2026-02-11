@@ -1,4 +1,3 @@
-
 'use server';
 import { firestoreAdmin } from '@/firebase/admin';
 import type { FinancialTitle, Process, FinancialEvent, Staff, StaffCredit, TimelineEvent } from './types';
@@ -128,6 +127,40 @@ export async function updateFinancialTitleStatus(titleId: string, status: 'PAGO'
     }
 }
 
+export async function updateFinancialTitle(id: string, data: Partial<FinancialTitle>) {
+  if (!firestoreAdmin) throw new Error("Servidor inacessível.");
+  try {
+    const titleRef = firestoreAdmin.collection('financial_titles').doc(id);
+    
+    // Converte datas se necessário
+    const payload = { ...data };
+    if (data.dueDate && !(data.dueDate instanceof Timestamp)) {
+      payload.dueDate = Timestamp.fromDate(new Date(data.dueDate as any));
+    }
+
+    await titleRef.update({
+      ...payload,
+      updatedAt: FieldValue.serverTimestamp()
+    });
+
+    revalidatePath('/dashboard/financeiro');
+    return { success: true };
+  } catch (error: any) {
+    throw new Error(error.message);
+  }
+}
+
+export async function deleteFinancialTitle(id: string) {
+  if (!firestoreAdmin) throw new Error("Servidor inacessível.");
+  try {
+    await firestoreAdmin.collection('financial_titles').doc(id).delete();
+    revalidatePath('/dashboard/financeiro');
+    return { success: true };
+  } catch (error: any) {
+    throw new Error(error.message);
+  }
+}
+
 export async function processRepasse(staffId: string, creditIds: string[], totalValue: number) {
   if (!firestoreAdmin) throw new Error("Servidor inacessível.");
   const session = await getServerSession(authOptions);
@@ -187,7 +220,6 @@ export async function createFinancialTitle(data: Partial<FinancialTitle> & { rec
         let initialDueDate: Date;
 
         if (typeof initialDateValue === 'string') {
-          // Garante que a data seja interpretada corretamente no fuso horário local
           initialDueDate = new Date(initialDateValue + 'T12:00:00');
         } else if (initialDateValue && typeof initialDateValue === 'object' && 'seconds' in initialDateValue) {
           initialDueDate = new Timestamp((initialDateValue as any).seconds, (initialDateValue as any).nanoseconds).toDate();
@@ -205,7 +237,6 @@ export async function createFinancialTitle(data: Partial<FinancialTitle> & { rec
                 ? `${baseData.description} (${i + 1}/${count})` 
                 : baseData.description;
 
-            // Construção explícita do payload para evitar propriedades 'undefined'
             const payload: any = {
                 description: description || 'Lançamento sem descrição',
                 type: baseData.type || 'RECEITA',
@@ -287,7 +318,7 @@ export async function updateCreditForecast(staffId: string, creditIds: string[],
 export async function requestCreditUnlock(staffId: string, creditId: string, reason: string) {
   if (!firestoreAdmin) throw new Error("Servidor inacessível.");
   try {
-    const ref = firestoreAdmin.collection(`staff/${staffId}/credits`).doc(creditId);
+    const ref = firestoreAdmin.collection('staff').doc(staffId).collection('credits').doc(creditId);
     await ref.update({ 
       unlockRequested: true,
       unlockReason: reason,

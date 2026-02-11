@@ -1,4 +1,3 @@
-
 'use client';
 import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -43,7 +42,8 @@ import {
   History,
   CalendarDays,
   ShieldCheck,
-  Bot
+  Bot,
+  Edit
 } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, Timestamp, query, orderBy, deleteDoc, doc, getDocs, where, limit } from 'firebase/firestore';
@@ -70,7 +70,7 @@ import { Input } from '@/components/ui/input';
 import { format, isBefore, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { createFinancialTitle, updateFinancialTitleStatus, processLatePaymentRoutine } from '@/lib/finance-actions';
+import { createFinancialTitle, updateFinancialTitleStatus, processLatePaymentRoutine, updateFinancialTitle, deleteFinancialTitle } from '@/lib/finance-actions';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -84,6 +84,7 @@ import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import Link from 'next/link';
 import { searchProcesses } from '@/lib/process-actions';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 const titleFormSchema = z.object({
   description: z.string().min(3, 'Descrição obrigatória'),
@@ -338,14 +339,26 @@ function ClientReceiptDialog({
   );
 }
 
-function NewTitleDialog({ onCreated }: { onCreated: () => void }) {
-  const [open, setOpen] = React.useState(false);
+function TitleFormDialog({ 
+  open, 
+  onOpenChange, 
+  title, 
+  onSuccess 
+}: { 
+  open: boolean; 
+  onOpenChange: (o: boolean) => void; 
+  title?: FinancialTitle | null; 
+  onSuccess: () => void 
+}) {
   const [isSaving, setIsSaving] = React.useState(false);
   const [processSearch, setProcessSearch] = React.useState('');
   const [processResults, setProcessResults] = React.useState<Process[]>([]);
   const [isSearchingProcess, setIsSearchingProcess] = React.useState(false);
   const [selectedProcess, setSelectedProcess] = React.useState<Process | null>(null);
   const { toast } = useToast();
+  const { firestore } = useFirebase();
+
+  const isEdit = !!title;
 
   const form = useForm<z.infer<typeof titleFormSchema>>({
     resolver: zodResolver(titleFormSchema),
@@ -362,6 +375,33 @@ function NewTitleDialog({ onCreated }: { onCreated: () => void }) {
       months: 1,
     }
   });
+
+  React.useEffect(() => {
+    if (open && title) {
+      const dateVal = title.dueDate instanceof Timestamp ? title.dueDate.toDate() : new Date(title.dueDate as any);
+      form.reset({
+        description: title.description,
+        type: title.type,
+        origin: title.origin,
+        status: title.status,
+        value: title.value,
+        dueDate: format(dateVal, 'yyyy-MM-dd'),
+        processId: title.processId || '',
+        clientId: title.clientId || '',
+        recurring: false,
+        months: 1
+      });
+      if (title.processId && firestore) {
+        getDocs(query(collection(firestore, 'processes'), where('id', '==', title.processId), limit(1)))
+          .then(snap => {
+            if (!snap.empty) setSelectedProcess({ id: snap.docs[0].id, ...snap.docs[0].data() } as Process);
+          });
+      }
+    } else if (open && !title) {
+      form.reset();
+      setSelectedProcess(null);
+    }
+  }, [open, title, form, firestore]);
 
   React.useEffect(() => {
     if (processSearch.length < 2) {
@@ -399,20 +439,22 @@ function NewTitleDialog({ onCreated }: { onCreated: () => void }) {
   const onSubmit = async (values: z.infer<typeof titleFormSchema>) => {
     setIsSaving(true);
     try {
-      // Sanitização explícita para evitar 'undefined' no Firestore
       const payload = {
         ...values,
         processId: selectedProcess?.id || '',
         clientId: selectedProcess?.clientId || '',
       };
 
-      await createFinancialTitle(payload);
-      toast({ title: values.recurring ? 'Lançamentos Recorrentes Criados!' : 'Lançamento realizado!' });
-      form.reset();
-      setSelectedProcess(null);
-      setProcessSearch('');
-      onCreated();
-      setOpen(false);
+      if (isEdit && title) {
+        await updateFinancialTitle(title.id, payload);
+        toast({ title: 'Lançamento Atualizado!' });
+      } else {
+        await createFinancialTitle(payload);
+        toast({ title: values.recurring ? 'Lançamentos Recorrentes Criados!' : 'Lançamento realizado!' });
+      }
+      
+      onSuccess();
+      onOpenChange(false);
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Erro ao Lançar', description: error.message });
     } finally {
@@ -421,30 +463,20 @@ function NewTitleDialog({ onCreated }: { onCreated: () => void }) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={(o) => {
-      setOpen(o);
-      if (!o) {
-        setSelectedProcess(null);
-        setProcessSearch('');
-        form.reset();
-      }
-    }}>
-      <DialogTrigger asChild>
-        <Button className="gap-2 bg-primary text-primary-foreground font-bold h-10 px-6 shadow-lg shadow-primary/20">
-          <PlusCircle className="h-4 w-4" />
-          Novo Lançamento
-        </Button>
-      </DialogTrigger>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-xl bg-[#020617] border-white/10 h-[90vh] flex flex-col p-0 overflow-hidden shadow-2xl">
         <DialogHeader className="p-6 border-b border-white/5 bg-white/5 shrink-0">
-          <DialogTitle className="text-xl font-black font-headline text-white uppercase tracking-tight">Novo Título Financeiro</DialogTitle>
-          <DialogDescription className="text-slate-400">Lançamento manual de entrada ou saída para controle de caixa.</DialogDescription>
+          <DialogTitle className="text-xl font-black font-headline text-white uppercase tracking-tight">
+            {isEdit ? 'Editar Título Financeiro' : 'Novo Título Financeiro'}
+          </DialogTitle>
+          <DialogDescription className="text-slate-400">
+            {isEdit ? 'Ajuste os dados do lançamento selecionado.' : 'Lançamento manual de entrada ou saída para controle de caixa.'}
+          </DialogDescription>
         </DialogHeader>
         
         <ScrollArea className="flex-1">
           <Form {...form}>
-            <form id="new-title-form" onSubmit={form.handleSubmit(onSubmit)} className="p-6 space-y-8">
-              
+            <form id="title-form" onSubmit={form.handleSubmit(onSubmit)} className="p-6 space-y-8">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField
                   control={form.control}
@@ -608,60 +640,62 @@ function NewTitleDialog({ onCreated }: { onCreated: () => void }) {
                 />
               </div>
 
-              <div className="space-y-4 pt-2">
-                <div className="flex items-center justify-between p-5 rounded-2xl bg-white/5 border border-white/10">
-                  <div className="space-y-0.5">
-                    <FormLabel className="text-white font-black text-sm">Habilitar Recorrência?</FormLabel>
-                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">O sistema gerará os próximos meses automaticamente</p>
-                  </div>
-                  <FormField
-                    control={form.control}
-                    name="recurring"
-                    render={({ field }) => (
-                      <FormControl>
-                        <Switch 
-                          checked={field.value} 
-                          onCheckedChange={field.onChange} 
-                          className="data-[state=checked]:bg-primary"
-                        />
-                      </FormControl>
-                    )}
-                  />
-                </div>
-
-                {form.watch('recurring') && (
-                  <FormField
-                    control={form.control}
-                    name="months"
-                    render={({ field }) => (
-                      <FormItem className="animate-in slide-in-from-top-2 duration-500 bg-black/40 p-6 rounded-2xl border border-primary/20 shadow-inner">
-                        <FormLabel className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-2">
-                          <CalendarDays className="h-4 w-4" /> Duração da Recorrência (Meses)
-                        </FormLabel>
+              {!isEdit && (
+                <div className="space-y-4 pt-2">
+                  <div className="flex items-center justify-between p-5 rounded-2xl bg-white/5 border border-white/10">
+                    <div className="space-y-0.5">
+                      <FormLabel className="text-white font-black text-sm">Habilitar Recorrência?</FormLabel>
+                      <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">O sistema gerará os próximos meses automaticamente</p>
+                    </div>
+                    <FormField
+                      control={form.control}
+                      name="recurring"
+                      render={({ field }) => (
                         <FormControl>
-                          <div className="relative pt-2">
-                            <Input 
-                              type="number" 
-                              min="2" 
-                              max="24" 
-                              className="h-12 bg-[#020617] border-primary/30 text-white text-lg font-black text-center pr-12" 
-                              {...field} 
-                            />
-                            <span className="absolute right-4 top-[60%] -translate-y-1/2 text-[10px] font-black text-slate-500 uppercase">Meses</span>
-                          </div>
+                          <Switch 
+                            checked={field.value} 
+                            onCheckedChange={field.onChange} 
+                            className="data-[state=checked]:bg-primary"
+                          />
                         </FormControl>
-                        <div className="flex items-start gap-2 mt-3 p-3 bg-primary/10 rounded-lg border border-primary/20">
-                          <Bot className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-                          <p className="text-[10px] text-slate-300 leading-relaxed uppercase font-bold">
-                            A inteligência financeira da Bueno Gois criará {field.value} lançamentos automáticos com vencimentos escalonados.
-                          </p>
-                        </div>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
-              </div>
+                      )}
+                    />
+                  </div>
+
+                  {form.watch('recurring') && (
+                    <FormField
+                      control={form.control}
+                      name="months"
+                      render={({ field }) => (
+                        <FormItem className="animate-in slide-in-from-top-2 duration-500 bg-black/40 p-6 rounded-2xl border border-primary/20 shadow-inner">
+                          <FormLabel className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-2">
+                            <CalendarDays className="h-4 w-4" /> Duração da Recorrência (Meses)
+                          </FormLabel>
+                          <FormControl>
+                            <div className="relative pt-2">
+                              <Input 
+                                type="number" 
+                                min="2" 
+                                max="24" 
+                                className="h-12 bg-[#020617] border-primary/30 text-white text-lg font-black text-center pr-12" 
+                                {...field} 
+                              />
+                              <span className="absolute right-4 top-[60%] -translate-y-1/2 text-[10px] font-black text-slate-500 uppercase">Meses</span>
+                            </div>
+                          </FormControl>
+                          <div className="flex items-start gap-2 mt-3 p-3 bg-primary/10 rounded-lg border border-primary/20">
+                            <Bot className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                            <p className="text-[10px] text-slate-300 leading-relaxed uppercase font-bold">
+                              A inteligência financeira da Bueno Gois criará {field.value} lançamentos automáticos com vencimentos escalonados.
+                            </p>
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+                </div>
+              )}
             </form>
           </Form>
         </ScrollArea>
@@ -674,12 +708,12 @@ function NewTitleDialog({ onCreated }: { onCreated: () => void }) {
           </DialogClose>
           <Button 
             type="submit" 
-            form="new-title-form" 
+            form="title-form" 
             disabled={isSaving} 
             className="flex-1 bg-primary text-primary-foreground font-black uppercase tracking-widest text-[11px] h-12 shadow-xl shadow-primary/20 hover:scale-[1.02] transition-all"
           >
             {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
-            Confirmar Lançamento
+            {isEdit ? 'Salvar Alterações' : 'Confirmar Lançamento'}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -695,6 +729,11 @@ export default function FinanceiroPage() {
   const [isReceiptOpen, setIsReceiptOpen] = React.useState(false);
   const [searchTerm, setSearchTerm] = React.useState('');
   const [expandedGroups, setExpandedGroups] = React.useState<Set<string>>(new Set());
+  const [isFormOpen, setIsFormOpen] = React.useState(false);
+  const [titleToEdit, setTitleToEdit] = React.useState<FinancialTitle | null>(null);
+  const [titleToDelete, setTitleToEditDelete] = React.useState<FinancialTitle | null>(null);
+  const [isDeleting, setIsDeleting] = React.useState(false);
+  
   const { toast } = useToast();
 
   const titlesQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'financial_titles'), orderBy('dueDate', 'asc'), limit(300)) : null), [firestore, refreshKey]);
@@ -798,6 +837,21 @@ export default function FinanceiroPage() {
     }
   };
 
+  const handleDeleteTitle = async () => {
+    if (!titleToDelete) return;
+    setIsDeleting(true);
+    try {
+      await deleteFinancialTitle(titleToDelete.id);
+      toast({ title: 'Lançamento excluído com sucesso!' });
+      setRefreshKey(k => k + 1);
+      setTitleToEditDelete(null);
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Erro ao excluir', description: e.message });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const toggleGroup = (id: string) => {
     const next = new Set(expandedGroups);
     if (next.has(id)) next.delete(id);
@@ -831,7 +885,13 @@ export default function FinanceiroPage() {
               <Wallet className="mr-2 h-4 w-4" /> Ir para Repasses & Folha
             </Link>
           </Button>
-          <NewTitleDialog onCreated={() => setRefreshKey(k => k + 1)} />
+          <Button 
+            className="gap-2 bg-primary text-primary-foreground font-bold h-10 px-6 shadow-lg shadow-primary/20"
+            onClick={() => { setTitleToEdit(null); setIsFormOpen(true); }}
+          >
+            <PlusCircle className="h-4 w-4" />
+            Novo Lançamento
+          </Button>
         </div>
       </div>
 
@@ -1018,6 +1078,13 @@ export default function FinanceiroPage() {
                                         <RefreshCw className="h-4 w-4 text-amber-500" /> <span className="font-bold text-amber-500">Estornar</span>
                                       </DropdownMenuItem>
                                     )}
+                                    <DropdownMenuSeparator className="bg-white/5" />
+                                    <DropdownMenuItem onClick={() => { setTitleToEdit(t); setIsFormOpen(true); }} className="gap-2 cursor-pointer">
+                                      <Edit className="h-4 w-4 text-blue-400" /> <span className="font-bold">Editar</span>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => setTitleToEditDelete(t)} className="gap-2 cursor-pointer text-rose-500 focus:bg-rose-500/10">
+                                      <Trash2 className="h-4 w-4" /> <span className="font-bold">Excluir</span>
+                                    </DropdownMenuItem>
                                   </DropdownMenuContent>
                                 </DropdownMenu>
                               </div>
@@ -1087,6 +1154,13 @@ export default function FinanceiroPage() {
                               <RefreshCw className="mr-2 h-4 w-4 text-amber-500" /> <span className="font-bold">Estornar Saída</span>
                             </DropdownMenuItem>
                           )}
+                          <DropdownMenuSeparator className="bg-white/5" />
+                          <DropdownMenuItem onClick={() => { setTitleToEdit(t); setIsFormOpen(true); }} className="gap-2 cursor-pointer">
+                            <Edit className="h-4 w-4 text-blue-400" /> <span className="font-bold">Editar</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setTitleToEditDelete(t)} className="gap-2 cursor-pointer text-rose-500 focus:bg-rose-500/10">
+                            <Trash2 className="h-4 w-4" /> <span className="font-bold">Excluir</span>
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -1109,6 +1183,13 @@ export default function FinanceiroPage() {
         </TabsContent>
       </Tabs>
 
+      <TitleFormDialog 
+        open={isFormOpen} 
+        onOpenChange={setIsFormOpen} 
+        title={titleToEdit}
+        onSuccess={() => setRefreshKey(k => k + 1)} 
+      />
+
       <ClientReceiptDialog 
         title={selectedReceiptTitle}
         client={selectedReceiptTitle ? clientsMap.get(selectedReceiptTitle.clientId || '') || null : null}
@@ -1116,6 +1197,24 @@ export default function FinanceiroPage() {
         open={isReceiptOpen}
         onOpenChange={setIsReceiptOpen}
       />
+
+      <AlertDialog open={!!titleToDelete} onOpenChange={(o) => !o && setTitleToEditDelete(null)}>
+        <AlertDialogContent className="bg-[#0f172a] border-white/10 text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-400">
+              Tem certeza que deseja remover este lançamento? Esta ação é irreversível e afetará os cálculos de faturamento do escritório.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting} className="bg-transparent border-white/10 text-slate-400">Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteTitle} disabled={isDeleting} className="bg-rose-600 text-white hover:bg-rose-700 border-none font-bold">
+              {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+              Confirmar Exclusão
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
