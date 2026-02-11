@@ -553,7 +553,7 @@ function NewTitleDialog({ onCreated }: { onCreated: () => void }) {
                   <FormItem>
                     <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Descrição do Lançamento *</FormLabel>
                     <FormControl>
-                      <Input className="h-12 bg-black/40 border-white/10 rounded-xl font-bold" placeholder="Ex: Honorários Contratuais 1ª Instância" {...field} />
+                      <Input className="h-12 bg-black/40 border-white/10 rounded-xl font-bold" placeholder="Ex: Honorários Contratuais 1ª Instância" {...field} value={field.value || ''} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -591,7 +591,7 @@ function NewTitleDialog({ onCreated }: { onCreated: () => void }) {
                       <FormControl>
                         <div className="relative">
                           <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-                          <Input type="date" className="bg-black/40 border-white/10 h-12 pl-10 text-white rounded-xl" {...field} />
+                          <Input type="date" className="bg-black/40 border-white/10 h-12 pl-10 text-white rounded-xl" {...field} value={field.value || ''} />
                         </div>
                       </FormControl>
                       <FormMessage />
@@ -639,6 +639,7 @@ function NewTitleDialog({ onCreated }: { onCreated: () => void }) {
                               max="24" 
                               className="h-12 bg-[#020617] border-primary/30 text-white text-lg font-black text-center pr-12" 
                               {...field} 
+                              value={field.value || 1}
                             />
                             <span className="absolute right-4 top-[60%] -translate-y-1/2 text-[10px] font-black text-slate-500 uppercase">Meses</span>
                           </div>

@@ -1,8 +1,7 @@
 'use server';
 import { firestoreAdmin } from '@/firebase/admin';
 import type { FinancialTitle, Process, FinancialEvent, Staff, StaffCredit, TimelineEvent } from './types';
-import { FieldValue } from 'firebase-admin/firestore';
-import { Timestamp } from 'firebase/firestore';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { addMonths, format, startOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { getServerSession } from 'next-auth/next';
@@ -57,7 +56,7 @@ export async function createFinancialEventAndTitles(data: CreateEventData) {
       type: 'RECEITA',
       origin,
       value: instVal,
-      dueDate: addMonths(new Date(firstDueDate), i),
+      dueDate: Timestamp.fromDate(addMonths(new Date(firstDueDate), i)),
       status: 'PENDENTE',
     });
   }
@@ -151,7 +150,7 @@ export async function processRepasse(staffId: string, creditIds: string[], total
     type: 'DESPESA',
     origin: 'HONORARIOS_PAGOS',
     value: totalValue,
-    dueDate: new Date(),
+    dueDate: Timestamp.now(),
     paymentDate: Timestamp.now(),
     status: 'PAGO',
     paidToStaffId: staffId
@@ -183,9 +182,16 @@ export async function createFinancialTitle(data: Partial<FinancialTitle> & { rec
           clientId = p.data()?.clientId;
         }
 
-        const initialDueDate = typeof baseData.dueDate === 'string' 
-            ? new Date(baseData.dueDate + 'T12:00:00')
-            : (baseData.dueDate instanceof Timestamp ? baseData.dueDate.toDate() : new Date(baseData.dueDate as any));
+        const initialDateValue = baseData.dueDate;
+        let initialDueDate: Date;
+
+        if (typeof initialDateValue === 'string') {
+          initialDueDate = new Date(initialDateValue + 'T12:00:00');
+        } else if (initialDateValue && typeof initialDateValue === 'object' && 'seconds' in initialDateValue) {
+          initialDueDate = new Timestamp((initialDateValue as any).seconds, (initialDateValue as any).nanoseconds).toDate();
+        } else {
+          initialDueDate = new Date(initialDateValue as any);
+        }
 
         const count = recurring ? Math.min(Math.max(months, 1), 24) : 1;
 
