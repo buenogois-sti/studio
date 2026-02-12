@@ -139,7 +139,6 @@ function OfficeWalletView() {
   const stats = React.useMemo(() => {
     if (!titles) return { grossHonorarios: 0, totalPayouts: 0, netBalance: 0 };
     
-    // O escritório fica com 30% das receitas (padrão honorários advocatícios Bueno Gois)
     const grossHonorarios = titles.reduce((acc, t) => acc + (t.value * 0.3), 0);
     const totalPayouts = payouts?.reduce((acc, p) => acc + p.value, 0) || 0;
     
@@ -459,7 +458,7 @@ function PayoutList({
 }
 
 function RepassePaymentDialog({ staff, credits, open, onOpenChange, onPaid }: { staff: Staff | null; credits: any[]; open: boolean; onOpenChange: (open: boolean) => void; onPaid: (total: number, creditsPaid: any[]) => void; }) {
-  const [isProcessing, setIsProcessing] = false;
+  const [isProcessing, setIsProcessing] = React.useState(false);
   const { toast } = useToast();
   const totalValue = React.useMemo(() => credits.reduce((sum, c) => sum + c.value, 0), [credits]);
   
@@ -830,7 +829,7 @@ export default function RepassesPage() {
         <Card className="bg-emerald-500/5 border-emerald-500/20"><CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-emerald-400 tracking-widest">{isAdmin ? 'Total Liquidado (Mês)' : 'Seu Recebido (Mês)'}</CardTitle></CardHeader><CardContent className="p-4 pt-0"><p className="text-2xl font-black text-white">{stats.totalPaidMonth.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p></CardContent></Card>
         <Card className="bg-amber-500/5 border-amber-500/20"><CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-amber-400 tracking-widest">{isAdmin ? 'Saldos Liberados (Banca)' : 'Seu Saldo Liberado'}</CardTitle></CardHeader><CardContent className="p-4 pt-0"><p className="text-2xl font-black text-white">{stats.totalPending.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p></CardContent></Card>
         <Card className="bg-blue-500/5 border-blue-500/20"><CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-blue-400 tracking-widest">{isAdmin ? 'Honorários Retidos (Futuro)' : 'Honorários Retidos'}</CardTitle></CardHeader><CardContent className="p-4 pt-0"><p className="text-2xl font-black text-white">{stats.totalRetained.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p></CardContent></Card>
-        <Card className="bg-white/5 border-white/10"><CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Ativos p/ Liquidação</CardTitle></CardHeader><CardContent className="p-4 pt-0"><p className="text-2xl font-black text-white">{isAdmin ? stats.staffCount : '1'}</p></CardContent>
+        <Card className="bg-white/5 border-white/10"><CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Ativos p/ Liquidação</CardTitle></CardHeader><CardContent className="p-4 pt-0"><p className="text-2xl font-black text-white">{isAdmin ? stats.staffCount : '1'}</p></CardContent></Card>
       </div>
 
       {isAdmin ? (
