@@ -35,7 +35,8 @@ import {
   TrendingUp,
   AlertTriangle,
   Receipt,
-  Heart
+  Heart,
+  Building
 } from 'lucide-react';
 import type { Client, FinancialTitle } from '@/lib/types';
 import { useToast } from '@/components/ui/use-toast';
@@ -139,7 +140,7 @@ export const ClientDetailsSheet = React.memo(function ClientDetailsSheet({ clien
       where('clientId', '==', client.id),
       orderBy('dueDate', 'desc')
     ) : null),
-    [firestore, client?.id] // Removido 'open' para manter query estável durante transições
+    [firestore, client?.id] 
   );
   const { data: titles, isLoading: isLoadingFinance } = useCollection<FinancialTitle>(titlesQuery);
 

@@ -1,4 +1,3 @@
-
 'use client';
 import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -763,6 +762,7 @@ export default function FinanceiroPage() {
   const [isDeleting, setIsDeleting] = React.useState(false);
   
   const { toast } = useToast();
+  const now = startOfDay(new Date());
 
   const titlesQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'financial_titles'), orderBy('dueDate', 'asc'), limit(300)) : null), [firestore, refreshKey]);
   const { data: titlesData, isLoading: isLoadingTitles } = useCollection<FinancialTitle>(titlesQuery);
@@ -771,7 +771,7 @@ export default function FinanceiroPage() {
   const { data: clientsData } = useCollection<Client>(clientsQuery);
   const clientsMap = React.useMemo(() => new Map(clientsData?.map(c => [c.id, c])), [clientsData]);
 
-  const processesQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'processes'), limit(100)) : null), [firestore]);
+  const processesQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'processes'), limit(100)) : null, [firestore]);
   const { data: processesData } = useCollection<Process>(processesQuery);
   const processesMap = React.useMemo(() => new Map(processesData?.map(p => [p.id, p])), [processesData]);
   
@@ -797,7 +797,7 @@ export default function FinanceiroPage() {
   const groupedReceitas = React.useMemo(() => {
     if (!titlesData) return [];
     const q = searchTerm.toLowerCase();
-    const now = startOfDay(new Date());
+    const currentDate = startOfDay(new Date());
     
     const filtered = titlesData.filter(t => 
       t.type === 'RECEITA' && (
@@ -822,7 +822,7 @@ export default function FinanceiroPage() {
       }
       
       const dueDate = t.dueDate instanceof Timestamp ? t.dueDate.toDate() : (t.dueDate && typeof t.dueDate === 'object' && 'seconds' in t.dueDate) ? new Date((t.dueDate as any).seconds * 1000) : new Date(t.dueDate as any);
-      const isOverdue = t.status !== 'PAGO' && isBefore(dueDate, now);
+      const isOverdue = t.status !== 'PAGO' && isBefore(dueDate, currentDate);
       if (isOverdue) groups[key].hasOverdue = true;
 
       groups[key].titles.push(t);

@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -33,7 +32,8 @@ import {
   Printer,
   ChevronDown,
   ChevronUp,
-  Briefcase
+  Briefcase,
+  Handshake
 } from 'lucide-react';
 import { 
   Bar, 
