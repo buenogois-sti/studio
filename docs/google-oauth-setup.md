@@ -21,35 +21,32 @@ Você precisa adicionar as URLs corretas na seção "URIs de redirecionamento au
     *   Encontre a seção **"URIs de redirecionamento autorizados"**.
     *   Clique em **"ADICIONAR URI"** e adicione as seguintes URLs, uma de cada vez:
 
+### Para o seu Domínio Principal (Produção)
+Adicione esta URL exatamente como está abaixo:
+```
+https://www.buenogoisadvogado.com.br/api/auth/callback/google
+```
+
+### Para a Vercel (Domínio de Preview)
+Adicione a URL que a Vercel te forneceu:
+```
+https://lexflow-bg.vercel.app/api/auth/callback/google
+```
+
 ### Para Desenvolvimento Local
-
-Adicione esta URL para poder fazer login ao rodar o projeto na sua máquina local:
-
+Adicione esta URL para poder testar na sua máquina:
 ```
 http://localhost:9002/api/auth/callback/google
 ```
 
-*(**Nota:** O `9002` é a porta definida no seu arquivo `package.json`. Se você a alterar, precisará atualizar esta URL aqui também.)*
-
-### Para Produção (Vercel, Firebase App Hosting, etc.)
-
-Adicione a URL do seu site em produção. Substitua `<URL_DO_SEU_SITE>` pelo domínio real do seu aplicativo:
-
-```
-https://<URL_DO_SEU_SITE>/api/auth/callback/google
-```
-
-*Se você tiver múltiplos ambientes (como previews de branches), precisará adicionar a URL de cada um deles.*
-
 4.  **Salve as Alterações:**
     *   Role até o final da página e clique em **"SALVAR"**.
 
-Pode levar alguns minutos para que as alterações entrem em vigor. Após salvar, tente fazer login novamente no seu aplicativo.
+**Importante:** Pode levar alguns minutos para que as alterações entrem em vigor no Google. Após salvar, aguarde um pouco e tente o login novamente.
 
 ---
 
-## Variável de Ambiente `NEXTAUTH_URL` (Opcional, mas Recomendado)
+## Variável de Ambiente `NEXTAUTH_URL`
 
-Para garantir que o `next-auth` sempre use a URL correta, é uma boa prática definir a variável de ambiente `NEXTAUTH_URL` no seu ambiente de produção com a URL principal do seu site.
-
-**Exemplo:** `NEXTAUTH_URL=https://<URL_DO_SEU_SITE>`
+Certifique-se de que na Vercel (Settings > Environment Variables) a variável `NEXTAUTH_URL` está configurada como:
+`https://www.buenogoisadvogado.com.br`
