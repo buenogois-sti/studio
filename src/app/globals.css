@@ -150,7 +150,8 @@
   /* Container for the printable content */
   #receipt-print-area, 
   #honorarios-print-area,
-  #staff-voucher-print-area {
+  #staff-voucher-print-area,
+  #report-print-area {
     width: 100% !important;
     height: auto !important;
     margin: 0 !important;
@@ -159,6 +160,26 @@
     visibility: visible !important;
     display: block !important;
     box-shadow: none !important;
+  }
+
+  /* Estilos específicos para o relatório impresso */
+  #report-print-area .card {
+    background: #f8fafc !important;
+    border: 1px solid #e2e8f0 !important;
+    color: #0f172a !important;
+    box-shadow: none !important;
+  }
+
+  #report-print-area h1, 
+  #report-print-area h2, 
+  #report-print-area h3, 
+  #report-print-area p, 
+  #report-print-area span {
+    color: #0f172a !important;
+  }
+
+  #report-print-area .text-primary {
+    color: #854d0e !important; /* Gold escurecido para melhor contraste em papel */
   }
 
   /* Ensure colors are printed accurately */

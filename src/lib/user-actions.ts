@@ -1,8 +1,10 @@
+
 'use server';
 
 import { firestoreAdmin, authAdmin } from '@/firebase/admin';
 import type { UserRole, UserRoleInfo } from './types';
 import { revalidatePath } from 'next/cache';
+import { Timestamp } from 'firebase-admin/firestore';
 
 export async function getUserRoles(): Promise<UserRoleInfo[]> {
     if (!firestoreAdmin) {
@@ -72,4 +74,17 @@ export async function deleteUserRole(email: string): Promise<{ success: boolean 
     
     revalidatePath('/dashboard/configuracoes');
     return { success: true };
+}
+
+export async function acceptLGPDTerms(userId: string): Promise<{ success: boolean }> {
+  if (!firestoreAdmin) throw new Error("Servidor inacessível.");
+  try {
+    await firestoreAdmin.collection('users').doc(userId).update({
+      lgpdAccepted: true,
+      lgpdAcceptedAt: Timestamp.now()
+    });
+    return { success: true };
+  } catch (error: any) {
+    throw new Error(error.message);
+  }
 }

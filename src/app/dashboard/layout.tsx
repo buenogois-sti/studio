@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -58,6 +59,7 @@ import {
 } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { NotificationBell } from '@/components/NotificationBell';
+import { LGPDGuard } from '@/components/LGPDGuard';
 
 const sidebarSections = [
   {
@@ -182,66 +184,68 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
     const isAuthorized = (roles: string[]) => userProfile && roles.includes(userProfile.role);
 
     return (
-        <SidebarProvider>
-        <Sidebar variant="sidebar" collapsible="icon" className="border-r border-white/5">
-            <SidebarHeader className="h-16 justify-center px-4 group-data-[collapsible=icon]:justify-center border-b border-white/5 bg-[#020617]">
-            <Link href="/dashboard" className="flex items-center gap-3">
-                <Logo />
-                <span className="font-bold text-xl text-white tracking-tight group-data-[collapsible=icon]:hidden">
-                Bueno Gois
-                </span>
-            </Link>
-            </SidebarHeader>
-            <SidebarContent className="bg-[#020617]">
-              {sidebarSections.map((section) => {
-                const accessibleItems = section.items.filter(item => isAuthorized(item.roles));
-                if (accessibleItems.length === 0) return null;
+        <LGPDGuard>
+          <SidebarProvider>
+          <Sidebar variant="sidebar" collapsible="icon" className="border-r border-white/5">
+              <SidebarHeader className="h-16 justify-center px-4 group-data-[collapsible=icon]:justify-center border-b border-white/5 bg-[#020617]">
+              <Link href="/dashboard" className="flex items-center gap-3">
+                  <Logo />
+                  <span className="font-bold text-xl text-white tracking-tight group-data-[collapsible=icon]:hidden">
+                  Bueno Gois
+                  </span>
+              </Link>
+              </SidebarHeader>
+              <SidebarContent className="bg-[#020617]">
+                {sidebarSections.map((section) => {
+                  const accessibleItems = section.items.filter(item => isAuthorized(item.roles));
+                  if (accessibleItems.length === 0) return null;
 
-                return (
-                  <SidebarGroup key={section.label}>
-                    <SidebarGroupLabel className="text-[10px] text-slate-500 font-black uppercase tracking-widest px-4 py-4">
-                      {section.label}
-                    </SidebarGroupLabel>
-                    <SidebarGroupContent>
-                      <SidebarMenu className="px-2">
-                        {accessibleItems.map((item) => (
-                          <SidebarMenuItem key={item.label}>
-                            <SidebarMenuButton
-                              asChild
-                              isActive={pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href))}
-                              tooltip={item.label}
-                              className="data-[active=true]:bg-primary/10 data-[active=true]:text-primary text-slate-400 hover:text-white transition-all h-10"
-                            >
-                              <Link href={item.href}>
-                                <item.icon />
-                                <span className="font-bold">{item.label}</span>
-                              </Link>
-                            </SidebarMenuButton>
-                          </SidebarMenuItem>
-                        ))}
-                      </SidebarMenu>
-                    </SidebarGroupContent>
-                  </SidebarGroup>
-                );
-              })}
-            </SidebarContent>
-            <SidebarFooter className="bg-[#020617] justify-center h-14 border-t border-white/5 group-data-[collapsible=icon]:justify-center">
-            </SidebarFooter>
-        </Sidebar>
-        <SidebarInset className="bg-[#020617] min-h-screen">
-            <header className="flex h-14 items-center gap-4 border-b border-white/5 bg-[#020617]/95 backdrop-blur-md px-4 lg:h-[60px] lg:px-6 sticky top-0 z-30">
-            <SidebarTrigger className="shrink-0 text-white" />
-            {getBreadcrumb()}
-            <div className="ml-auto flex items-center gap-2">
-                <NotificationBell />
-                <UserNav />
-            </div>
-            </header>
-            <main className="flex-1 p-4 sm:p-6 overflow-y-auto bg-transparent">
-              {children}
-            </main>
-        </SidebarInset>
-        </SidebarProvider>
+                  return (
+                    <SidebarGroup key={section.label}>
+                      <SidebarGroupLabel className="text-[10px] text-slate-500 font-black uppercase tracking-widest px-4 py-4">
+                        {section.label}
+                      </SidebarGroupLabel>
+                      <SidebarGroupContent>
+                        <SidebarMenu className="px-2">
+                          {accessibleItems.map((item) => (
+                            <SidebarMenuItem key={item.label}>
+                              <SidebarMenuButton
+                                asChild
+                                isActive={pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href))}
+                                tooltip={item.label}
+                                className="data-[active=true]:bg-primary/10 data-[active=true]:text-primary text-slate-400 hover:text-white transition-all h-10"
+                              >
+                                <Link href={item.href}>
+                                  <item.icon />
+                                  <span className="font-bold">{item.label}</span>
+                                </Link>
+                              </SidebarMenuButton>
+                            </SidebarMenuItem>
+                          ))}
+                        </SidebarMenu>
+                      </SidebarGroupContent>
+                    </SidebarGroup>
+                  );
+                })}
+              </SidebarContent>
+              <SidebarFooter className="bg-[#020617] justify-center h-14 border-t border-white/5 group-data-[collapsible=icon]:justify-center">
+              </SidebarFooter>
+          </Sidebar>
+          <SidebarInset className="bg-[#020617] min-h-screen">
+              <header className="flex h-14 items-center gap-4 border-b border-white/5 bg-[#020617]/95 backdrop-blur-md px-4 lg:h-[60px] lg:px-6 sticky top-0 z-30">
+              <SidebarTrigger className="shrink-0 text-white" />
+              {getBreadcrumb()}
+              <div className="ml-auto flex items-center gap-2">
+                  <NotificationBell />
+                  <UserNav />
+              </div>
+              </header>
+              <main className="flex-1 p-4 sm:p-6 overflow-y-auto bg-transparent">
+                {children}
+              </main>
+          </SidebarInset>
+          </SidebarProvider>
+        </LGPDGuard>
     );
 }
 

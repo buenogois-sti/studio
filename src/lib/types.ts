@@ -13,6 +13,8 @@ export type UserProfile = {
   createdAt: Timestamp;
   updatedAt: Timestamp;
   googleRefreshToken?: string;
+  lgpdAccepted?: boolean;
+  lgpdAcceptedAt?: Timestamp;
 };
 
 export type UserRoleInfo = {
