@@ -375,6 +375,8 @@ function LeadDetailsSheet({
     try {
       await updateLeadStatus(lead.id, nextStatus);
       toast({ title: 'Lead Avançado!', description: `Movido para a fase de ${stageConfig[nextStatus].label}.` });
+      // FECHAR AUTOMATICAMENTE AO AVANÇAR
+      onOpenChange(false);
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Erro', description: error.message });
     } finally {
