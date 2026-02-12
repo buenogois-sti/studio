@@ -20,7 +20,6 @@ import {
   MapPin, 
   CreditCard, 
   Briefcase,
-  FileText,
   Calendar,
   AtSign,
   Smartphone,
@@ -36,7 +35,8 @@ import {
   AlertTriangle,
   Receipt,
   Heart,
-  Building
+  Building,
+  FileText
 } from 'lucide-react';
 import type { Client, FinancialTitle } from '@/lib/types';
 import { useToast } from '@/components/ui/use-toast';
@@ -55,7 +55,6 @@ interface ClientDetailsSheetProps {
   onOpenChange: (open: boolean) => void;
 }
 
-// Sub-componente memoizado definido fora para evitar recriação de tipo em cada render
 const InfoRow = React.memo(({ 
   icon: Icon, 
   label, 
@@ -382,7 +381,7 @@ export const ClientDetailsSheet = React.memo(function ClientDetailsSheet({ clien
             </div>
             <div className="font-mono opacity-50">ID: {client.id}</div>
           </div>
-        </div>
+        </Tabs>
       </SheetContent>
     </Sheet>
   );

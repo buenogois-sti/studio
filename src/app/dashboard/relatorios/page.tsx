@@ -248,7 +248,10 @@ export default function RelatoriosPage() {
   const [error, setError] = React.useState<string | null>(null);
   const [reportData, setReportData] = React.useState<any>(null);
 
-  const userProfileRef = useMemoFirebase(() => (firestore && session?.user?.id ? doc(firestore, 'users', session.user.id) : null), [firestore, session]);
+  const userProfileRef = useMemoFirebase(
+    () => (firestore && session?.user?.id ? doc(firestore, 'users', session.user.id) : null),
+    [firestore, session]
+  );
   const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
   const role = userProfile?.role || 'assistant';
 
@@ -277,7 +280,6 @@ export default function RelatoriosPage() {
       const avgCaseValue = allProcesses.length > 0 ? allProcesses.reduce((s, p) => s + (p.caseValue || 0), 0) / allProcesses.length : 0;
       const avgSettlementValue = settlements.length > 0 ? settlements.reduce((s, t) => s + t.value, 0) / settlements.length : 0;
       
-      // Taxa de Procedência baseada em Eventos de Sentença vs Acordo (Simulação em cima de dados reais)
       const ProcedenciaCount = titles.filter(t => t.origin === 'SENTENCA' && t.status === 'PAGO').length;
       const ImprocedenciaCount = allProcesses.filter(p => p.status === 'Arquivado' && !titles.some(t => t.processId === p.id && t.status === 'PAGO')).length;
       const successRate = ProcedenciaCount > 0 ? ((ProcedenciaCount / (ProcedenciaCount + ImprocedenciaCount)) * 100).toFixed(1) : "0";
@@ -292,7 +294,7 @@ export default function RelatoriosPage() {
             nome: `${data.firstName} ${data.lastName.charAt(0)}.`,
             demandas: allProcesses.filter(p => p.leadLawyerId === s.id).length,
             audiencias: hearings.filter(h => h.lawyerId === s.id).length,
-            prazos: 0 // Placeholder
+            prazos: 0 
           };
         });
 
@@ -313,7 +315,7 @@ export default function RelatoriosPage() {
         const mKey = format(t.dueDate instanceof Timestamp ? t.dueDate.toDate() : new Date(t.dueDate as any), 'yyyy-MM');
         const m = months.find(m => m.key === mKey);
         if (m) {
-          if (t.type === 'RECEITA' && t.status === 'PAGO') m.receita += (t.value * 0.3); // Margem Bueno Gois
+          if (t.type === 'RECEITA' && t.status === 'PAGO') m.receita += (t.value * 0.3); 
           if (t.type === 'DESPESA' && t.status === 'PAGO') m.despesa += t.value;
         }
       });
@@ -323,7 +325,7 @@ export default function RelatoriosPage() {
           avgCaseValue,
           avgSettlementValue,
           successRate,
-          avgAging: 14, // Simulação de meses baseada em amostragem
+          avgAging: 14, 
         },
         lawyerPerformance,
         leadCapture,
