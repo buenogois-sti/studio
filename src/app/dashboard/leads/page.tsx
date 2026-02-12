@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -558,7 +557,7 @@ function LeadDetailsSheet({
                   ) : (
                     <div className="text-center py-10 opacity-40 bg-white/[0.02] border border-dashed border-white/10 rounded-2xl">
                       <p className="text-xs font-bold uppercase text-slate-500">Nenhuma entrevista personalizada para {lead.legalArea}.</p>
-                      <p className="text-[10px] mt-1 uppercase">Configure em Checklists > Entrevistas.</p>
+                      <p className="text-[10px] mt-1 uppercase">Configure em Checklists &gt; Entrevistas.</p>
                     </div>
                   )}
                 </div>
@@ -896,17 +895,29 @@ export default function LeadsPage() {
   const [sourceFilter, setSourceFilter] = React.useState<string>('all');
   const [priorityFilter, setPriorityFilter] = React.useState<string>('all');
 
-  const userProfileRef = useMemoFirebase(() => (firestore && user?.uid ? doc(firestore, 'users', user.uid) : null), [firestore, user?.uid]);
+  const userProfileRef = useMemoFirebase(
+    () => (firestore && user?.uid ? doc(firestore, 'users', user.uid) : null),
+    [firestore, user?.uid]
+  );
   const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
 
-  const leadsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'leads'), where('status', '!=', 'CONVERTIDO')) : null), [firestore]);
+  const leadsQuery = useMemoFirebase(
+    () => (firestore ? query(collection(firestore, 'leads'), where('status', '!=', 'CONVERTIDO')) : null),
+    [firestore]
+  );
   const { data: leadsData, isLoading: isLoadingLeads } = useCollection<Lead>(leadsQuery);
 
-  const clientsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'clients'), limit(500)) : null), [firestore]);
+  const clientsQuery = useMemoFirebase(
+    () => (firestore ? query(collection(firestore, 'clients'), limit(500)) : null),
+    [firestore]
+  );
   const { data: clientsData } = useCollection<Client>(clientsQuery);
   const clientsMap = React.useMemo(() => new Map(clientsData?.map(c => [c.id, c])), [clientsData]);
 
-  const staffQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'staff') : null), [firestore]);
+  const staffQuery = useMemoFirebase(
+    () => (firestore ? collection(firestore, 'staff') : null),
+    [firestore]
+  );
   const { data: staffData } = useCollection<Staff>(staffQuery);
   const lawyers = staffData?.filter(s => s.role === 'lawyer' || s.role === 'partner') || [];
   const staffMap = React.useMemo(() => new Map(staffData?.map(s => [s.id, s])), [staffData]);
