@@ -1,3 +1,4 @@
+
 'use server';
 import { firestoreAdmin } from '@/firebase/admin';
 import type { FinancialTitle, Process, FinancialEvent, Staff, StaffCredit, TimelineEvent } from './types';
@@ -127,15 +128,14 @@ export async function updateFinancialTitleStatus(titleId: string, status: 'PAGO'
     }
 }
 
-export async function updateFinancialTitle(id: string, data: Partial<FinancialTitle>) {
+export async function updateFinancialTitle(id: string, data: any) {
   if (!firestoreAdmin) throw new Error("Servidor inacessível.");
   try {
     const titleRef = firestoreAdmin.collection('financial_titles').doc(id);
     
-    // Converte datas se necessário
     const payload = { ...data };
-    if (data.dueDate && !(data.dueDate instanceof Timestamp)) {
-      payload.dueDate = Timestamp.fromDate(new Date(data.dueDate as any));
+    if (data.dueDate) {
+      payload.dueDate = Timestamp.fromDate(new Date(data.dueDate));
     }
 
     await titleRef.update({
@@ -204,7 +204,7 @@ export async function processRepasse(staffId: string, creditIds: string[], total
   return { success: true };
 }
 
-export async function createFinancialTitle(data: Partial<FinancialTitle> & { recurring?: boolean, months?: number }) {
+export async function createFinancialTitle(data: any) {
     if (!firestoreAdmin) throw new Error("Servidor inacessível.");
     try {
         const batch = firestoreAdmin.batch();
@@ -216,17 +216,7 @@ export async function createFinancialTitle(data: Partial<FinancialTitle> & { rec
           resolvedClientId = p.data()?.clientId || null;
         }
 
-        const initialDateValue = baseData.dueDate;
-        let initialDueDate: Date;
-
-        if (typeof initialDateValue === 'string') {
-          initialDueDate = new Date(initialDateValue + 'T12:00:00');
-        } else if (initialDateValue && typeof initialDateValue === 'object' && 'seconds' in initialDateValue) {
-          initialDueDate = new Timestamp((initialDateValue as any).seconds, (initialDateValue as any).nanoseconds).toDate();
-        } else {
-          initialDueDate = new Date(initialDateValue as any);
-        }
-
+        const initialDueDate = new Date(baseData.dueDate);
         const count = recurring ? Math.min(Math.max(months, 1), 24) : 1;
 
         for (let i = 0; i < count; i++) {

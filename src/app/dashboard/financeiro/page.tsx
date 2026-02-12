@@ -1,3 +1,4 @@
+
 'use client';
 import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -104,6 +105,9 @@ const titleFormSchema = z.object({
     'MATERIAL_ESCRITORIO',
     'SERVICOS_TERCEIROS',
     'OUTRAS_DESPESAS',
+    'PERICIA',
+    'DESLOCAMENTO',
+    'ADICIONAL'
   ]),
   value: z.coerce.number().positive('Valor deve ser positivo'),
   dueDate: z.string().min(1, 'Data de vencimento obrigatória'),
@@ -378,19 +382,28 @@ function TitleFormDialog({
 
   React.useEffect(() => {
     if (open && title) {
-      const dateVal = title.dueDate instanceof Timestamp ? title.dueDate.toDate() : new Date(title.dueDate as any);
+      let dateVal: Date;
+      if (title.dueDate instanceof Timestamp) {
+        dateVal = title.dueDate.toDate();
+      } else if (title.dueDate && typeof title.dueDate === 'object' && 'seconds' in title.dueDate) {
+        dateVal = new Date((title.dueDate as any).seconds * 1000);
+      } else {
+        dateVal = new Date(title.dueDate as any);
+      }
+
       form.reset({
-        description: title.description,
-        type: title.type,
-        origin: title.origin,
-        status: title.status,
-        value: title.value,
+        description: title.description || '',
+        type: title.type || 'RECEITA',
+        origin: title.origin as any || 'OUTRAS_DESPESAS',
+        status: title.status || 'PENDENTE',
+        value: title.value || 0,
         dueDate: format(dateVal, 'yyyy-MM-dd'),
         processId: title.processId || '',
         clientId: title.clientId || '',
         recurring: false,
         months: 1
       });
+      
       if (title.processId && firestore) {
         getDocs(query(collection(firestore, 'processes'), where('id', '==', title.processId), limit(1)))
           .then(snap => {
@@ -398,7 +411,18 @@ function TitleFormDialog({
           });
       }
     } else if (open && !title) {
-      form.reset();
+      form.reset({
+        description: '',
+        type: 'RECEITA',
+        origin: 'OUTRAS_DESPESAS',
+        status: 'PENDENTE',
+        value: 0,
+        dueDate: format(new Date(), 'yyyy-MM-dd'),
+        processId: '',
+        clientId: '',
+        recurring: false,
+        months: 1
+      });
       setSelectedProcess(null);
     }
   }, [open, title, form, firestore]);
@@ -439,8 +463,9 @@ function TitleFormDialog({
   const onSubmit = async (values: z.infer<typeof titleFormSchema>) => {
     setIsSaving(true);
     try {
-      const payload = {
+      const payload: any = {
         ...values,
+        dueDate: new Date(values.dueDate + 'T12:00:00'),
         processId: selectedProcess?.id || '',
         clientId: selectedProcess?.clientId || '',
       };
@@ -522,9 +547,12 @@ function TitleFormDialog({
                           <SelectItem value="SUCUMBENCIA">🏆 Honorários de Sucumbência</SelectItem>
                           <SelectItem value="ACORDO">🤝 Acordo / Liquidação</SelectItem>
                           <SelectItem value="CUSTAS_PROCESSUAIS">📄 Custas Judiciais</SelectItem>
+                          <SelectItem value="PERICIA">🔍 Perícia Técnica</SelectItem>
+                          <SelectItem value="DESLOCAMENTO">🚗 Deslocamento/Diligência</SelectItem>
                           
                           <DropdownMenuSeparator className="bg-white/5" />
                           <SelectItem value="OUTRAS_DESPESAS">📦 Outras Operações</SelectItem>
+                          <SelectItem value="ADICIONAL">➕ Adicional / Extra</SelectItem>
                         </SelectContent>
                       </Select>
                     </FormItem>
@@ -793,7 +821,8 @@ export default function FinanceiroPage() {
         };
       }
       
-      const isOverdue = t.status !== 'PAGO' && isBefore(t.dueDate instanceof Timestamp ? t.dueDate.toDate() : new Date(t.dueDate as any), now);
+      const dueDate = t.dueDate instanceof Timestamp ? t.dueDate.toDate() : (t.dueDate && typeof t.dueDate === 'object' && 'seconds' in t.dueDate) ? new Date((t.dueDate as any).seconds * 1000) : new Date(t.dueDate as any);
+      const isOverdue = t.status !== 'PAGO' && isBefore(dueDate, now);
       if (isOverdue) groups[key].hasOverdue = true;
 
       groups[key].titles.push(t);
@@ -997,7 +1026,8 @@ export default function FinanceiroPage() {
                     </TableHeader>
                     <TableBody>
                       {group.titles.map(t => {
-                        const isOverdue = t.status !== 'PAGO' && isBefore(t.dueDate instanceof Timestamp ? t.dueDate.toDate() : new Date(t.dueDate as any), startOfDay(new Date()));
+                        const dueDate = t.dueDate instanceof Timestamp ? t.dueDate.toDate() : (t.dueDate && typeof t.dueDate === 'object' && 'seconds' in t.dueDate) ? new Date((t.dueDate as any).seconds * 1000) : new Date(t.dueDate as any);
+                        const isOverdue = t.status !== 'PAGO' && isBefore(dueDate, now);
                         return (
                           <TableRow key={t.id} className={cn(
                             "border-white/5 hover:bg-white/5 transition-colors",
@@ -1007,7 +1037,7 @@ export default function FinanceiroPage() {
                               <span className={cn("font-bold text-xs", isOverdue ? "text-rose-400" : "text-slate-200")}>{t.description}</span>
                             </TableCell>
                             <TableCell className={cn("text-[10px] font-mono", isOverdue ? "text-rose-500 font-black" : "text-slate-400")}>
-                              {format(t.dueDate instanceof Timestamp ? t.dueDate.toDate() : new Date(t.dueDate as any), 'dd/MM/yyyy')}
+                              {format(dueDate, 'dd/MM/yyyy')}
                             </TableCell>
                             <TableCell className="text-center">
                               <Badge variant="outline" className={cn(
@@ -1123,49 +1153,52 @@ export default function FinanceiroPage() {
                   Array.from({ length: 3 }).map((_, i) => (
                     <TableRow key={i}><TableCell colSpan={5}><Skeleton className="h-8 w-full bg-white/5" /></TableCell></TableRow>
                   ))
-                ) : (titlesData?.filter(t => t.type === 'DESPESA').map(t => (
-                  <TableRow key={t.id} className="border-white/5 hover:bg-white/5 transition-colors">
-                    <TableCell className="px-6 font-bold text-white text-sm">{t.description}</TableCell>
-                    <TableCell className="text-xs text-slate-400 font-mono">
-                      {format(t.dueDate instanceof Timestamp ? t.dueDate.toDate() : new Date(t.dueDate as any), 'dd/MM/yyyy')}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <Badge variant="outline" className={cn("text-[9px] font-black uppercase px-2 h-6 border-none", t.status === 'PAGO' ? 'bg-rose-500/20 text-rose-400' : 'bg-amber-500/20 text-amber-400')}>
-                        {t.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right font-black text-rose-400 text-sm tabular-nums">
-                      {formatCurrency(t.value)}
-                    </TableCell>
-                    <TableCell className="text-right px-6">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-white/30 hover:text-white rounded-full">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="bg-card border-border p-1">
-                          {t.status !== 'PAGO' ? (
-                            <DropdownMenuItem onClick={() => handleUpdateStatus(t.id, 'PAGO')} className="gap-2 cursor-pointer focus:bg-emerald-500/10">
-                              <Check className="mr-2 h-4 w-4 text-emerald-500" /> <span className="font-bold">Confirmar Saída</span>
+                ) : (titlesData?.filter(t => t.type === 'DESPESA').map(t => {
+                  const dueDate = t.dueDate instanceof Timestamp ? t.dueDate.toDate() : (t.dueDate && typeof t.dueDate === 'object' && 'seconds' in t.dueDate) ? new Date((t.dueDate as any).seconds * 1000) : new Date(t.dueDate as any);
+                  return (
+                    <TableRow key={t.id} className="border-white/5 hover:bg-white/5 transition-colors">
+                      <TableCell className="px-6 font-bold text-white text-sm">{t.description}</TableCell>
+                      <TableCell className="text-xs text-slate-400 font-mono">
+                        {format(dueDate, 'dd/MM/yyyy')}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge variant="outline" className={cn("text-[9px] font-black uppercase px-2 h-6 border-none", t.status === 'PAGO' ? 'bg-rose-500/20 text-rose-400' : 'bg-amber-500/20 text-amber-400')}>
+                          {t.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right font-black text-rose-400 text-sm tabular-nums">
+                        {formatCurrency(t.value)}
+                      </TableCell>
+                      <TableCell className="text-right px-6">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-white/30 hover:text-white rounded-full">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="bg-card border-border p-1">
+                            {t.status !== 'PAGO' ? (
+                              <DropdownMenuItem onClick={() => handleUpdateStatus(t.id, 'PAGO')} className="gap-2 cursor-pointer focus:bg-emerald-500/10">
+                                <Check className="mr-2 h-4 w-4 text-emerald-500" /> <span className="font-bold">Confirmar Saída</span>
+                              </DropdownMenuItem>
+                            ) : (
+                              <DropdownMenuItem onClick={() => handleUpdateStatus(t.id, 'PENDENTE')} className="gap-2 cursor-pointer focus:bg-amber-500/10">
+                                <RefreshCw className="mr-2 h-4 w-4 text-amber-500" /> <span className="font-bold">Estornar Saída</span>
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuSeparator className="bg-white/5" />
+                            <DropdownMenuItem onClick={() => { setTitleToEdit(t); setIsFormOpen(true); }} className="gap-2 cursor-pointer">
+                              <Edit className="h-4 w-4 text-blue-400" /> <span className="font-bold">Editar</span>
                             </DropdownMenuItem>
-                          ) : (
-                            <DropdownMenuItem onClick={() => handleUpdateStatus(t.id, 'PENDENTE')} className="gap-2 cursor-pointer focus:bg-amber-500/10">
-                              <RefreshCw className="mr-2 h-4 w-4 text-amber-500" /> <span className="font-bold">Estornar Saída</span>
+                            <DropdownMenuItem onClick={() => setTitleToEditDelete(t)} className="gap-2 cursor-pointer text-rose-500 focus:bg-rose-500/10">
+                              <Trash2 className="h-4 w-4" /> <span className="font-bold">Excluir</span>
                             </DropdownMenuItem>
-                          )}
-                          <DropdownMenuSeparator className="bg-white/5" />
-                          <DropdownMenuItem onClick={() => { setTitleToEdit(t); setIsFormOpen(true); }} className="gap-2 cursor-pointer">
-                            <Edit className="h-4 w-4 text-blue-400" /> <span className="font-bold">Editar</span>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => setTitleToEditDelete(t)} className="gap-2 cursor-pointer text-rose-500 focus:bg-rose-500/10">
-                            <Trash2 className="h-4 w-4" /> <span className="font-bold">Excluir</span>
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                )))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  )
+                }))}
               </TableBody>
             </Table>
           </Card>

@@ -238,8 +238,8 @@ export type FinancialTitle = {
     | 'DESLOCAMENTO'
     | 'ADICIONAL';
   value: number;
-  dueDate: Date | Timestamp;
-  paymentDate?: Timestamp;
+  dueDate: any;
+  paymentDate?: any;
   status: 'PENDENTE' | 'PAGO' | 'ATRASADO';
   paidToStaffId?: string;
 };
