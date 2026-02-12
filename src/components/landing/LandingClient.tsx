@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { 
@@ -25,10 +25,8 @@ import {
   Quote, 
   CheckCircle2,
   Instagram,
-  Scale,
   AtSign,
   ShieldCheck,
-  Lock,
   Smartphone
 } from 'lucide-react';
 import { WhatsAppFloating } from '@/components/WhatsAppFloating';
@@ -122,7 +120,7 @@ const testimonials = [
     },
     {
         name: 'João Carlos Lima',
-        text: 'Sofri um acidente feio na fábrica e me descartaram como se eu fosse lixo. Esse escritório me devolveu a dignidade. O processo demorou o tempo da justiça, mas eles nunca me deixaram sem resposta. Pode confiar sem medo.',
+        text: 'Sofri um acidente feio na fábrica e me descartaram como se eu fosse lixo. Esse escritório me devolveru a dignidade. O processo demorou o tempo da justiça, mas eles nunca me deixaram sem resposta. Pode confiar sem medo.',
     },
     {
         name: 'Eliana Mendes',
@@ -130,62 +128,35 @@ const testimonials = [
     }
 ]
 
-function useScrollPosition() {
-  const [scrollPosition, setScrollPosition] = useState(0);
-
-  useEffect(() => {
-    let rafId: number;
-    let lastScrollY = 0;
-
-    const handleScroll = () => {
-      if (rafId) {
-        cancelAnimationFrame(rafId);
-      }
-      
-      rafId = requestAnimationFrame(() => {
-        const currentScrollY = window.scrollY;
-        // Debounce: Só atualiza se o scroll mudou mais que 10px para aliviar o processamento
-        if (Math.abs(currentScrollY - lastScrollY) > 10) {
-          setScrollPosition(currentScrollY);
-          lastScrollY = currentScrollY;
-        }
-      });
-    };
-
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-      if (rafId) cancelAnimationFrame(rafId);
-    };
-  }, []);
-
-  return scrollPosition;
-}
-
-function useIntersectionObserver(options = {}) {
+// Hook de interseção estabilizado para evitar loops de renderização
+function useIntersectionObserver(options?: IntersectionObserverInit) {
   const [ref, setRef] = useState<HTMLElement | null>(null);
   const [isIntersecting, setIsIntersecting] = useState(false);
+  const optionsRef = useRef(options);
 
   useEffect(() => {
     if (!ref) return;
 
     const observer = new IntersectionObserver(([entry]) => {
       setIsIntersecting(entry.isIntersecting);
-    }, { threshold: 0.1, ...options });
+    }, optionsRef.current);
 
     observer.observe(ref);
     return () => observer.disconnect();
-  }, [ref, options]);
+  }, [ref]);
 
   return [setRef, isIntersecting] as const;
 }
 
+// Parallax ultra-otimizado usando Variáveis CSS (0 re-renders de React)
 const ParallaxLayer = React.memo(({ children, speed = 1, className = '' }: { children: React.ReactNode; speed?: number; className?: string }) => {
-  const scrollY = useScrollPosition();
-  const transform = useMemo(() => `translateY(${Math.round(scrollY * speed * 10) / 10}px)`, [scrollY, speed]);
-
   return (
-    <div className={className} style={{ transform, willChange: 'transform' }}>
+    <div 
+      className={cn("will-change-transform", className)} 
+      style={{ 
+        transform: `translateY(calc(var(--scroll-y, 0) * ${speed}))`,
+      }}
+    >
       {children}
     </div>
   );
@@ -213,9 +184,9 @@ AnimatedSection.displayName = 'AnimatedSection';
 
 const FloatingParticles = React.memo(() => {
   const particles = useMemo(() => 
-    Array.from({ length: 8 }, (_, i) => ({
+    Array.from({ length: 6 }, (_, i) => ({
       id: i,
-      size: Math.random() * 3 + 2,
+      size: Math.random() * 2 + 2,
       x: Math.random() * 100,
       y: Math.random() * 100,
       duration: Math.random() * 15 + 10,
@@ -224,7 +195,7 @@ const FloatingParticles = React.memo(() => {
   );
 
   return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-40">
+    <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-30">
       {particles.map((particle) => (
         <div
           key={particle.id}
@@ -241,8 +212,8 @@ const FloatingParticles = React.memo(() => {
       ))}
       <style jsx>{`
         @keyframes float {
-          0%, 100% { transform: translate(0, 0); opacity: 0.4; }
-          50% { transform: translate(-15px, 15px); opacity: 0.6; }
+          0%, 100% { transform: translate(0, 0); opacity: 0.3; }
+          50% { transform: translate(-10px, 10px); opacity: 0.5; }
         }
       `}</style>
     </div>
@@ -252,15 +223,15 @@ FloatingParticles.displayName = 'FloatingParticles';
 
 const AnimatedGradientBg = React.memo(() => (
   <div className="absolute inset-0 overflow-hidden pointer-events-none">
-    <div className="absolute -top-1/2 -left-1/2 w-full h-full bg-gradient-to-br from-primary/10 via-transparent to-transparent rounded-full blur-3xl opacity-50" />
-    <div className="absolute top-1/4 right-0 w-96 h-96 bg-gradient-to-bl from-primary/5 via-transparent to-transparent rounded-full blur-2xl opacity-60" />
+    <div className="absolute -top-1/2 -left-1/2 w-full h-full bg-gradient-to-br from-primary/5 via-transparent to-transparent rounded-full blur-3xl opacity-40" />
+    <div className="absolute top-1/4 right-0 w-96 h-96 bg-gradient-to-bl from-primary/5 via-transparent to-transparent rounded-full blur-2xl opacity-40" />
   </div>
 ));
 AnimatedGradientBg.displayName = 'AnimatedGradientBg';
 
 export function LandingClient({ initialSettings, initialSeo }: { initialSettings: any, initialSeo: any }) {
-  const scrollY = useScrollPosition();
   const { firestore } = useFirebase();
+  const [headerBg, setHeaderBg] = useState(false);
   const whatsappUrl = "https://wa.me/5511980590128?text=Olá!%20Vi%20o%20site%20da%20Bueno%20Gois%20Advogados%20e%20gostaria%20de%20saber%20mais%20sobre%20seus%20serviços.";
 
   const settingsRef = useMemoFirebase(() => firestore ? doc(firestore, 'system_settings', 'general') : null, [firestore]);
@@ -269,17 +240,36 @@ export function LandingClient({ initialSettings, initialSeo }: { initialSettings
   const currentSettings = settings || initialSettings;
   const instagramUrl = currentSettings?.instagram || "https://www.instagram.com/buenogoisadvogado/";
 
+  // Único listener de scroll otimizado que atualiza variáveis CSS e estado do header
+  useEffect(() => {
+    let rafId: number;
+    const root = document.documentElement;
+
+    const handleScroll = () => {
+      rafId = requestAnimationFrame(() => {
+        const scrollY = window.scrollY;
+        // Atualiza variável CSS para Parallax sem re-renderizar React
+        root.style.setProperty('--scroll-y', `${scrollY}px`);
+        // Atualiza background do header apenas quando necessário
+        setHeaderBg(scrollY > 50);
+      });
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      cancelAnimationFrame(rafId);
+    };
+  }, []);
+
   return (
     <div className="bg-background text-foreground font-body overflow-x-hidden antialiased">
       {/* Header */}
-      <header className="fixed top-0 left-0 right-0 z-40 transition-all duration-300"
-        style={{
-          background: scrollY > 50 ? 'rgba(3, 7, 18, 0.95)' : 'transparent',
-          backdropFilter: scrollY > 50 ? 'blur(20px)' : 'none',
-          borderBottom: scrollY > 50 ? '1px solid rgba(245, 208, 48, 0.1)' : 'none',
-        }}
-      >
-        <div className="container mx-auto flex items-center justify-between p-4 text-white">
+      <header className={cn(
+        "fixed top-0 left-0 right-0 z-40 transition-all duration-300",
+        headerBg ? "bg-[#030712]/95 backdrop-blur-xl border-b border-white/5 py-2" : "bg-transparent py-4"
+      )}>
+        <div className="container mx-auto flex items-center justify-between px-4 text-white">
           <LandingLogo />
           
           <nav className="hidden md:flex items-center space-x-8 text-sm font-medium">
@@ -312,8 +302,8 @@ export function LandingClient({ initialSettings, initialSeo }: { initialSettings
           <div className="container mx-auto relative z-10 pt-32 pb-20 px-4">
             <div className="grid lg:grid-cols-2 gap-12 items-center">
               <AnimatedSection delay={200} className="relative">
-                <div className="relative h-[600px]">
-                  <ParallaxLayer speed={0.05}>
+                <div className="relative h-[600px] flex items-center justify-center">
+                  <ParallaxLayer speed={0.03} className="w-full">
                     <div className="relative h-[600px]">
                       <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-primary/5 rounded-3xl blur-3xl" />
                       <img
@@ -321,7 +311,7 @@ export function LandingClient({ initialSettings, initialSeo }: { initialSettings
                         alt="Dr. Alan Bueno De Gois - Advogado Trabalhista Especialista em SBC"
                         width={500}
                         height={600}
-                        className="relative object-contain object-bottom filter drop-shadow-[0_35px_60px_rgba(245,208,48,0.3)]"
+                        className="relative object-contain object-bottom filter drop-shadow-[0_35px_60px_rgba(245,208,48,0.3)] mx-auto"
                         loading="eager"
                       />
                     </div>
@@ -398,7 +388,7 @@ export function LandingClient({ initialSettings, initialSeo }: { initialSettings
               {services.map((service, index) => {
                 const Icon = service.icon;
                 return (
-                  <AnimatedSection key={index} delay={index * 100}>
+                  <AnimatedSection key={index} delay={index * 50}>
                     <Card className="group relative bg-white border-2 border-gray-150 p-8 flex flex-col h-full hover:border-primary/40 transition-all duration-300 hover:shadow-2xl cursor-pointer shadow-sm">
                       <div className="w-16 h-16 rounded-xl bg-primary/10 flex items-center justify-center mb-6 group-hover:bg-primary transition-all duration-300">
                         <Icon className="w-8 h-8 text-primary group-hover:text-primary-foreground transition-colors" />
@@ -533,12 +523,12 @@ export function LandingClient({ initialSettings, initialSeo }: { initialSettings
         </section>
       </main>
 
-      {/* Footer Evoluído */}
+      {/* Footer */}
       <footer className="relative bg-[#020617] text-white pt-24 pb-12 border-t-2 border-primary/30">
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 lg:gap-8 mb-16">
             
-            {/* Coluna 1: Branding */}
+            {/* Branding */}
             <div className="space-y-6">
               <div className="p-2 rounded-xl inline-block bg-[#152c4b] shadow-inner border border-white/5">
                 <img src="/logo.png" alt="Bueno Gois" className="h-16 w-auto" />
@@ -557,7 +547,7 @@ export function LandingClient({ initialSettings, initialSeo }: { initialSettings
               </div>
             </div>
 
-            {/* Coluna 2: Especialidades */}
+            {/* Especialidades */}
             <div className="space-y-6">
               <h4 className="text-xs font-black uppercase tracking-[0.2em] text-primary flex items-center gap-2">
                 <ShieldCheck className="h-4 w-4" /> Especialidades
@@ -572,7 +562,7 @@ export function LandingClient({ initialSettings, initialSeo }: { initialSettings
               </ul>
             </div>
 
-            {/* Coluna 3: Links Rápidos */}
+            {/* Links Rápidos */}
             <div className="space-y-6">
               <h4 className="text-xs font-black uppercase tracking-[0.2em] text-primary flex items-center gap-2">
                 <Building className="h-4 w-4" /> Escritório
@@ -587,7 +577,7 @@ export function LandingClient({ initialSettings, initialSeo }: { initialSettings
               </ul>
             </div>
 
-            {/* Coluna 4: Contato */}
+            {/* Contato */}
             <div className="space-y-6">
               <h4 className="text-xs font-black uppercase tracking-[0.2em] text-primary flex items-center gap-2">
                 <Smartphone className="h-4 w-4" /> Contato
@@ -605,7 +595,7 @@ export function LandingClient({ initialSettings, initialSeo }: { initialSettings
                 </div>
                 <div className="flex items-center gap-3">
                   <MessageCircle className="h-5 w-5 text-primary shrink-0" />
-                  <p className="font-bold text-white text-xs">011 9 8059-0128 | 011 96085-6744</p>
+                  <p className="font-bold text-white text-xs">011 9 8059-0128</p>
                 </div>
                 <div className="pt-4">
                   <Badge variant="outline" className="border-emerald-500/20 text-emerald-400 bg-emerald-500/5 text-[9px] font-black uppercase py-1 px-3">
@@ -620,7 +610,7 @@ export function LandingClient({ initialSettings, initialSeo }: { initialSettings
             <p>&copy; {new Date().getFullYear()} {currentSettings?.officeName || 'Bueno Gois Advogados e Associados'} </p>
             <div className="flex gap-8">
               <Link href="/login" className="hover:text-primary transition-colors flex items-center gap-1.5 group">
-                <Lock className="h-3 w-3 opacity-50 group-hover:opacity-100" /> Área do Advogado
+                <span className="opacity-50 group-hover:opacity-100">🔒</span> Área do Advogado
               </Link>
               <Link href="#" className="hover:text-primary transition-colors">Privacidade</Link>
               <p className="text-primary/40">Powered by LexFlow Elite</p>

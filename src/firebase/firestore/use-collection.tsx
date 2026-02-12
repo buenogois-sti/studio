@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -29,7 +30,7 @@ export interface UseCollectionResult<T> {
   data: WithId<T>[] | null;
   isLoading: boolean;
   error: any | null;
-  isStale: boolean; // Indica se os dados vieram do cache e estão sendo revalidados
+  isStale: boolean;
 }
 
 export interface InternalQuery extends Query<DocumentData> {
@@ -44,9 +45,9 @@ function getQueryKey(query: CollectionReference<DocumentData> | Query<DocumentDa
   if (query.type === 'collection') {
     return (query as CollectionReference).path;
   }
-  // Tenta extrair a string canônica da query para servir como chave única
   try {
-    return (query as unknown as InternalQuery)._query.path.canonicalString() + JSON.stringify((query as any)._query.filters || '');
+    const q = query as any;
+    return q._query?.path?.canonicalString() || query.toString();
   } catch (e) {
     return query.toString();
   }
@@ -62,20 +63,19 @@ export function useCollection<T = any>(
     isStale: false
   });
 
+  const lastKeyRef = useRef<string>('');
+
   useEffect(() => {
     if (!memoizedQuery) {
       setState({ data: null, isLoading: false, error: null, isStale: false });
       return;
     }
 
-    if (!memoizedQuery.__memo) {
-      console.warn('[useCollection] Query não memoizada detectada. Use useMemoFirebase para evitar loops.');
-    }
-
     const key = getQueryKey(memoizedQuery);
+    lastKeyRef.current = key;
+    
     let cacheEntry = queryCache.get(key);
 
-    // Se já temos dados no cache, entrega imediatamente (SWR)
     if (cacheEntry && cacheEntry.lastData) {
       setState({
         data: cacheEntry.lastData,
@@ -138,10 +138,12 @@ export function useCollection<T = any>(
       if (cacheEntry) {
         cacheEntry.listeners.delete(onUpdate);
         // Delay para remover a subscrição (mantém cache vivo em navegações rápidas)
+        const currentKey = lastKeyRef.current;
         setTimeout(() => {
-          if (cacheEntry && cacheEntry.listeners.size === 0) {
-            cacheEntry.unsubscribe();
-            queryCache.delete(key);
+          const freshEntry = queryCache.get(currentKey);
+          if (freshEntry && freshEntry.listeners.size === 0) {
+            freshEntry.unsubscribe();
+            queryCache.delete(currentKey);
           }
         }, 5000);
       }
