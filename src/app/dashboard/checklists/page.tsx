@@ -84,6 +84,68 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { searchProcesses } from '@/lib/process-actions';
 
+// Componente de Card memoizado para performance
+const ChecklistCard = React.memo(({ 
+  template, 
+  isAdmin, 
+  onEdit, 
+  onExecute, 
+  onDelete 
+}: { 
+  template: ChecklistTemplate; 
+  isAdmin: boolean; 
+  onEdit: (t: ChecklistTemplate) => void;
+  onExecute: (t: ChecklistTemplate) => void;
+  onDelete: (id: string) => void;
+}) => (
+  <Card className="bg-[#0f172a] border-white/5 border-2 hover:border-primary/20 transition-all group overflow-hidden">
+    <CardHeader className="pb-2">
+      <div className="flex items-start justify-between">
+        <div className="flex flex-wrap gap-1.5">
+          <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 text-[9px] font-black uppercase tracking-widest">{template.category}</Badge>
+          {template.legalArea && (
+            <Badge variant="secondary" className="bg-blue-500/10 text-blue-400 border-none text-[9px] font-black uppercase tracking-widest">
+              {template.legalArea}
+            </Badge>
+          )}
+        </div>
+        {isAdmin && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-white/20 hover:text-white"><MoreVertical className="h-4 w-4" /></Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="bg-[#0f172a] border-white/10 text-white shadow-2xl p-1">
+              <DropdownMenuItem onClick={() => onEdit(template)} className="gap-2 focus:bg-white/5">
+                <Edit className="h-4 w-4 text-primary" /> Editar Modelo
+              </DropdownMenuItem>
+              <DropdownMenuSeparator className="bg-white/5" />
+              <DropdownMenuItem onClick={() => onDelete(template.id)} className="text-rose-500 gap-2 focus:bg-rose-500/10">
+                <Trash2 className="h-4 w-4" /> Excluir Permanentemente
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+      </div>
+      <CardTitle className="text-lg font-black text-white mt-2 leading-tight group-hover:text-primary transition-colors">{template.title}</CardTitle>
+      <CardDescription className="text-xs text-slate-400 line-clamp-2 mt-1">{template.description}</CardDescription>
+    </CardHeader>
+    <CardContent className="pb-4">
+      <div className="flex items-center gap-2 text-[10px] text-slate-500 font-bold uppercase">
+        <Target className="h-3 w-3 text-primary" /> {template.items.length} Passos de Verificação
+      </div>
+    </CardContent>
+    <CardFooter className="bg-white/5 border-t border-white/5 p-4">
+      <Button 
+        className="w-full bg-white/5 hover:bg-primary hover:text-primary-foreground font-black uppercase tracking-widest text-[10px] h-10 gap-2 transition-all"
+        onClick={() => onExecute(template)}
+      >
+        <Play className="h-3 w-3" /> Executar Checklist
+      </Button>
+    </CardFooter>
+  </Card>
+));
+ChecklistCard.displayName = 'ChecklistCard';
+
 export default function ChecklistsPage() {
   const { firestore } = useFirebase();
   const { data: session } = useSession();
@@ -115,6 +177,16 @@ export default function ChecklistsPage() {
     const q = searchTerm.toLowerCase();
     return templates.filter(t => t.title.toLowerCase().includes(q) || t.category.toLowerCase().includes(q));
   }, [templates, searchTerm]);
+
+  const handleEditTemplate = React.useCallback((t: ChecklistTemplate) => {
+    setSelectedTemplate(t);
+    setIsEditorOpen(true);
+  }, []);
+
+  const handleExecuteTemplate = React.useCallback((t: ChecklistTemplate) => {
+    setSelectedTemplate(t);
+    setIsExecutorOpen(true);
+  }, []);
 
   return (
     <div className="flex flex-col gap-8 pb-10">
@@ -165,51 +237,14 @@ export default function ChecklistsPage() {
           ) : filteredTemplates.length > 0 ? (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredTemplates.map(template => (
-                <Card key={template.id} className="bg-[#0f172a] border-white/5 border-2 hover:border-primary/20 transition-all group overflow-hidden">
-                  <CardHeader className="pb-2">
-                    <div className="flex items-start justify-between">
-                      <div className="flex flex-wrap gap-1.5">
-                        <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 text-[9px] font-black uppercase tracking-widest">{template.category}</Badge>
-                        {template.legalArea && (
-                          <Badge variant="secondary" className="bg-blue-500/10 text-blue-400 border-none text-[9px] font-black uppercase tracking-widest">
-                            {template.legalArea}
-                          </Badge>
-                        )}
-                      </div>
-                      {isAdmin && (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-white/20 hover:text-white"><MoreVertical className="h-4 w-4" /></Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="bg-[#0f172a] border-white/10 text-white shadow-2xl p-1">
-                            <DropdownMenuItem onClick={() => { setSelectedTemplate(template); setIsEditorOpen(true); }} className="gap-2 focus:bg-white/5">
-                              <Edit className="h-4 w-4 text-primary" /> Editar Modelo
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator className="bg-white/5" />
-                            <DropdownMenuItem onClick={() => deleteChecklistTemplate(template.id)} className="text-rose-500 gap-2 focus:bg-rose-500/10">
-                              <Trash2 className="h-4 w-4" /> Excluir Permanentemente
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      )}
-                    </div>
-                    <CardTitle className="text-lg font-black text-white mt-2 leading-tight group-hover:text-primary transition-colors">{template.title}</CardTitle>
-                    <CardDescription className="text-xs text-slate-400 line-clamp-2 mt-1">{template.description}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="pb-4">
-                    <div className="flex items-center gap-2 text-[10px] text-slate-500 font-bold uppercase">
-                      <Target className="h-3 w-3 text-primary" /> {template.items.length} Passos de Verificação
-                    </div>
-                  </CardContent>
-                  <CardFooter className="bg-white/5 border-t border-white/5 p-4">
-                    <Button 
-                      className="w-full bg-white/5 hover:bg-primary hover:text-primary-foreground font-black uppercase tracking-widest text-[10px] h-10 gap-2 transition-all"
-                      onClick={() => { setSelectedTemplate(template); setIsExecutorOpen(true); }}
-                    >
-                      <Play className="h-3 w-3" /> Executar Checklist
-                    </Button>
-                  </CardFooter>
-                </Card>
+                <ChecklistCard 
+                  key={template.id} 
+                  template={template} 
+                  isAdmin={isAdmin}
+                  onEdit={handleEditTemplate}
+                  onExecute={handleExecuteTemplate}
+                  onDelete={deleteChecklistTemplate}
+                />
               ))}
             </div>
           ) : (
@@ -287,18 +322,21 @@ export default function ChecklistsPage() {
       </Tabs>
 
       <ChecklistEditorDialog 
+        key={selectedTemplate?.id || 'new'}
         open={isEditorOpen} 
         onOpenChange={setIsEditorOpen} 
         template={selectedTemplate}
       />
 
       <ChecklistExecutorDialog 
+        key={selectedTemplate?.id ? `exec-${selectedTemplate.id}` : 'exec-none'}
         open={isExecutorOpen} 
         onOpenChange={setIsExecutorOpen} 
         template={selectedTemplate}
       />
 
       <ChecklistDetailsDialog
+        key={selectedExecution?.id || 'details-none'}
         open={isDetailsOpen}
         onOpenChange={setIsDetailsOpen}
         execution={selectedExecution}
@@ -308,7 +346,7 @@ export default function ChecklistsPage() {
   );
 }
 
-function ChecklistEditorDialog({ open, onOpenChange, template }: { open: boolean; onOpenChange: (o: boolean) => void; template: ChecklistTemplate | null }) {
+const ChecklistEditorDialog = React.memo(function ChecklistEditorDialog({ open, onOpenChange, template }: { open: boolean; onOpenChange: (o: boolean) => void; template: ChecklistTemplate | null }) {
   const [isSaving, setIsSaving] = React.useState(false);
   const [title, setTitle] = React.useState('');
   const [description, setDescription] = React.useState('');
@@ -333,23 +371,23 @@ function ChecklistEditorDialog({ open, onOpenChange, template }: { open: boolean
     }
   }, [template, open]);
 
-  const addItem = () => {
+  const addItem = React.useCallback(() => {
     const newItem: ChecklistItem = {
       id: Math.random().toString(36).substr(2, 9),
       label: '',
       type: 'YES_NO',
       required: true
     };
-    setItems([...items, newItem]);
-  };
+    setItems(prev => [...prev, newItem]);
+  }, []);
 
-  const removeItem = (id: string) => {
-    setItems(items.filter(i => i.id !== id));
-  };
+  const removeItem = React.useCallback((id: string) => {
+    setItems(prev => prev.filter(i => i.id !== id));
+  }, []);
 
-  const updateItem = (id: string, field: keyof ChecklistItem, value: any) => {
-    setItems(items.map(i => i.id === id ? { ...i, [field]: value } : i));
-  };
+  const updateItem = React.useCallback((id: string, field: keyof ChecklistItem, value: any) => {
+    setItems(prev => prev.map(i => i.id === id ? { ...i, [field]: value } : i));
+  }, []);
 
   const handleSave = async () => {
     if (!title || items.length === 0) {
@@ -512,9 +550,9 @@ function ChecklistEditorDialog({ open, onOpenChange, template }: { open: boolean
       </DialogContent>
     </Dialog>
   );
-}
+});
 
-function ChecklistExecutorDialog({ open, onOpenChange, template }: { open: boolean; onOpenChange: (o: boolean) => void; template: ChecklistTemplate | null }) {
+const ChecklistExecutorDialog = React.memo(function ChecklistExecutorDialog({ open, onOpenChange, template }: { open: boolean; onOpenChange: (o: boolean) => void; template: ChecklistTemplate | null }) {
   const [isSaving, setIsSaving] = React.useState(false);
   const [answers, setAnswers] = React.useState<Record<string, any>>({});
   const [observations, setObservations] = React.useState('');
@@ -771,9 +809,9 @@ function ChecklistExecutorDialog({ open, onOpenChange, template }: { open: boole
       </DialogContent>
     </Dialog>
   );
-}
+});
 
-function ChecklistDetailsDialog({ 
+const ChecklistDetailsDialog = React.memo(function ChecklistDetailsDialog({ 
   open, 
   onOpenChange, 
   execution, 
@@ -906,4 +944,4 @@ function ChecklistDetailsDialog({
       </DialogContent>
     </Dialog>
   );
-}
+});
