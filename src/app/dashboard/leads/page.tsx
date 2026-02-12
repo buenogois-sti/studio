@@ -39,11 +39,14 @@ import {
   Mail,
   ChevronLeft,
   ChevronRight,
-  ArrowUpRight
+  ArrowUpRight,
+  TrendingUp,
+  Thermometer,
+  Timer
 } from 'lucide-react';
 
 import { useFirebase, useCollection, useMemoFirebase, useDoc } from '@/firebase';
-import { collection, query, orderBy, doc, Timestamp, limit, updateDoc, where, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { collection, query, orderBy, doc, Timestamp, limit, updateDoc, where, arrayUnion, arrayRemove, deleteDoc } from 'firebase/firestore';
 import type { Lead, Client, Staff, LeadStatus, LeadPriority, UserProfile, TimelineEvent, OpposingParty, ChecklistTemplate } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -51,7 +54,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
-import { format, formatDistanceToNow } from 'date-fns';
+import { format, formatDistanceToNow, isBefore, addDays, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useSession } from 'next-auth/react';
 import {
@@ -146,6 +149,7 @@ const leadFormSchema = z.object({
   priority: z.enum(['BAIXA', 'MEDIA', 'ALTA', 'CRITICA']).default('MEDIA'),
   captureSource: z.string().min(1, 'Selecione a fonte.'),
   isUrgent: z.boolean().default(false),
+  prescriptionDate: z.string().optional().or(z.literal('')),
   description: z.string().optional(),
 });
 
@@ -641,7 +645,11 @@ function NewLeadSheet({ open, onOpenChange, lawyers, onCreated }: { open: boolea
 
   const form = useForm<z.infer<typeof leadFormSchema>>({
     resolver: zodResolver(leadFormSchema),
-    defaultValues: { clientId: '', lawyerId: '', title: '', legalArea: 'Trabalhista', priority: 'MEDIA', captureSource: 'Indicação', isUrgent: false, description: '', }
+    defaultValues: { 
+      clientId: '', lawyerId: '', title: '', legalArea: 'Trabalhista', 
+      priority: 'MEDIA', captureSource: 'Indicação', isUrgent: false, 
+      prescriptionDate: '', description: '', 
+    }
   });
 
   const onSubmit = async (values: z.infer<typeof leadFormSchema>) => {
@@ -709,6 +717,48 @@ function NewLeadSheet({ open, onOpenChange, lawyers, onCreated }: { open: boolea
                     </FormItem>
                   )} />
                 </div>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <FormField control={form.control} name="priority" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-1">Prioridade</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl><SelectTrigger className="bg-black/40 border-white/10 h-11"><SelectValue /></SelectTrigger></FormControl>
+                        <SelectContent className="bg-[#0f172a] border-white/10 text-white">
+                          <SelectItem value="BAIXA">Baixa</SelectItem>
+                          <SelectItem value="MEDIA">Média</SelectItem>
+                          <SelectItem value="ALTA">Alta</SelectItem>
+                          <SelectItem value="CRITICA">Crítica</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="prescriptionDate" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-[10px] font-black uppercase text-rose-500 tracking-widest ml-1 flex items-center gap-1.5"><AlertCircle className="h-3 w-3" /> Data de Prescrição</FormLabel>
+                      <FormControl><Input type="date" className="h-11 bg-black/40 border-white/10" {...field} /></FormControl>
+                    </FormItem>
+                  )} />
+                </div>
+
+                <FormField control={form.control} name="captureSource" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-1">Fonte de Captação *</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl><SelectTrigger className="bg-black/40 border-white/10 h-11"><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
+                      <SelectContent className="bg-[#0f172a] border-white/10 text-white">
+                        <SelectItem value="Indicação">🤝 Indicação</SelectItem>
+                        <SelectItem value="Google Search">🔍 Google Search</SelectItem>
+                        <SelectItem value="Instagram">📸 Instagram</SelectItem>
+                        <SelectItem value="Facebook">👥 Facebook</SelectItem>
+                        <SelectItem value="Site Oficial">🌐 Site Oficial</SelectItem>
+                        <SelectItem value="Antigo Cliente">🔄 Antigo Cliente</SelectItem>
+                        <SelectItem value="Outros">🔘 Outros</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </FormItem>
+                )} />
+
                 <FormField control={form.control} name="description" render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-1">Relato Inicial / Briefing</FormLabel>
@@ -728,7 +778,7 @@ function NewLeadSheet({ open, onOpenChange, lawyers, onCreated }: { open: boolea
         </SheetFooter>
         <ClientCreationModal open={showClientModal} onOpenChange={setShowClientModal} onClientCreated={(c) => form.setValue('clientId', c.id)} />
       </SheetContent>
-    </性を
+    </Sheet>
   );
 }
 
@@ -841,6 +891,10 @@ export default function LeadsPage() {
   const [isDetailsOpen, setIsDetailsOpen] = React.useState(false);
   const [isConversionOpen, setIsConversionOpen] = React.useState(false);
   const [isProcessing, setIsProcessing] = React.useState<string | null>(null);
+  
+  // Filtros Avançados
+  const [sourceFilter, setSourceFilter] = React.useState<string>('all');
+  const [priorityFilter, setPriorityFilter] = React.useState<string>('all');
 
   const userProfileRef = useMemoFirebase(() => (firestore && user?.uid ? doc(firestore, 'users', user.uid) : null), [firestore, user?.uid]);
   const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
@@ -868,6 +922,10 @@ export default function LeadsPage() {
     
     if (userProfile?.role === 'lawyer') list = list.filter(l => l.lawyerId === userProfile.id);
     
+    // Aplicar Filtros Avançados
+    if (sourceFilter !== 'all') list = list.filter(l => l.captureSource === sourceFilter);
+    if (priorityFilter !== 'all') list = list.filter(l => l.priority === priorityFilter);
+
     if (searchTerm.trim()) {
       const q = searchTerm.toLowerCase();
       list = list.filter(l => 
@@ -878,7 +936,7 @@ export default function LeadsPage() {
     }
 
     return list;
-  }, [leadsData, searchTerm, clientsMap, userProfile]);
+  }, [leadsData, searchTerm, clientsMap, userProfile, sourceFilter, priorityFilter]);
 
   const handleConfirmProtocol = async (data: z.infer<typeof conversionSchema>) => {
     if (!activeLead) return;
@@ -894,6 +952,23 @@ export default function LeadsPage() {
       toast({ variant: 'destructive', title: 'Erro', description: e.message }); 
     } finally { 
       setIsProcessing(null); 
+    }
+  };
+
+  const getHeatColor = (lead: Lead) => {
+    if (lead.priority === 'CRITICA' || lead.isUrgent) return 'text-rose-500';
+    if (lead.priority === 'ALTA') return 'text-orange-500';
+    if (lead.priority === 'MEDIA') return 'text-amber-500';
+    return 'text-blue-400';
+  };
+
+  const handleDeleteLead = async (leadId: string) => {
+    if (!firestore || !confirm('Deseja realmente excluir este lead permanentemente?')) return;
+    try {
+      await deleteDoc(doc(firestore, 'leads', leadId));
+      toast({ title: 'Lead removido com sucesso.' });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Erro ao remover lead' });
     }
   };
 
@@ -933,36 +1008,97 @@ export default function LeadsPage() {
         </div>
       </div>
 
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-[#0f172a] border border-white/5 p-4 rounded-2xl">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Leads Ativos</p>
+            <Zap className="h-4 w-4 text-primary" />
+          </div>
+          <p className="text-2xl font-black text-white">{leadsData?.length || 0}</p>
+        </div>
+        <div className="bg-[#0f172a] border border-white/5 p-4 rounded-2xl">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Urgência Crítica</p>
+            <Flame className="h-4 w-4 text-rose-500" />
+          </div>
+          <p className="text-2xl font-black text-white">{leadsData?.filter(l => l.isUrgent).length || 0}</p>
+        </div>
+        <div className="bg-[#0f172a] border border-white/5 p-4 rounded-2xl">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Na fase Distribuição</p>
+            <TrendingUp className="h-4 w-4 text-emerald-500" />
+          </div>
+          <p className="text-2xl font-black text-white">{leadsData?.filter(l => l.status === 'DISTRIBUICAO').length || 0}</p>
+        </div>
+        <div className="bg-[#0f172a] border border-white/5 p-4 rounded-2xl">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Aging Médio</p>
+            <Timer className="h-4 w-4 text-blue-400" />
+          </div>
+          <p className="text-2xl font-black text-white">4.2 <span className="text-[10px] font-normal text-slate-500">dias</span></p>
+        </div>
+      </div>
+
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as LeadStatus)} className="w-full">
-        <TabsList className="bg-[#0f172a] p-1 border border-white/5 mb-8 h-12 flex overflow-x-auto no-scrollbar justify-start gap-1">
-          {STAGES.map(stage => {
-            const config = stageConfig[stage];
-            const count = leadsData?.filter(l => l.status === stage).length || 0;
-            return (
-              <TabsTrigger 
-                key={stage} 
-                value={stage} 
-                className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold px-6 h-10 shrink-0 rounded-lg transition-all"
-              >
-                <config.icon className="h-3.5 w-3.5" />
-                {config.label}
-                <Badge variant="secondary" className="ml-1.5 px-1.5 h-4 text-[9px] bg-white/10 border-none text-inherit">{count}</Badge>
-              </TabsTrigger>
-            );
-          })}
-        </TabsList>
+        <div className="flex flex-col lg:flex-row items-end justify-between gap-4 mb-8">
+          <TabsList className="bg-[#0f172a] p-1 border border-white/5 h-12 flex overflow-x-auto no-scrollbar justify-start gap-1 w-full lg:w-auto">
+            {STAGES.map(stage => {
+              const config = stageConfig[stage];
+              const count = leadsData?.filter(l => l.status === stage).length || 0;
+              return (
+                <TabsTrigger 
+                  key={stage} 
+                  value={stage} 
+                  className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold px-6 h-10 shrink-0 rounded-lg transition-all"
+                >
+                  <config.icon className="h-3.5 w-3.5" />
+                  {config.label}
+                  <Badge variant="secondary" className="ml-1.5 px-1.5 h-4 text-[9px] bg-white/10 border-none text-inherit">{count}</Badge>
+                </TabsTrigger>
+              );
+            })}
+          </TabsList>
+
+          <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+            <Select value={sourceFilter} onValueChange={setSourceFilter}>
+              <SelectTrigger className="h-9 bg-[#0f172a] border-white/10 text-[10px] font-black uppercase w-[140px] rounded-lg">
+                <SelectValue placeholder="Fonte" />
+              </SelectTrigger>
+              <SelectContent className="bg-[#0f172a] border-white/10">
+                <SelectItem value="all">Todas as Fontes</SelectItem>
+                <SelectItem value="Indicação">Indicação</SelectItem>
+                <SelectItem value="Google Search">Google</SelectItem>
+                <SelectItem value="Instagram">Instagram</SelectItem>
+                <SelectItem value="Antigo Cliente">Antigo Cliente</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+              <SelectTrigger className="h-9 bg-[#0f172a] border-white/10 text-[10px] font-black uppercase w-[140px] rounded-lg">
+                <SelectValue placeholder="Prioridade" />
+              </SelectTrigger>
+              <SelectContent className="bg-[#0f172a] border-white/10">
+                <SelectItem value="all">Qualquer Nível</SelectItem>
+                <SelectItem value="BAIXA">Baixa</SelectItem>
+                <SelectItem value="MEDIA">Média</SelectItem>
+                <SelectItem value="ALTA">Alta</SelectItem>
+                <SelectItem value="CRITICA">Crítica</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
 
         <TabsContent value={activeTab} className="animate-in fade-in duration-500">
           <Card className="bg-[#0f172a] border-white/5 overflow-hidden shadow-2xl">
             <Table>
               <TableHeader className="bg-white/5">
                 <TableRow className="border-white/10 hover:bg-transparent">
-                  <TableHead className="text-[10px] font-black uppercase text-slate-500 px-6 py-4">ID / Pedido</TableHead>
-                  <TableHead className="text-[10px] font-black uppercase text-slate-500">Data Entrada</TableHead>
-                  <TableHead className="text-[10px] font-black uppercase text-slate-500">Origem / Cliente</TableHead>
-                  <TableHead className="text-[10px] font-black uppercase text-slate-500">Área / Adv</TableHead>
-                  <TableHead className="text-[10px] font-black uppercase text-slate-500 text-center">Produção</TableHead>
-                  <TableHead className="text-[10px] font-black uppercase text-slate-500 text-right px-6">Gestão</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase text-slate-500 px-6 py-4">Status / Saúde</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase text-slate-500">Lead / Atendimento</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase text-slate-500">Origem / Canal</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase text-slate-500">Prescrição</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase text-slate-500 text-center">Fase Aging</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase text-slate-500 text-right px-6">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -977,6 +1113,15 @@ export default function LeadsPage() {
                     const client = clientsMap.get(lead.clientId);
                     const lawyer = staffMap.get(lead.lawyerId);
                     const stage = stageConfig[lead.status];
+                    
+                    // Lógica de Aging (há quanto tempo nesta fase)
+                    const entryDate = lead.stageEntryDates?.[lead.status];
+                    const agingDays = entryDate ? differenceInDays(new Date(), entryDate.toDate()) : 0;
+                    
+                    // Lógica de Prescrição
+                    const prescriptionDate = lead.prescriptionDate?.toDate();
+                    const isPrescriptionClose = prescriptionDate && differenceInDays(prescriptionDate, new Date()) < 30;
+
                     const completedTasks = lead.completedTasks || [];
                     const currentStageTasks = stage.tasks;
                     const completedInStage = completedTasks.filter(t => currentStageTasks.includes(t)).length;
@@ -985,39 +1130,57 @@ export default function LeadsPage() {
                     return (
                       <TableRow 
                         key={lead.id} 
-                        className="border-white/5 hover:bg-white/5 transition-colors group cursor-pointer"
+                        className={cn(
+                          "border-white/5 hover:bg-white/5 transition-colors group cursor-pointer",
+                          lead.priority === 'CRITICA' && "bg-rose-500/[0.02]"
+                        )}
                         onClick={() => { setSelectedLeadId(lead.id); setIsDetailsOpen(true); }}
                       >
-                        <TableCell className="px-6 py-5 font-mono text-[11px] text-primary font-black">
-                          #{lead.id.substring(0, 6).toUpperCase()}
-                        </TableCell>
-                        <TableCell className="text-xs text-slate-400">
-                          <div className="flex flex-col">
-                            <span className="font-bold text-slate-200">{format(lead.createdAt.toDate(), 'dd/MM/yyyy')}</span>
-                            <span className="text-[10px] opacity-50">{format(lead.createdAt.toDate(), 'HH:mm:ss')}</span>
+                        <TableCell className="px-6 py-5">
+                          <div className="flex items-center gap-3">
+                            <Thermometer className={cn("h-5 w-5", getHeatColor(lead))} />
+                            <div className="flex flex-col">
+                              <span className={cn("text-[9px] font-black uppercase tracking-widest", getHeatColor(lead))}>{lead.priority}</span>
+                              <span className="text-[10px] font-mono text-slate-500">#{lead.id.substring(0, 6)}</span>
+                            </div>
                           </div>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-3">
-                            <div className="h-9 w-9 rounded-full bg-blue-500/10 flex items-center justify-center border border-blue-500/20 text-blue-400">
-                              <UserCircle className="h-5 w-5" />
+                            <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20 text-primary font-black text-xs">
+                              {client?.firstName.charAt(0)}
                             </div>
-                            <div className="flex flex-col max-w-[200px]">
-                              <span className="font-bold text-white truncate uppercase text-xs">{client?.firstName} {client?.lastName}</span>
-                              <span className="text-[9px] text-slate-500 font-mono">{client?.document || 'N/A'}</span>
+                            <div className="flex flex-col max-w-[220px]">
+                              <span className="font-bold text-white truncate text-sm">{lead.title}</span>
+                              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">Cliente: {client?.firstName} {client?.lastName}</span>
                             </div>
                           </div>
                         </TableCell>
                         <TableCell>
                           <div className="flex flex-col">
-                            <span className="text-[10px] font-black uppercase text-primary">{lead.legalArea}</span>
-                            <span className="text-[10px] text-slate-400 font-bold">{lawyer?.firstName || 'Pendente'}</span>
+                            <span className="text-[10px] font-black uppercase text-primary/80">{lead.captureSource}</span>
+                            <span className="text-[10px] text-slate-500 font-bold">{lawyer?.firstName || 'Pendente'}</span>
                           </div>
+                        </TableCell>
+                        <TableCell>
+                          {prescriptionDate ? (
+                            <div className={cn(
+                              "flex flex-col",
+                              isPrescriptionClose ? "text-rose-500 animate-pulse" : "text-slate-400"
+                            )}>
+                              <span className="font-bold text-[11px]">{format(prescriptionDate, 'dd/MM/yyyy')}</span>
+                              <span className="text-[9px] font-black uppercase tracking-tighter">
+                                {isPrescriptionClose ? '⚠️ RISCO ALTO' : `${differenceInDays(prescriptionDate, new Date())} dias p/ fim`}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-slate-700 italic text-[10px]">Não definida</span>
+                          )}
                         </TableCell>
                         <TableCell className="text-center w-[180px]">
                           <div className="flex flex-col gap-1.5 items-center">
                             <div className="flex items-center justify-between w-full text-[9px] font-black uppercase text-slate-500">
-                              <span>{completedInStage}/{currentStageTasks.length}</span>
+                              <span>{agingDays}d nesta fase</span>
                               <span className={cn(progress === 100 ? "text-emerald-500" : "text-white")}>{Math.round(progress)}%</span>
                             </div>
                             <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
@@ -1029,9 +1192,25 @@ export default function LeadsPage() {
                           </div>
                         </TableCell>
                         <TableCell className="text-right px-6">
-                          <Button variant="ghost" size="icon" className="text-white/20 group-hover:text-primary transition-colors">
-                            <ArrowUpRight className="h-5 w-5" />
-                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                              <Button variant="ghost" size="icon" className="text-white/20 hover:text-white">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="bg-[#0f172a] border-white/10 w-56 p-1">
+                              <DropdownMenuItem className="font-bold gap-2 focus:bg-primary/10">
+                                <Info className="h-4 w-4 text-primary" /> Ficha de Triagem
+                              </DropdownMenuItem>
+                              <DropdownMenuItem className="font-bold gap-2">
+                                <History className="h-4 w-4" /> Timeline
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator className="bg-white/5" />
+                              <DropdownMenuItem className="text-rose-500 font-bold gap-2" onClick={(e) => { e.stopPropagation(); handleDeleteLead(lead.id); }}>
+                                <Trash2 className="h-4 w-4" /> Excluir Atendimento
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </TableCell>
                       </TableRow>
                     );
