@@ -762,7 +762,7 @@ export default function FinanceiroPage() {
   const [isDeleting, setIsDeleting] = React.useState(false);
   
   const { toast } = useToast();
-  const now = startOfDay(new Date());
+  const now = React.useMemo(() => startOfDay(new Date()), []);
 
   const titlesQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'financial_titles'), orderBy('dueDate', 'asc'), limit(300)) : null), [firestore, refreshKey]);
   const { data: titlesData, isLoading: isLoadingTitles } = useCollection<FinancialTitle>(titlesQuery);
@@ -1155,6 +1155,7 @@ export default function FinanceiroPage() {
                   ))
                 ) : (titlesData?.filter(t => t.type === 'DESPESA').map(t => {
                   const dueDate = t.dueDate instanceof Timestamp ? t.dueDate.toDate() : (t.dueDate && typeof t.dueDate === 'object' && 'seconds' in t.dueDate) ? new Date((t.dueDate as any).seconds * 1000) : new Date(t.dueDate as any);
+                  const isOverdue = t.status !== 'PAGO' && isBefore(dueDate, now);
                   return (
                     <TableRow key={t.id} className="border-white/5 hover:bg-white/5 transition-colors">
                       <TableCell className="px-6 font-bold text-white text-sm">{t.description}</TableCell>
@@ -1163,7 +1164,7 @@ export default function FinanceiroPage() {
                       </TableCell>
                       <TableCell className="text-center">
                         <Badge variant="outline" className={cn("text-[9px] font-black uppercase px-2 h-6 border-none", t.status === 'PAGO' ? 'bg-rose-500/20 text-rose-400' : 'bg-amber-500/20 text-amber-400')}>
-                          {t.status}
+                          {isOverdue ? 'VENCIDO' : t.status}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right font-black text-rose-400 text-sm tabular-nums">

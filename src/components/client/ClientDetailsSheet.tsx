@@ -382,7 +382,7 @@ export const ClientDetailsSheet = React.memo(function ClientDetailsSheet({ clien
             </div>
             <div className="font-mono opacity-50">ID: {client.id}</div>
           </div>
-        </Tabs>
+        </div>
       </SheetContent>
     </Sheet>
   );
