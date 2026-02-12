@@ -1,4 +1,3 @@
-
 'use client';
 import * as React from 'react';
 import {
@@ -159,7 +158,10 @@ export default function ClientsPage() {
 
   const handleAddNew = React.useCallback(() => { setEditingClient(null); setIsSheetOpen(true); }, []);
   const handleEdit = React.useCallback((client: Client) => { setEditingClient(client); setIsSheetOpen(true); }, []);
-  const handleViewDetails = React.useCallback((client: Client) => { setSelectedClientForDetails(client); setIsDetailsOpen(true); }, []);
+  const handleViewDetails = React.useCallback((client: Client) => { 
+    setSelectedClientForDetails(client); 
+    setIsDetailsOpen(true); 
+  }, []);
 
   const handleDelete = async () => {
     if (!firestore || !clientToDelete || isDeleting) return;
@@ -521,7 +523,11 @@ export default function ClientsPage() {
           </div>
       )}
 
-      <Sheet open={isSheetOpen} onOpenChange={(open) => { if (!open) setEditingClient(null); setIsSheetOpen(open); }}>
+      <Sheet 
+        key={editingClient?.id || 'new-sheet'}
+        open={isSheetOpen} 
+        onOpenChange={(open) => { if (!open) setEditingClient(null); setIsSheetOpen(open); }}
+      >
         <SheetContent className="sm:max-w-5xl w-full p-0 flex flex-col bg-[#020617] border-border">
           <SheetHeader className="px-6 pt-6 pb-2">
             <SheetTitle className="text-white text-2xl font-black font-headline">{editingClient ? 'Editar Cadastro' : 'Novo Cliente'}</SheetTitle>
@@ -535,7 +541,12 @@ export default function ClientsPage() {
         </SheetContent>
       </Sheet>
 
-      <ClientDetailsSheet client={selectedClientForDetails} open={isDetailsOpen} onOpenChange={setIsDetailsOpen} />
+      <ClientDetailsSheet 
+        key={selectedClientForDetails?.id || 'details-sheet'}
+        client={selectedClientForDetails} 
+        open={isDetailsOpen} 
+        onOpenChange={setIsDetailsOpen} 
+      />
 
       <AlertDialog open={!!clientToDeactivate} onOpenChange={(open) => !isDeactivating && !open && setClientToDeactivate(null)}>
         <AlertDialogContent className="bg-[#0f172a] border-white/10 text-white">
