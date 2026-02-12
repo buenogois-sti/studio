@@ -1,8 +1,9 @@
+
 import type {Metadata} from 'next';
 import {Toaster} from '@/components/ui/toaster';
 import './globals.css';
 import { Providers } from './providers';
-
+import { SpeedInsights } from "@vercel/speed-insights/next"
 
 export const metadata: Metadata = {
   title: 'Bueno Gois Advogados e Associados',
@@ -29,7 +30,8 @@ export default function RootLayout({
           {children}
         </Providers>
         <Toaster />
-        </body>
+        <SpeedInsights />
+      </body>
     </html>
   );
 }
