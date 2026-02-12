@@ -14,10 +14,9 @@ Plataforma integrada de gestão jurídica com tecnologia de elite para o escrit�
 ## 🛠️ Tecnologias
 - Next.js 15, Firebase, Google APIs, Genkit (AI), Tailwind CSS.
 
-## 📘 Documentação Detalhada
-- [Guia Técnico](./src/docs/TECHNICAL_GUIDE.md)
-- [Guia de Configuração Firebase](./docs/FIREBASE_SETUP_GUIDE.md)
-- [Guia de Publicação (Locaweb VPS)](./docs/LOCAWEB_DEPLOY_GUIDE.md) 🚀
+## 📘 Guias de Publicação (Deploy)
+- [🚀 Publicar na Vercel (Recomendado)](./docs/VERCEL_DEPLOY_GUIDE.md)
+- [📦 Publicar na Locaweb (VPS/Linux)](./docs/LOCAWEB_DEPLOY_GUIDE.md)
 
 ## 🛡️ Segurança
 O sistema utiliza autenticação via Google Workspace com permissões granulares baseadas em perfis (Admin, Advogado, Financeiro, Assistente).
