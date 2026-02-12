@@ -554,7 +554,7 @@ function LeadDetailsSheet({
                   ) : (
                     <div className="text-center py-10 opacity-40 bg-white/[0.02] border border-dashed border-white/10 rounded-2xl">
                       <p className="text-xs font-bold uppercase text-slate-500">Nenhuma entrevista personalizada para {lead.legalArea}.</p>
-                      <p className="text-[10px] mt-1 uppercase">Configure em Checklists &gt; Entrevistas.</p>
+                      <p className="text-[10px] mt-1 uppercase">Configure em Checklists > Entrevistas.</p>
                     </div>
                   )}
                 </div>
@@ -728,7 +728,7 @@ function NewLeadSheet({ open, onOpenChange, lawyers, onCreated }: { open: boolea
         </SheetFooter>
         <ClientCreationModal open={showClientModal} onOpenChange={setShowClientModal} onClientCreated={(c) => form.setValue('clientId', c.id)} />
       </SheetContent>
-    </Sheet>
+    </性を
   );
 }
 
