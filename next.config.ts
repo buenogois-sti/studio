@@ -9,6 +9,9 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  // Produz um build otimizado para VPS/Docker (Locaweb Cloud)
+  output: 'standalone',
+  
   // Performance optimizations
   reactStrictMode: true,
   compiler: {

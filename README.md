@@ -1,3 +1,4 @@
+
 # LexFlow - Bueno Gois Advogados
 
 Plataforma integrada de gestão jurídica com tecnologia de elite para o escritório Bueno Gois Advogados e Associados.
@@ -14,7 +15,9 @@ Plataforma integrada de gestão jurídica com tecnologia de elite para o escrit�
 - Next.js 15, Firebase, Google APIs, Genkit (AI), Tailwind CSS.
 
 ## 📘 Documentação Detalhada
-Para detalhes técnicos de cada componente e página, consulte o [Guia Técnico](./src/docs/TECHNICAL_GUIDE.md).
+- [Guia Técnico](./src/docs/TECHNICAL_GUIDE.md)
+- [Guia de Configuração Firebase](./docs/FIREBASE_SETUP_GUIDE.md)
+- [Guia de Publicação (Locaweb VPS)](./docs/LOCAWEB_DEPLOY_GUIDE.md) 🚀
 
 ## 🛡️ Segurança
 O sistema utiliza autenticação via Google Workspace com permissões granulares baseadas em perfis (Admin, Advogado, Financeiro, Assistente).
