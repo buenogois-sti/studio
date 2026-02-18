@@ -526,16 +526,14 @@ export default function ProcessosPage() {
       </div>
 
       <Sheet open={isSheetOpen} onOpenChange={(open) => { if (!open) setEditingProcess(null); setIsSheetOpen(open); }}>
-        <SheetContent className="sm:max-w-5xl w-full p-1 flex flex-col bg-[#020617] border-border">
-          <SheetHeader className="px-6 pt-6 pb-2">
+        <SheetContent className="sm:max-w-5xl w-full p-0 flex flex-col bg-[#020617] border-border">
+          <SheetHeader className="px-6 pt-6 pb-2 shrink-0">
             <SheetTitle className="text-white text-2xl font-black font-headline">{editingProcess ? 'Editar Processo' : 'Novo Processo'}</SheetTitle>
             <SheetDescription className="text-slate-400">Siga as etapas para um cadastro completo.</SheetDescription>
           </SheetHeader>
-          <ScrollArea className="flex-1 px-6">
-            <div className="pb-8">
-              <ProcessForm onSave={() => setIsSheetOpen(false)} process={editingProcess} />
-            </div>
-          </ScrollArea>
+          <div className="flex-1 overflow-hidden">
+            <ProcessForm onSave={() => setIsSheetOpen(false)} process={editingProcess} />
+          </div>
         </SheetContent>
       </Sheet>
 

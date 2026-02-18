@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
@@ -184,7 +185,7 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col h-screen relative">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col h-full relative overflow-hidden">
         <ProcessFormHeader
           steps={STEPS}
           currentStep={currentStep}
@@ -197,7 +198,7 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
           processId={process?.id}
         />
 
-        <div className="relative flex-1 overflow-hidden">
+        <div className="relative flex-1 flex flex-col overflow-hidden min-h-0">
           {isTransitioning && (
             <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-background/60 backdrop-blur-[2px] animate-in fade-in duration-200">
               <Loader2 className="h-10 w-10 animate-spin text-primary" />
@@ -206,7 +207,7 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
           )}
           
           <div className={cn(
-            "h-full overflow-y-auto px-1 pb-28 transition-all duration-300",
+            "flex-1 overflow-y-auto px-6 py-6 transition-all duration-300",
             isTransitioning ? "opacity-0 scale-95 blur-sm" : "opacity-100 scale-100 blur-0"
           )}>
             <fieldset 
@@ -217,18 +218,18 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
             >
               {StepContent}
             </fieldset>
+          </div>
 
-            <div className="sticky bottom-0 w-full border-t bg-background/95 backdrop-blur-sm z-50 shadow-lg mt-auto">
-              <ProcessFormFooter
-                currentStep={currentStep}
-                totalSteps={STEPS.length}
-                isSaving={isSaving}
-                hasErrors={hasErrors}
-                onPrevious={() => handleStepChange('prev')}
-                onNext={() => handleStepChange('next')}
-                onSubmit={() => form.handleSubmit(onSubmit)()}
-              />
-            </div>
+          <div className="shrink-0 border-t bg-background/95 backdrop-blur-sm z-50 shadow-lg">
+            <ProcessFormFooter
+              currentStep={currentStep}
+              totalSteps={STEPS.length}
+              isSaving={isSaving}
+              hasErrors={hasErrors}
+              onPrevious={() => handleStepChange('prev')}
+              onNext={() => handleStepChange('next')}
+              onSubmit={() => form.handleSubmit(onSubmit)()}
+            />
           </div>
         </div>
       </form>
