@@ -20,7 +20,7 @@ export const processSchema = z.object({
   court: z.string().optional().or(z.literal('')),
   courtAddress: z.string().optional().or(z.literal('')),
   courtBranch: z.string().optional().or(z.literal('')),
-  courtWebsite: z.string().url('Link inválido').optional().or(z.literal('')),
+  courtWebsite: z.string().url('Link inválido').optional().or(z.literal('')).or(z.string().length(0)),
   leadLawyerId: z.string().min(1, 'Defina o advogado responsável.'),
   teamParticipants: z.array(z.object({
     staffId: z.string().min(1, 'Selecione um membro.'),
@@ -126,36 +126,56 @@ export const useProcessForm = (process?: Process | null, onSave?: () => void) =>
     }
   }, []);
 
+  // Helper para remover campos undefined que quebram o Firestore
+  const sanitizeData = (data: any) => {
+    const clean: any = {};
+    Object.keys(data).forEach(key => {
+      if (data[key] !== undefined) {
+        if (Array.isArray(data[key])) {
+          clean[key] = data[key].map((item: any) => 
+            (typeof item === 'object' && item !== null) ? sanitizeData(item) : item
+          );
+        } else if (typeof data[key] === 'object' && data[key] !== null && !(data[key] instanceof Date)) {
+          clean[key] = sanitizeData(data[key]);
+        } else {
+          clean[key] = data[key];
+        }
+      }
+    });
+    return clean;
+  };
+
   const submitForm = useCallback(async (values: ProcessFormValues) => {
     if (!firestore) return false;
 
     try {
       let savedProcessId = process?.id;
-      // Convert secondaryClientIds back to string array for Firestore
-      const data = {
+      
+      // Preparação e Limpeza de Dados (Crucial para evitar erro de undefined)
+      const rawData = {
         ...values,
         secondaryClientIds: values.secondaryClientIds.map(item => item.id),
         updatedAt: serverTimestamp(),
       };
 
+      const cleanData = sanitizeData(rawData);
+
       if (process?.id) {
         const ref = doc(firestore, 'processes', process.id);
-        await updateDoc(ref, data);
+        await updateDoc(ref, cleanData);
         clearDraft(process.id);
         toast({ 
           title: 'Processo atualizado!', 
           description: 'As alterações foram salvas com sucesso.',
-          variant: 'default'
         });
       } else {
         const col = collection(firestore, 'processes');
-        const docRef = await addDoc(col, { ...data, createdAt: serverTimestamp() });
+        const docRef = await addDoc(col, { ...cleanData, createdAt: serverTimestamp() });
         clearDraft();
         savedProcessId = docRef.id;
         toast({ 
           title: 'Processo criado!', 
           description: 'O novo caso foi registrado e organizado.',
-          variant: 'default'
         });
       }
 
@@ -178,7 +198,7 @@ export const useProcessForm = (process?: Process | null, onSave?: () => void) =>
       toast({
         variant: 'destructive',
         title: 'Erro ao salvar',
-        description: error.message || 'Não foi possível salvar os dados do processo.',
+        description: error.message || 'Não foi possível salvar os dados do processo. Verifique se todos os campos obrigatórios estão preenchidos.',
       });
       return false;
     }

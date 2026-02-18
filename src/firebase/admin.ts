@@ -1,3 +1,4 @@
+
 import admin from 'firebase-admin';
 import { firebaseConfig } from './config';
 
@@ -11,23 +12,28 @@ if (!admin.apps.length) {
     if (serviceAccountJson) {
       const serviceAccount = JSON.parse(serviceAccountJson);
       
-      console.log(`[Firebase Admin] 🔍 Tentando inicializar...`);
-      console.log(`[Firebase Admin] JSON Project ID: "${serviceAccount.project_id}"`);
-      console.log(`[Firebase Admin] Config Project ID: "${firebaseConfig.projectId}"`);
+      // Limpeza de Project ID para evitar erros de caractere invisível
+      const serviceProjectId = serviceAccount.project_id?.trim();
+      const configProjectId = firebaseConfig.projectId?.trim();
+
+      console.log(`[Firebase Admin] 🔍 Analisando credenciais...`);
+      console.log(`[Firebase Admin] JSON Project ID: "${serviceProjectId}"`);
+      console.log(`[Firebase Admin] Config Project ID: "${configProjectId}"`);
 
       // Validação Crítica de Project ID
-      if (serviceAccount.project_id !== firebaseConfig.projectId) {
-        console.error(`[Firebase Admin] ❌ PROJECT ID MISMATCH: O servidor está configurado para o projeto '${serviceAccount.project_id}' mas o cliente espera '${firebaseConfig.projectId}'. O login vai falhar.`);
+      if (serviceProjectId !== configProjectId) {
+        console.error(`[Firebase Admin] ❌ PROJECT ID MISMATCH DETECTED!`);
+        console.error(`[Firebase Admin] Token será assinado para '${serviceProjectId}' mas o cliente espera '${configProjectId}'.`);
       }
 
       admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
       });
       
-      console.log(`[Firebase Admin] ✅ Inicializado com sucesso para: ${serviceAccount.project_id}`);
+      console.log(`[Firebase Admin] ✅ Inicializado com sucesso para: ${serviceProjectId}`);
       initialized = true;
     } else {
-      console.warn('[Firebase Admin] ⚠️ FIREBASE_SERVICE_ACCOUNT_JSON não configurado no .env.local');
+      console.warn('[Firebase Admin] ⚠️ FIREBASE_SERVICE_ACCOUNT_JSON não configurado no ambiente');
       admin.initializeApp();
       initialized = true;
     }

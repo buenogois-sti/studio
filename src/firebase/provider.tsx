@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { DependencyList, createContext, useContext, ReactNode, useMemo, useState, useEffect, useRef } from 'react';
@@ -64,20 +65,17 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
       }
 
       console.log('[Firebase Auth] Intentando autenticação com Custom Token...');
-      console.log('[Firebase Auth] Project ID Cliente:', firebaseConfig.projectId);
-
+      
       signInWithCustomToken(auth, session.customToken).then((userCredential) => {
-        console.log('[Firebase Auth] ✅ Autenticação realizada com sucesso:', userCredential.user.email);
+        console.log('[Firebase Auth] ✅ Sessão Firebase vinculada:', userCredential.user.email);
         lastTokenRef.current = session.customToken!;
+        setUserAuthState(prev => ({ ...prev, isUserLoading: false, userError: null }));
       }).catch((error: any) => {
         const errorCode = error?.code || 'UNKNOWN_ERROR';
-        console.error('[Firebase Auth] ❌ Falha na autenticação do token customizado:', errorCode);
-        console.error('[Firebase Auth] Mensagem:', error.message);
+        console.error('[Firebase Auth] ❌ Falha na autenticação do token:', errorCode);
         
         if (errorCode === 'auth/invalid-custom-token') {
-          console.error('[Firebase Auth] PROJECT ID MISMATCH DETECTED. O servidor gerou um token para um projeto diferente do configurado no cliente.');
-          console.error('[Firebase Auth] SERVER PROJECT:', auth.app.options.projectId);
-          console.error('[Firebase Auth] CLIENT PROJECT:', firebaseConfig.projectId);
+          console.error('[Firebase Auth] Erro de integridade de projeto detectado. O token foi gerado para um Project ID diferente do cliente.');
         }
         
         setUserAuthState((state) => ({ ...state, userError: error, isUserLoading: false }));
@@ -146,11 +144,6 @@ export const useFirebase = (): FirebaseServicesAndUser => {
   };
 };
 
-/**
- * useMemoFirebase: Especialmente desenhado para o LexFlow.
- * Gera chaves de cache estáveis para queries e referências do Firestore,
- * prevenindo re-subscrições desnecessárias que causam congelamentos.
- */
 export function useMemoFirebase<T>(factory: () => T, deps: DependencyList): T & {__memo?: boolean} {
   const memoized = useMemo(() => {
     const result = factory();
