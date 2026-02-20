@@ -1,4 +1,3 @@
-
 import type { Timestamp } from 'firebase/firestore';
 
 export type UserRole = 'admin' | 'lawyer' | 'financial' | 'assistant';

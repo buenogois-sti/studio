@@ -111,7 +111,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 
-// Sequência Bueno Gois
+// Sequência Bueno Gois atualizada
 const STAGES: LeadStatus[] = ['NOVO', 'ATENDIMENTO', 'CONTRATUAL', 'BUROCRACIA', 'DISTRIBUICAO'];
 
 interface StageConfig {

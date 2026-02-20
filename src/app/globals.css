@@ -155,7 +155,8 @@
   /* Specific print areas targeting */
   #report-print-area,
   #receipt-print-area,
-  #staff-voucher-print-area {
+  #staff-voucher-print-area,
+  #checklist-print-area {
     display: block !important;
     visibility: visible !important;
     background: white !important;
@@ -167,23 +168,18 @@
   }
 
   /* Estilos específicos para o relatório impresso */
-  #report-print-area .card {
+  .card {
     background: #f8fafc !important;
     border: 1px solid #e2e8f0 !important;
     color: #0f172a !important;
     box-shadow: none !important;
   }
 
-  #report-print-area h1, 
-  #report-print-area h2, 
-  #report-print-area h3, 
-  #report-print-area p, 
-  #report-print-area span,
-  #report-print-area div {
+  h1, h2, h3, p, span, div {
     color: #0f172a !important;
   }
 
-  #report-print-area .text-primary {
+  .text-primary {
     color: #854d0e !important; /* Gold escurecido para melhor contraste em papel */
   }
 
