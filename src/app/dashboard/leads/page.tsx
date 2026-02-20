@@ -97,6 +97,12 @@ import { extractProtocolData } from '@/ai/flows/extract-protocol-data-flow';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   Table,
   TableBody,
   TableCell,
@@ -105,42 +111,67 @@ import {
   TableRow,
 } from '@/components/ui/table';
 
-// Sequência atualizada Bueno Gois
+// Sequência Bueno Gois
 const STAGES: LeadStatus[] = ['NOVO', 'ATENDIMENTO', 'CONTRATUAL', 'BUROCRACIA', 'DISTRIBUICAO'];
 
-const stageConfig: Record<LeadStatus, { label: string; color: string; icon: any; tasks: string[] }> = {
+interface StageConfig {
+  label: string;
+  color: string;
+  icon: any;
+  description: string;
+  tasks: string[];
+}
+
+const stageConfig: Record<LeadStatus, StageConfig> = {
   NOVO: { 
     label: 'Triagem', 
     color: 'bg-blue-500/10 text-blue-400 border-blue-500/20', 
     icon: Zap, 
+    description: 'Qualificação inicial do interesse, identificação da área jurídica e designação do advogado titular responsável.',
     tasks: ['Qualificação do Lead', 'Identificação da área jurídica', 'Direcionamento ao Adv. Responsável'] 
   },
   ATENDIMENTO: { 
     label: 'Atendimento', 
     color: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20', 
     icon: UserCircle, 
+    description: 'Realização da entrevista técnica detalhada com o cliente e preenchimento dos checklists de fatos e viabilidade.',
     tasks: ['Entrevista técnica realizada', 'Preenchimento de checklists', 'Análise de viabilidade jurídica'] 
   },
   CONTRATUAL: { 
     label: 'Contratual', 
     color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20', 
     icon: ShieldCheck, 
+    description: 'Fase operacional para elaboração e coleta de assinaturas da Procuração, Declaração e Contrato de Honorários.',
     tasks: ['Elaboração da Procuração', 'Declaração de Hipossuficiência', 'Contrato de Honorários', 'Assinaturas colhidas'] 
   },
   BUROCRACIA: { 
     label: 'Documentos ou Provas', 
     color: 'bg-amber-500/10 text-amber-400 border-amber-500/20', 
     icon: FileText, 
+    description: 'Coleta de documentos pessoais (RG/CPF/Endereço) e montagem do acervo probatório (prints, áudios e documentos).',
     tasks: ['RG/CPF do cliente', 'Comprovante de residência', 'Acervo de provas (Prints/Docs)', 'Qualificação do Réu'] 
   },
   DISTRIBUICAO: { 
     label: 'Distribuição', 
     color: 'bg-purple-500/10 text-purple-400 border-purple-500/20', 
     icon: FolderKanban, 
+    description: 'Fase final onde o advogado titular elabora a Petição Inicial com base nas provas e realiza o protocolo judicial.',
     tasks: ['Elaboração da Petição Inicial', 'Revisão final', 'Protocolo judicial', 'Cadastro no sistema'] 
   },
-  CONVERTIDO: { label: 'Convertido', color: 'bg-slate-500/10 text-slate-400 border-slate-500/20', icon: CheckCircle2, tasks: [] },
-  ABANDONADO: { label: 'Abandonado', color: 'bg-rose-500/10 text-rose-400 border-rose-500/20', icon: AlertCircle, tasks: [] },
+  CONVERTIDO: { 
+    label: 'Convertido', 
+    color: 'bg-slate-500/10 text-slate-400 border-slate-500/20', 
+    icon: CheckCircle2, 
+    description: 'Lead convertido com sucesso em processo judicial ativo.',
+    tasks: [] 
+  },
+  ABANDONADO: { 
+    label: 'Abandonado', 
+    color: 'bg-rose-500/10 text-rose-400 border-rose-500/20', 
+    icon: AlertCircle, 
+    description: 'Atendimento encerrado por desistência ou falta de contato do cliente.',
+    tasks: [] 
+  },
 };
 
 const leadFormSchema = z.object({
@@ -983,283 +1014,304 @@ export default function LeadsPage() {
   const isLoading = isLoadingLeads;
 
   return (
-    <div className="flex flex-col gap-8 pb-10">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div>
-          <h1 className="text-3xl font-black tracking-tight font-headline text-white flex items-center gap-3">
-            <Zap className="h-8 w-8 text-primary" />
-            Cockpit de Leads
-          </h1>
-          <p className="text-sm text-muted-foreground">Triagem e conversão estratégica Bueno Gois.</p>
-        </div>
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-          <div className="relative flex-1 sm:w-80">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-            <Input 
-              placeholder="Busque pelo ID, nome ou CPF..." 
-              className="pl-9 pr-20 bg-[#0f172a] border-white/10 h-11 text-sm rounded-xl text-white" 
-              value={searchTerm} 
-              onChange={e => setSearchTerm(e.target.value)} 
-            />
-            {searchTerm && (
-              <button 
-                onClick={() => setSearchTerm('')} 
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-black uppercase text-primary hover:text-white transition-colors"
-              >
-                Limpar
-              </button>
-            )}
+    <TooltipProvider>
+      <div className="flex flex-col gap-8 pb-10">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div>
+            <h1 className="text-3xl font-black tracking-tight font-headline text-white flex items-center gap-3">
+              <Zap className="h-8 w-8 text-primary" />
+              Cockpit de Leads
+            </h1>
+            <p className="text-sm text-muted-foreground">Triagem e conversão estratégica Bueno Gois.</p>
           </div>
-          <Button onClick={() => setIsNewLeadOpen(true)} className="bg-primary text-primary-foreground font-black uppercase text-[10px] tracking-widest h-11 px-8 rounded-xl shadow-lg shadow-primary/20">
-            <PlusCircle className="mr-2 h-4 w-4" /> Novo Lead
-          </Button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-[#0f172a] border border-white/5 p-4 rounded-2xl">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Leads Ativos</p>
-            <Zap className="h-4 w-4 text-primary" />
-          </div>
-          <p className="text-2xl font-black text-white">{leadsData?.length || 0}</p>
-        </div>
-        <div className="bg-[#0f172a] border border-white/5 p-4 rounded-2xl">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Urgência Crítica</p>
-            <Flame className="h-4 w-4 text-rose-500" />
-          </div>
-          <p className="text-2xl font-black text-white">{leadsData?.filter(l => l.isUrgent).length || 0}</p>
-        </div>
-        <div className="bg-[#0f172a] border border-white/5 p-4 rounded-2xl">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Na fase Distribuição</p>
-            <TrendingUp className="h-4 w-4 text-emerald-500" />
-          </div>
-          <p className="text-2xl font-black text-white">{leadsData?.filter(l => l.status === 'DISTRIBUICAO').length || 0}</p>
-        </div>
-        <div className="bg-[#0f172a] border border-white/5 p-4 rounded-2xl">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Aging Médio</p>
-            <Timer className="h-4 w-4 text-blue-400" />
-          </div>
-          <p className="text-2xl font-black text-white">4.2 <span className="text-[10px] font-normal text-slate-500">dias</span></p>
-        </div>
-      </div>
-
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as LeadStatus)} className="w-full">
-        <div className="flex flex-col lg:flex-row items-end justify-between gap-4 mb-8">
-          <TabsList className="bg-[#0f172a] p-1 border border-white/5 h-12 flex overflow-x-auto no-scrollbar justify-start gap-1 w-full lg:w-auto">
-            {STAGES.map(stage => {
-              const config = stageConfig[stage];
-              const count = leadsData?.filter(l => l.status === stage).length || 0;
-              return (
-                <TabsTrigger 
-                  key={stage} 
-                  value={stage} 
-                  className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold px-6 h-10 shrink-0 rounded-lg transition-all"
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            <div className="relative flex-1 sm:w-80">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+              <Input 
+                placeholder="Busque pelo ID, nome ou CPF..." 
+                className="pl-9 pr-20 bg-[#0f172a] border-white/10 h-11 text-sm rounded-xl text-white" 
+                value={searchTerm} 
+                onChange={e => setSearchTerm(e.target.value)} 
+              />
+              {searchTerm && (
+                <button 
+                  onClick={() => setSearchTerm('')} 
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-black uppercase text-primary hover:text-white transition-colors"
                 >
-                  <config.icon className="h-3.5 w-3.5" />
-                  {config.label}
-                  <Badge variant="secondary" className="ml-1.5 px-1.5 h-4 text-[9px] bg-white/10 border-none text-inherit">{count}</Badge>
-                </TabsTrigger>
-              );
-            })}
-          </TabsList>
-
-          <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
-            <Select value={sourceFilter} onValueChange={setSourceFilter}>
-              <SelectTrigger className="h-9 bg-[#0f172a] border-white/10 text-[10px] font-black uppercase w-[140px] rounded-lg">
-                <SelectValue placeholder="Fonte" />
-              </SelectTrigger>
-              <SelectContent className="bg-[#0f172a] border-white/10">
-                <SelectItem value="all">Todas as Fontes</SelectItem>
-                <SelectItem value="Indicação">Indicação</SelectItem>
-                <SelectItem value="Google Search">Google</SelectItem>
-                <SelectItem value="Instagram">Instagram</SelectItem>
-                <SelectItem value="Antigo Cliente">Antigo Cliente</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-              <SelectTrigger className="h-9 bg-[#0f172a] border-white/10 text-[10px] font-black uppercase w-[140px] rounded-lg">
-                <SelectValue placeholder="Prioridade" />
-              </SelectTrigger>
-              <SelectContent className="bg-[#0f172a] border-white/10">
-                <SelectItem value="all">Qualquer Nível</SelectItem>
-                <SelectItem value="BAIXA">Baixa</SelectItem>
-                <SelectItem value="MEDIA">Média</SelectItem>
-                <SelectItem value="ALTA">Alta</SelectItem>
-                <SelectItem value="CRITICA">Crítica</SelectItem>
-              </SelectContent>
-            </Select>
+                  Limpar
+                </button>
+              )}
+            </div>
+            <Button onClick={() => setIsNewLeadOpen(true)} className="bg-primary text-primary-foreground font-black uppercase text-[10px] tracking-widest h-11 px-8 rounded-xl shadow-lg shadow-primary/20">
+              <PlusCircle className="mr-2 h-4 w-4" /> Novo Lead
+            </Button>
           </div>
         </div>
 
-        <TabsContent value={activeTab} className="animate-in fade-in duration-500">
-          <Card className="bg-[#0f172a] border-white/5 overflow-hidden shadow-2xl">
-            <Table>
-              <TableHeader className="bg-white/5">
-                <TableRow className="border-white/10 hover:bg-transparent">
-                  <TableHead className="text-[10px] font-black uppercase text-slate-500 px-6 py-4">Status / Saúde</TableHead>
-                  <TableHead className="text-[10px] font-black uppercase text-slate-500">Lead / Atendimento</TableHead>
-                  <TableHead className="text-[10px] font-black uppercase text-slate-500">Origem / Canal</TableHead>
-                  <TableHead className="text-[10px] font-black uppercase text-slate-500">Prescrição</TableHead>
-                  <TableHead className="text-[10px] font-black uppercase text-slate-500 text-center">Fase Aging</TableHead>
-                  <TableHead className="text-[10px] font-black uppercase text-slate-500 text-right px-6">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  [...Array(5)].map((_, i) => (
-                    <TableRow key={i} className="border-white/5">
-                      <TableCell colSpan={6} className="p-6"><Skeleton className="h-10 w-full bg-white/5" /></TableCell>
-                    </TableRow>
-                  ))
-                ) : filteredLeads.filter(l => l.status === activeTab).length > 0 ? (
-                  filteredLeads.filter(l => l.status === activeTab).map(lead => {
-                    const client = clientsMap.get(lead.clientId);
-                    const lawyer = staffMap.get(lead.lawyerId);
-                    const stage = stageConfig[lead.status];
-                    
-                    // Lógica de Aging (há quanto tempo nesta fase)
-                    const entryDate = lead.stageEntryDates?.[lead.status];
-                    const agingDays = entryDate ? differenceInDays(new Date(), entryDate.toDate()) : 0;
-                    
-                    // Alerta de inatividade Bueno Gois para fase Contratual
-                    const isInactivityAlert = lead.status === 'CONTRATUAL' && agingDays >= 3;
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="bg-[#0f172a] border border-white/5 p-4 rounded-2xl">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Leads Ativos</p>
+              <Zap className="h-4 w-4 text-primary" />
+            </div>
+            <p className="text-2xl font-black text-white">{leadsData?.length || 0}</p>
+          </div>
+          <div className="bg-[#0f172a] border border-white/5 p-4 rounded-2xl">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Urgência Crítica</p>
+              <Flame className="h-4 w-4 text-rose-500" />
+            </div>
+            <p className="text-2xl font-black text-white">{leadsData?.filter(l => l.isUrgent).length || 0}</p>
+          </div>
+          <div className="bg-[#0f172a] border border-white/5 p-4 rounded-2xl">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Na fase Distribuição</p>
+              <TrendingUp className="h-4 w-4 text-emerald-500" />
+            </div>
+            <p className="text-2xl font-black text-white">{leadsData?.filter(l => l.status === 'DISTRIBUICAO').length || 0}</p>
+          </div>
+          <div className="bg-[#0f172a] border border-white/5 p-4 rounded-2xl">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Aging Médio</p>
+              <Timer className="h-4 w-4 text-blue-400" />
+            </div>
+            <p className="text-2xl font-black text-white">4.2 <span className="text-[10px] font-normal text-slate-500">dias</span></p>
+          </div>
+        </div>
 
-                    // Lógica de Prescrição
-                    const prescriptionDate = lead.prescriptionDate?.toDate();
-                    const isPrescriptionClose = prescriptionDate && differenceInDays(prescriptionDate, new Date()) < 30;
-
-                    const completedTasks = lead.completedTasks || [];
-                    const currentStageTasks = stage.tasks;
-                    const completedInStage = completedTasks.filter(t => currentStageTasks.includes(t)).length;
-                    const progress = currentStageTasks.length > 0 ? (completedInStage / currentStageTasks.length) * 100 : 0;
-
-                    return (
-                      <TableRow 
-                        key={lead.id} 
-                        className={cn(
-                          "border-white/5 hover:bg-white/5 transition-colors group cursor-pointer",
-                          lead.priority === 'CRITICA' && "bg-rose-500/[0.02]",
-                          isInactivityAlert && "bg-amber-500/[0.02]"
-                        )}
-                        onClick={() => { setSelectedLeadId(lead.id); setIsDetailsOpen(true); }}
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as LeadStatus)} className="w-full">
+          <div className="flex flex-col lg:flex-row items-end justify-between gap-4 mb-8">
+            <TabsList className="bg-[#0f172a] p-1 border border-white/5 h-12 flex overflow-x-auto no-scrollbar justify-start gap-1 w-full lg:w-auto">
+              {STAGES.map(stage => {
+                const config = stageConfig[stage];
+                const count = leadsData?.filter(l => l.status === stage).length || 0;
+                return (
+                  <Tooltip key={stage} delayDuration={300}>
+                    <TooltipTrigger asChild>
+                      <TabsTrigger 
+                        value={stage} 
+                        className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold px-6 h-10 shrink-0 rounded-lg transition-all"
                       >
-                        <TableCell className="px-6 py-5">
-                          <div className="flex items-center gap-3">
-                            <Thermometer className={cn("h-5 w-5", getHeatColor(lead))} />
-                            <div className="flex flex-col">
-                              <span className={cn("text-[9px] font-black uppercase tracking-widest", getHeatColor(lead))}>{lead.priority}</span>
-                              <span className="text-[10px] font-mono text-slate-500">#{lead.id.substring(0, 6)}</span>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20 text-primary font-black text-xs">
-                              {client?.firstName.charAt(0)}
-                            </div>
-                            <div className="flex flex-col max-w-[220px]">
-                              <span className="font-bold text-white truncate text-sm">{lead.title}</span>
-                              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">Cliente: {client?.firstName} {client?.lastName}</span>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-col">
-                            <span className="text-[10px] font-black uppercase text-primary/80">{lead.captureSource}</span>
-                            <span className="text-[10px] text-slate-500 font-bold">{lawyer?.firstName || 'Pendente'}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {prescriptionDate ? (
-                            <div className={cn(
-                              "flex flex-col",
-                              isPrescriptionClose ? "text-rose-500 animate-pulse" : "text-slate-400"
-                            )}>
-                              <span className="font-bold text-[11px]">{format(prescriptionDate, 'dd/MM/yyyy')}</span>
-                              <span className="text-[9px] font-black uppercase tracking-tighter">
-                                {isPrescriptionClose ? '⚠️ RISCO ALTO' : `${differenceInDays(prescriptionDate, new Date())} dias p/ fim`}
-                              </span>
-                            </div>
-                          ) : (
-                            <span className="text-slate-700 italic text-[10px]">Não definida</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-center w-[180px]">
-                          <div className="flex flex-col gap-1.5 items-center">
-                            <div className="flex items-center justify-between w-full text-[9px] font-black uppercase text-slate-500">
-                              <span className={cn(isInactivityAlert && "text-amber-400 flex items-center gap-1 font-black")}>
-                                {isInactivityAlert && <ShieldAlert className="h-3 w-3" />}
-                                {agingDays}d na fase
-                              </span>
-                              <span className={cn(progress === 100 ? "text-emerald-500" : "text-white")}>{Math.round(progress)}%</span>
-                            </div>
-                            <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
-                              <div 
-                                className={cn("h-full transition-all duration-500", progress === 100 ? "bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]" : "bg-primary")}
-                                style={{ width: `${progress}%` }}
-                              />
-                            </div>
-                            {isInactivityAlert && (
-                              <p className="text-[8px] font-black text-amber-500 uppercase mt-1 animate-pulse">Cobrar Assinaturas / Documentos</p>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right px-6">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                              <Button variant="ghost" size="icon" className="text-white/20 hover:text-white">
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="bg-[#0f172a] border-white/10 w-56 p-1">
-                              <DropdownMenuItem className="font-bold gap-2 focus:bg-primary/10">
-                                <Info className="h-4 w-4 text-primary" /> Ficha de Triagem
-                              </DropdownMenuItem>
-                              <DropdownMenuItem className="font-bold gap-2">
-                                <History className="h-4 w-4" /> Timeline
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator className="bg-white/5" />
-                              <DropdownMenuItem className="text-rose-500 font-bold gap-2" onClick={(e) => { e.stopPropagation(); handleDeleteLead(lead.id); }}>
-                                <Trash2 className="h-4 w-4" /> Excluir Atendimento
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={6} className="h-60 text-center opacity-30 italic text-slate-500">
-                      <div className="flex flex-col items-center gap-3">
-                        <Activity className="h-12 w-12" />
-                        <p className="font-black uppercase tracking-widest text-[10px]">Nenhum pedido nesta fase</p>
+                        <config.icon className="h-3.5 w-3.5" />
+                        {config.label}
+                        <Badge variant="secondary" className="ml-1.5 px-1.5 h-4 text-[9px] bg-white/10 border-none text-inherit">{count}</Badge>
+                      </TabsTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent className="bg-[#0f172a] border-white/10 text-white p-4 max-w-xs shadow-2xl">
+                      <div className="space-y-2">
+                        <p className="text-[10px] font-black uppercase text-primary tracking-widest mb-1">Expectativa da Etapa</p>
+                        <p className="text-xs font-medium leading-relaxed">{config.description}</p>
+                        <div className="pt-2">
+                          <p className="text-[9px] font-black uppercase text-slate-500 tracking-widest mb-1">O que fazer agora:</p>
+                          <ul className="space-y-1">
+                            {config.tasks.map(t => (
+                              <li key={t} className="text-[10px] flex items-center gap-1.5 text-slate-300">
+                                <div className="h-1 w-1 rounded-full bg-primary" /> {t}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
                       </div>
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </Card>
-        </TabsContent>
-      </Tabs>
+                    </TooltipContent>
+                  </Tooltip>
+                );
+              })}
+            </TabsList>
 
-      <LeadDetailsSheet 
-        lead={activeLead} 
-        client={activeLead ? clientsMap.get(activeLead.clientId) : undefined} 
-        open={isDetailsOpen} 
-        onOpenChange={setIsDetailsOpen} 
-        onProtocolClick={(l) => { setSelectedLeadId(l.id); setIsConversionOpen(true); }} 
-      />
-      
-      <NewLeadSheet open={isNewLeadOpen} onOpenChange={setIsNewLeadOpen} lawyers={lawyers} onCreated={() => {}} />
-      
-      <LeadConversionDialog lead={activeLead} open={isConversionOpen} onOpenChange={setIsConversionOpen} onConfirm={handleConfirmProtocol} lawyers={lawyers} />
-    </div>
+            <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+              <Select value={sourceFilter} onValueChange={setSourceFilter}>
+                <SelectTrigger className="h-9 bg-[#0f172a] border-white/10 text-[10px] font-black uppercase w-[140px] rounded-lg">
+                  <SelectValue placeholder="Fonte" />
+                </SelectTrigger>
+                <SelectContent className="bg-[#0f172a] border-white/10">
+                  <SelectItem value="all">Todas as Fontes</SelectItem>
+                  <SelectItem value="Indicação">Indicação</SelectItem>
+                  <SelectItem value="Google Search">Google</SelectItem>
+                  <SelectItem value="Instagram">Instagram</SelectItem>
+                  <SelectItem value="Antigo Cliente">Antigo Cliente</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                <SelectTrigger className="h-9 bg-[#0f172a] border-white/10 text-[10px] font-black uppercase w-[140px] rounded-lg">
+                  <SelectValue placeholder="Prioridade" />
+                </SelectTrigger>
+                <SelectContent className="bg-[#0f172a] border-white/10">
+                  <SelectItem value="all">Qualquer Nível</SelectItem>
+                  <SelectItem value="BAIXA">Baixa</SelectItem>
+                  <SelectItem value="MEDIA">Média</SelectItem>
+                  <SelectItem value="ALTA">Alta</SelectItem>
+                  <SelectItem value="CRITICA">Crítica</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <TabsContent value={activeTab} className="animate-in fade-in duration-500">
+            <Card className="bg-[#0f172a] border-white/5 overflow-hidden shadow-2xl">
+              <Table>
+                <TableHeader className="bg-white/5">
+                  <TableRow className="border-white/10 hover:bg-transparent">
+                    <TableHead className="text-[10px] font-black uppercase text-slate-500 px-6 py-4">Status / Saúde</TableHead>
+                    <TableHead className="text-[10px] font-black uppercase text-slate-500">Lead / Atendimento</TableHead>
+                    <TableHead className="text-[10px] font-black uppercase text-slate-500">Origem / Canal</TableHead>
+                    <TableHead className="text-[10px] font-black uppercase text-slate-500">Prescrição</TableHead>
+                    <TableHead className="text-[10px] font-black uppercase text-slate-500 text-center">Fase Aging</TableHead>
+                    <TableHead className="text-[10px] font-black uppercase text-slate-500 text-right px-6">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {isLoading ? (
+                    [...Array(5)].map((_, i) => (
+                      <TableRow key={i} className="border-white/5">
+                        <TableCell colSpan={6} className="p-6"><Skeleton className="h-10 w-full bg-white/5" /></TableCell>
+                      </TableRow>
+                    ))
+                  ) : filteredLeads.filter(l => l.status === activeTab).length > 0 ? (
+                    filteredLeads.filter(l => l.status === activeTab).map(lead => {
+                      const client = clientsMap.get(lead.clientId);
+                      const lawyer = staffMap.get(lead.lawyerId);
+                      const stage = stageConfig[lead.status];
+                      
+                      // Lógica de Aging (há quanto tempo nesta fase)
+                      const entryDate = lead.stageEntryDates?.[lead.status];
+                      const agingDays = entryDate ? differenceInDays(new Date(), entryDate.toDate()) : 0;
+                      
+                      // Alerta de inatividade Bueno Gois para fase Contratual
+                      const isInactivityAlert = lead.status === 'CONTRATUAL' && agingDays >= 3;
+
+                      // Lógica de Prescrição
+                      const prescriptionDate = lead.prescriptionDate?.toDate();
+                      const isPrescriptionClose = prescriptionDate && differenceInDays(prescriptionDate, new Date()) < 30;
+
+                      const completedTasks = lead.completedTasks || [];
+                      const currentStageTasks = stage.tasks;
+                      const completedInStage = completedTasks.filter(t => currentStageTasks.includes(t)).length;
+                      const progress = currentStageTasks.length > 0 ? (completedInStage / currentStageTasks.length) * 100 : 0;
+
+                      return (
+                        <TableRow 
+                          key={lead.id} 
+                          className={cn(
+                            "border-white/5 hover:bg-white/5 transition-colors group cursor-pointer",
+                            lead.priority === 'CRITICA' && "bg-rose-500/[0.02]",
+                            isInactivityAlert && "bg-amber-500/[0.02]"
+                          )}
+                          onClick={() => { setSelectedLeadId(lead.id); setIsDetailsOpen(true); }}
+                        >
+                          <TableCell className="px-6 py-5">
+                            <div className="flex items-center gap-3">
+                              <Thermometer className={cn("h-5 w-5", getHeatColor(lead))} />
+                              <div className="flex flex-col">
+                                <span className={cn("text-[9px] font-black uppercase tracking-widest", getHeatColor(lead))}>{lead.priority}</span>
+                                <span className="text-[10px] font-mono text-slate-500">#{lead.id.substring(0, 6)}</span>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20 text-primary font-black text-xs">
+                                {client?.firstName.charAt(0)}
+                              </div>
+                              <div className="flex flex-col max-w-[220px]">
+                                <span className="font-bold text-white truncate text-sm">{lead.title}</span>
+                                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">Cliente: {client?.firstName} {client?.lastName}</span>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-col">
+                              <span className="text-[10px] font-black uppercase text-primary/80">{lead.captureSource}</span>
+                              <span className="text-[10px] text-slate-500 font-bold">{lawyer?.firstName || 'Pendente'}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {prescriptionDate ? (
+                              <div className={cn(
+                                "flex flex-col",
+                                isPrescriptionClose ? "text-rose-500 animate-pulse" : "text-slate-400"
+                              )}>
+                                <span className="font-bold text-[11px]">{format(prescriptionDate, 'dd/MM/yyyy')}</span>
+                                <span className="text-[9px] font-black uppercase tracking-tighter">
+                                  {isPrescriptionClose ? '⚠️ RISCO ALTO' : `${differenceInDays(prescriptionDate, new Date())} dias p/ fim`}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-slate-700 italic text-[10px]">Não definida</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center w-[180px]">
+                            <div className="flex flex-col gap-1.5 items-center">
+                              <div className="flex items-center justify-between w-full text-[9px] font-black uppercase text-slate-500">
+                                <span className={cn(isInactivityAlert && "text-amber-400 flex items-center gap-1 font-black")}>
+                                  {isInactivityAlert && <ShieldAlert className="h-3 w-3" />}
+                                  {agingDays}d na fase
+                                </span>
+                                <span className={cn(progress === 100 ? "text-emerald-500" : "text-white")}>{Math.round(progress)}%</span>
+                              </div>
+                              <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
+                                <div 
+                                  className={cn("h-full transition-all duration-500", progress === 100 ? "bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]" : "bg-primary")}
+                                  style={{ width: `${progress}%` }}
+                                />
+                              </div>
+                              {isInactivityAlert && (
+                                <p className="text-[8px] font-black text-amber-500 uppercase mt-1 animate-pulse">Cobrar Assinaturas / Documentos</p>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right px-6">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                <Button variant="ghost" size="icon" className="text-white/20 hover:text-white">
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="bg-[#0f172a] border-white/10 w-56 p-1">
+                                <DropdownMenuItem className="font-bold gap-2 focus:bg-primary/10">
+                                  <Info className="h-4 w-4 text-primary" /> Ficha de Triagem
+                                </DropdownMenuItem>
+                                <DropdownMenuItem className="font-bold gap-2">
+                                  <History className="h-4 w-4" /> Timeline
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator className="bg-white/5" />
+                                <DropdownMenuItem className="text-rose-500 font-bold gap-2" onClick={(e) => { e.stopPropagation(); handleDeleteLead(lead.id); }}>
+                                  <Trash2 className="h-4 w-4" /> Excluir Atendimento
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={6} className="h-60 text-center opacity-30 italic text-slate-500">
+                        <div className="flex flex-col items-center gap-3">
+                          <Activity className="h-12 w-12" />
+                          <p className="font-black uppercase tracking-widest text-[10px]">Nenhum pedido nesta fase</p>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </Card>
+          </TabsContent>
+        </Tabs>
+
+        <LeadDetailsSheet 
+          lead={activeLead} 
+          client={activeLead ? clientsMap.get(activeLead.clientId) : undefined} 
+          open={isDetailsOpen} 
+          onOpenChange={setIsDetailsOpen} 
+          onProtocolClick={(l) => { setSelectedLeadId(l.id); setIsConversionOpen(true); }} 
+        />
+        
+        <NewLeadSheet open={isNewLeadOpen} onOpenChange={setIsNewLeadOpen} lawyers={lawyers} onCreated={() => {}} />
+        
+        <LeadConversionDialog lead={activeLead} open={isConversionOpen} onOpenChange={setIsConversionOpen} onConfirm={handleConfirmProtocol} lawyers={lawyers} />
+      </div>
+    </TooltipProvider>
   );
 }
