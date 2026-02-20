@@ -41,7 +41,9 @@ import {
   ArrowUpRight,
   TrendingUp,
   Thermometer,
-  Timer
+  Timer,
+  Gavel,
+  ShieldAlert
 } from 'lucide-react';
 
 import { useFirebase, useCollection, useMemoFirebase, useDoc } from '@/firebase';
@@ -53,7 +55,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
-import { format, formatDistanceToNow, isBefore, addDays, differenceInDays } from 'date-fns';
+import { format, formatDistanceToNow, isBefore, addDays, differenceInDays, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useSession } from 'next-auth/react';
 import {
@@ -103,38 +105,39 @@ import {
   TableRow,
 } from '@/components/ui/table';
 
-const STAGES: LeadStatus[] = ['NOVO', 'ATENDIMENTO', 'BUROCRACIA', 'CONTRATUAL', 'DISTRIBUICAO'];
+// Sequência atualizada Bueno Gois
+const STAGES: LeadStatus[] = ['NOVO', 'ATENDIMENTO', 'CONTRATUAL', 'BUROCRACIA', 'DISTRIBUICAO'];
 
 const stageConfig: Record<LeadStatus, { label: string; color: string; icon: any; tasks: string[] }> = {
   NOVO: { 
     label: 'Triagem', 
     color: 'bg-blue-500/10 text-blue-400 border-blue-500/20', 
     icon: Zap, 
-    tasks: ['Relato inicial do cliente', 'Identificação da área jurídica', 'Verificação de conflito de interesse'] 
+    tasks: ['Qualificação do Lead', 'Identificação da área jurídica', 'Direcionamento ao Adv. Responsável'] 
   },
   ATENDIMENTO: { 
     label: 'Atendimento', 
     color: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20', 
     icon: UserCircle, 
-    tasks: ['Agendamento de entrevista', 'Entrevista realizada', 'Análise de provas iniciais', 'Parecer de viabilidade jurídica'] 
-  },
-  BUROCRACIA: { 
-    label: 'Burocracia', 
-    color: 'bg-amber-500/10 text-amber-400 border-amber-500/20', 
-    icon: Clock, 
-    tasks: ['Coleta de dados pessoais completos', 'Qualificação completa do Réu', 'Organização do acervo de provas', 'Preparação de procuração/subst'] 
+    tasks: ['Entrevista técnica realizada', 'Preenchimento de checklists', 'Análise de viabilidade jurídica'] 
   },
   CONTRATUAL: { 
     label: 'Contratual', 
     color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20', 
     icon: ShieldCheck, 
-    tasks: ['Emissão dos contratos/procuração', 'Asssignature colhida (Contrato)', 'Asssignature colhida (Procuração)', 'Check de integridade documental'] 
+    tasks: ['Elaboração da Procuração', 'Declaração de Hipossuficiência', 'Contrato de Honorários', 'Assinaturas colhidas'] 
+  },
+  BUROCRACIA: { 
+    label: 'Documentos ou Provas', 
+    color: 'bg-amber-500/10 text-amber-400 border-amber-500/20', 
+    icon: FileText, 
+    tasks: ['RG/CPF do cliente', 'Comprovante de residência', 'Acervo de provas (Prints/Docs)', 'Qualificação do Réu'] 
   },
   DISTRIBUICAO: { 
     label: 'Distribuição', 
     color: 'bg-purple-500/10 text-purple-400 border-purple-500/20', 
     icon: FolderKanban, 
-    tasks: ['Elaboração da Peça Inicial', 'Juntada de provas e documentos', 'Revisão final de viabilidade', 'Designação de equipe final'] 
+    tasks: ['Elaboração da Petição Inicial', 'Revisão final', 'Protocolo judicial', 'Cadastro no sistema'] 
   },
   CONVERTIDO: { label: 'Convertido', color: 'bg-slate-500/10 text-slate-400 border-slate-500/20', icon: CheckCircle2, tasks: [] },
   ABANDONADO: { label: 'Abandonado', color: 'bg-rose-500/10 text-rose-400 border-rose-500/20', icon: AlertCircle, tasks: [] },
@@ -335,7 +338,7 @@ function LeadDetailsSheet({
     const completed = lead.completedTasks || [];
     const isCompleted = completed.includes(task);
     
-    if (task === 'Agendamento de entrevista' && !isCompleted) {
+    if (task === 'Entrevista técnica realizada' && !isCompleted) {
       setIsSchedulingOpen(true);
       return;
     }
@@ -375,7 +378,6 @@ function LeadDetailsSheet({
     try {
       await updateLeadStatus(lead.id, nextStatus);
       toast({ title: 'Lead Avançado!', description: `Movido para a fase de ${stageConfig[nextStatus].label}.` });
-      // FECHAR AUTOMATICAMENTE AO AVANÇAR
       onOpenChange(false);
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Erro', description: error.message });
@@ -436,7 +438,7 @@ function LeadDetailsSheet({
                 className="bg-primary text-primary-foreground font-black uppercase text-[9px] h-9 px-4 gap-2"
                 onClick={() => setIsDraftingOpen(true)}
               >
-                <FilePlus2 className="h-3.5 w-3.5" /> Gerar Contratos/Procurações
+                <FilePlus2 className="h-3.5 w-3.5" /> Elaborar Documentos
               </Button>
             )}
           </div>
@@ -466,7 +468,7 @@ function LeadDetailsSheet({
             <section className="space-y-4">
               <div className="flex items-center justify-between px-1">
                 <div className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-500 tracking-widest">
-                  <Activity className="h-3.5 w-3.5 text-primary" /> Fase: {stage.label}
+                  <Activity className="h-3.5 w-3.5 text-primary" /> Próximos Passos: {stage.label}
                 </div>
                 <span className="text-[10px] font-black text-white bg-white/5 px-2 py-0.5 rounded-lg border border-white/10">{completedCount}/{totalTasks}</span>
               </div>
@@ -474,7 +476,6 @@ function LeadDetailsSheet({
               <div className="grid gap-2">
                 {stage.tasks.map(task => {
                   const isDone = lead.completedTasks?.includes(task);
-                  const isScheduling = task === 'Agendamento de entrevista';
                   return (
                     <div 
                       key={task} 
@@ -493,22 +494,16 @@ function LeadDetailsSheet({
                         </div>
                         <span className={cn("text-xs font-bold tracking-tight", isDone ? "text-emerald-400/70" : "text-slate-200")}>{task}</span>
                       </div>
-                      
-                      {isScheduling && !isDone && (
-                        <div className="flex items-center gap-1.5 text-[9px] font-black text-primary uppercase animate-pulse">
-                          <Video className="h-3.5 w-3.5" /> Abrir Agenda
-                        </div>
-                      )}
                     </div>
                   );
                 })}
               </div>
             </section>
 
-            {lead.status === 'NOVO' && (
+            {lead.status === 'ATENDIMENTO' && (
               <section className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-500">
                 <div className="flex items-center gap-2 text-[10px] font-black uppercase text-amber-400 tracking-widest">
-                  <ClipboardList className="h-3.5 w-3.5" /> Entrevista de Triagem
+                  <ClipboardList className="h-3.5 w-3.5" /> Entrevista Técnica ({lead.legalArea})
                 </div>
                 <div className="grid grid-cols-1 gap-4">
                   {activeInterview ? (
@@ -659,7 +654,7 @@ function NewLeadSheet({ open, onOpenChange, lawyers, onCreated }: { open: boolea
       const result = await createLead(values);
       if (result.success && result.id) {
         await syncLeadToDrive(result.id);
-        toast({ title: 'Lead Criado!', description: 'Atendimento iniciado.' });
+        toast({ title: 'Lead Criado!', description: 'Triagem iniciada.' });
         onCreated();
         onOpenChange(false);
         form.reset();
@@ -675,7 +670,7 @@ function NewLeadSheet({ open, onOpenChange, lawyers, onCreated }: { open: boolea
             <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20 shrink-0">
               <PlusCircle className="h-5 w-5 text-primary" />
             </div>
-            Novo Atendimento
+            Nova Triagem
           </SheetTitle>
         </SheetHeader>
         <ScrollArea className="flex-1">
@@ -699,7 +694,7 @@ function NewLeadSheet({ open, onOpenChange, lawyers, onCreated }: { open: boolea
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormField control={form.control} name="lawyerId" render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-1">Responsável *</FormLabel>
+                      <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-1">Advogado Responsável *</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl><SelectTrigger className="bg-black/40 border-white/10 h-11"><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
                         <SelectContent className="bg-[#0f172a] border-white/10 text-white">{lawyers.map(l => <SelectItem key={l.id} value={l.id} className="font-bold">Dr(a). {l.firstName}</SelectItem>)}</SelectContent>
@@ -762,8 +757,8 @@ function NewLeadSheet({ open, onOpenChange, lawyers, onCreated }: { open: boolea
 
                 <FormField control={form.control} name="description" render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-1">Relato Inicial / Briefing</FormLabel>
-                    <Textarea className="bg-black/40 border-white/10 h-32 rounded-xl p-4 resize-none leading-relaxed text-sm font-medium" placeholder="Descreva os fatos principais narrados pelo cliente..." {...field} />
+                    <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-1">Briefing Inicial</FormLabel>
+                    <Textarea className="bg-black/40 border-white/10 h-32 rounded-xl p-4 resize-none leading-relaxed text-sm font-medium" placeholder="Relato inicial do cliente..." {...field} />
                   </FormItem>
                 )} />
               </form>
@@ -774,7 +769,7 @@ function NewLeadSheet({ open, onOpenChange, lawyers, onCreated }: { open: boolea
           <Button variant="ghost" className="flex-1 text-slate-400 font-bold uppercase text-[10px] tracking-widest h-12" onClick={() => onOpenChange(false)}>Cancelar</Button>
           <Button type="submit" form="new-lead-form" disabled={isSaving} className="flex-1 bg-primary text-primary-foreground font-black uppercase tracking-widest text-[10px] h-12 rounded-lg shadow-lg shadow-primary/20">
             {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Target className="h-4 w-4 mr-2" />} 
-            Criar Lead
+            Iniciar Triagem
           </Button>
         </SheetFooter>
         <ClientCreationModal open={showClientModal} onOpenChange={setShowClientModal} onClientCreated={(c) => form.setValue('clientId', c.id)} />
@@ -1131,6 +1126,9 @@ export default function LeadsPage() {
                     const entryDate = lead.stageEntryDates?.[lead.status];
                     const agingDays = entryDate ? differenceInDays(new Date(), entryDate.toDate()) : 0;
                     
+                    // Alerta de inatividade Bueno Gois para fase Contratual
+                    const isInactivityAlert = lead.status === 'CONTRATUAL' && agingDays >= 3;
+
                     // Lógica de Prescrição
                     const prescriptionDate = lead.prescriptionDate?.toDate();
                     const isPrescriptionClose = prescriptionDate && differenceInDays(prescriptionDate, new Date()) < 30;
@@ -1145,7 +1143,8 @@ export default function LeadsPage() {
                         key={lead.id} 
                         className={cn(
                           "border-white/5 hover:bg-white/5 transition-colors group cursor-pointer",
-                          lead.priority === 'CRITICA' && "bg-rose-500/[0.02]"
+                          lead.priority === 'CRITICA' && "bg-rose-500/[0.02]",
+                          isInactivityAlert && "bg-amber-500/[0.02]"
                         )}
                         onClick={() => { setSelectedLeadId(lead.id); setIsDetailsOpen(true); }}
                       >
@@ -1193,7 +1192,10 @@ export default function LeadsPage() {
                         <TableCell className="text-center w-[180px]">
                           <div className="flex flex-col gap-1.5 items-center">
                             <div className="flex items-center justify-between w-full text-[9px] font-black uppercase text-slate-500">
-                              <span>{agingDays}d nesta fase</span>
+                              <span className={cn(isInactivityAlert && "text-amber-400 flex items-center gap-1 font-black")}>
+                                {isInactivityAlert && <ShieldAlert className="h-3 w-3" />}
+                                {agingDays}d na fase
+                              </span>
                               <span className={cn(progress === 100 ? "text-emerald-500" : "text-white")}>{Math.round(progress)}%</span>
                             </div>
                             <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
@@ -1202,6 +1204,9 @@ export default function LeadsPage() {
                                 style={{ width: `${progress}%` }}
                               />
                             </div>
+                            {isInactivityAlert && (
+                              <p className="text-[8px] font-black text-amber-500 uppercase mt-1 animate-pulse">Cobrar Assinaturas / Documentos</p>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell className="text-right px-6">

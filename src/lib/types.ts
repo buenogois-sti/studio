@@ -99,7 +99,8 @@ export type TeamParticipant = {
   percentage: number;
 };
 
-export type LeadStatus = 'NOVO' | 'ATENDIMENTO' | 'BUROCRACIA' | 'CONTRATUAL' | 'DISTRIBUICAO' | 'CONVERTIDO' | 'ABANDONADO';
+// LeadStatus atualizado Bueno Gois
+export type LeadStatus = 'NOVO' | 'ATENDIMENTO' | 'CONTRATUAL' | 'BUROCRACIA' | 'DISTRIBUICAO' | 'CONVERTIDO' | 'ABANDONADO';
 export type LeadPriority = 'BAIXA' | 'MEDIA' | 'ALTA' | 'CRITICA';
 
 export type Lead = {
