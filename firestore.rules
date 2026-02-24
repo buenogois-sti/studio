@@ -59,9 +59,8 @@ service cloud.firestore {
 
     // Gestão de Leads (Triagem)
     match /leads/{leadId} {
-      allow read: if isOneOfRoles(['admin', 'assistant', 'financial']) || 
-                  (resource.data.lawyerId == request.auth.uid);
-      allow create, update: if isOneOfRoles(['admin', 'lawyer', 'assistant']);
+      allow read: if isStaff();
+      allow create, update: if isStaff();
       allow delete: if isAdmin();
     }
 

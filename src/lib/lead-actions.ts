@@ -34,6 +34,10 @@ export async function createLead(data: {
   try {
     const leadRef = firestoreAdmin.collection('leads').doc();
     
+    // Buscar dados do cliente para denormalização (facilita a busca)
+    const clientDoc = await firestoreAdmin.collection('clients').doc(data.clientId).get();
+    const clientData = clientDoc.data();
+
     const prescriptionDate = data.prescriptionDate 
       ? Timestamp.fromDate(new Date(data.prescriptionDate))
       : undefined;
@@ -41,6 +45,8 @@ export async function createLead(data: {
     const now = Timestamp.now();
     const payload: any = {
       clientId: data.clientId,
+      clientName: clientData ? `${clientData.firstName} ${clientData.lastName}`.trim() : 'Cliente não identificado',
+      clientDocument: clientData?.document || '',
       lawyerId: data.lawyerId,
       title: data.title,
       legalArea: data.legalArea,
@@ -101,6 +107,38 @@ export async function updateLeadStatus(id: string, status: LeadStatus) {
 }
 
 /**
+ * Busca leads ativos por nome do cliente, documento ou título.
+ */
+export async function searchLeads(queryText: string): Promise<Lead[]> {
+    if (!queryText || queryText.length < 2) return [];
+    if (!firestoreAdmin) throw new Error("Servidor inacessível.");
+    
+    try {
+        const q = queryText.trim().toLowerCase();
+        // Busca leads ativos (não convertidos)
+        const snapshot = await firestoreAdmin.collection('leads')
+            .where('status', '!=', 'CONVERTIDO')
+            .orderBy('status') // Necessário para o filtro de '!='
+            .orderBy('updatedAt', 'desc')
+            .limit(200)
+            .get();
+        
+        const results = snapshot.docs
+            .map(doc => ({ id: doc.id, ...doc.data() } as Lead))
+            .filter(l => 
+                l.title.toLowerCase().includes(q) || 
+                (l.clientName || '').toLowerCase().includes(q) ||
+                (l.clientDocument || '').includes(q)
+            );
+
+        return results.slice(0, 10);
+    } catch (error) {
+        console.error("Error searching leads:", error);
+        return [];
+    }
+}
+
+/**
  * Converte um Lead em um Processo ativo (Distribuição Processual).
  */
 export async function convertLeadToProcess(leadId: string, data: {
@@ -135,6 +173,7 @@ export async function convertLeadToProcess(leadId: string, data: {
 
     const processPayload: Omit<Process, 'id'> = {
       clientId: leadData.clientId,
+      clientName: leadData.clientName || '',
       name: leadData.title,
       legalArea: leadData.legalArea,
       description: leadData.description || '',

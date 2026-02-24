@@ -1,3 +1,4 @@
+
 import type { Timestamp } from 'firebase/firestore';
 
 export type UserRole = 'admin' | 'lawyer' | 'financial' | 'assistant';
@@ -106,6 +107,7 @@ export type Lead = {
   id: string;
   clientId: string;
   clientName?: string;
+  clientDocument?: string;
   lawyerId: string;
   title: string;
   legalArea: string;
@@ -400,6 +402,8 @@ export type ChecklistExecution = {
   userName: string;
   processId?: string;
   processName?: string;
+  leadId?: string;
+  leadTitle?: string;
   answers: Record<string, any>;
   status: 'COMPLETED' | 'DRAFT';
   executedAt: Timestamp;

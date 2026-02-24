@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -238,7 +239,7 @@ function ScheduleInterviewDialog({
       onSuccess();
       onOpenChange(false);
     } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Falha no agendamento', description: e.message });
+      toast({ variant: 'destructive', title: 'Logística de agendamento indisponível', description: e.message });
     } finally {
       setIsSaving(false);
     }
@@ -928,6 +929,7 @@ export default function LeadsPage() {
     [firestore, user?.uid]
   );
   const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
+  const isAdmin = userProfile?.role === 'admin';
 
   const leadsQuery = useMemoFirebase(
     () => (firestore ? query(collection(firestore, 'leads'), where('status', '!=', 'CONVERTIDO')) : null),
@@ -959,7 +961,7 @@ export default function LeadsPage() {
     if (!leadsData) return [];
     let list = [...leadsData].sort((a, b) => b.updatedAt.seconds - a.updatedAt.seconds);
     
-    if (userProfile?.role === 'lawyer') list = list.filter(l => l.lawyerId === userProfile.id);
+    // Todos podem ver os leads, então não filtramos mais por advogado.
     
     // Aplicar Filtros Avançados
     if (sourceFilter !== 'all') list = list.filter(l => l.captureSource === sourceFilter);
@@ -969,13 +971,13 @@ export default function LeadsPage() {
       const q = searchTerm.toLowerCase();
       list = list.filter(l => 
         l.title.toLowerCase().includes(q) || 
-        clientsMap.get(l.clientId)?.firstName.toLowerCase().includes(q) ||
-        clientsMap.get(l.clientId)?.document?.includes(q)
+        (l.clientName || '').toLowerCase().includes(q) ||
+        (l.clientDocument || '').includes(q)
       );
     }
 
     return list;
-  }, [leadsData, searchTerm, clientsMap, userProfile, sourceFilter, priorityFilter]);
+  }, [leadsData, searchTerm, sourceFilter, priorityFilter]);
 
   const handleConfirmProtocol = async (data: z.infer<typeof conversionSchema>) => {
     if (!activeLead) return;
@@ -1028,7 +1030,7 @@ export default function LeadsPage() {
             <div className="relative flex-1 sm:w-80">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
               <Input 
-                placeholder="Busque pelo ID, nome ou CPF..." 
+                placeholder="Busque pelo título, nome ou CPF..." 
                 className="pl-9 pr-20 bg-[#0f172a] border-white/10 h-11 text-sm rounded-xl text-white" 
                 value={searchTerm} 
                 onChange={e => setSearchTerm(e.target.value)} 
@@ -1215,7 +1217,7 @@ export default function LeadsPage() {
                               </div>
                               <div className="flex flex-col max-w-[220px]">
                                 <span className="font-bold text-white truncate text-sm">{lead.title}</span>
-                                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">Cliente: {client?.firstName} {client?.lastName}</span>
+                                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">Cliente: {lead.clientName || `${client?.firstName} ${client?.lastName}`}</span>
                               </div>
                             </div>
                           </TableCell>
@@ -1274,10 +1276,14 @@ export default function LeadsPage() {
                                 <DropdownMenuItem className="font-bold gap-2">
                                   <History className="h-4 w-4" /> Timeline
                                 </DropdownMenuItem>
-                                <DropdownMenuSeparator className="bg-white/5" />
-                                <DropdownMenuItem className="text-rose-500 font-bold gap-2" onClick={(e) => { e.stopPropagation(); handleDeleteLead(lead.id); }}>
-                                  <Trash2 className="h-4 w-4" /> Excluir Atendimento
-                                </DropdownMenuItem>
+                                {isAdmin && (
+                                  <>
+                                    <DropdownMenuSeparator className="bg-white/5" />
+                                    <DropdownMenuItem className="text-rose-500 font-bold gap-2" onClick={(e) => { e.stopPropagation(); handleDeleteLead(lead.id); }}>
+                                      <Trash2 className="h-4 w-4" /> Excluir Atendimento
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </TableCell>

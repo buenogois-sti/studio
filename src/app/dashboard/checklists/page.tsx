@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -27,11 +28,12 @@ import {
   ExternalLink,
   Calculator,
   Printer,
-  Scale
+  Scale,
+  Zap
 } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy, limit, Timestamp } from 'firebase/firestore';
-import type { ChecklistTemplate, ChecklistExecution, ChecklistItem, ChecklistItemType, Process } from '@/lib/types';
+import type { ChecklistTemplate, ChecklistExecution, ChecklistItem, ChecklistItemType, Process, Lead } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -82,6 +84,7 @@ import {
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { searchProcesses } from '@/lib/process-actions';
+import { searchLeads } from '@/lib/lead-actions';
 
 // Componente de Card memoizado para performance
 const ChecklistCard = React.memo(({ 
@@ -259,7 +262,7 @@ export default function ChecklistsPage() {
             <Table>
               <TableHeader className="bg-white/5 border-b border-white/10">
                 <TableRow className="hover:bg-transparent">
-                  <TableHead className="text-muted-foreground text-[10px] font-black uppercase px-6">Checklist / Processo</TableHead>
+                  <TableHead className="text-muted-foreground text-[10px] font-black uppercase px-6">Checklist / Vínculo</TableHead>
                   <TableHead className="text-muted-foreground text-[10px] font-black uppercase">Responsável</TableHead>
                   <TableHead className="text-muted-foreground text-[10px] font-black uppercase">Data/Hora</TableHead>
                   <TableHead className="text-center text-muted-foreground text-[10px] font-black uppercase">Status</TableHead>
@@ -274,10 +277,12 @@ export default function ChecklistsPage() {
                     <TableCell className="px-6">
                       <div className="flex flex-col">
                         <span className="font-bold text-white text-sm">{exec.templateTitle}</span>
-                        {exec.processName && (
+                        {(exec.processName || exec.leadTitle) && (
                           <div className="flex items-center gap-1.5 mt-1 text-primary">
-                            <FolderKanban className="h-3 w-3" />
-                            <span className="text-[10px] font-black uppercase tracking-tighter">{exec.processName}</span>
+                            {exec.processName ? <FolderKanban className="h-3 w-3" /> : <Zap className="h-3 w-3" />}
+                            <span className="text-[10px] font-black uppercase tracking-tighter truncate max-w-[200px]">
+                              {exec.processName || exec.leadTitle}
+                            </span>
                           </div>
                         )}
                       </div>
@@ -542,7 +547,7 @@ const ChecklistEditorDialog = React.memo(function ChecklistEditorDialog({ open, 
             className="flex-1 bg-primary text-primary-foreground font-black uppercase tracking-widest text-[11px] h-11 px-8 shadow-xl shadow-primary/20 hover:scale-[1.02] transition-all"
             onClick={handleSave}
           >
-            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin mr-2" /> : <ShieldCheck className="mr-2 h-5 w-5" />}
+            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin mr-2" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
             Salvar e Disponibilizar na Banca
           </Button>
         </DialogFooter>
@@ -555,10 +560,10 @@ const ChecklistExecutorDialog = React.memo(function ChecklistExecutorDialog({ op
   const [isSaving, setIsSaving] = React.useState(false);
   const [answers, setAnswers] = React.useState<Record<string, any>>({});
   const [observations, setObservations] = React.useState('');
-  const [processSearch, setProcessSearch] = React.useState('');
-  const [processResults, setProcessResults] = React.useState<Process[]>([]);
-  const [selectedProcess, setSelectedProcess] = React.useState<Process | null>(null);
-  const [isSearchingProcess, setIsSearchingProcess] = React.useState(false);
+  const [searchQuery, setSearchQuery] = React.useState('');
+  const [searchResults, setSearchResults] = React.useState<Array<{ type: 'process' | 'lead', data: any }>>([]);
+  const [selectedTarget, setSelectedTarget] = React.useState<{ type: 'process' | 'lead', data: any } | null>(null);
+  const [isSearching, setIsSearching] = React.useState(false);
   
   const { toast } = useToast();
 
@@ -566,29 +571,38 @@ const ChecklistExecutorDialog = React.memo(function ChecklistExecutorDialog({ op
     if (template && open) {
       setAnswers({});
       setObservations('');
-      setSelectedProcess(null);
-      setProcessSearch('');
+      setSelectedTarget(null);
+      setSearchQuery('');
     }
   }, [template, open]);
 
   React.useEffect(() => {
-    if (processSearch.length < 2) {
-      setProcessResults([]);
+    if (searchQuery.length < 2) {
+      setSearchResults([]);
       return;
     }
     const timer = setTimeout(async () => {
-      setIsSearchingProcess(true);
+      setIsSearching(true);
       try {
-        const results = await searchProcesses(processSearch);
-        setProcessResults(results);
+        const [processes, leads] = await Promise.all([
+          searchProcesses(searchQuery),
+          searchLeads(searchQuery)
+        ]);
+        
+        const combinedResults: any[] = [
+          ...processes.map(p => ({ type: 'process', data: p })),
+          ...leads.map(l => ({ type: 'lead', data: l }))
+        ];
+        
+        setSearchResults(combinedResults);
       } catch (e) {
         console.error(e);
       } finally {
-        setIsSearchingProcess(false);
+        setIsSearching(false);
       }
     }, 500);
     return () => clearTimeout(timer);
-  }, [processSearch]);
+  }, [searchQuery]);
 
   const handleFinish = async () => {
     if (!template) return;
@@ -604,8 +618,10 @@ const ChecklistExecutorDialog = React.memo(function ChecklistExecutorDialog({ op
       await saveChecklistExecution({
         templateId: template.id,
         templateTitle: template.title,
-        processId: selectedProcess?.id,
-        processName: selectedProcess?.name,
+        processId: selectedTarget?.type === 'process' ? selectedTarget.data.id : undefined,
+        processName: selectedTarget?.type === 'process' ? selectedTarget.data.name : undefined,
+        leadId: selectedTarget?.type === 'lead' ? selectedTarget.data.id : undefined,
+        leadTitle: selectedTarget?.type === 'lead' ? selectedTarget.data.title : undefined,
         answers,
         observations,
         status: 'COMPLETED'
@@ -640,18 +656,25 @@ const ChecklistExecutorDialog = React.memo(function ChecklistExecutorDialog({ op
           <div className="p-6 space-y-10 pb-10">
             <div className="space-y-3">
               <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
-                <FolderKanban className="h-3 w-3 text-primary" /> Vínculo Processual (Opcional)
+                <Search className="h-3 w-3 text-primary" /> Vínculo (Lead ou Processo)
               </Label>
-              {selectedProcess ? (
-                <div className="flex items-center justify-between p-4 rounded-2xl border-2 border-primary/30 bg-primary/5 animate-in zoom-in-95">
+              {selectedTarget ? (
+                <div className={cn(
+                  "flex items-center justify-between p-4 rounded-2xl border-2 animate-in zoom-in-95",
+                  selectedTarget.type === 'process' ? "border-primary/30 bg-primary/5" : "border-emerald-500/30 bg-emerald-500/5"
+                )}>
                   <div className="flex items-center gap-3 overflow-hidden">
-                    <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
+                    {selectedTarget.type === 'process' ? <FolderKanban className="h-5 w-5 text-primary shrink-0" /> : <Zap className="h-5 w-5 text-emerald-500 shrink-0" />}
                     <div className="min-w-0">
-                      <p className="text-sm font-black text-white truncate">{selectedProcess.name}</p>
-                      <p className="text-[10px] text-primary/60 font-mono tracking-widest">{selectedProcess.processNumber || 'Sem Nº CNJ'}</p>
+                      <p className="text-sm font-black text-white truncate">{selectedTarget.type === 'process' ? selectedTarget.data.name : selectedTarget.data.title}</p>
+                      <p className="text-[10px] text-muted-foreground font-mono tracking-widest">
+                        {selectedTarget.type === 'process' 
+                          ? (selectedTarget.data.processNumber || 'Sem Nº CNJ') 
+                          : `LEAD #${selectedTarget.data.id.substring(0,6)} - ${selectedTarget.data.clientName || 'Doc: ' + selectedTarget.data.clientDocument}`}
+                      </p>
                     </div>
                   </div>
-                  <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-500 hover:text-white rounded-xl" onClick={() => setSelectedProcess(null)}>
+                  <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-500 hover:text-white rounded-xl" onClick={() => setSelectedTarget(null)}>
                     <X className="h-4 w-4" />
                   </Button>
                 </div>
@@ -660,29 +683,38 @@ const ChecklistExecutorDialog = React.memo(function ChecklistExecutorDialog({ op
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
                   <Input 
                     className="h-12 bg-black/40 border-white/10 pl-10 focus:border-primary transition-all rounded-xl" 
-                    placeholder="Pesquisar processo para vincular..." 
-                    value={processSearch}
-                    onChange={(e) => setProcessSearch(e.target.value)}
+                    placeholder="Pesquisar por nome, CPF ou título..." 
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
                   />
-                  {isSearchingProcess && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-primary" />}
+                  {isSearching && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-primary" />}
                   
-                  {processResults.length > 0 && (
+                  {searchResults.length > 0 && (
                     <div className="absolute top-full left-0 right-0 mt-2 bg-[#0f172a] border border-white/10 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-[60] overflow-hidden animate-in fade-in slide-in-from-top-2">
                       <ScrollArea className="max-h-[250px]">
                         <div className="p-2 space-y-1">
-                          {processResults.map(p => (
+                          {searchResults.map((item, idx) => (
                             <button
-                              key={p.id}
+                              key={`${item.type}-${idx}`}
                               type="button"
-                              className="w-full text-left p-4 hover:bg-white/5 transition-all rounded-xl border border-transparent hover:border-white/5 group"
+                              className="w-full text-left p-4 hover:bg-white/5 transition-all rounded-xl border border-transparent hover:border-white/5 group flex items-start gap-3"
                               onClick={() => {
-                                setSelectedProcess(p);
-                                setProcessResults([]);
-                                setProcessSearch('');
+                                setSelectedTarget(item);
+                                setSearchResults([]);
+                                setSearchQuery('');
                               }}
                             >
-                              <p className="text-sm font-bold text-white group-hover:text-primary transition-colors truncate">{p.name}</p>
-                              <p className="text-[10px] text-slate-500 font-mono uppercase mt-0.5">{p.processNumber || 'Nº não informado'}</p>
+                              {item.type === 'process' ? <FolderKanban className="h-4 w-4 text-primary shrink-0 mt-1" /> : <Zap className="h-4 w-4 text-emerald-500 shrink-0 mt-1" />}
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-bold text-white group-hover:text-primary transition-colors truncate">
+                                  {item.type === 'process' ? item.data.name : item.data.title}
+                                </p>
+                                <p className="text-[10px] text-slate-500 font-mono uppercase mt-0.5">
+                                  {item.type === 'process' 
+                                    ? (item.data.processNumber || 'Nº não informado') 
+                                    : `Lead: ${item.data.clientName || 'Sem nome'} (${item.data.clientDocument || 'Sem CPF'})`}
+                                </p>
+                              </div>
                             </button>
                           ))}
                         </div>
@@ -861,11 +893,12 @@ const ChecklistDetailsDialog = React.memo(function ChecklistDetailsDialog({
                   <Clock className="h-3.5 w-3.5 text-primary" /> {format(execution.executedAt.toDate(), 'dd/MM/yyyy HH:mm')}
                 </p>
               </div>
-              {execution.processName && (
+              {(execution.processName || execution.leadTitle) && (
                 <div className="p-4 rounded-2xl bg-primary/5 border border-primary/20 space-y-1 col-span-full">
-                  <Label className="text-[10px] font-black uppercase text-primary tracking-widest">Vínculo Processual</Label>
+                  <Label className="text-[10px] font-black uppercase text-primary tracking-widest">Vínculo Direto</Label>
                   <p className="text-sm font-black text-white flex items-center gap-2">
-                    <FolderKanban className="h-4 w-4 text-primary" /> {execution.processName}
+                    {execution.processName ? <FolderKanban className="h-4 w-4 text-primary" /> : <Zap className="h-4 w-4 text-emerald-500" />} 
+                    {execution.processName || execution.leadTitle}
                   </p>
                 </div>
               )}
