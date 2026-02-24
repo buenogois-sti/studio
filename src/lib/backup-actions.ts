@@ -19,8 +19,9 @@ const COLLECTIONS_TO_BACKUP = [
 async function findOrCreateBackupFolder(drive: any): Promise<string> {
     const folderName = 'LexFlow Backups';
     try {
+        // Busca global por nome (inclui compartilhados) para evitar criação no drive pessoal indesejada
         const res = await drive.files.list({
-            q: `mimeType='application/vnd.google-apps.folder' and name='${folderName}' and 'root' in parents and trashed=false`,
+            q: `mimeType='application/vnd.google-apps.folder' and name='${folderName}' and trashed=false`,
             fields: 'files(id)',
             pageSize: 1,
             supportsAllDrives: true,
@@ -28,11 +29,11 @@ async function findOrCreateBackupFolder(drive: any): Promise<string> {
         });
 
         if (res.data.files && res.data.files.length > 0 && res.data.files[0].id) {
-            console.log(`Found backup folder with ID: ${res.data.files[0].id}`);
+            console.log(`[Backup] Pasta de backup localizada: ${res.data.files[0].id}`);
             return res.data.files[0].id;
         }
 
-        console.log("Backup folder not found, creating it.");
+        console.log("[Backup] Pasta de backup não encontrada, criando na raiz.");
         const fileMetadata = {
             name: folderName,
             mimeType: 'application/vnd.google-apps.folder',
@@ -45,13 +46,13 @@ async function findOrCreateBackupFolder(drive: any): Promise<string> {
         });
         
         if (!file.data.id) {
-             throw new Error('Could not create backup folder in Google Drive.');
+             throw new Error('Não foi possível criar a pasta de backup no Google Drive.');
         }
-        console.log(`Created backup folder with ID: ${file.data.id}`);
+        console.log(`[Backup] Pasta criada: ${file.data.id}`);
         return file.data.id;
     } catch (error: any) {
-        console.error('Error finding or creating backup folder:', error.message);
-        throw new Error('Falha ao localizar ou criar la pasta de backups no Google Drive.');
+        console.error('[Backup] Erro ao gerenciar pasta no Drive:', error.message);
+        throw new Error('Falha ao localizar ou criar a pasta de backups no Google Drive.');
     }
 }
 
@@ -68,7 +69,6 @@ export async function triggerManualBackup(): Promise<{ fileLink: string }> {
             const snapshot = await firestoreAdmin.collection(collectionName).get();
             backupData[collectionName] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         }
-        // Note: This simple implementation does not handle sub-collections.
 
         const backupJsonString = JSON.stringify(backupData, null, 2);
         const timestamp = format(new Date(), 'yyyy-MM-dd_HH-mm-ss');
@@ -90,6 +90,7 @@ export async function triggerManualBackup(): Promise<{ fileLink: string }> {
 
         const file = await drive.files.create({
             requestBody: fileMetadata,
+            media: media,
             fields: 'id, webViewLink',
             supportsAllDrives: true,
         });
@@ -101,7 +102,7 @@ export async function triggerManualBackup(): Promise<{ fileLink: string }> {
         return { fileLink: file.data.webViewLink };
 
     } catch (error: any) {
-        console.error('Error during manual backup process:', error);
+        console.error('[Backup] Erro crítico no processo de backup:', error);
         throw new Error(error.message || 'Ocorreu um erro desconhecido durante o processo de backup.');
     }
 }

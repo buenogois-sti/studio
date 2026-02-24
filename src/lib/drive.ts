@@ -63,22 +63,27 @@ export async function getGoogleApiClientsForUser(): Promise<GoogleApiClients> {
 }
 
 /**
- * Busca ou cria uma pasta na raiz do Drive.
+ * Busca ou cria uma pasta raiz. 
+ * AGORA: Busca globalmente em itens compartilhados para evitar criação no drive pessoal se já existir.
  */
 async function getOrCreateRootFolder(drive: drive_v3.Drive, name: string): Promise<string> {
     try {
+        // Busca global por nome (inclui compartilhados e drives compartilhados)
         const res = await drive.files.list({
-            q: `mimeType='application/vnd.google-apps.folder' and name='${name}' and 'root' in parents and trashed=false`,
-            fields: 'files(id)',
+            q: `mimeType='application/vnd.google-apps.folder' and name='${name}' and trashed=false`,
+            fields: 'files(id, name, parents)',
             pageSize: 1,
             supportsAllDrives: true,
             includeItemsFromAllDrives: true,
         });
 
         if (res.data.files && res.data.files.length > 0) {
+            console.log(`[DriveRoot] Pasta raiz encontrada: ${name} (${res.data.files[0].id})`);
             return res.data.files[0].id!;
         }
 
+        // Se não encontrar em lugar nenhum, cria na raiz do usuário atual (Fallback inicial)
+        console.log(`[DriveRoot] Pasta "${name}" não encontrada. Criando nova pasta.`);
         const newFolder = await drive.files.create({
             requestBody: {
                 name,
@@ -92,7 +97,7 @@ async function getOrCreateRootFolder(drive: drive_v3.Drive, name: string): Promi
         return newFolder.data.id!;
     } catch (error: any) {
         console.error(`[DriveRoot] Erro ao gerenciar pasta raiz "${name}":`, error.message);
-        throw new Error(`Falha ao acessar ou criar a pasta raiz "${name}" no seu Drive.`);
+        throw new Error(`Falha ao acessar ou criar a pasta raiz "${name}" no Google Drive.`);
     }
 }
 
