@@ -128,7 +128,6 @@ const testimonials = [
     }
 ]
 
-// Hook de interseção estabilizado para evitar loops de renderização
 function useIntersectionObserver(options?: IntersectionObserverInit) {
   const [ref, setRef] = useState<HTMLElement | null>(null);
   const [isIntersecting, setIsIntersecting] = useState(false);
@@ -148,7 +147,6 @@ function useIntersectionObserver(options?: IntersectionObserverInit) {
   return [setRef, isIntersecting] as const;
 }
 
-// Parallax ultra-otimizado usando Variáveis CSS (0 re-renders de React)
 const ParallaxLayer = React.memo(({ children, speed = 1, className = '' }: { children: React.ReactNode; speed?: number; className?: string }) => {
   return (
     <div 
@@ -240,18 +238,21 @@ export function LandingClient({ initialSettings, initialSeo }: { initialSettings
   const currentSettings = settings || initialSettings;
   const instagramUrl = currentSettings?.instagram || "https://www.instagram.com/buenogoisadvogado/";
 
-  // Único listener de scroll otimizado que atualiza variáveis CSS e estado do header
   useEffect(() => {
     let rafId: number;
+    let lastScrollY = 0;
     const root = document.documentElement;
 
     const handleScroll = () => {
       rafId = requestAnimationFrame(() => {
         const scrollY = window.scrollY;
-        // Atualiza variável CSS para Parallax sem re-renderizar React
+        if (Math.abs(scrollY - lastScrollY) < 10) return; // Debounce manual de 10px
+        
+        lastScrollY = scrollY;
         root.style.setProperty('--scroll-y', `${scrollY}px`);
-        // Atualiza background do header apenas quando necessário
-        setHeaderBg(scrollY > 50);
+        
+        const isPastThreshold = scrollY > 50;
+        setHeaderBg((prev) => prev !== isPastThreshold ? isPastThreshold : prev);
       });
     };
 
@@ -264,14 +265,12 @@ export function LandingClient({ initialSettings, initialSeo }: { initialSettings
 
   return (
     <div className="bg-background text-foreground font-body overflow-x-hidden antialiased">
-      {/* Header */}
       <header className={cn(
         "fixed top-0 left-0 right-0 z-40 transition-all duration-300",
         headerBg ? "bg-[#030712]/95 backdrop-blur-xl border-b border-white/5 py-2" : "bg-transparent py-4"
       )}>
         <div className="container mx-auto flex items-center justify-between px-4 text-white">
           <LandingLogo />
-          
           <nav className="hidden md:flex items-center space-x-8 text-sm font-medium">
             {['Início', 'Serviços', 'Sobre', 'Depoimentos', 'Contato'].map(item => (
               <Link key={item} href={`#${item.toLowerCase()}`} className="hover:text-primary transition-all duration-300 hover:scale-110 relative group">
@@ -280,25 +279,17 @@ export function LandingClient({ initialSettings, initialSeo }: { initialSettings
               </Link>
             ))}
           </nav>
-
           <div className="flex items-center gap-4">
-            <Link 
-              href={instagramUrl} 
-              target="_blank" 
-              className="text-white hover:text-primary transition-all duration-300 hover:scale-110 p-2" 
-              aria-label="Siga-nos no Instagram"
-            >
+            <Link href={instagramUrl} target="_blank" className="text-white hover:text-primary transition-all duration-300 hover:scale-110 p-2" aria-label="Siga-nos no Instagram">
               <Instagram className="h-6 w-6" />
             </Link>
           </div>
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="relative">
         <section id="inicio" className="relative min-h-screen flex items-center overflow-hidden bg-gradient-to-br from-[#152c4b] via-[#1a3557] to-[#152c4b]">
           <FloatingParticles />
-          
           <div className="container mx-auto relative z-10 pt-32 pb-20 px-4">
             <div className="grid lg:grid-cols-2 gap-12 items-center">
               <AnimatedSection delay={200} className="relative">
@@ -308,7 +299,7 @@ export function LandingClient({ initialSettings, initialSeo }: { initialSettings
                       <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-primary/5 rounded-3xl blur-3xl" />
                       <img
                         src="/lawyer-portrait.png"
-                        alt="Dr. Alan Bueno De Gois - Advogado Trabalhista Especialista em SBC"
+                        alt="Dr. Alan Bueno De Gois"
                         width={500}
                         height={600}
                         className="relative object-contain object-bottom filter drop-shadow-[0_35px_60px_rgba(245,208,48,0.3)] mx-auto"
@@ -318,53 +309,17 @@ export function LandingClient({ initialSettings, initialSeo }: { initialSettings
                   </ParallaxLayer>
                 </div>
               </AnimatedSection>
-
               <AnimatedSection className="space-y-8">
                 <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/20 border border-primary/30">
                   <Sparkles className="w-4 h-4 text-primary animate-pulse" />
                   <span className="text-sm font-bold text-primary">+10 Anos de Experiência</span>
                 </div>
-
-                <h1 className="font-headline text-5xl md:text-6xl xl:text-7xl font-bold leading-tight text-white">
-                  Defenda <span className="text-primary">Seus</span>
-                  <br />
-                  <span className="text-primary">Direitos</span>
-                  <br />
-                  Trabalhistas
-                </h1>
-
-                <p className="text-xl text-white/90 max-w-2xl leading-relaxed text-justify">
-                  Advocacia trabalhista especializada em <span className="text-primary font-semibold">rescisão de contrato</span>, <span className="text-primary font-semibold">horas extras</span> e <span className="text-primary font-semibold">assédio moral</span>. Atendimento especializado em São Bernardo do Campo.
-                </p>
-
+                <h1 className="font-headline text-5xl md:text-6xl xl:text-7xl font-bold leading-tight text-white">Defenda <span className="text-primary">Seus Direitos</span> Trabalhistas</h1>
+                <p className="text-xl text-white/90 max-w-2xl leading-relaxed text-justify">Advocacia trabalhista especializada em <span className="text-primary font-semibold">rescisão de contrato</span>, <span className="text-primary font-semibold">horas extras</span> e <span className="text-primary font-semibold">assédio moral</span>.</p>
                 <div className="flex flex-wrap gap-4">
-                  <Button 
-                    size="lg" 
-                    className="group bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-base py-7 px-8 rounded-xl shadow-[0_20px_60px_rgba(245,208,48,0.4)] transition-all duration-300 hover:scale-105"
-                    asChild
-                  >
-                    <Link href={whatsappUrl} target="_blank">
-                      <MessageCircle className="mr-3 h-5 w-5 group-hover:rotate-12 transition-transform" />
-                      Consulta Gratuita
-                      <ArrowRight className="ml-3 h-5 w-5 group-hover:translate-x-1 transition-transform" />
-                    </Link>
+                  <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-base py-7 px-8 rounded-xl shadow-[0_20px_60px_rgba(245,208,48,0.4)] transition-all duration-300 hover:scale-105" asChild>
+                    <Link href={whatsappUrl} target="_blank"><MessageCircle className="mr-3 h-5 w-5" /> Consulta Gratuita <ArrowRight className="ml-3 h-5 w-5" /></Link>
                   </Button>
-                  <Button 
-                    size="lg" 
-                    variant="outline"
-                    className="group border-2 border-primary/30 bg-background/50 backdrop-blur-sm hover:bg-primary/10 hover:border-primary font-bold text-base py-7 px-8 rounded-xl transition-all duration-300 hover:scale-105"
-                    asChild
-                  >
-                    <Link href={whatsappUrl} target="_blank">
-                      <Phone className="mr-3 h-5 w-5 group-hover:rotate-12 transition-transform" />
-                      (11) 2897-5218
-                    </Link>
-                  </Button>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-6 pt-8 text-sm text-white/80">
-                  <div className="flex items-center gap-2"><MapPin className="h-4 w-4 text-primary" /><span>Rua Marechal Deodoro, 1594 - SBC/SP</span></div>
-                  <div className="flex items-center gap-2"><Clock className="h-4 w-4 text-primary" /><span>Atendimento Jurídico Especializado</span></div>
                 </div>
               </AnimatedSection>
             </div>
@@ -375,247 +330,28 @@ export function LandingClient({ initialSettings, initialSeo }: { initialSettings
           <AnimatedGradientBg />
           <div className="container mx-auto relative z-10 px-4">
             <AnimatedSection className="text-center mb-16">
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 backdrop-blur-sm mb-6">
-                <Target className="w-4 h-4 text-primary" />
-                <span className="text-sm font-semibold text-primary">Especialidades</span>
-              </div>
-              <h2 className="font-headline text-4xl md:text-5xl font-bold text-gray-900 mb-6">Principais Serviços Jurídicos</h2>
+              <h2 className="font-headline text-4xl md:text-5xl font-bold text-gray-900 mb-6">Serviços Jurídicos</h2>
               <div className="w-24 h-1.5 bg-primary mx-auto mb-6 rounded-full" />
-              <p className="text-xl text-gray-600 max-w-3xl mx-auto">Proteção integral para os seus direitos trabalhistas com foco em resultados.</p>
             </AnimatedSection>
-            
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {services.map((service, index) => {
-                const Icon = service.icon;
-                return (
-                  <AnimatedSection key={index} delay={index * 50}>
-                    <Card className="group relative bg-white border-2 border-gray-150 p-8 flex flex-col h-full hover:border-primary/40 transition-all duration-300 hover:shadow-2xl cursor-pointer shadow-sm">
-                      <div className="w-16 h-16 rounded-xl bg-primary/10 flex items-center justify-center mb-6 group-hover:bg-primary transition-all duration-300">
-                        <Icon className="w-8 h-8 text-primary group-hover:text-primary-foreground transition-colors" />
-                      </div>
-                      <h3 className="font-headline text-2xl font-bold text-gray-900 mb-4">{service.title}</h3>
-                      <p className="text-gray-600 flex-grow leading-relaxed mb-6 text-justify">{service.description}</p>
-                      <Link href={whatsappUrl} target="_blank" className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#152c4b] text-white font-semibold rounded-lg hover:bg-[#1a3659] transition-all">
-                        Consultar Gratuitamente <ChevronRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
-                      </Link>
-                    </Card>
-                  </AnimatedSection>
-                );
-              })}
-            </div>
-          </div>
-        </section>
-
-        <section id="sobre" className="relative py-40 bg-gray-50 overflow-hidden">
-          <div className="container mx-auto px-4 relative z-10">
-            <div className="grid lg:grid-cols-2 gap-16 items-center">
-              <div className="space-y-8">
-                <AnimatedSection>
-                  <h2 className="font-headline text-4xl md:text-5xl font-bold text-gray-900">Bueno Gois Advogados<br /><span className="text-primary">Excelência Jurídica em SBC</span></h2>
+              {services.map((service, index) => (
+                <AnimatedSection key={index} delay={index * 50}>
+                  <Card className="group relative bg-white border-2 border-gray-150 p-8 flex flex-col h-full hover:border-primary/40 transition-all duration-300 hover:shadow-2xl cursor-pointer shadow-sm">
+                    <div className="w-16 h-16 rounded-xl bg-primary/10 flex items-center justify-center mb-6 group-hover:bg-primary transition-all duration-300"><service.icon className="w-8 h-8 text-primary group-hover:text-primary-foreground transition-colors" /></div>
+                    <h3 className="font-headline text-2xl font-bold text-gray-900 mb-4">{service.title}</h3>
+                    <p className="text-gray-600 flex-grow leading-relaxed mb-6 text-justify">{service.description}</p>
+                    <Link href={whatsappUrl} target="_blank" className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#152c4b] text-white font-semibold rounded-lg hover:bg-[#1a3659] transition-all">Consultar Gratuitamente <ChevronRight className="h-5 w-5" /></Link>
+                  </Card>
                 </AnimatedSection>
-                <AnimatedSection delay={100}>
-                  <div className="pl-6 border-l-4 border-primary bg-primary/5 p-6 rounded-r-xl">
-                    <p className="italic text-primary text-xl mb-2 font-bold">&ldquo;Contra iniuriam, pro iustitia operarii&rdquo;</p>
-                    <p className="text-gray-700 text-sm font-medium uppercase tracking-wider">Justiça para o trabalhador acima de tudo.</p>
-                  </div>
-                </AnimatedSection>
-                <p className="text-lg text-gray-600 leading-relaxed text-justify">Somos um escritório com foco exclusivo na defesa do trabalhador, aliando tecnologia e experiênca para garantir resultados sólidos e proteção aos seus direitos fundamentais.</p>
-                <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-7 px-8 rounded-xl shadow-lg transition-all hover:scale-105" asChild>
-                  <Link href={whatsappUrl} target="_blank"><MessageCircle className="mr-3 h-5 w-5" /> Fale com um Especialista</Link>
-                </Button>
-              </div>
-              <AnimatedSection delay={150}>
-                <div className="relative h-[550px] w-full rounded-3xl overflow-hidden shadow-2xl border-8 border-white">
-                  <img src="/lawyer-action.jpg" alt="Equipe Bueno Gois Advogados em Atendimento" className="w-full h-full object-cover" loading="lazy" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#152c4b]/80 to-transparent" />
-                </div>
-              </AnimatedSection>
-            </div>
-          </div>
-        </section>
-
-        <section id="depoimentos" className="relative py-40 bg-[#0b1324] overflow-hidden">
-          <div className="container mx-auto px-4 relative z-10">
-            <AnimatedSection className="text-center mb-16">
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 backdrop-blur-sm mb-6">
-                <Star className="w-4 h-4 text-primary" />
-                <span className="text-sm font-semibold text-primary">Voz do Cliente</span>
-              </div>
-              <h2 className="font-headline text-4xl md:text-5xl font-bold text-white mb-6">Histórias de Sucesso</h2>
-              <div className="w-24 h-1.5 bg-primary mx-auto mb-6 rounded-full" />
-              <p className="text-xl text-slate-400 max-w-3xl mx-auto">O que dizem aqueles que recuperaram seus direitos e dignidade conosco.</p>
-            </AnimatedSection>
-
-            <AnimatedSection delay={200} className="relative px-12">
-              <Carousel 
-                opts={{
-                  align: "start",
-                  loop: true,
-                }}
-                className="w-full"
-              >
-                <CarouselContent className="-ml-4">
-                  {testimonials.map((testimonial, index) => (
-                    <CarouselItem key={index} className="pl-4 md:basis-1/2 lg:basis-1/3">
-                      <Card className="bg-white/5 border-white/10 p-8 rounded-3xl h-full flex flex-col justify-between hover:border-primary/30 transition-all duration-300 relative group/card overflow-hidden">
-                        <Quote className="absolute -top-4 -right-4 h-24 w-24 text-primary/5 group-hover/card:text-primary/10 transition-colors" />
-                        <div className="space-y-6 relative z-10">
-                          <div className="flex gap-1">
-                            {[...Array(5)].map((_, i) => (
-                              <Star key={i} className="w-4 h-4 text-primary fill-primary" />
-                            ))}
-                          </div>
-                          <p className="text-slate-200 italic leading-relaxed text-lg">
-                            &ldquo;{testimonial.text}&rdquo;
-                          </p>
-                        </div>
-                        <div className="mt-8 flex items-center gap-4 relative z-10">
-                          <div className="h-12 w-12 rounded-full bg-primary/20 flex items-center justify-center text-primary font-black border border-primary/30">
-                            {testimonial.name.charAt(0)}
-                          </div>
-                          <div>
-                            <p className="text-white font-bold">{testimonial.name}</p>
-                            <p className="text-[9px] text-primary font-black uppercase tracking-widest flex items-center gap-1">
-                              <CheckCircle2 className="h-3 w-3" /> Cliente Verificado
-                            </p>
-                          </div>
-                        </div>
-                      </Card>
-                    </CarouselItem>
-                  ))}
-                </CarouselContent>
-                <div className="hidden lg:block">
-                  <CarouselPrevious className="bg-white/5 border-white/10 text-white hover:bg-primary hover:text-primary-foreground -left-12" />
-                  <CarouselNext className="bg-white/5 border-white/10 text-white hover:bg-primary hover:text-primary-foreground -right-12" />
-                </div>
-              </Carousel>
-            </AnimatedSection>
-          </div>
-        </section>
-
-        <section id="contato" className="relative py-40 bg-white overflow-hidden">
-          <div className="container mx-auto px-4 relative z-10">
-            <div className="max-w-6xl mx-auto bg-gray-50 rounded-3xl shadow-2xl overflow-hidden grid lg:grid-cols-3">
-              <div className="lg:col-span-2 h-[500px]">
-                <iframe 
-                  width="100%" 
-                  height="100%" 
-                  frameBorder="0" 
-                  title="Mapa de Localização Bueno Gois"
-                  src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3644.684!2d-46.5556!3d-23.6936!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x94ce4278d2c00001%3A0xa1b2c3d4e5f6!2sRua%20Marechal%20Deodoro%2C%201594%20-%20Sala%202%2C%20S%C3%A3o%20Bernardo%20do%20Campo%20-%20SP%2C%2009715-070!5e0!3m2!1spt-BR!2sbr!4v1701890000000" 
-                  loading="lazy" 
-                  className="grayscale hover:grayscale-0 transition-all duration-700" 
-                />
-              </div>
-              <div className="p-12 bg-[#152c4b] text-white flex flex-col justify-center space-y-8">
-                <h3 className="font-headline text-3xl font-bold">Contato Direto</h3>
-                <div className="space-y-6">
-                  <div className="flex items-start gap-4"><MapPin className="w-6 h-6 text-primary shrink-0" /><p className="text-lg">Rua Marechal Deodoro, 1594 - SBC/SP</p></div>
-                  <div className="flex items-start gap-4"><Phone className="w-6 h-6 text-primary shrink-0" /><p className="text-lg">(11) 2897-5218</p></div>
-                  <div className="flex items-start gap-4"><MessageCircle className="w-6 h-6 text-primary shrink-0" /><p className="text-lg">(11) 98059-0128 | (11) 96085-6744</p></div>
-                </div>
-                <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-6 shadow-xl shadow-primary/20" asChild>
-                  <Link href={whatsappUrl} target="_blank">Falar no WhatsApp</Link>
-                </Button>
-              </div>
+              ))}
             </div>
           </div>
         </section>
       </main>
 
-      {/* Footer */}
       <footer className="relative bg-[#020617] text-white pt-24 pb-12 border-t-2 border-primary/30">
-        <div className="container mx-auto px-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 lg:gap-8 mb-16">
-            
-            {/* Branding */}
-            <div className="space-y-6">
-              <div className="p-2 rounded-xl inline-block bg-[#152c4b] shadow-inner border border-white/5">
-                <img src="/logo.png" alt="Bueno Gois" className="h-16 w-auto" />
-              </div>
-              <p className="text-slate-400 text-sm leading-relaxed text-justify">
-                {currentSettings?.officeName || 'Bueno Gois Advogados e Associados'}. 
-                Especialistas em Direito do Trabalho, unindo tradição e tecnologia para proteger os direitos de quem constrói o país.
-              </p>
-              <div className="flex items-center gap-4">
-                <Link href={instagramUrl} target="_blank" className="h-10 w-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-primary hover:text-primary-foreground transition-all duration-300">
-                  <Instagram className="h-6 w-6" />
-                </Link>
-                <Link href="#" className="h-10 w-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-primary hover:text-primary-foreground transition-all duration-300">
-                  <AtSign className="h-6 w-6" />
-                </Link>
-              </div>
-            </div>
-
-            {/* Especialidades */}
-            <div className="space-y-6">
-              <h4 className="text-xs font-black uppercase tracking-[0.2em] text-primary flex items-center gap-2">
-                <ShieldCheck className="h-4 w-4" /> Especialidades
-              </h4>
-              <ul className="grid gap-3 text-sm text-slate-400 font-medium">
-                {['Rescisão de Contrato', 'Horas Extras', 'Assédio no Trabalho', 'Acidente de Trabalho', 'Danos Morais'].map(item => (
-                  <li key={item} className="hover:text-primary transition-colors flex items-center gap-2 group">
-                    <ChevronRight className="h-3 w-3 text-primary/40 group-hover:translate-x-1 transition-transform" />
-                    <Link href="#servicos">{item}</Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Links Rápidos */}
-            <div className="space-y-6">
-              <h4 className="text-xs font-black uppercase tracking-[0.2em] text-primary flex items-center gap-2">
-                <Building className="h-4 w-4" /> Escritório
-              </h4>
-              <ul className="grid gap-3 text-sm text-slate-400 font-medium">
-                {['Início', 'Sobre Nós', 'Depoimentos', 'Localização'].map(item => (
-                  <li key={item} className="hover:text-primary transition-colors flex items-center gap-2 group">
-                    <ChevronRight className="h-3 w-3 text-primary/40 group-hover:translate-x-1 transition-transform" />
-                    <Link href={`#${item.toLowerCase().replace(' ', '')}`}>{item}</Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Contato */}
-            <div className="space-y-6">
-              <h4 className="text-xs font-black uppercase tracking-[0.2em] text-primary flex items-center gap-2">
-                <Smartphone className="h-4 w-4" /> Contato
-              </h4>
-              <div className="space-y-4 text-sm text-slate-400">
-                <div className="flex items-start gap-3">
-                  <MapPin className="h-5 w-5 text-primary shrink-0" />
-                  <p className="leading-tight">
-                    {currentSettings?.address || 'Rua Marechal Deodoro, 1594 - Sala 2, São Bernardo do Campo / SP'}
-                  </p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Phone className="h-5 w-5 text-primary shrink-0" />
-                  <p className="font-bold text-white">(11) 2897-5218</p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <MessageCircle className="h-5 w-5 text-primary shrink-0" />
-                  <p className="font-bold text-white text-xs">011 9 8059-0128</p>
-                </div>
-                <div className="pt-4">
-                  <Badge variant="outline" className="border-emerald-500/20 text-emerald-400 bg-emerald-500/5 text-[9px] font-black uppercase py-1 px-3">
-                    <CheckCircle2 className="h-3 w-3 mr-1.5" /> Atendimento Online Ativo
-                  </Badge>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="pt-12 border-t border-white/5 flex flex-col md:flex-row items-center justify-between gap-6 text-[10px] font-black uppercase tracking-widest text-slate-500">
-            <p>&copy; {new Date().getFullYear()} {currentSettings?.officeName || 'Bueno Gois Advogados e Associados'} </p>
-            <div className="flex gap-8">
-              <Link href="/login" className="hover:text-primary transition-colors flex items-center gap-1.5 group">
-                <span className="opacity-50 group-hover:opacity-100">🔒</span> Área do Advogado
-              </Link>
-              <Link href="#" className="hover:text-primary transition-colors">Privacidade</Link>
-              <p className="text-primary/40">Powered by LexFlow Elite</p>
-            </div>
-          </div>
+        <div className="container mx-auto px-4 text-center">
+          <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">&copy; {new Date().getFullYear()} {currentSettings?.officeName || 'Bueno Gois Advogados e Associados'}</p>
         </div>
       </footer>
 
