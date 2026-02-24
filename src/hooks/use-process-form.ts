@@ -3,7 +3,7 @@ import { useCallback, useMemo } from 'react';
 import { z } from 'zod';
 import { useToast } from '@/components/ui/use-toast';
 import { useFirebase } from '@/firebase';
-import { collection, serverTimestamp, doc, addDoc, updateDoc } from 'firebase/firestore';
+import { collection, serverTimestamp, doc, addDoc, updateDoc, getDoc } from 'firebase/firestore';
 import type { Process } from '@/lib/types';
 
 export const processSchema = z.object({
@@ -151,9 +151,22 @@ export const useProcessForm = (process?: Process | null, onSave?: () => void) =>
     try {
       let savedProcessId = process?.id;
       
-      // Preparação e Limpeza de Dados (Crucial para evitar erro de undefined)
+      // Busca dados denormalizados do cliente para facilitar a busca de processos
+      let clientName = '';
+      let clientDocument = '';
+      if (values.clientId) {
+        const clientSnap = await getDoc(doc(firestore, 'clients', values.clientId));
+        if (clientSnap.exists()) {
+          const c = clientSnap.data();
+          clientName = `${c.firstName} ${c.lastName || ''}`.trim();
+          clientDocument = c.document || '';
+        }
+      }
+
       const rawData = {
         ...values,
+        clientName,
+        clientDocument,
         secondaryClientIds: values.secondaryClientIds.map(item => item.id),
         updatedAt: serverTimestamp(),
       };

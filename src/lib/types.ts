@@ -131,6 +131,7 @@ export type Process = {
   id: string;
   clientId: string;
   clientName?: string;
+  clientDocument?: string;
   clientRole?: 'Polo Ativo' | 'Polo Passivo';
   secondaryClientIds?: string[];
   name: string;

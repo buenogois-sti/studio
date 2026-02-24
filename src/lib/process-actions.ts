@@ -1,3 +1,4 @@
+
 'use server';
 import { firestoreAdmin } from '@/firebase/admin';
 import type { Process, DocumentTemplate, TimelineEvent, Client, Staff, Lead } from './types';
@@ -110,16 +111,19 @@ export async function searchProcesses(query: string): Promise<Process[]> {
     
     try {
         const q = query.trim().toLowerCase();
+        // Busca processos ativos ou pendentes
         const snapshot = await firestoreAdmin.collection('processes')
             .orderBy('updatedAt', 'desc')
-            .limit(150)
+            .limit(200)
             .get();
         
         const results = snapshot.docs
             .map(doc => ({ id: doc.id, ...doc.data() } as Process))
             .filter(p => 
                 p.name.toLowerCase().includes(q) || 
-                (p.processNumber || '').includes(q)
+                (p.processNumber || '').includes(q) ||
+                (p.clientName || '').toLowerCase().includes(q) ||
+                (p.clientDocument || '').includes(q)
             );
 
         return results.slice(0, 10);

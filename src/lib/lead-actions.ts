@@ -174,6 +174,7 @@ export async function convertLeadToProcess(leadId: string, data: {
     const processPayload: Omit<Process, 'id'> = {
       clientId: leadData.clientId,
       clientName: leadData.clientName || '',
+      clientDocument: leadData.clientDocument || '',
       name: leadData.title,
       legalArea: leadData.legalArea,
       description: leadData.description || '',

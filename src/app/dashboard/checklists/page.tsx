@@ -665,11 +665,11 @@ const ChecklistExecutorDialog = React.memo(function ChecklistExecutorDialog({ op
                 )}>
                   <div className="flex items-center gap-3 overflow-hidden">
                     {selectedTarget.type === 'process' ? <FolderKanban className="h-5 w-5 text-primary shrink-0" /> : <Zap className="h-5 w-5 text-emerald-500 shrink-0" />}
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <p className="text-sm font-black text-white truncate">{selectedTarget.type === 'process' ? selectedTarget.data.name : selectedTarget.data.title}</p>
                       <p className="text-[10px] text-muted-foreground font-mono tracking-widest">
                         {selectedTarget.type === 'process' 
-                          ? (selectedTarget.data.processNumber || 'Sem Nº CNJ') 
+                          ? `${selectedTarget.data.processNumber || 'Sem Nº'} - Cliente: ${selectedTarget.data.clientName || 'N/A'}` 
                           : `LEAD #${selectedTarget.data.id.substring(0,6)} - ${selectedTarget.data.clientName || 'Doc: ' + selectedTarget.data.clientDocument}`}
                       </p>
                     </div>
@@ -711,7 +711,7 @@ const ChecklistExecutorDialog = React.memo(function ChecklistExecutorDialog({ op
                                 </p>
                                 <p className="text-[10px] text-slate-500 font-mono uppercase mt-0.5">
                                   {item.type === 'process' 
-                                    ? (item.data.processNumber || 'Nº não informado') 
+                                    ? `${item.data.processNumber || 'Sem Nº'} - Cliente: ${item.data.clientName || 'N/A'}` 
                                     : `Lead: ${item.data.clientName || 'Sem nome'} (${item.data.clientDocument || 'Sem CPF'})`}
                                 </p>
                               </div>
