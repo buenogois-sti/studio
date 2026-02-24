@@ -29,26 +29,26 @@ function buildCalendarDescription(data: {
   createdByName: string;
   clientNotified?: boolean;
   notificationMethod?: string;
+  isMeeting?: boolean;
 }) {
   const cleanPhone = data.clientPhone.replace(/\D/g, '');
   const whatsappLink = cleanPhone ? `https://wa.me/${cleanPhone.startsWith('55') ? cleanPhone : '55' + cleanPhone}` : 'Telefone não disponível';
 
+  const typeLabel = data.isMeeting ? '🗓️ ATENDIMENTO / REUNIÃO' : '📌 PROCESSO JUDICIAL';
+
   return [
-    `📌 Processo Judicial`,
-    `Tipo: ${data.legalArea}`,
+    typeLabel,
+    data.isMeeting ? `Finalidade: ${data.legalArea}` : `Tipo: ${data.legalArea}`,
     ``,
     `🔢 Número do Processo:`,
     `${data.processNumber}`,
     ``,
-    `⚖️ Juízo / Vara:`,
-    `${data.courtBranch || 'Não informado'}`,
+    data.isMeeting ? `📍 Local/Modo:` : `⚖️ Juízo / Vara:`,
+    `${data.courtBranch || data.location || 'Não informado'}`,
     ``,
     `👤 Cliente:`,
     `${data.clientName} - ${data.clientPhone}`,
     `Link WhatsApp: ${whatsappLink}`,
-    ``,
-    `📍 Local:`,
-    `${data.location}`,
     ``,
     `👨‍⚖️ Responsável:`,
     `${data.responsibleParty}`,
@@ -125,7 +125,7 @@ export async function createHearing(data: {
       createdById: session.user.id,
       createdByName: session.user.name || 'Sistema',
       date: Timestamp.fromDate(new Date(hearingDate)),
-      location: summarizeAddress(location),
+      location: type === 'ATENDIMENTO' ? location : summarizeAddress(location),
       courtBranch: courtBranch || '',
       responsibleParty,
       status: status || 'PENDENTE',
@@ -139,18 +139,34 @@ export async function createHearing(data: {
 
     const hearingRef = await firestoreAdmin.collection('hearings').add(hearingPayload);
 
+    // Timeline do Processo
+    const timelineEvent: TimelineEvent = {
+      id: uuidv4(),
+      type: type === 'ATENDIMENTO' ? 'meeting' : 'hearing',
+      description: `${type === 'ATENDIMENTO' ? 'ATENDIMENTO AGENDADO' : 'AUDIÊNCIA AGENDADA'}: ${type} para o dia ${format(new Date(hearingDate), 'dd/MM/yyyy HH:mm', { locale: ptBR })}. Local: ${location}.`,
+      date: Timestamp.now() as any,
+      authorName: session.user.name || 'Sistema'
+    };
+
+    await firestoreAdmin.collection('processes').doc(processId).update({
+      timeline: FieldValue.arrayUnion(timelineEvent),
+      updatedAt: FieldValue.serverTimestamp()
+    });
+
     // Sincronização com o Google Agenda
     try {
       const { calendar } = await getGoogleApiClientsForUser();
       const startDateTime = new Date(hearingDate);
       const endDateTime = add(startDateTime, { hours: 1 });
 
+      const isMeeting = type === 'ATENDIMENTO';
+
       const description = buildCalendarDescription({
         legalArea,
         processNumber,
         clientName: clientInfo.name,
         clientPhone: clientInfo.phone,
-        location: summarizeAddress(location),
+        location: isMeeting ? location : summarizeAddress(location),
         courtBranch: courtBranch,
         responsibleParty,
         status: status || 'PENDENTE',
@@ -158,11 +174,13 @@ export async function createHearing(data: {
         id: hearingRef.id,
         createdByName: session.user.name || 'Sistema',
         clientNotified: !!clientNotified,
-        notificationMethod: notificationMethod
+        notificationMethod: notificationMethod,
+        isMeeting
       });
 
+      const summaryPrefix = isMeeting ? '🗓️ REUNIÃO' : (type === 'PERICIA' ? '🔍 Perícia' : '⚖️ Audiência');
       const event = {
-        summary: `${type === 'PERICIA' ? '🔍 Perícia' : '⚖️ Audiência'} [${type}] | ${clientInfo.name} (Dr. ${lawyerName})`,
+        summary: `${summaryPrefix} [${type}] | ${clientInfo.name} (Dr. ${lawyerName})`,
         location: location,
         description: description,
         start: { dateTime: formatISO(startDateTime), timeZone: 'America/Sao_Paulo' },
@@ -192,8 +210,8 @@ export async function createHearing(data: {
     if (lawyerId !== session.user.id) {
       await createNotification({
         userId: lawyerId,
-        title: "Pauta Atualizada",
-        description: `${session.user.name} agendou um ato (${type}) para você no processo ${processData?.name}.`,
+        title: isMeeting ? "Novo Atendimento Agendado" : "Pauta Atualizada",
+        description: `${session.user.name} agendou um compromisso (${type}) para você no processo ${processData?.name}.`,
         type: 'hearing',
         href: `/dashboard/audiencias`,
       });
@@ -201,8 +219,8 @@ export async function createHearing(data: {
     
     return { success: true, id: hearingRef.id };
   } catch (error: any) {
-    console.error('Error creating hearing:', error);
-    throw new Error(error.message || 'Falha ao agendar audiência.');
+    console.error('Error creating hearing/meeting:', error);
+    throw new Error(error.message || 'Falha ao realizar agendamento.');
   }
 }
 
@@ -212,7 +230,7 @@ export async function updateHearingStatus(hearingId: string, status: HearingStat
     try {
         const hearingRef = firestoreAdmin.collection('hearings').doc(hearingId);
         const hearingDoc = await hearingRef.get();
-        if (!hearingDoc.exists) throw new Error('Audiência não encontrada.');
+        if (!hearingDoc.exists) throw new Error('Agendamento não encontrado.');
         const hearing = hearingDoc.data();
 
         await hearingRef.update({ status, updatedAt: FieldValue.serverTimestamp() });
@@ -221,7 +239,6 @@ export async function updateHearingStatus(hearingId: string, status: HearingStat
             try {
                 const { calendar } = await getGoogleApiClientsForUser();
                 
-                // Se for adiada ou cancelada, removemos do calendário para limpar a pauta conforme solicitado
                 if (status === 'ADIADA' || status === 'CANCELADA') {
                   await calendar.events.delete({
                     calendarId: 'primary',
@@ -229,9 +246,9 @@ export async function updateHearingStatus(hearingId: string, status: HearingStat
                   });
                   await hearingRef.update({ googleCalendarEventId: FieldValue.delete() });
                 } else {
-                  // Apenas atualiza o prefixo para REALIZADA
                   const prefix = status === 'REALIZADA' ? '✅ ' : '';
-                  const typeLabel = hearing.type === 'PERICIA' ? 'Perícia' : 'Audiência';
+                  const isMeeting = hearing.type === 'ATENDIMENTO';
+                  const typeLabel = isMeeting ? 'Reunião' : (hearing.type === 'PERICIA' ? 'Perícia' : 'Audiência');
                   
                   await calendar.events.patch({
                       calendarId: 'primary',

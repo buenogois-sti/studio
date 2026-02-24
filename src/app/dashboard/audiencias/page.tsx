@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -33,7 +32,8 @@ import {
   HelpCircle,
   Eye,
   ExternalLink,
-  RotateCcw
+  RotateCcw,
+  Video
 } from 'lucide-react';
 import { 
   format, 
@@ -91,6 +91,12 @@ const statusConfig: Record<HearingStatus, { label: string; icon: any; color: str
     REALIZADA: { label: 'Realizada', icon: CheckCircle2, color: 'text-emerald-500 bg-emerald-500/10' },
     CANCELADA: { label: 'Cancelada', icon: XCircle, color: 'text-rose-500 bg-rose-500/10' },
     ADIADA: { label: 'Adiada', icon: AlertTriangle, color: 'text-amber-500 bg-amber-500/10' },
+};
+
+const getTypeIcon = (type: string) => {
+  if (type === 'ATENDIMENTO') return <Users className="h-3.5 w-3.5" />;
+  if (type === 'PERICIA') return <Activity className="h-3.5 w-3.5" />;
+  return <Gavel className="h-3.5 w-3.5" />;
 };
 
 export default function AudienciasPage() {
@@ -210,9 +216,9 @@ export default function AudienciasPage() {
     <div className="flex flex-col gap-8 pb-10">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
-                <H1 className="text-white text-3xl font-black">Pauta de Audiências</H1>
+                <H1 className="text-white text-3xl font-black">Agenda de Compromissos</H1>
                 <p className="text-sm text-muted-foreground">
-                  {userProfile?.role === 'lawyer' ? 'Seus compromissos judiciais agendados.' : 'Visão global e distribuição de pauta do escritório.'}
+                  {userProfile?.role === 'lawyer' ? 'Seus compromissos estratégicos e judiciais.' : 'Visão global de atendimentos e pauta da banca.'}
                 </p>
             </div>
             
@@ -242,7 +248,7 @@ export default function AudienciasPage() {
                     disabled={isLoading}
                 >
                     <RefreshCw className={cn("h-4 w-4 mr-2", isLoading && "animate-spin")} />
-                    {isLoading ? 'Sincronizando...' : 'Atualizar Pauta'}
+                    {isLoading ? 'Sincronizando...' : 'Atualizar Agenda'}
                 </Button>
             </div>
         </div>
@@ -254,7 +260,7 @@ export default function AudienciasPage() {
                 <AlertCircle className="h-5 w-5 text-amber-500" />
                 <div>
                   <p className="text-sm font-bold text-amber-200">Retornos Jurídicos Pendentes</p>
-                  <p className="text-xs text-amber-400/70">Existem {pendingReturns.length} audiência(s) realizada(s) aguardando o seguimento jurídico.</p>
+                  <p className="text-xs text-amber-400/70">Existem {pendingReturns.length} compromisso(s) realizado(s) aguardando o seguimento operacional.</p>
                 </div>
               </div>
               <Button 
@@ -286,7 +292,7 @@ export default function AudienciasPage() {
                 {isLoading ? (
                   <div className="flex flex-col items-center justify-center py-32 space-y-4">
                     <Loader2 className="h-12 w-12 animate-spin text-primary" />
-                    <p className="text-sm font-black uppercase tracking-widest text-muted-foreground">Buscando pauta...</p>
+                    <p className="text-sm font-black uppercase tracking-widest text-muted-foreground">Buscando compromissos...</p>
                   </div>
                 ) : (
                   <Card className="bg-[#0f172a] border-white/5 overflow-hidden shadow-2xl">
@@ -312,22 +318,35 @@ export default function AudienciasPage() {
                                               const p = processesMap.get(h.processId);
                                               const StatusIcon = statusConfig[h.status || 'PENDENTE'].icon;
                                               const isUpdating = isProcessing === h.id;
+                                              const isMeeting = h.type === 'ATENDIMENTO';
                                               
                                               return (
-                                                  <div key={h.id} className="flex flex-col md:flex-row md:items-center gap-6 p-5 rounded-2xl border border-white/5 bg-black/20 hover:bg-black/40 hover:border-primary/20 transition-all duration-300 group">
+                                                  <div key={h.id} className={cn(
+                                                    "flex flex-col md:flex-row md:items-center gap-6 p-5 rounded-2xl border transition-all duration-300 group",
+                                                    isMeeting ? "bg-emerald-500/[0.02] border-emerald-500/10 hover:border-emerald-500/30" : "bg-black/20 border-white/5 hover:border-primary/20"
+                                                  )}>
                                                       <div className="flex items-center gap-3 min-w-[100px] border-r border-white/5 pr-4">
-                                                          <Clock className="h-4 w-4 text-primary" />
+                                                          <Clock className={cn("h-4 w-4", isMeeting ? "text-emerald-400" : "text-primary")} />
                                                           <span className="text-base font-black text-white tabular-nums">{format(h.date.toDate(), 'HH:mm')}</span>
                                                       </div>
                                                       <div className="flex-1 min-w-0">
                                                           <div className="flex flex-wrap items-center gap-2 mb-2">
-                                                              <Badge variant="outline" className="text-[9px] font-black uppercase border-primary/30 text-primary px-2">{h.type}</Badge>
+                                                              <Badge variant="outline" className={cn(
+                                                                "text-[9px] font-black uppercase px-2 gap-1.5 h-5",
+                                                                isMeeting ? "border-emerald-500/30 text-emerald-400" : "border-primary/30 text-primary"
+                                                              )}>
+                                                                {getTypeIcon(h.type)}
+                                                                {h.type}
+                                                              </Badge>
                                                               <Badge variant="outline" className="text-[9px] font-black uppercase border-white/10 text-slate-400 flex items-center gap-1">
-                                                                  <Users className="h-2.5 w-2.5" /> Dr(a). {h.lawyerName || 'Pendente'}
+                                                                  <User className="h-2.5 w-2.5" /> Dr(a). {h.lawyerName || 'Pendente'}
                                                               </Badge>
                                                           </div>
-                                                          <h4 className="font-black text-lg text-white truncate group-hover:text-primary transition-colors">{p?.name}</h4>
-                                                          <p className="text-[10px] text-slate-500 font-mono mt-1 flex items-center gap-1.5"><MapPin className="h-3 w-3 text-primary shrink-0" /> {h.location}</p>
+                                                          <h4 className="font-black text-lg text-white truncate group-hover:text-primary transition-colors">{p?.name || h.processName}</h4>
+                                                          <p className="text-[10px] text-slate-500 font-mono mt-1 flex items-center gap-1.5">
+                                                            {isMeeting ? <Video className="h-3 w-3 text-emerald-500 shrink-0" /> : <MapPin className="h-3 w-3 text-primary shrink-0" />} 
+                                                            {h.location}
+                                                          </p>
                                                       </div>
                                                       <div className="flex items-center gap-3">
                                                           <Badge variant="outline" className={cn("gap-1.5 h-8 px-4 text-[10px] font-black uppercase tracking-widest", statusConfig[h.status || 'PENDENTE'].color)}>
@@ -340,10 +359,10 @@ export default function AudienciasPage() {
                                                               </DropdownMenuTrigger>
                                                               <DropdownMenuContent align="end" className="bg-[#0f172a] border-white/10 w-56 p-1">
                                                                   <DropdownMenuItem onClick={() => handleUpdateStatus(h, 'REALIZADA')} className="font-bold gap-2 text-white hover:bg-emerald-500/10">
-                                                                      <ArrowRightCircle className="h-4 w-4 text-emerald-500" /> Marcar Realizada
+                                                                      <CheckCircle2 className="h-4 w-4 text-emerald-500" /> Marcar Concluído
                                                                   </DropdownMenuItem>
                                                                   <DropdownMenuItem onClick={() => handleUpdateStatus(h, 'ADIADA')} className="font-bold gap-2 text-white">
-                                                                      <Clock3 className="h-4 w-4 text-amber-500" /> Adiar Audiência
+                                                                      <Clock3 className="h-4 w-4 text-amber-500" /> Adiar Atendimento
                                                                   </DropdownMenuItem>
                                                                   <DropdownMenuItem className="text-rose-500 font-bold gap-2" onClick={() => handleUpdateStatus(h, 'CANCELADA')}>
                                                                       <XCircle className="h-4 w-4" /> Cancelar
@@ -416,7 +435,8 @@ export default function AudienciasPage() {
                               <div key={h.id} className={cn(
                                 "w-1.5 h-1.5 rounded-full",
                                 h.status === 'REALIZADA' ? "bg-emerald-500" : 
-                                h.status === 'CANCELADA' ? "bg-rose-500" : "bg-primary"
+                                h.status === 'CANCELADA' ? "bg-rose-500" : 
+                                h.type === 'ATENDIMENTO' ? "bg-emerald-400" : "bg-primary"
                               )} />
                             ))}
                           </div>
@@ -438,20 +458,26 @@ export default function AudienciasPage() {
                         <div className="p-4 space-y-4">
                           {hearingsForSelectedDay.length > 0 ? (
                             hearingsForSelectedDay.map(h => (
-                              <div key={h.id} className="p-5 rounded-2xl border border-white/5 bg-black/30 space-y-4 hover:border-primary/20 transition-all group">
+                              <div key={h.id} className={cn(
+                                "p-5 rounded-2xl border space-y-4 transition-all group",
+                                h.type === 'ATENDIMENTO' ? "bg-emerald-500/[0.03] border-emerald-500/20" : "bg-black/30 border-white/5 hover:border-primary/20"
+                              )}>
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center gap-2">
-                                    <Clock className="h-3.5 w-3.5 text-primary" />
+                                    <Clock className={cn("h-3.5 w-3.5", h.type === 'ATENDIMENTO' ? "text-emerald-400" : "text-primary")} />
                                     <span className="text-xs font-black text-white">{format(h.date.toDate(), 'HH:mm')}</span>
                                   </div>
                                   <Badge variant="outline" className={cn("text-[8px] font-black uppercase tracking-widest px-2 h-5 border-none", statusConfig[h.status || 'PENDENTE'].color)}>
                                     {h.status}
                                   </Badge>
                                 </div>
-                                <p className="text-xs font-black text-slate-200 leading-snug line-clamp-2">{processesMap.get(h.processId)?.name}</p>
+                                <div className="space-y-1">
+                                  <p className="text-[10px] font-black uppercase text-slate-500 tracking-tighter">{h.type}</p>
+                                  <p className="text-xs font-black text-slate-200 leading-snug line-clamp-2">{processesMap.get(h.processId)?.name || h.processName}</p>
+                                </div>
                                 <div className="pt-2 border-t border-white/5">
                                   <p className="text-[10px] text-slate-500 flex items-start gap-1.5">
-                                    <MapPin className="h-3 w-3 text-primary shrink-0 mt-0.5" /> 
+                                    {h.type === 'ATENDIMENTO' ? <Video className="h-3 w-3 text-emerald-500 shrink-0 mt-0.5" /> : <MapPin className="h-3 w-3 text-primary shrink-0 mt-0.5" />}
                                     <span className="line-clamp-2">{h.location}</span>
                                   </p>
                                 </div>
@@ -460,7 +486,7 @@ export default function AudienciasPage() {
                           ) : (
                             <div className="flex flex-col items-center justify-center py-32 text-center opacity-20">
                               <CalendarIcon className="h-12 w-12 mb-3" />
-                              <p className="text-[10px] font-black uppercase tracking-widest">Sem atos agendados</p>
+                              <p className="text-[10px] font-black uppercase tracking-widest">Sem compromissos</p>
                             </div>
                           )}
                         </div>
@@ -477,9 +503,9 @@ export default function AudienciasPage() {
                       <TableHeader className="bg-white/5 text-[10px] uppercase font-black tracking-[0.2em] text-slate-500 border-b border-white/5">
                         <TableRow>
                           <TableHead className="px-6 py-5">Data/Hora</TableHead>
-                          <TableHead className="px-6 py-5">Processo / Advogado</TableHead>
+                          <TableHead className="px-6 py-5">Tipo / Processo</TableHead>
+                          <TableHead className="px-6 py-5">Responsável</TableHead>
                           <TableHead className="px-6 py-5">Status Final</TableHead>
-                          <TableHead className="px-6 py-5">Retorno Jurídico</TableHead>
                           <TableHead className="px-6 py-5 text-right">Ações</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -500,31 +526,27 @@ export default function AudienciasPage() {
                                   </TableCell>
                                   <TableCell className="px-6 py-5">
                                     <div className="flex flex-col">
+                                      <div className="flex items-center gap-2 mb-1">
+                                        <Badge variant="secondary" className="bg-white/10 text-slate-400 border-none text-[8px] font-black h-4.5 px-1.5">{h.type}</Badge>
+                                        {isPendingReturn && <Badge className="bg-amber-500/20 text-amber-400 border-none text-[8px] font-black h-4.5 px-1.5 animate-pulse">REQUER RETORNO</Badge>}
+                                      </div>
                                       <span className="text-slate-300 font-bold group-hover:text-primary transition-colors truncate max-w-[200px]">
-                                        {process?.name}
+                                        {process?.name || h.processName}
                                       </span>
-                                      <span className="text-[9px] text-primary/60 font-black uppercase">{h.lawyerName || 'Pendente'}</span>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="px-6 py-5">
+                                    <div className="flex items-center gap-2">
+                                      <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-primary text-[8px] font-black border border-primary/20">
+                                        {h.lawyerName?.charAt(0)}
+                                      </div>
+                                      <span className="text-[10px] text-slate-400 font-black uppercase">{h.lawyerName || 'Pendente'}</span>
                                     </div>
                                   </TableCell>
                                   <TableCell className="px-6 py-5">
                                     <Badge variant="outline" className={cn("gap-1.5 h-7 px-3 text-[10px] font-black uppercase tracking-widest", config.color)}>
                                         {config.label}
                                     </Badge>
-                                  </TableCell>
-                                  <TableCell className="px-6 py-5">
-                                    {h.hasFollowUp ? (
-                                      <div className="flex items-center gap-2 text-emerald-500">
-                                        <CheckCircle2 className="h-4 w-4" />
-                                        <span className="text-[10px] font-black uppercase">Processado</span>
-                                      </div>
-                                    ) : h.status === 'REALIZADA' ? (
-                                      <div className="flex items-center gap-2 text-amber-500">
-                                        <AlertCircle className="h-4 w-4" />
-                                        <span className="text-[10px] font-black uppercase animate-pulse">Pendente</span>
-                                      </div>
-                                    ) : (
-                                      <span className="text-slate-600">---</span>
-                                    )}
                                   </TableCell>
                                   <TableCell className="px-6 py-5 text-right">
                                     <DropdownMenu>
