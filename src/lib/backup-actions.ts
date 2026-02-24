@@ -4,6 +4,9 @@ import { firestoreAdmin } from '@/firebase/admin';
 import { getGoogleApiClientsForUser } from './drive';
 import { format } from 'date-fns';
 
+// ID da Pasta Raiz Compartilhada Bueno Gois
+const SHARED_ROOT_FOLDER_ID = '1DVI828qlM7SoN4-FJsGj9wwmxcOEjh6l';
+
 const COLLECTIONS_TO_BACKUP = [
     'users',
     'clients',
@@ -19,9 +22,9 @@ const COLLECTIONS_TO_BACKUP = [
 async function findOrCreateBackupFolder(drive: any): Promise<string> {
     const folderName = 'LexFlow Backups';
     try {
-        // Busca global por nome (inclui compartilhados) para evitar criação no drive pessoal indesejada
+        // Busca a pasta de backup exclusivamente dentro do Shared Drive central
         const res = await drive.files.list({
-            q: `mimeType='application/vnd.google-apps.folder' and name='${folderName}' and trashed=false`,
+            q: `'${SHARED_ROOT_FOLDER_ID}' in parents and mimeType='application/vnd.google-apps.folder' and name='${folderName}' and trashed=false`,
             fields: 'files(id)',
             pageSize: 1,
             supportsAllDrives: true,
@@ -29,15 +32,15 @@ async function findOrCreateBackupFolder(drive: any): Promise<string> {
         });
 
         if (res.data.files && res.data.files.length > 0 && res.data.files[0].id) {
-            console.log(`[Backup] Pasta de backup localizada: ${res.data.files[0].id}`);
+            console.log(`[Backup] Pasta de backup localizada no Shared Drive: ${res.data.files[0].id}`);
             return res.data.files[0].id;
         }
 
-        console.log("[Backup] Pasta de backup não encontrada, criando na raiz.");
+        console.log("[Backup] Pasta de backup não encontrada no Shared Drive, criando nova.");
         const fileMetadata = {
             name: folderName,
             mimeType: 'application/vnd.google-apps.folder',
-            parents: ['root'],
+            parents: [SHARED_ROOT_FOLDER_ID],
         };
         const file = await drive.files.create({
             requestBody: fileMetadata,
@@ -52,7 +55,7 @@ async function findOrCreateBackupFolder(drive: any): Promise<string> {
         return file.data.id;
     } catch (error: any) {
         console.error('[Backup] Erro ao gerenciar pasta no Drive:', error.message);
-        throw new Error('Falha ao localizar ou criar a pasta de backups no Google Drive.');
+        throw new Error('Falha ao localizar ou criar a pasta de backups no diretório compartilhado.');
     }
 }
 

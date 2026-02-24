@@ -9,7 +9,10 @@ import type { Session } from 'next-auth';
 import type { Client, Process, Lead } from './types';
 import { revalidatePath } from 'next/cache';
 
-// Nomes das pastas raiz para autodescoberta
+// ID da Pasta Raiz Compartilhada Bueno Gois
+const SHARED_ROOT_FOLDER_ID = '1DVI828qlM7SoN4-FJsGj9wwmxcOEjh6l';
+
+// Nomes das pastas raiz para autodescoberta dentro do Shared Drive
 const CLIENTS_ROOT_NAME = '00 - CLIENTES';
 const PROCESSES_ROOT_NAME = '00 - PROCESSOS';
 const LEADS_ROOT_NAME = '00 - TRIAGEM (LEADS)';
@@ -63,32 +66,31 @@ export async function getGoogleApiClientsForUser(): Promise<GoogleApiClients> {
 }
 
 /**
- * Busca ou cria uma pasta raiz. 
- * AGORA: Busca globalmente em itens compartilhados para evitar criação no drive pessoal se já existir.
+ * Busca ou cria uma pasta raiz dentro do diretório compartilhado Bueno Gois.
  */
 async function getOrCreateRootFolder(drive: drive_v3.Drive, name: string): Promise<string> {
     try {
-        // Busca global por nome (inclui compartilhados e drives compartilhados)
+        // Busca a pasta pelo nome especificamente dentro do Shared Drive ID
         const res = await drive.files.list({
-            q: `mimeType='application/vnd.google-apps.folder' and name='${name}' and trashed=false`,
-            fields: 'files(id, name, parents)',
+            q: `'${SHARED_ROOT_FOLDER_ID}' in parents and mimeType='application/vnd.google-apps.folder' and name='${name}' and trashed=false`,
+            fields: 'files(id, name)',
             pageSize: 1,
             supportsAllDrives: true,
             includeItemsFromAllDrives: true,
         });
 
         if (res.data.files && res.data.files.length > 0) {
-            console.log(`[DriveRoot] Pasta raiz encontrada: ${name} (${res.data.files[0].id})`);
+            console.log(`[DriveRoot] Pasta encontrada no Shared Drive: ${name} (${res.data.files[0].id})`);
             return res.data.files[0].id!;
         }
 
-        // Se não encontrar em lugar nenhum, cria na raiz do usuário atual (Fallback inicial)
-        console.log(`[DriveRoot] Pasta "${name}" não encontrada. Criando nova pasta.`);
+        // Se não encontrar, cria dentro do Shared Drive
+        console.log(`[DriveRoot] Pasta "${name}" não encontrada. Criando dentro do diretório compartilhado.`);
         const newFolder = await drive.files.create({
             requestBody: {
                 name,
                 mimeType: 'application/vnd.google-apps.folder',
-                parents: ['root'],
+                parents: [SHARED_ROOT_FOLDER_ID],
             },
             fields: 'id',
             supportsAllDrives: true,
@@ -97,12 +99,12 @@ async function getOrCreateRootFolder(drive: drive_v3.Drive, name: string): Promi
         return newFolder.data.id!;
     } catch (error: any) {
         console.error(`[DriveRoot] Erro ao gerenciar pasta raiz "${name}":`, error.message);
-        throw new Error(`Falha ao acessar ou criar a pasta raiz "${name}" no Google Drive.`);
+        throw new Error(`Falha ao acessar o diretório compartilhado Bueno Gois no Google Drive.`);
     }
 }
 
 /**
- * Busca um item (pasta, arquivo ou atalho) pelo nome dentro de um diretório pai.
+ * Busca um item pelo nome dentro de um diretório pai.
  */
 async function findItemByName(drive: drive_v3.Drive, parentId: string, name: string, mimeType?: string): Promise<string | null> {
     try {
