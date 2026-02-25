@@ -14,8 +14,8 @@ import { revalidatePath } from 'next/cache';
 const SHARED_ROOT_FOLDER_ID = '1DVI828qlM7SoN4-FJsGj9wwmxcOEjh6l';
 
 // Nomes das pastas raiz para autodescoberta dentro do Shared Drive
-const CLIENTS_ROOT_NAME = '00 - CLIENTES';
-const LEADS_ROOT_NAME = '00 - TRIAGEM (LEADS)';
+const CLIENTS_ROOT_NAME = 'CLIENTES';
+const LEADS_ROOT_NAME = 'TRIAGEM (LEADS)';
 
 const CLIENT_FOLDER_STRUCTURE = [
   '01 - Cadastro e Documentos Pessoais',
@@ -30,7 +30,7 @@ const PROCESS_FOLDER_STRUCTURE = [
   '02 - Decisões e Sentenças',
   '03 - Provas e Documentos Processuais',
   '04 - Recursos',
-  '05 - Atas e Audiências',
+  '05 - Atas e Senteças',
   '06 - Execução',
   '07 - Encerramento'
 ];

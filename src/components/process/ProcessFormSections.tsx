@@ -240,8 +240,10 @@ export function PartiesSection({ control, partyFields, onAddParty, onRemoveParty
       if (data.erro) {
         toast({ variant: 'destructive', title: 'CEP não encontrado' });
       } else {
-        const address = `${data.logradouro}, ${data.bairro}, ${data.localidade} - ${data.uf}`;
-        setValue(`opposingParties.${index}.address` as any, address, { shouldDirty: true, shouldValidate: true });
+        setValue(`opposingParties.${index}.street` as any, data.logradouro || '', { shouldDirty: true, shouldValidate: true });
+        setValue(`opposingParties.${index}.neighborhood` as any, data.bairro || '', { shouldDirty: true, shouldValidate: true });
+        setValue(`opposingParties.${index}.city` as any, data.localidade || '', { shouldDirty: true, shouldValidate: true });
+        setValue(`opposingParties.${index}.state` as any, data.uf || '', { shouldDirty: true, shouldValidate: true });
         toast({ title: 'Endereço localizado!' });
       }
     } catch (error) {
@@ -385,8 +387,8 @@ export function PartiesSection({ control, partyFields, onAddParty, onRemoveParty
                   />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                  <div className="md:col-span-1 space-y-2">
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                  <div className="md:col-span-3 space-y-2">
                     <FormField
                       control={control}
                       name={`opposingParties.${index}.cep` as any}
@@ -416,24 +418,125 @@ export function PartiesSection({ control, partyFields, onAddParty, onRemoveParty
                       )}
                     />
                   </div>
+                  <div className="md:col-span-6 space-y-2">
+                    <FormField
+                      control={control}
+                      name={`opposingParties.${index}.street` as any}
+                      render={({ field: streetField }) => (
+                        <FormItem>
+                          <FormLabel className="text-[10px] uppercase font-black text-slate-500 tracking-widest">Logradouro / Rua</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="Ex: Rua Marechal Deodoro" 
+                              className="h-11 bg-black/20 border-white/10" 
+                              {...streetField} 
+                              onKeyDown={(e) => e.stopPropagation()} 
+                              value={streetField.value as any}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                   <div className="md:col-span-3 space-y-2">
                     <FormField
                       control={control}
-                      name={`opposingParties.${index}.address` as any}
-                      render={({ field: addrField }) => (
+                      name={`opposingParties.${index}.number` as any}
+                      render={({ field: numField }) => (
                         <FormItem>
-                          <FormLabel className="text-[10px] uppercase font-black text-slate-500 tracking-widest">Endereço Completo</FormLabel>
+                          <FormLabel className="text-[10px] uppercase font-black text-slate-500 tracking-widest">Número</FormLabel>
                           <FormControl>
-                            <div className="relative">
-                              <MapPin className="absolute left-3 top-3 h-4 w-4 text-slate-500" />
-                              <Textarea 
-                                placeholder="Rua, número, bairro, cidade - UF..." 
-                                className="pl-10 min-h-[80px] bg-black/20 border-white/10 resize-none pt-2 text-sm" 
-                                {...addrField} 
-                                onKeyDown={(e) => e.stopPropagation()} 
-                                value={addrField.value as any}
-                              />
-                            </div>
+                            <Input 
+                              placeholder="Ex: 1594" 
+                              className="h-11 bg-black/20 border-white/10" 
+                              {...numField} 
+                              onKeyDown={(e) => e.stopPropagation()} 
+                              value={numField.value as any}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                  <div className="md:col-span-4 space-y-2">
+                    <FormField
+                      control={control}
+                      name={`opposingParties.${index}.neighborhood` as any}
+                      render={({ field: neighField }) => (
+                        <FormItem>
+                          <FormLabel className="text-[10px] uppercase font-black text-slate-500 tracking-widest">Bairro</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="Ex: Centro" 
+                              className="h-11 bg-black/20 border-white/10" 
+                              {...neighField} 
+                              onKeyDown={(e) => e.stopPropagation()} 
+                              value={neighField.value as any}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <div className="md:col-span-4 space-y-2">
+                    <FormField
+                      control={control}
+                      name={`opposingParties.${index}.city` as any}
+                      render={({ field: cityField }) => (
+                        <FormItem>
+                          <FormLabel className="text-[10px] uppercase font-black text-slate-500 tracking-widest">Cidade</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="Ex: São Bernardo do Campo" 
+                              className="h-11 bg-black/20 border-white/10" 
+                              {...cityField} 
+                              onKeyDown={(e) => e.stopPropagation()} 
+                              value={cityField.value as any}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <div className="md:col-span-2 space-y-2">
+                    <FormField
+                      control={control}
+                      name={`opposingParties.${index}.state` as any}
+                      render={({ field: stateField }) => (
+                        <FormItem>
+                          <FormLabel className="text-[10px] uppercase font-black text-slate-500 tracking-widest">UF</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="SP" 
+                              className="h-11 bg-black/20 border-white/10 uppercase" 
+                              {...stateField} 
+                              onKeyDown={(e) => e.stopPropagation()} 
+                              maxLength={2}
+                              value={stateField.value as any}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <div className="md:col-span-2 space-y-2">
+                    <FormField
+                      control={control}
+                      name={`opposingParties.${index}.complement` as any}
+                      render={({ field: compField }) => (
+                        <FormItem>
+                          <FormLabel className="text-[10px] uppercase font-black text-slate-500 tracking-widest">Comp.</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="Sala 2" 
+                              className="h-11 bg-black/20 border-white/10" 
+                              {...compField} 
+                              onKeyDown={(e) => e.stopPropagation()} 
+                              value={compField.value as any}
+                            />
                           </FormControl>
                         </FormItem>
                       )}
