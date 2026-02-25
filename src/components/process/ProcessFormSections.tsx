@@ -25,7 +25,8 @@ import {
   Phone,
   Gavel,
   Calendar,
-  Clock
+  Clock,
+  Hash
 } from 'lucide-react';
 import { Control, useFieldArray, useFormContext, useWatch } from 'react-hook-form';
 
@@ -168,7 +169,7 @@ export function ClientsSection({ control, onClientSelect }: ClientsSectionProps)
                 onClick={() => addSecondary({ id: '' })}
                 className="h-8 text-[10px] font-black uppercase text-primary hover:bg-primary/10"
               >
-                 UserPlus className="h-3 w-3 mr-1.5" /> Adicionar Outro
+                <UserPlus className="h-3 w-3 mr-1.5" /> Adicionar Outro
               </Button>
             </div>
 
@@ -240,7 +241,7 @@ export function PartiesSection({ control, partyFields, onAddParty, onRemoveParty
         toast({ variant: 'destructive', title: 'CEP não encontrado' });
       } else {
         const address = `${data.logradouro}, ${data.bairro}, ${data.localidade} - ${data.uf}`;
-        setValue(`opposingParties.${index}.address` as any, address, { shouldDirty: true });
+        setValue(`opposingParties.${index}.address` as any, address, { shouldDirty: true, shouldValidate: true });
         toast({ title: 'Endereço localizado!' });
       }
     } catch (error) {
@@ -297,7 +298,7 @@ export function PartiesSection({ control, partyFields, onAddParty, onRemoveParty
                           <FormControl>
                             <Input
                               placeholder="Digite o nome oficial..."
-                              className="h-11 bg-black/20 border-white/10"
+                              className="h-11 bg-black/20 border-white/10 font-bold"
                               onKeyDown={(e) => e.stopPropagation()}
                               {...nameField}
                               value={nameField.value as any}
@@ -345,13 +346,13 @@ export function PartiesSection({ control, partyFields, onAddParty, onRemoveParty
                     name={`opposingParties.${index}.email` as any}
                     render={({ field: emailField }) => (
                       <FormItem>
-                        <FormLabel className="text-[9px] uppercase font-bold text-slate-500">Email Jurídico / RH</FormLabel>
+                        <FormLabel className="text-[10px] uppercase font-black text-slate-500 tracking-widest">Email Jurídico / RH</FormLabel>
                         <FormControl>
                           <div className="relative">
-                            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500" />
+                            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
                             <Input 
                               placeholder="juridico@empresa.com" 
-                              className="pl-10 h-10 text-xs bg-black/20" 
+                              className="pl-10 h-11 bg-black/20 border-white/10" 
                               {...emailField} 
                               onKeyDown={(e) => e.stopPropagation()} 
                               value={emailField.value as any}
@@ -366,13 +367,13 @@ export function PartiesSection({ control, partyFields, onAddParty, onRemoveParty
                     name={`opposingParties.${index}.phone` as any}
                     render={({ field: phoneField }) => (
                       <FormItem>
-                        <FormLabel className="text-[9px] uppercase font-bold text-slate-500">Telefone</FormLabel>
+                        <FormLabel className="text-[10px] uppercase font-black text-slate-500 tracking-widest">Telefone</FormLabel>
                         <FormControl>
                           <div className="relative">
-                            <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500" />
+                            <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
                             <Input 
                               placeholder="(00) 0000-0000" 
-                              className="pl-10 h-10 text-xs bg-black/20" 
+                              className="pl-10 h-11 bg-black/20 border-white/10" 
                               {...phoneField} 
                               onKeyDown={(e) => e.stopPropagation()} 
                               value={phoneField.value as any}
@@ -391,12 +392,12 @@ export function PartiesSection({ control, partyFields, onAddParty, onRemoveParty
                       name={`opposingParties.${index}.cep` as any}
                       render={({ field: cepField }) => (
                         <FormItem>
-                          <FormLabel className="text-[9px] uppercase font-bold text-slate-500">CEP</FormLabel>
+                          <FormLabel className="text-[10px] uppercase font-black text-slate-500 tracking-widest">CEP</FormLabel>
                           <FormControl>
                             <div className="relative">
                               <Input 
                                 placeholder="00000-000" 
-                                className="h-10 pr-10 text-xs bg-black/20" 
+                                className="h-11 pr-10 bg-black/20 border-white/10 font-mono" 
                                 {...cepField} 
                                 onKeyDown={(e) => e.stopPropagation()} 
                                 maxLength={9}
@@ -405,9 +406,9 @@ export function PartiesSection({ control, partyFields, onAddParty, onRemoveParty
                               <button 
                                 type="button" 
                                 onClick={() => handleOpposingCepSearch(index)}
-                                className="absolute right-2 top-1/2 -translate-y-1/2 text-primary hover:scale-110 transition-transform"
+                                className="absolute right-2 top-1/2 -translate-y-1/2 text-primary hover:scale-110 transition-transform p-1 rounded-lg hover:bg-white/5"
                               >
-                                {isSearchingCep === index ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
+                                {isSearchingCep === index ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
                               </button>
                             </div>
                           </FormControl>
@@ -421,13 +422,13 @@ export function PartiesSection({ control, partyFields, onAddParty, onRemoveParty
                       name={`opposingParties.${index}.address` as any}
                       render={({ field: addrField }) => (
                         <FormItem>
-                          <FormLabel className="text-[9px] uppercase font-bold text-slate-500">Endereço Completo</FormLabel>
+                          <FormLabel className="text-[10px] uppercase font-black text-slate-500 tracking-widest">Endereço Completo</FormLabel>
                           <FormControl>
                             <div className="relative">
                               <MapPin className="absolute left-3 top-3 h-4 w-4 text-slate-500" />
                               <Textarea 
                                 placeholder="Rua, número, bairro, cidade - UF..." 
-                                className="pl-10 min-h-[80px] text-xs bg-black/20 resize-none pt-2" 
+                                className="pl-10 min-h-[80px] bg-black/20 border-white/10 resize-none pt-2 text-sm" 
                                 {...addrField} 
                                 onKeyDown={(e) => e.stopPropagation()} 
                                 value={addrField.value as any}
@@ -445,11 +446,11 @@ export function PartiesSection({ control, partyFields, onAddParty, onRemoveParty
                   name={`opposingParties.${index}.observation` as any}
                   render={({ field: obsField }) => (
                     <FormItem>
-                      <FormLabel className="text-[9px] uppercase font-bold text-slate-500">Observações do Réu</FormLabel>
+                      <FormLabel className="text-[10px] uppercase font-black text-slate-500 tracking-widest">Observações do Réu</FormLabel>
                       <FormControl>
                         <Input 
                           placeholder="Ex: Faz parte do grupo econômico X..." 
-                          className="h-10 text-xs bg-black/20" 
+                          className="h-11 bg-black/20 border-white/10 text-sm" 
                           {...obsField} 
                           onKeyDown={(e) => e.stopPropagation()} 
                           value={obsField.value as any}
