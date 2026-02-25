@@ -21,6 +21,7 @@ export const processSchema = z.object({
   court: z.string().optional().or(z.literal('')),
   courtAddress: z.string().optional().or(z.literal('')),
   courtBranch: z.string().optional().or(z.literal('')),
+  courtPhone: z.string().optional().or(z.literal('')),
   courtWebsite: z.string().url('Link inválido').optional().or(z.literal('')).or(z.string().length(0)),
   leadLawyerId: z.string().min(1, 'Defina o advogado responsável.'),
   teamParticipants: z.array(z.object({
@@ -80,6 +81,7 @@ export const useProcessForm = (process?: Process | null, onSave?: () => void) =>
         court: '',
         courtAddress: '',
         courtBranch: '',
+        courtPhone: '',
         courtWebsite: '',
         leadLawyerId: '',
         teamParticipants: [],
@@ -105,6 +107,7 @@ export const useProcessForm = (process?: Process | null, onSave?: () => void) =>
       court: process.court || '',
       courtAddress: process.courtAddress || '',
       courtBranch: process.courtBranch || '',
+      courtPhone: process.courtPhone || '',
       courtWebsite: process.courtWebsite || '',
       leadLawyerId: process.leadLawyerId || '',
       teamParticipants: process.teamParticipants || [],

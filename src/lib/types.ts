@@ -139,6 +139,7 @@ export type Process = {
   court?: string;
   courtAddress?: string;
   courtBranch?: string;
+  courtPhone?: string;
   courtWebsite?: string;
   caseValue?: number;
   opposingParties?: OpposingParty[];

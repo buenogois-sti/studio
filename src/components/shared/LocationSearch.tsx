@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -14,10 +15,11 @@ const RECENT_FALLBACK = 'Fórum de São Bernardo do Campo';
 interface LocationSearchProps {
   value: string;
   onSelect: (val: string) => void;
+  onAddressDetail?: (fullAddress: string) => void;
   placeholder?: string;
 }
 
-export function LocationSearch({ value, onSelect, placeholder = "Pesquisar local ou endereço..." }: LocationSearchProps) {
+export function LocationSearch({ value, onSelect, onAddressDetail, placeholder = "Pesquisar local ou endereço..." }: LocationSearchProps) {
   const [open, setOpen] = React.useState(false);
   const [search, setSearch] = React.useState("");
   const [apiResults, setApiResults] = React.useState<string[]>([]);
@@ -98,6 +100,9 @@ export function LocationSearch({ value, onSelect, placeholder = "Pesquisar local
   const handleLocationSelect = (rawAddress: string) => {
     const summarized = summarizeAddress(rawAddress);
     onSelect(summarized);
+    if (onAddressDetail) {
+      onAddressDetail(rawAddress);
+    }
     addRecentLocation(summarized);
     setOpen(false);
     setSearch('');

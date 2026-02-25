@@ -751,6 +751,7 @@ export function IdentificationSection({ control }: { control: Control<ProcessFor
 export function CourtSection({ control }: { control: Control<ProcessFormValues> }) {
   const court = useWatch({ control, name: 'court' });
   const hasLocation = !!court;
+  const { setValue } = useFormContext<ProcessFormValues>();
 
   return (
     <div className="space-y-8 max-w-3xl mx-auto">
@@ -781,6 +782,7 @@ export function CourtSection({ control }: { control: Control<ProcessFormValues> 
                   <LocationSearch
                     value={field.value || ''}
                     onSelect={(val) => field.onChange(val)}
+                    onAddressDetail={(full) => setValue('courtAddress', full, { shouldDirty: true })}
                     placeholder="Digite o nome do fórum..."
                   />
                 </FormControl>
@@ -792,14 +794,54 @@ export function CourtSection({ control }: { control: Control<ProcessFormValues> 
 
         <FormField
           control={control}
-          name="courtBranch"
+          name="courtAddress"
           render={({ field }) => (
             <FormItem className="md:col-span-2">
+              <FormLabel className="text-xs font-black uppercase text-slate-400 tracking-wider flex items-center gap-2">
+                <MapPin className="h-3.5 w-3.5" /> Endereço do Juízo
+              </FormLabel>
+              <FormControl>
+                <Input 
+                  placeholder="Rua, número, cidade..." 
+                  className="h-11 bg-black/40 border-white/10" 
+                  onKeyDown={(e) => e.stopPropagation()}
+                  {...field} 
+                />
+              </FormControl>
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={control}
+          name="courtBranch"
+          render={({ field }) => (
+            <FormItem>
               <FormLabel className="text-xs font-black uppercase text-slate-400 tracking-wider">Vara / Câmara / Turma</FormLabel>
               <FormControl>
                 <Input 
-                  placeholder="Ex: 2ª Vara do Trabalho de São Bernardo do Campo" 
-                  className="h-11 bg-black/40 border-white/10" 
+                  placeholder="Ex: 2ª Vara do Trabalho" 
+                  className="h-11 bg-black/40 border-white/10 font-bold" 
+                  onKeyDown={(e) => e.stopPropagation()}
+                  {...field} 
+                />
+              </FormControl>
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={control}
+          name="courtPhone"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="text-xs font-black uppercase text-slate-400 tracking-wider flex items-center gap-2">
+                <Phone className="h-3.5 w-3.5" /> Telefone da Vara
+              </FormLabel>
+              <FormControl>
+                <Input 
+                  placeholder="(00) 0000-0000" 
+                  className="h-11 bg-black/40 border-white/10 font-mono" 
                   onKeyDown={(e) => e.stopPropagation()}
                   {...field} 
                 />
