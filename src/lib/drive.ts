@@ -1,3 +1,4 @@
+
 'use server';
 
 import { google, type drive_v3, type sheets_v4, type calendar_v3, type tasks_v1, type docs_v1 } from 'googleapis';
@@ -14,7 +15,6 @@ const SHARED_ROOT_FOLDER_ID = '1DVI828qlM7SoN4-FJsGj9wwmxcOEjh6l';
 
 // Nomes das pastas raiz para autodescoberta dentro do Shared Drive
 const CLIENTS_ROOT_NAME = '00 - CLIENTES';
-const PROCESSES_ROOT_NAME = '00 - PROCESSOS';
 const LEADS_ROOT_NAME = '00 - TRIAGEM (LEADS)';
 
 const CLIENT_FOLDER_STRUCTURE = [
@@ -217,7 +217,8 @@ export async function syncLeadToDrive(leadId: string): Promise<{ success: boolea
 }
 
 /**
- * Sincroniza um processo, garantindo que ele esteja dentro do cliente e possua um atalho global.
+ * Sincroniza um processo, garantindo que ele esteja dentro do cliente.
+ * Removida a redundância da pasta global "00 - PROCESSOS".
  */
 export async function syncProcessToDrive(processId: string): Promise<{ success: boolean; error?: string }> {
     if (!firestoreAdmin) return { success: false, error: "Servidor de dados inacessível." };
@@ -254,30 +255,10 @@ export async function syncProcessToDrive(processId: string): Promise<{ success: 
             await ensureFolder(drive, physicalProcessFolderId, name);
         }
 
-        const rootProcessesId = await getOrCreateRootFolder(drive, PROCESSES_ROOT_NAME);
-        const areaFolderId = await ensureFolder(drive, rootProcessesId, processData.legalArea);
-        
-        let shortcutId = await findItemByName(drive, areaFolderId, processFolderName, 'application/vnd.google-apps.shortcut');
-        
-        if (!shortcutId) {
-            const res = await drive.files.create({
-                requestBody: {
-                    name: processFolderName,
-                    mimeType: 'application/vnd.google-apps.shortcut',
-                    parents: [areaFolderId],
-                    shortcutDetails: {
-                        targetId: physicalProcessFolderId,
-                    },
-                },
-                fields: 'id',
-                supportsAllDrives: true,
-            });
-            shortcutId = res.data.id!;
-        }
+        // Removida a criação de atalhos na pasta global "00 - PROCESSOS" por ser redundante.
 
         await processRef.update({
             driveFolderId: physicalProcessFolderId,
-            globalDriveFolderId: shortcutId,
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
         
