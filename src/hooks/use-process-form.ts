@@ -5,6 +5,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { useFirebase } from '@/firebase';
 import { collection, serverTimestamp, doc, addDoc, updateDoc, getDoc } from 'firebase/firestore';
 import type { Process } from '@/lib/types';
+import { createHearing } from '@/lib/hearing-actions';
 
 export const processSchema = z.object({
   clientId: z.string().min(1, 'Selecione um cliente principal.'),
@@ -36,6 +37,11 @@ export const processSchema = z.object({
     observation: z.string().optional().or(z.literal('')),
   })).default([]),
   description: z.string().optional().or(z.literal('')),
+  // Campos para agendamento rápido
+  quickHearingDate: z.string().optional().or(z.literal('')),
+  quickHearingTime: z.string().optional().or(z.literal('')),
+  quickHearingType: z.enum(['UNA', 'CONCILIACAO', 'INSTRUCAO', 'JULGAMENTO', 'PERICIA', 'OUTRA']).optional(),
+  quickHearingLocation: z.string().optional().or(z.literal('')),
 });
 
 export type ProcessFormValues = z.infer<typeof processSchema>;
@@ -72,6 +78,10 @@ export const useProcessForm = (process?: Process | null, onSave?: () => void) =>
         teamParticipants: [],
         opposingParties: [],
         description: '',
+        quickHearingDate: '',
+        quickHearingTime: '',
+        quickHearingType: 'UNA',
+        quickHearingLocation: '',
       };
     }
     return {
@@ -91,6 +101,10 @@ export const useProcessForm = (process?: Process | null, onSave?: () => void) =>
       teamParticipants: process.teamParticipants || [],
       opposingParties: process.opposingParties || [],
       description: process.description || '',
+      quickHearingDate: '',
+      quickHearingTime: '',
+      quickHearingType: 'UNA',
+      quickHearingLocation: '',
     };
   }, [process]);
 
@@ -126,7 +140,6 @@ export const useProcessForm = (process?: Process | null, onSave?: () => void) =>
     }
   }, []);
 
-  // Helper para remover campos undefined que quebram o Firestore
   const sanitizeData = (data: any) => {
     const clean: any = {};
     Object.keys(data).forEach(key => {
@@ -151,7 +164,6 @@ export const useProcessForm = (process?: Process | null, onSave?: () => void) =>
     try {
       let savedProcessId = process?.id;
       
-      // Busca dados denormalizados do cliente para facilitar a busca de processos
       let clientName = '';
       let clientDocument = '';
       if (values.clientId) {
@@ -163,8 +175,11 @@ export const useProcessForm = (process?: Process | null, onSave?: () => void) =>
         }
       }
 
+      // Extrair campos de agendamento rápido para não salvar no documento do processo
+      const { quickHearingDate, quickHearingTime, quickHearingType, quickHearingLocation, ...finalFormValues } = values;
+
       const rawData = {
-        ...values,
+        ...finalFormValues,
         clientName,
         clientDocument,
         secondaryClientIds: values.secondaryClientIds.map(item => item.id),
@@ -192,6 +207,7 @@ export const useProcessForm = (process?: Process | null, onSave?: () => void) =>
         });
       }
 
+      // 1. Sincronização Drive
       if (savedProcessId) {
         try {
           await fetch('/api/drive/sync-process', {
@@ -202,6 +218,27 @@ export const useProcessForm = (process?: Process | null, onSave?: () => void) =>
         } catch (error) {
           console.error('Erro ao sincronizar processo no Drive:', error);
         }
+
+        // 2. Agendamento Rápido de Audiência
+        if (quickHearingDate && quickHearingTime) {
+          try {
+            await createHearing({
+              processId: savedProcessId,
+              processName: values.name,
+              lawyerId: values.leadLawyerId,
+              hearingDate: `${quickHearingDate}T${quickHearingTime}`,
+              location: quickHearingLocation || values.court || 'Fórum / Videoconferência',
+              courtBranch: values.courtBranch,
+              responsibleParty: values.name,
+              status: 'PENDENTE',
+              type: quickHearingType || 'UNA',
+              notes: 'Agendado automaticamente durante o cadastro do processo.',
+            });
+            console.log('[useProcessForm] Quick hearing scheduled successfully');
+          } catch (hError) {
+            console.error('[useProcessForm] Error scheduling quick hearing:', hError);
+          }
+        }
       }
       
       onSave?.();
@@ -211,7 +248,7 @@ export const useProcessForm = (process?: Process | null, onSave?: () => void) =>
       toast({
         variant: 'destructive',
         title: 'Erro ao salvar',
-        description: error.message || 'Não foi possível salvar os dados do processo. Verifique se todos os campos obrigatórios estão preenchidos.',
+        description: error.message || 'Não foi possível salvar os dados do processo.',
       });
       return false;
     }

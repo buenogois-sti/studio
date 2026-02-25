@@ -22,7 +22,10 @@ import {
   Search,
   Loader2,
   Mail,
-  Phone
+  Phone,
+  Gavel,
+  Calendar,
+  Clock
 } from 'lucide-react';
 import { Control, useFieldArray, useFormContext, useWatch } from 'react-hook-form';
 
@@ -45,6 +48,7 @@ import { cn } from '@/lib/utils';
 import type { Client, Staff } from '@/lib/types';
 import type { ProcessFormValues } from '@/hooks/use-process-form';
 import { useToast } from '@/components/ui/use-toast';
+import { Separator } from '../ui/separator';
 
 interface SectionHeaderProps {
   icon: React.ReactNode;
@@ -164,7 +168,7 @@ export function ClientsSection({ control, onClientSelect }: ClientsSectionProps)
                 onClick={() => addSecondary({ id: '' })}
                 className="h-8 text-[10px] font-black uppercase text-primary hover:bg-primary/10"
               >
-                <UserPlus className="h-3 w-3 mr-1.5" /> Adicionar Outro
+                 UserPlus className="h-3 w-3 mr-1.5" /> Adicionar Outro
               </Button>
             </div>
 
@@ -866,6 +870,7 @@ export function TeamSection({ control, staff, teamFields, onAddMember, onRemoveM
 // STEP 6: STRATEGY
 export function StrategySection({ control }: { control: Control<ProcessFormValues> }) {
   const description = useWatch({ control, name: 'description' });
+  const quickHearingDate = useWatch({ control, name: 'quickHearingDate' });
   const hasNotes = !!description?.trim();
 
   return (
@@ -895,7 +900,7 @@ export function StrategySection({ control }: { control: Control<ProcessFormValue
               <FormControl>
                 <Textarea
                   placeholder="Detalhamento estratégico para o advogado responsável e equipe de apoio. Cite prazos, teses jurídicas e particularidades do cliente..."
-                  className="min-h-[300px] resize-none text-sm bg-black/40 border-white/10 p-6 leading-relaxed font-medium focus:border-primary transition-all"
+                  className="min-h-[250px] resize-none text-sm bg-black/40 border-white/10 p-6 leading-relaxed font-medium focus:border-primary transition-all"
                   onKeyDown={(e) => e.stopPropagation()}
                   {...field}
                 />
@@ -904,6 +909,100 @@ export function StrategySection({ control }: { control: Control<ProcessFormValue
             </FormItem>
           )}
         />
+
+        <div className="mt-10 pt-8 border-t border-white/10 space-y-6">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+              <Gavel className="h-4 w-4" />
+            </div>
+            <div>
+              <h4 className="text-xs font-black uppercase tracking-widest text-white">Agendamento de Audiência (Opcional)</h4>
+              <p className="text-[10px] text-slate-500 font-bold uppercase">Se houver uma data designada, registre-a aqui</p>
+            </div>
+          </div>
+
+          <div className={cn(
+            "grid grid-cols-1 md:grid-cols-2 gap-6 p-6 rounded-2xl border-2 transition-all duration-300",
+            quickHearingDate ? "bg-primary/[0.03] border-primary/20" : "bg-black/20 border-white/5"
+          )}>
+            <FormField
+              control={control}
+              name="quickHearingType"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Tipo de Ato</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger className="h-11 bg-black/40 border-white/10">
+                        <SelectValue placeholder="Selecione o tipo..." />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent className="bg-[#0f172a] border-white/10">
+                      <SelectItem value="UNA">Audiência Una</SelectItem>
+                      <SelectItem value="CONCILIACAO">Conciliação</SelectItem>
+                      <SelectItem value="INSTRUCAO">Instrução</SelectItem>
+                      <SelectItem value="JULGAMENTO">Sentença / Julgamento</SelectItem>
+                      <SelectItem value="PERICIA">Perícia</SelectItem>
+                      <SelectItem value="OUTRA">Outra</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </FormItem>
+              )}
+            />
+
+            <div className="grid grid-cols-2 gap-3">
+              <FormField
+                control={control}
+                name="quickHearingDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Data</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-primary" />
+                        <Input type="date" className="h-11 bg-black/40 border-white/10 pl-8 text-xs font-bold" {...field} />
+                      </div>
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={control}
+                name="quickHearingTime"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Horário</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <Clock className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-primary" />
+                        <Input type="time" className="h-11 bg-black/40 border-white/10 pl-8 text-xs font-bold" {...field} />
+                      </div>
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <FormField
+              control={control}
+              name="quickHearingLocation"
+              render={({ field }) => (
+                <FormItem className="md:col-span-2">
+                  <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
+                    <MapPin className="h-3 w-3" /> Local ou Link da Sala
+                  </FormLabel>
+                  <FormControl>
+                    <Input 
+                      placeholder="Fórum, sala virtual ou endereço..." 
+                      className="h-11 bg-black/40 border-white/10" 
+                      {...field} 
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+          </div>
+        </div>
       </div>
     </div>
   );
