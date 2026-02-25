@@ -34,7 +34,8 @@ import {
   Scale,
   FolderOpen,
   ArchiveX,
-  CalendarDays
+  CalendarDays,
+  Filter
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
@@ -47,6 +48,7 @@ import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, doc, deleteDoc, query, limit, orderBy, updateDoc, arrayUnion, Timestamp } from 'firebase/firestore';
@@ -72,6 +74,8 @@ const STATUS_CONFIG = {
   'Pendente': { label: 'Pendente', color: 'bg-amber-500/10 text-amber-400 border-amber-500/20', icon: ShieldAlert },
   'Arquivado': { label: 'Arquivado', color: 'bg-slate-500/10 text-slate-400 border-slate-500/20', icon: Archive },
 };
+
+const LEGAL_AREAS = ['Todos', 'Trabalhista', 'Cível', 'Criminal', 'Previdenciário', 'Família', 'Tributário', 'Outro'];
 
 const ITEMS_PER_PAGE = 8;
 
@@ -318,6 +322,7 @@ export default function ProcessosPage() {
   const [currentPage, setCurrentPage] = React.useState(1);
   const [processToArchive, setProcessToArchive] = React.useState<Process | null>(null);
   const [isArchiving, setIsArchiving] = React.useState(false);
+  const [activeAreaTab, setActiveAreaTab] = React.useState('Todos');
 
   const { firestore, isUserLoading } = useFirebase();
   const { data: session } = useSession();
@@ -394,9 +399,12 @@ export default function ProcessosPage() {
   const filteredProcesses = React.useMemo(() => {
     let result = searchResults || processesData || [];
     result = result.filter(p => p.status !== 'Arquivado');
+    
     if (clientIdFilter) result = result.filter(p => p.clientId === clientIdFilter);
+    if (activeAreaTab !== 'Todos') result = result.filter(p => p.legalArea === activeAreaTab);
+    
     return result;
-  }, [processesData, searchResults, clientIdFilter]);
+  }, [processesData, searchResults, clientIdFilter, activeAreaTab]);
 
   const totalPages = Math.max(1, Math.ceil(filteredProcesses.length / ITEMS_PER_PAGE));
   const paginatedProcesses = React.useMemo(() => {
@@ -497,7 +505,7 @@ export default function ProcessosPage() {
   const isLoading = isUserLoading || isLoadingProcesses || isSearching;
 
   return (
-    <div className="grid flex-1 items-start gap-6 auto-rows-max">
+    <div className="grid flex-1 items-start gap-6 auto-rows-max animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-black tracking-tight font-headline text-white">Processos</h1>
@@ -514,7 +522,7 @@ export default function ProcessosPage() {
             />
             {isSearching && <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-primary" />}
           </div>
-          <Button size="sm" className="bg-primary text-primary-foreground h-10 px-6 font-bold" onClick={() => { setEditingProcess(null); setIsSheetOpen(true); }} disabled={isLoading}>
+          <Button size="sm" className="bg-primary text-primary-foreground h-10 px-6 font-bold shadow-lg shadow-primary/20" onClick={() => { setEditingProcess(null); setIsSheetOpen(true); }} disabled={isLoading}>
               <PlusCircle className="mr-2 h-4 w-4" /> Novo Processo
           </Button>
         </div>
@@ -559,77 +567,96 @@ export default function ProcessosPage() {
         </Card>
       </div>
 
-      <div className="grid gap-4 min-h-[400px]">
-        {isLoading && !paginatedProcesses.length ? (
-          <div className="flex flex-col items-center justify-center py-32 space-y-4">
-            <Loader2 className="h-12 w-12 animate-spin text-primary" />
-            <p className="text-sm font-black uppercase tracking-widest text-muted-foreground">Carregando processos...</p>
-          </div>
-        ) : paginatedProcesses.length > 0 ? (
-          paginatedProcesses.map((p) => (
-            <ProcessCard 
-              key={p.id}
-              process={p}
-              client={clientsMap.get(p.clientId)}
-              leadLawyer={p.leadLawyerId ? staffMap.get(p.leadLawyerId) : null}
-              isExpanded={expandedProcessId === p.id}
-              onToggleExpand={handleToggleExpand}
-              onTimeline={handleTimeline}
-              onMeeting={handleMeeting}
-              onDeadline={handleDeadline}
-              onHearing={handleHearing}
-              onDrafting={handleDrafting}
-              onEdit={handleEdit}
-              onArchive={handleArchiveRequest}
-              onEvent={handleEventRequest}
-              onSync={handleSyncProcess}
-              isSyncing={isSyncing === p.id}
-              processHearings={hearingsByProcessMap.get(p.id) || []}
-              processAgreement={agreementsByProcessMap.get(p.id)}
-            />
-          ))
-        ) : (
-          <div className="text-center py-24 bg-[#0f172a] rounded-3xl border-2 border-dashed border-white/5 opacity-40">
-            <FolderKanban className="h-16 w-16 mx-auto mb-4 text-slate-500" />
-            <p className="font-black text-white uppercase tracking-widest text-xs">Nenhum processo localizado</p>
-          </div>
-        )}
+      <Tabs value={activeAreaTab} onValueChange={setActiveAreaTab} className="w-full">
+        <TabsList className="bg-[#0f172a] border border-white/5 p-1 h-12 flex justify-start overflow-x-auto no-scrollbar gap-1 mb-6">
+          {LEGAL_AREAS.map(area => {
+            const count = processesData?.filter(p => p.status !== 'Arquivado' && (area === 'Todos' || p.legalArea === area)).length || 0;
+            return (
+              <TabsTrigger 
+                key={area} 
+                value={area}
+                className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold px-6 h-10 shrink-0 rounded-lg transition-all"
+              >
+                {area === 'Todos' && <Filter className="h-3 w-3" />}
+                {area}
+                <Badge variant="secondary" className="ml-1.5 px-1.5 h-4 text-[9px] bg-white/10 border-none text-inherit">{count}</Badge>
+              </TabsTrigger>
+            );
+          })}
+        </TabsList>
 
-        {totalPages > 1 && (
-          <div className="flex items-center justify-center gap-6 mt-6 py-6 border-t border-white/5">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => {
-                setCurrentPage(prev => Math.max(prev - 1, 1));
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }} 
-              disabled={currentPage === 1 || isLoading} 
-              className="bg-[#0f172a] border-border/50 text-white hover:bg-primary/10 hover:text-primary h-9 px-4 text-[10px] font-black uppercase"
-            >
-              <ChevronLeft className="h-4 w-4 mr-2" /> Anterior
-            </Button>
-            
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] font-black text-white bg-primary/10 px-3 py-1 rounded">Página {currentPage}</span>
-              <span className="text-[11px] text-muted-foreground font-bold">/ {totalPages}</span>
+        <div className="grid gap-4 min-h-[400px]">
+          {isLoading && !paginatedProcesses.length ? (
+            <div className="flex flex-col items-center justify-center py-32 space-y-4">
+              <Loader2 className="h-12 w-12 animate-spin text-primary" />
+              <p className="text-sm font-black uppercase tracking-widest text-muted-foreground">Carregando processos...</p>
             </div>
-            
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => {
-                setCurrentPage(prev => Math.min(prev + 1, totalPages));
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }} 
-              disabled={currentPage === totalPages || isLoading} 
-              className="bg-[#0f172a] border-border/50 text-white hover:bg-primary/10 hover:text-primary h-9 px-4 text-[10px] font-black uppercase"
-            >
-              Próxima <ChevronRight className="h-4 w-4 ml-2" />
-            </Button>
-          </div>
-        )}
-      </div>
+          ) : paginatedProcesses.length > 0 ? (
+            paginatedProcesses.map((p) => (
+              <ProcessCard 
+                key={p.id}
+                process={p}
+                client={clientsMap.get(p.clientId)}
+                leadLawyer={p.leadLawyerId ? staffMap.get(p.leadLawyerId) : null}
+                isExpanded={expandedProcessId === p.id}
+                onToggleExpand={handleToggleExpand}
+                onTimeline={handleTimeline}
+                onMeeting={handleMeeting}
+                onDeadline={handleDeadline}
+                onHearing={handleHearing}
+                onDrafting={handleDrafting}
+                onEdit={handleEdit}
+                onArchive={handleArchiveRequest}
+                onEvent={handleEventRequest}
+                onSync={handleSyncProcess}
+                isSyncing={isSyncing === p.id}
+                processHearings={hearingsByProcessMap.get(p.id) || []}
+                processAgreement={agreementsByProcessMap.get(p.id)}
+              />
+            ))
+          ) : (
+            <div className="text-center py-24 bg-[#0f172a] rounded-3xl border-2 border-dashed border-white/5 opacity-40">
+              <FolderKanban className="h-16 w-16 mx-auto mb-4 text-slate-500" />
+              <p className="font-black text-white uppercase tracking-widest text-xs">Nenhum processo localizado nesta área</p>
+            </div>
+          )}
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-6 mt-6 py-6 border-t border-white/5">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => {
+                  setCurrentPage(prev => Math.max(prev - 1, 1));
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }} 
+                disabled={currentPage === 1 || isLoading} 
+                className="bg-[#0f172a] border-border/50 text-white hover:bg-primary/10 hover:text-primary h-9 px-4 text-[10px] font-black uppercase"
+              >
+                <ChevronLeft className="h-4 w-4 mr-2" /> Anterior
+              </Button>
+              
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-black text-white bg-primary/10 px-3 py-1 rounded">Página {currentPage}</span>
+                <span className="text-[11px] text-muted-foreground font-bold">/ {totalPages}</span>
+              </div>
+              
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => {
+                  setCurrentPage(prev => Math.min(prev + 1, totalPages));
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }} 
+                disabled={currentPage === totalPages || isLoading} 
+                className="bg-[#0f172a] border-border/50 text-white hover:bg-primary/10 hover:text-primary h-9 px-4 text-[10px] font-black uppercase"
+              >
+                Próxima <ChevronRight className="h-4 w-4 ml-2" />
+              </Button>
+            </div>
+          )}
+        </div>
+      </Tabs>
 
       <Sheet open={isSheetOpen} onOpenChange={(open) => { if (!open) setEditingProcess(null); setIsSheetOpen(open); }}>
         <SheetContent className="sm:max-w-5xl w-full p-0 flex flex-col bg-[#020617] border-border">
