@@ -7,7 +7,7 @@ import admin from 'firebase-admin';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/options';
 import type { Session } from 'next-auth';
-import type { Client, Process, Lead } from './types';
+import type { Client, Process, Lead, Staff } from './types';
 import { revalidatePath } from 'next/cache';
 
 // ID da Pasta Raiz Compartilhada Bueno Gois
@@ -41,6 +41,7 @@ interface GoogleApiClients {
     calendar: calendar_v3.Calendar;
     tasks: tasks_v1.Tasks;
     docs: docs_v1.Docs;
+    targetEmail?: string;
 }
 
 /**
@@ -62,7 +63,73 @@ export async function getGoogleApiClientsForUser(): Promise<GoogleApiClients> {
         calendar: google.calendar({ version: 'v3', auth }),
         tasks: google.tasks({ version: 'v1', auth }),
         docs: google.docs({ version: 'v1', auth }),
+        targetEmail: session.user.email || undefined
     };
+}
+
+/**
+ * Obtém clientes da API do Google para um membro específico da equipe.
+ * Se o membro tiver um token de atualização, usa o dele para agir em seu nome.
+ * Caso contrário, cai de volta para o usuário da sessão.
+ */
+export async function getGoogleClientsForStaff(staffId: string): Promise<GoogleApiClients> {
+    if (!firestoreAdmin) throw new Error("Firestore Admin não inicializado.");
+    
+    const session = await getServerSession(authOptions);
+    const staffDoc = await firestoreAdmin.collection('staff').doc(staffId).get();
+    const staffData = staffDoc.data() as Staff | undefined;
+    
+    if (!staffData || !staffData.email) {
+        return getGoogleApiClientsForUser();
+    }
+
+    // Se o alvo for o próprio usuário logado, retorna direto
+    if (staffData.email.toLowerCase() === session?.user?.email?.toLowerCase()) {
+        return getGoogleApiClientsForUser();
+    }
+
+    // Tenta encontrar o refresh token do usuário alvo
+    try {
+        const userQuery = await firestoreAdmin.collection('users')
+            .where('email', '==', staffData.email.toLowerCase())
+            .limit(1)
+            .get();
+        
+        const userData = userQuery.docs[0]?.data();
+        
+        if (userData?.googleRefreshToken) {
+            const oauth2Client = new google.auth.OAuth2(
+                process.env.GOOGLE_CLIENT_ID,
+                process.env.GOOGLE_CLIENT_SECRET
+            );
+            
+            oauth2Client.setCredentials({
+                refresh_token: userData.googleRefreshToken
+            });
+
+            // Força o refresh para obter um access token válido agora
+            const { token } = await oauth2Client.getAccessToken();
+            
+            if (token) {
+                const targetAuth = new google.auth.OAuth2();
+                targetAuth.setCredentials({ access_token: token });
+                
+                return {
+                    drive: google.drive({ version: 'v3', auth: targetAuth }),
+                    sheets: google.sheets({ version: 'v4', auth: targetAuth }),
+                    calendar: google.calendar({ version: 'v3', auth: targetAuth }),
+                    tasks: google.tasks({ version: 'v1', auth: targetAuth }),
+                    docs: google.docs({ version: 'v1', auth: targetAuth }),
+                    targetEmail: staffData.email
+                };
+            }
+        }
+    } catch (error) {
+        console.error(`[Drive] Falha ao obter credenciais para ${staffData.email}:`, error);
+    }
+
+    // Fallback: Usa o usuário logado
+    return getGoogleApiClientsForUser();
 }
 
 /**

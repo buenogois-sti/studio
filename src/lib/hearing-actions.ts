@@ -2,7 +2,7 @@
 'use server';
 
 import { firestoreAdmin } from '@/firebase/admin';
-import { getGoogleApiClientsForUser } from '@/lib/drive';
+import { getGoogleClientsForStaff } from '@/lib/drive';
 import { add, formatISO, format } from 'date-fns';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/options';
@@ -175,9 +175,9 @@ export async function createHearing(data: {
       updatedAt: FieldValue.serverTimestamp()
     });
 
-    // Sincronização com o Google Agenda
+    // Sincronização com o Google Agenda (RESPEITANDO O RESPONSÁVEL)
     try {
-      const { calendar } = await getGoogleApiClientsForUser();
+      const { calendar } = await getGoogleClientsForStaff(lawyerId);
       const startDateTime = new Date(hearingDate);
       const endDateTime = add(startDateTime, { hours: 1 });
 
@@ -219,7 +219,7 @@ export async function createHearing(data: {
       };
 
       const createdEvent = await calendar.events.insert({
-        calendarId: 'primary',
+        calendarId: 'primary', // Como estamos usando o token do Staff, 'primary' é o dele
         requestBody: event,
       });
 
@@ -259,9 +259,9 @@ export async function updateHearingStatus(hearingId: string, status: HearingStat
 
         await hearingRef.update({ status, updatedAt: FieldValue.serverTimestamp() });
 
-        if (hearing?.googleCalendarEventId) {
+        if (hearing?.googleCalendarEventId && hearing.lawyerId) {
             try {
-                const { calendar } = await getGoogleApiClientsForUser();
+                const { calendar } = await getGoogleClientsForStaff(hearing.lawyerId);
                 
                 if (status === 'ADIADA' || status === 'CANCELADA') {
                   await calendar.events.delete({
@@ -339,8 +339,8 @@ export async function processHearingReturn(hearingId: string, data: {
       updatedAt: FieldValue.serverTimestamp()
     });
 
-    // 3. Agendar iterações futuras
-    const { tasks } = await getGoogleApiClientsForUser();
+    // 3. Agendar iterações futuras (Respeitando o advogado do ato)
+    const { tasks } = await getGoogleClientsForStaff(hearingData.lawyerId);
 
     // 3.1. Tarefa de seguimento genérica
     if (data.nextStepType && data.nextStepDeadline) {

@@ -1,12 +1,13 @@
+
 'use server';
 
 import { firestoreAdmin } from '@/firebase/admin';
-import type { LegalDeadline, LegalDeadlineStatus, TimelineEvent } from './types';
+import type { LegalDeadline, LegalDeadlineStatus, TimelineEvent, Process } from './types';
 import { Timestamp, FieldValue } from 'firebase-admin/firestore';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/options';
 import { v4 as uuidv4 } from 'uuid';
-import { getGoogleApiClientsForUser } from '@/lib/drive';
+import { getGoogleClientsForStaff } from '@/lib/drive';
 import { formatISO, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { createNotification } from './notification-actions';
@@ -91,7 +92,9 @@ export async function createLegalDeadline(data: {
     const processRef = firestoreAdmin.collection('processes').doc(data.processId);
 
     const processDoc = await processRef.get();
-    const processData = processDoc.data();
+    const processData = processDoc.data() as Process | undefined;
+    const processNumber = processData?.processNumber || 'Não informado';
+    const leadLawyerId = processData?.leadLawyerId || session.user.id;
     
     let clientInfo = { name: 'Não informado', phone: 'Não informado' };
     if (processData?.clientId) {
@@ -105,9 +108,9 @@ export async function createLegalDeadline(data: {
       }
     }
 
-    let responsibleName = session.user.name || 'Advogado Responsável';
-    if (processData?.leadLawyerId) {
-        const staffDoc = await firestoreAdmin.collection('staff').doc(processData.leadLawyerId).get();
+    let responsibleName = 'Advogado Responsável';
+    if (leadLawyerId) {
+        const staffDoc = await firestoreAdmin.collection('staff').doc(leadLawyerId).get();
         const staffData = staffDoc.data();
         if (staffData) {
             responsibleName = `${staffData.firstName} ${staffData.lastName}`;
@@ -135,7 +138,7 @@ export async function createLegalDeadline(data: {
       endDate: new Date(data.endDate),
       legalArea: processData?.legalArea || 'N/A',
       processName: processData?.name || 'Processo',
-      processNumber: processData?.processNumber || 'N/A',
+      processNumber: processNumber,
       clientName: clientInfo.name,
       clientPhone: clientInfo.phone,
       publicationText: data.publicationText,
@@ -145,12 +148,12 @@ export async function createLegalDeadline(data: {
       id: deadlineRef.id
     });
 
-    // 1. Sincronização com Google Calendar e Google Tasks
+    // 1. Sincronização com Google Agenda e Google Tasks (RESPEITANDO O RESPONSÁVEL DO PROCESSO)
     let googleCalendarEventId: string | undefined;
     let googleTaskId: string | undefined;
 
     try {
-      const { calendar, tasks } = await getGoogleApiClientsForUser();
+      const { calendar, tasks } = await getGoogleClientsForStaff(leadLawyerId);
       
       const fatalDate = new Date(data.endDate);
       fatalDate.setHours(9, 0, 0, 0);
@@ -180,7 +183,6 @@ export async function createLegalDeadline(data: {
       googleCalendarEventId = createdEvent.data.id || undefined;
 
       // Criar Tarefa no Google Tasks
-      // NOTA: O campo 'due' no Google Tasks deve ser um RFC 3339 timestamp sem offset (Z).
       try {
         const taskDate = new Date(data.endDate);
         taskDate.setUTCHours(0, 0, 0, 0); 
@@ -194,7 +196,6 @@ export async function createLegalDeadline(data: {
           }
         });
         googleTaskId = createdTask.data.id || undefined;
-        console.log('[DeadlineActions] Google Task criada com sucesso:', googleTaskId);
       } catch (taskErr: any) {
         console.warn('[DeadlineActions] Falha ao sincronizar com Google Tasks:', taskErr.message);
       }
@@ -210,7 +211,7 @@ export async function createLegalDeadline(data: {
     const timelineEvent: TimelineEvent = {
       id: uuidv4(),
       type: 'deadline',
-      description: `PRAZO LANÇADO: ${data.type} (${data.daysCount} ${methodLabel}). Vencimento: ${new Date(data.endDate).toLocaleDateString('pt-BR')}. Tarefa criada no Workspace.`,
+      description: `PRAZO LANÇADO: ${data.type} (${data.daysCount} ${methodLabel}). Vencimento: ${new Date(data.endDate).toLocaleDateString('pt-BR')}. Tarefa criada no Workspace do responsável.`,
       date: Timestamp.now() as any,
       authorName: session.user.name || 'Sistema',
       endDate: Timestamp.fromDate(new Date(data.endDate)) as any,
@@ -226,11 +227,11 @@ export async function createLegalDeadline(data: {
 
     await batch.commit();
 
-    if (session.user.id) {
+    if (leadLawyerId) {
       await createNotification({
-        userId: session.user.id,
-        title: "Prazo Registrado",
-        description: `${data.type} para ${processData?.name} agendado para ${new Date(data.endDate).toLocaleDateString('pt-BR')}.`,
+        userId: leadLawyerId,
+        title: "Novo Prazo na sua Agenda",
+        description: `${data.type} para ${processData?.name} agendado por ${session.user.name}.`,
         type: 'deadline',
         href: `/dashboard/prazos`,
       });
@@ -264,6 +265,9 @@ export async function updateLegalDeadline(id: string, data: {
     
     const oldData = deadlineDoc.data() as LegalDeadline;
     const processRef = firestoreAdmin.collection('processes').doc(oldData.processId);
+    const processDoc = await processRef.get();
+    const processData = processDoc.data() as Process | undefined;
+    const leadLawyerId = processData?.leadLawyerId || oldData.authorId;
 
     const updatePayload = {
       type: data.type,
@@ -278,11 +282,9 @@ export async function updateLegalDeadline(id: string, data: {
 
     await deadlineRef.update(updatePayload);
 
-    // Atualizar Google Workspace
+    // Atualizar Google Workspace do Responsável
     try {
-      const { calendar, tasks } = await getGoogleApiClientsForUser();
-      const processDoc = await processRef.get();
-      const processData = processDoc.data();
+      const { calendar, tasks } = await getGoogleClientsForStaff(leadLawyerId);
       
       let clientInfo = { name: 'Não informado', phone: 'Não informado' };
       if (processData?.clientId) {
@@ -296,9 +298,9 @@ export async function updateLegalDeadline(id: string, data: {
         }
       }
 
-      let responsibleName = session.user.name || 'Advogado Responsável';
-      if (processData?.leadLawyerId) {
-          const staffDoc = await firestoreAdmin.collection('staff').doc(processData.leadLawyerId).get();
+      let responsibleName = 'Advogado Responsável';
+      if (leadLawyerId) {
+          const staffDoc = await firestoreAdmin.collection('staff').doc(leadLawyerId).get();
           const staffData = staffDoc.data();
           if (staffData) {
               responsibleName = `${staffData.firstName} ${staffData.lastName}`;
@@ -375,17 +377,18 @@ export async function updateDeadlineStatus(id: string, status: LegalDeadlineStat
     
     const deadlineData = deadlineDoc.data() as LegalDeadline;
     const processRef = firestoreAdmin.collection('processes').doc(deadlineData.processId);
+    const processDoc = await processRef.get();
+    const processData = processDoc.data() as Process | undefined;
+    const leadLawyerId = processData?.leadLawyerId || deadlineData.authorId;
 
     await deadlineRef.update({ 
       status, 
       updatedAt: Timestamp.now() 
     });
 
-    // Atualizar Google Workspace
+    // Atualizar Google Workspace do Responsável
     try {
-      const { calendar, tasks } = await getGoogleApiClientsForUser();
-      const processDoc = await processRef.get();
-      const processData = processDoc.data();
+      const { calendar, tasks } = await getGoogleClientsForStaff(leadLawyerId);
       
       let clientInfo = { name: 'Não informado', phone: 'Não informado' };
       if (processData?.clientId) {
@@ -399,9 +402,9 @@ export async function updateDeadlineStatus(id: string, status: LegalDeadlineStat
         }
       }
 
-      let responsibleName = session.user.name || 'Advogado Responsável';
-      if (processData?.leadLawyerId) {
-          const staffDoc = await firestoreAdmin.collection('staff').doc(processData.leadLawyerId).get();
+      let responsibleName = 'Advogado Responsável';
+      if (leadLawyerId) {
+          const staffDoc = await firestoreAdmin.collection('staff').doc(leadLawyerId).get();
           const staffData = staffDoc.data();
           if (staffData) {
               responsibleName = `${staffData.firstName} ${staffData.lastName}`;
@@ -473,10 +476,15 @@ export async function deleteLegalDeadline(id: string) {
   try {
     const deadlineRef = firestoreAdmin.collection('deadlines').doc(id);
     const deadlineDoc = await deadlineRef.get();
-    const deadlineData = deadlineDoc.data();
+    if (!deadlineDoc.exists) return { success: true };
+    
+    const deadlineData = deadlineDoc.data() as LegalDeadline;
+    const processRef = firestoreAdmin.collection('processes').doc(deadlineData.processId);
+    const processDoc = await processRef.get();
+    const leadLawyerId = processDoc.data()?.leadLawyerId || deadlineData.authorId;
 
     try {
-      const { calendar, tasks } = await getGoogleApiClientsForUser();
+      const { calendar, tasks } = await getGoogleClientsForStaff(leadLawyerId);
       if (deadlineData?.googleCalendarEventId) {
         await calendar.events.delete({
           calendarId: 'primary',
