@@ -349,9 +349,50 @@ export function LandingClient({ initialSettings, initialSeo }: { initialSettings
         </section>
       </main>
 
-      <footer className="relative bg-[#020617] text-white pt-24 pb-12 border-t-2 border-primary/30">
-        <div className="container mx-auto px-4 text-center">
-          <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">&copy; {new Date().getFullYear()} {currentSettings?.officeName || 'Bueno Gois Advogados e Associados'}</p>
+      <footer className="relative bg-[#020617] text-white pt-20 pb-10 border-t border-white/5">
+        <div className="container mx-auto px-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-12 mb-16 text-center md:text-left">
+            <div className="space-y-6">
+              <LandingLogo />
+              <p className="text-sm text-slate-400 leading-relaxed">
+                Justiça e excelência na defesa dos direitos do trabalhador. Atendimento estratégico e humanizado em São Bernardo do Campo.
+              </p>
+            </div>
+            
+            <div className="space-y-6">
+              <h4 className="text-xs font-black uppercase tracking-[0.2em] text-primary">Contato Direto</h4>
+              <ul className="space-y-4 text-sm text-slate-300">
+                <li className="flex items-center justify-center md:justify-start gap-3">
+                  <Smartphone className="h-4 w-4 text-primary" />
+                  <span>(11) 98059-0128</span>
+                </li>
+                <li className="flex items-center justify-center md:justify-start gap-3">
+                  <AtSign className="h-4 w-4 text-primary" />
+                  <span>contato@buenogoisadvogado.com.br</span>
+                </li>
+              </ul>
+            </div>
+
+            <div className="space-y-6">
+              <h4 className="text-xs font-black uppercase tracking-[0.2em] text-primary">Localização</h4>
+              <ul className="space-y-4 text-sm text-slate-300">
+                <li className="flex items-start justify-center md:justify-start gap-3">
+                  <MapPin className="h-4 w-4 text-primary shrink-0 mt-1" />
+                  <span>Rua Marechal Deodoro, 1594 - Sala 2<br />Centro, São Bernardo do Campo - SP<br />CEP 09715-070</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="pt-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-6">
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+              &copy; {new Date().getFullYear()} {currentSettings?.officeName || 'Bueno Gois Advogados e Associados'}
+            </p>
+            <div className="flex items-center gap-6">
+              <span className="text-[9px] font-bold text-slate-600 uppercase tracking-tighter">OAB/SP 00.000</span>
+              <Link href="/login" className="text-[9px] font-black uppercase tracking-widest text-slate-500 hover:text-primary transition-colors border border-white/10 px-3 py-1 rounded">Acesso Restrito</Link>
+            </div>
+          </div>
         </div>
       </footer>
 
