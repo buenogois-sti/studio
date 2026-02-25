@@ -175,6 +175,8 @@ export type Hearing = {
   status: HearingStatus;
   type: HearingType;
   notes?: string;
+  meetingLink?: string;
+  meetingPassword?: string;
   resultNotes?: string;
   hasFollowUp?: boolean;
   googleCalendarEventId?: string;

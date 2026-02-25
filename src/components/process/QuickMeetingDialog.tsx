@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -19,7 +20,8 @@ import {
   ShieldCheck,
   Video,
   Smartphone,
-  Info
+  Info,
+  Key
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -44,6 +46,8 @@ const meetingSchema = z.object({
   location: z.string().min(3, 'O local/modo é obrigatório.'),
   responsibleParty: z.string().min(3, 'O nome do profissional na agenda é obrigatório.'),
   notes: z.string().optional(),
+  meetingLink: z.string().optional().or(z.literal('')),
+  meetingPassword: z.string().optional().or(z.literal('')),
   clientNotified: z.boolean().default(false),
   notificationMethod: z.enum(['whatsapp', 'email', 'phone', 'personal', 'court', 'other']).optional(),
 });
@@ -74,6 +78,8 @@ export function QuickMeetingDialog({ process, open, onOpenChange, onSuccess }: Q
       location: 'Sede Bueno Gois - Rua Marechal Deodoro, 1594',
       responsibleParty: '',
       notes: '',
+      meetingLink: '',
+      meetingPassword: '',
       clientNotified: false,
       notificationMethod: 'whatsapp',
     }
@@ -102,15 +108,22 @@ export function QuickMeetingDialog({ process, open, onOpenChange, onSuccess }: Q
       toast({ variant: 'destructive', title: 'WhatsApp indisponível', description: 'O cliente não possui celular cadastrado.' });
       return;
     }
-    const date = form.getValues('date');
-    const time = form.getValues('time');
-    const loc = form.getValues('location');
+    const values = form.getValues();
     
-    const [year, month, day] = date.split('-').map(Number);
+    const [year, month, day] = values.date.split('-').map(Number);
     const dateObj = new Date(year, month - 1, day);
     const dateFmt = format(dateObj, "dd/MM (EEEE)", { locale: ptBR });
     
-    const message = `Olá, ${clientData.firstName}! Sou da Bueno Gois Advogados.\n\nAgendamos um atendimento para falarmos sobre seu processo:\n📅 Data: *${dateFmt}*\n🕘 Horário: *${time}*\n📍 Local/Modo: *${loc}*\n\nFavor confirmar se este horário está livre para você.`.trim();
+    let message = `Olá, ${clientData.firstName}! Sou da Bueno Gois Advogados.\n\nAgendamos um atendimento para falarmos sobre seu processo:\n📅 Data: *${dateFmt}*\n🕘 Horário: *${values.time}*\n📍 Local/Modo: *${values.location}*`.trim();
+    
+    if (values.meetingLink) {
+      message += `\n\n🔗 *LINK DA REUNIÃO:* ${values.meetingLink}`;
+      if (values.meetingPassword) {
+        message += `\n🔑 *SENHA:* ${values.meetingPassword}`;
+      }
+    }
+
+    message += `\n\nFavor confirmar se este horário está livre para você.`;
     
     const cleanPhone = clientData.mobile.replace(/\D/g, '');
     const url = `https://wa.me/${cleanPhone.startsWith('55') ? cleanPhone : '55' + cleanPhone}?text=${encodeURIComponent(message)}`;
@@ -228,29 +241,62 @@ export function QuickMeetingDialog({ process, open, onOpenChange, onSuccess }: Q
                   />
                 </div>
 
-                <FormField
-                  control={form.control}
-                  name="location"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Local / Modo de Atendimento *</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger className="h-12 bg-black/40 border-white/10">
-                            <SelectValue />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent className="bg-[#0f172a] text-white">
-                          <SelectItem value="Sede Bueno Gois - Rua Marechal Deodoro, 1594">🏢 Presencial na Sede</SelectItem>
-                          <SelectItem value="Reunião Online - Google Meet">🎥 Reunião Online (Meet)</SelectItem>
-                          <SelectItem value="Chamada via WhatsApp Vídeo">📱 WhatsApp Vídeo</SelectItem>
-                          <SelectItem value="Visita Técnica / Local do Cliente">🚗 Local do Cliente</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="location"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Local / Modo de Atendimento *</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger className="h-12 bg-black/40 border-white/10">
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent className="bg-[#0f172a] text-white">
+                            <SelectItem value="Sede Bueno Gois - Rua Marechal Deodoro, 1594">🏢 Presencial na Sede</SelectItem>
+                            <SelectItem value="Reunião Online - Google Meet">🎥 Reunião Online (Meet)</SelectItem>
+                            <SelectItem value="Chamada via WhatsApp Vídeo">📱 WhatsApp Vídeo</SelectItem>
+                            <SelectItem value="Visita Técnica / Local do Cliente">🚗 Local do Cliente</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="meetingLink"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-2">
+                            <Video className="h-3.5 w-3.5" /> Link da Reunião
+                          </FormLabel>
+                          <FormControl>
+                            <Input placeholder="https://meet.google.com/..." className="h-11 bg-black/40 border-primary/20 font-mono text-[10px]" {...field} />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="meetingPassword"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
+                            <Key className="h-3.5 w-3.5" /> Código de Acesso
+                          </FormLabel>
+                          <FormControl>
+                            <Input placeholder="Senha da sala..." className="h-11 bg-black/40 border-white/10" {...field} />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
 
                 <div className="p-6 rounded-3xl bg-blue-500/5 border border-blue-500/20 space-y-6">
                   <div className="flex items-center justify-between">

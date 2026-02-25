@@ -1,3 +1,4 @@
+
 'use server';
 
 import { firestoreAdmin } from '@/firebase/admin';
@@ -25,6 +26,8 @@ function buildCalendarDescription(data: {
   responsibleParty: string;
   status: string;
   notes?: string;
+  meetingLink?: string;
+  meetingPassword?: string;
   id: string;
   createdByName: string;
   clientNotified?: boolean;
@@ -36,7 +39,7 @@ function buildCalendarDescription(data: {
 
   const typeLabel = data.isMeeting ? '🗓️ ATENDIMENTO / REUNIÃO' : '📌 PROCESSO JUDICIAL';
 
-  return [
+  const sections = [
     typeLabel,
     data.isMeeting ? `Finalidade: ${data.legalArea}` : `Tipo: ${data.legalArea}`,
     ``,
@@ -45,7 +48,19 @@ function buildCalendarDescription(data: {
     ``,
     data.isMeeting ? `📍 Local/Modo:` : `⚖️ Juízo / Vara:`,
     `${data.courtBranch || data.location || 'Não informado'}`,
-    ``,
+    ``
+  ];
+
+  if (data.meetingLink) {
+    sections.push(`🔗 LINK DA SALA VIRTUAL:`);
+    sections.push(`${data.meetingLink}`);
+    if (data.meetingPassword) {
+      sections.push(`🔑 SENHA DE ACESSO: ${data.meetingPassword}`);
+    }
+    sections.push(``);
+  }
+
+  sections.push(
     `👤 Cliente:`,
     `${data.clientName} - ${data.clientPhone}`,
     `Link WhatsApp: ${whatsappLink}`,
@@ -64,7 +79,9 @@ function buildCalendarDescription(data: {
     ``,
     `📋 Agendado por: ${data.createdByName}`,
     `🔐 ID Interno: ${data.id}`
-  ].join('\n');
+  );
+
+  return sections.join('\n');
 }
 
 export async function createHearing(data: {
@@ -78,6 +95,8 @@ export async function createHearing(data: {
   status: HearingStatus;
   type: HearingType;
   notes?: string;
+  meetingLink?: string;
+  meetingPassword?: string;
   clientNotified?: boolean;
   notificationMethod?: NotificationMethod;
 }) {
@@ -93,6 +112,7 @@ export async function createHearing(data: {
   const { 
     processId, lawyerId, hearingDate, location, 
     courtBranch, responsibleParty, status, type, notes,
+    meetingLink, meetingPassword,
     clientNotified, notificationMethod 
   } = data;
 
@@ -131,6 +151,8 @@ export async function createHearing(data: {
       status: status || 'PENDENTE',
       type: type || 'OUTRA',
       notes: notes || '',
+      meetingLink: meetingLink || '',
+      meetingPassword: meetingPassword || '',
       clientNotified: !!clientNotified,
       notificationMethod: notificationMethod || null,
       notificationDate: clientNotified ? FieldValue.serverTimestamp() : null,
@@ -143,7 +165,7 @@ export async function createHearing(data: {
     const timelineEvent: TimelineEvent = {
       id: uuidv4(),
       type: type === 'ATENDIMENTO' ? 'meeting' : 'hearing',
-      description: `${type === 'ATENDIMENTO' ? 'ATENDIMENTO AGENDADO' : 'AUDIÊNCIA AGENDADA'}: ${type} para o dia ${format(new Date(hearingDate), 'dd/MM/yyyy HH:mm', { locale: ptBR })}. Local: ${location}.`,
+      description: `${type === 'ATENDIMENTO' ? 'ATENDIMENTO AGENDADO' : 'AUDIÊNCIA AGENDADA'}: ${type} para o dia ${format(new Date(hearingDate), 'dd/MM/yyyy HH:mm', { locale: ptBR })}. Local: ${location}.${meetingLink ? ' Link virtual configurado.' : ''}`,
       date: Timestamp.now() as any,
       authorName: session.user.name || 'Sistema'
     };
@@ -171,6 +193,8 @@ export async function createHearing(data: {
         responsibleParty,
         status: status || 'PENDENTE',
         notes,
+        meetingLink,
+        meetingPassword,
         id: hearingRef.id,
         createdByName: session.user.name || 'Sistema',
         clientNotified: !!clientNotified,
@@ -181,7 +205,7 @@ export async function createHearing(data: {
       const summaryPrefix = isMeeting ? '🗓️ REUNIÃO' : (type === 'PERICIA' ? '🔍 Perícia' : '⚖️ Audiência');
       const event = {
         summary: `${summaryPrefix} [${type}] | ${clientInfo.name} (Dr. ${lawyerName})`,
-        location: location,
+        location: meetingLink || location,
         description: description,
         start: { dateTime: formatISO(startDateTime), timeZone: 'America/Sao_Paulo' },
         end: { dateTime: formatISO(endDateTime), timeZone: 'America/Sao_Paulo' },

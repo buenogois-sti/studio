@@ -47,6 +47,8 @@ export const processSchema = z.object({
   quickHearingTime: z.string().optional().or(z.literal('')),
   quickHearingType: z.enum(['UNA', 'CONCILIACAO', 'INSTRUCAO', 'JULGAMENTO', 'PERICIA', 'OUTRA']).optional(),
   quickHearingLocation: z.string().optional().or(z.literal('')),
+  quickHearingLink: z.string().optional().or(z.literal('')),
+  quickHearingPassword: z.string().optional().or(z.literal('')),
 });
 
 export type ProcessFormValues = z.infer<typeof processSchema>;
@@ -87,6 +89,8 @@ export const useProcessForm = (process?: Process | null, onSave?: () => void) =>
         quickHearingTime: '',
         quickHearingType: 'UNA',
         quickHearingLocation: '',
+        quickHearingLink: '',
+        quickHearingPassword: '',
       };
     }
     return {
@@ -110,6 +114,8 @@ export const useProcessForm = (process?: Process | null, onSave?: () => void) =>
       quickHearingTime: '',
       quickHearingType: 'UNA',
       quickHearingLocation: '',
+      quickHearingLink: '',
+      quickHearingPassword: '',
     };
   }, [process]);
 
@@ -181,7 +187,11 @@ export const useProcessForm = (process?: Process | null, onSave?: () => void) =>
       }
 
       // Extrair campos de agendamento rápido para não salvar no documento do processo
-      const { quickHearingDate, quickHearingTime, quickHearingType, quickHearingLocation, ...finalFormValues } = values;
+      const { 
+        quickHearingDate, quickHearingTime, quickHearingType, 
+        quickHearingLocation, quickHearingLink, quickHearingPassword, 
+        ...finalFormValues 
+      } = values;
 
       const rawData = {
         ...finalFormValues,
@@ -237,6 +247,8 @@ export const useProcessForm = (process?: Process | null, onSave?: () => void) =>
               responsibleParty: values.name,
               status: 'PENDENTE',
               type: quickHearingType || 'UNA',
+              meetingLink: quickHearingLink,
+              meetingPassword: quickHearingPassword,
               notes: 'Agendado automaticamente durante o cadastro do processo.',
             });
             console.log('[useProcessForm] Quick hearing scheduled successfully');

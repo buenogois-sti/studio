@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -20,7 +21,9 @@ import {
   AlertCircle,
   Smartphone,
   ShieldCheck,
-  X
+  X,
+  Video,
+  Key
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -49,6 +52,8 @@ const hearingSchema = z.object({
   type: z.enum(['CONCILIACAO', 'INSTRUCAO', 'UNA', 'JULGAMENTO', 'OUTRA']),
   responsibleParty: z.string().min(3, 'O responsável é obrigatório.'),
   notes: z.string().optional(),
+  meetingLink: z.string().optional().or(z.literal('')),
+  meetingPassword: z.string().optional().or(z.literal('')),
   clientNotified: z.boolean().default(false),
   notificationMethod: z.enum(['whatsapp', 'email', 'phone', 'personal', 'court', 'other']).optional(),
 });
@@ -81,6 +86,8 @@ export function QuickHearingDialog({ process, open, onOpenChange, onSuccess }: Q
       courtBranch: '',
       responsibleParty: '',
       notes: '',
+      meetingLink: '',
+      meetingPassword: '',
       clientNotified: false,
       notificationMethod: 'whatsapp',
     }
@@ -117,15 +124,20 @@ export function QuickHearingDialog({ process, open, onOpenChange, onSuccess }: Q
       toast({ variant: 'destructive', title: 'WhatsApp indisponível', description: 'O cliente não possui celular cadastrado.' });
       return;
     }
-    const date = form.getValues('date');
-    const time = form.getValues('time');
-    const type = form.getValues('type');
-    const loc = form.getValues('location');
-    
-    const dateObj = getLocalDate(date);
+    const values = form.getValues();
+    const dateObj = getLocalDate(values.date);
     const dateFmt = format(dateObj, "dd/MM (EEEE)", { locale: ptBR });
     
-    const message = `Olá, ${clientData.firstName}! Sou do escritório Bueno Gois Advogados.\n\nInformamos que sua audiência de *${type}* foi agendada:\n📅 Data: *${dateFmt}*\n🕘 Horário: *${time}*\n📍 Local: *${loc}*\n\nProcesso: ${process?.processNumber || 'N/A'}\n\nFavor confirmar o recebimento desta mensagem.`.trim();
+    let message = `Olá, ${clientData.firstName}! Sou do escritório Bueno Gois Advogados.\n\nInformamos que sua audiência de *${values.type}* foi agendada:\n📅 Data: *${dateFmt}*\n🕘 Horário: *${values.time}*\n📍 Local: *${values.location}*`.trim();
+    
+    if (values.meetingLink) {
+      message += `\n\n🔗 *LINK DA SALA VIRTUAL:* ${values.meetingLink}`;
+      if (values.meetingPassword) {
+        message += `\n🔑 *SENHA:* ${values.meetingPassword}`;
+      }
+    }
+
+    message += `\n\nProcesso: ${process?.processNumber || 'N/A'}\n\nFavor confirmar o recebimento desta mensagem.`;
     
     const cleanPhone = clientData.mobile.replace(/\D/g, '');
     const url = `https://wa.me/${cleanPhone.startsWith('55') ? cleanPhone : '55' + cleanPhone}?text=${encodeURIComponent(message)}`;
@@ -139,15 +151,21 @@ export function QuickHearingDialog({ process, open, onOpenChange, onSuccess }: Q
       toast({ variant: 'destructive', title: 'E-mail indisponível', description: 'O cliente não possui e-mail cadastrado.' });
       return;
     }
-    const date = form.getValues('date');
-    const time = form.getValues('time');
-    const type = form.getValues('type');
-    
-    const dateObj = getLocalDate(date);
+    const values = form.getValues();
+    const dateObj = getLocalDate(values.date);
     const dateFmt = format(dateObj, "dd/MM/yyyy", { locale: ptBR });
     
     const subject = `Agendamento de Audiência - ${process?.name}`;
-    const body = `Prezado(a) ${clientData.firstName},\n\nComunicamos o agendamento de audiência para o seu processo:\n\nTipo: ${type}\nData: ${dateFmt}\nHorário: ${time}\nLocal: ${form.getValues('location')}\n\nAtenciosamente,\nEquipe Bueno Gois Advogados.`;
+    let body = `Prezado(a) ${clientData.firstName},\n\nComunicamos o agendamento de audiência para o seu processo:\n\nTipo: ${values.type}\nData: ${dateFmt}\nHorário: ${values.time}\nLocal: ${values.location}`;
+    
+    if (values.meetingLink) {
+      body += `\n\nLink da Sala Virtual: ${values.meetingLink}`;
+      if (values.meetingPassword) {
+        body += `\nSenha de Acesso: ${values.meetingPassword}`;
+      }
+    }
+
+    body += `\n\nAtenciosamente,\nEquipe Bueno Gois Advogados.`;
     
     const mailto = `mailto:${clientData.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     window.location.href = mailto;
@@ -296,15 +314,46 @@ export function QuickHearingDialog({ process, open, onOpenChange, onSuccess }: Q
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
-                          <MapPin className="h-3 w-3" /> Endereço ou Link da Sala *
+                          <MapPin className="h-3 w-3" /> Endereço ou Fórum Presencial *
                         </FormLabel>
                         <FormControl>
-                          <LocationSearch value={field.value} onSelect={field.onChange} placeholder="Pesquise o fórum ou cole o link do ZOOM/TEAMS..." />
+                          <LocationSearch value={field.value} onSelect={field.onChange} placeholder="Pesquise o fórum ou endereço..." />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="meetingLink"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-2">
+                            <Video className="h-3.5 w-3.5" /> Link da Sala (Virtual)
+                          </FormLabel>
+                          <FormControl>
+                            <Input placeholder="Link do Zoom, Meet ou Teams..." className="h-11 bg-black/40 border-primary/20 focus:border-primary font-mono text-[10px]" {...field} />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="meetingPassword"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
+                            <Key className="h-3.5 w-3.5" /> Senha de Acesso
+                          </FormLabel>
+                          <FormControl>
+                            <Input placeholder="Senha da reunião..." className="h-11 bg-black/40 border-white/10" {...field} />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
 
                   <FormField
                     control={form.control}

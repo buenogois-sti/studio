@@ -30,7 +30,7 @@ const PROCESS_FOLDER_STRUCTURE = [
   '02 - Decisões e Sentenças',
   '03 - Provas e Documentos Processuais',
   '04 - Recursos',
-  '05 - Atas e Senteças',
+  '05 - Atas e Sentenças',
   '06 - Execução',
   '07 - Encerramento'
 ];

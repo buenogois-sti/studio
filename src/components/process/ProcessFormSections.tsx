@@ -26,7 +26,9 @@ import {
   Gavel,
   Calendar,
   Clock,
-  Hash
+  Hash,
+  Video,
+  Key
 } from 'lucide-react';
 import { Control, useFieldArray, useFormContext, useWatch } from 'react-hook-form';
 
@@ -1004,7 +1006,7 @@ export function StrategySection({ control }: { control: Control<ProcessFormValue
               <FormControl>
                 <Textarea
                   placeholder="Detalhamento estratégico para o advogado responsável e equipe de apoio. Cite prazos, teses jurídicas e particularidades do cliente..."
-                  className="min-h-[250px] resize-none text-sm bg-black/40 border-white/10 p-6 leading-relaxed font-medium focus:border-primary transition-all"
+                  className="min-h-[200px] resize-none text-sm bg-black/40 border-white/10 p-6 leading-relaxed font-medium focus:border-primary transition-all"
                   onKeyDown={(e) => e.stopPropagation()}
                   {...field}
                 />
@@ -1093,11 +1095,11 @@ export function StrategySection({ control }: { control: Control<ProcessFormValue
               render={({ field }) => (
                 <FormItem className="md:col-span-2">
                   <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
-                    <MapPin className="h-3 w-3" /> Local ou Link da Sala
+                    <MapPin className="h-3 w-3" /> Fórum ou Endereço Presencial
                   </FormLabel>
                   <FormControl>
                     <Input 
-                      placeholder="Fórum, sala virtual ou endereço..." 
+                      placeholder="Fórum de São Bernardo do Campo..." 
                       className="h-11 bg-black/40 border-white/10" 
                       {...field} 
                     />
@@ -1105,6 +1107,45 @@ export function StrategySection({ control }: { control: Control<ProcessFormValue
                 </FormItem>
               )}
             />
+
+            <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+              <FormField
+                control={control}
+                name="quickHearingLink"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-2">
+                      <Video className="h-3.5 w-3.5" /> Link da Sala (Virtual)
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="https://zoom.us/j/..." 
+                        className="h-11 bg-black/40 border-primary/20 focus:border-primary font-mono text-[10px]" 
+                        {...field} 
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={control}
+                name="quickHearingPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
+                      <Key className="h-3.5 w-3.5" /> Senha / Código
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Senha da sala..." 
+                        className="h-11 bg-black/40 border-white/10 focus:border-primary" 
+                        {...field} 
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+            </div>
           </div>
         </div>
       </div>
