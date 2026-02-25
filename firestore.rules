@@ -40,6 +40,7 @@ service cloud.firestore {
       allow create, delete: if isAdmin();
 
       match /notifications/{notificationId} {
+        // Regra atualizada: Dono pode gerenciar, sistema (autenticado) pode criar para qualquer um
         allow read, update, delete: if isOwner(userId) || isAdmin();
         allow create: if isAuthenticated();
       }

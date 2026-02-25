@@ -20,10 +20,10 @@ import { ptBR } from 'date-fns/locale';
 import { useRouter } from 'next/navigation';
 
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, limit, doc, writeBatch, deleteDoc } from 'firebase/firestore';
+import { collection, query, orderBy, limit } from 'firebase/firestore';
 import type { Notification, NotificationType } from '@/lib/types';
 import { cn } from '@/lib/utils';
-import { markNotificationAsRead } from '@/lib/notification-actions';
+import { markNotificationAsRead, markAllNotificationsAsRead, clearAllNotifications } from '@/lib/notification-actions';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -70,37 +70,21 @@ export function NotificationBell() {
     return notifications?.filter(n => !n.isRead).length || 0;
   }, [notifications]);
 
-  const markAllAsRead = async () => {
-    if (!firestore || !session?.user?.id || !notifications) return;
-    
-    const batch = writeBatch(firestore);
-    notifications.forEach(notification => {
-      if (!notification.isRead) {
-        const notifRef = doc(firestore, `users/${session.user.id}/notifications`, notification.id);
-        batch.update(notifRef, { isRead: true });
-      }
-    });
-    
-    try {
-      await batch.commit();
-    } catch (error) {
-      console.error("Error marking notifications as read:", error);
+  const handleMarkAllAsRead = async () => {
+    if (!session?.user?.id) return;
+    await markAllNotificationsAsRead(session.user.id);
+  };
+
+  const handleClearAll = async () => {
+    if (!session?.user?.id) return;
+    if (confirm('Deseja excluir permanentemente todo o histórico de notificações?')) {
+      await clearAllNotifications(session.user.id);
     }
   };
 
-  const clearAll = async () => {
-    if (!firestore || !session?.user?.id || !notifications) return;
-    const batch = writeBatch(firestore);
-    notifications.forEach(n => {
-      const ref = doc(firestore, `users/${session.user.id}/notifications`, n.id);
-      batch.delete(ref);
-    });
-    await batch.commit();
-  };
-
-  const handleNotificationClick = (notification: Notification) => {
+  const handleNotificationClick = async (notification: Notification) => {
     if (!notification.isRead && session?.user?.id) {
-      markNotificationAsRead(session.user.id, notification.id);
+      await markNotificationAsRead(session.user.id, notification.id);
     }
     if (notification.href && notification.href !== '#') {
       router.push(notification.href);
@@ -121,17 +105,17 @@ export function NotificationBell() {
           <span className="sr-only">Notificações</span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-80 md:w-[400px] bg-[#0f172a] border-border/50 p-0 shadow-2xl overflow-hidden" align="end">
+      <DropdownMenuContent className="w-80 md:w-[400px] bg-[#0f172a] border-white/10 p-0 shadow-2xl overflow-hidden" align="end">
         <DropdownMenuLabel className="flex items-center justify-between p-4 bg-white/5">
           <div className="flex items-center gap-2">
             <span className="font-headline text-lg text-white">Notificações</span>
             {unreadCount > 0 && <Badge variant="secondary" className="bg-rose-500/20 text-rose-400 border-rose-500/20 px-1.5 h-5 text-[10px]">{unreadCount} Novas</Badge>}
           </div>
           <div className="flex gap-1">
-            <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-white/10" onClick={markAllAsRead} title="Lidas">
+            <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-white/10 text-emerald-400" onClick={handleMarkAllAsRead} title="Lidas">
               <Check className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-rose-500/10 text-rose-400" onClick={clearAll} title="Limpar">
+            <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-rose-500/10 text-rose-400" onClick={handleClearAll} title="Limpar">
               <Trash2 className="h-4 w-4" />
             </Button>
           </div>
