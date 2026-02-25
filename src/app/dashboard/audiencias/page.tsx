@@ -33,7 +33,8 @@ import {
   Eye,
   ExternalLink,
   RotateCcw,
-  Video
+  Video,
+  FileText
 } from 'lucide-react';
 import { 
   format, 
@@ -85,6 +86,15 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from '@/components/ui/dialog';
 
 const statusConfig: Record<HearingStatus, { label: string; icon: any; color: string }> = {
     PENDENTE: { label: 'Pendente', icon: Clock3, color: 'text-blue-500 bg-blue-500/10' },
@@ -99,14 +109,122 @@ const getTypeIcon = (type: string) => {
   return <Gavel className="h-3.5 w-3.5" />;
 };
 
+function HearingDetailsDialog({ 
+  hearing, 
+  process, 
+  open, 
+  onOpenChange 
+}: { 
+  hearing: Hearing | null, 
+  process?: Process, 
+  open: boolean, 
+  onOpenChange: (o: boolean) => void 
+}) {
+  if (!hearing) return null;
+  const config = statusConfig[hearing.status || 'PENDENTE'];
+  const Icon = config.icon;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg bg-[#020617] border-white/10 text-white shadow-2xl">
+        <DialogHeader>
+          <div className="flex items-center gap-3 mb-2">
+            <Badge variant="outline" className={cn("gap-1.5 h-6 px-2 text-[10px] font-black uppercase tracking-widest", config.color)}>
+              <Icon className="h-3 w-3" /> {config.label}
+            </Badge>
+            <Badge variant="outline" className="text-[10px] font-black uppercase border-primary/30 text-primary">
+              {hearing.type}
+            </Badge>
+          </div>
+          <DialogTitle className="text-xl font-black font-headline leading-tight">
+            {process?.name || hearing.processName}
+          </DialogTitle>
+          <DialogDescription className="text-slate-400">
+            Detalhamento completo do compromisso agendado.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-6 py-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="p-3 rounded-xl bg-white/5 border border-white/10">
+              <p className="text-[9px] font-black uppercase text-slate-500 mb-1">Data e Hora</p>
+              <div className="flex items-center gap-2 text-sm font-bold text-slate-200">
+                <Clock className="h-4 w-4 text-primary" />
+                {format(hearing.date.toDate(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+              </div>
+            </div>
+            <div className="p-3 rounded-xl bg-white/5 border border-white/10">
+              <p className="text-[9px] font-black uppercase text-slate-500 mb-1">Responsável</p>
+              <div className="flex items-center gap-2 text-sm font-bold text-slate-200">
+                <User className="h-4 w-4 text-emerald-400" />
+                Dr(a). {hearing.lawyerName}
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
+              <MapPin className="h-3.5 w-3.5 text-primary" /> Localização / Juízo
+            </p>
+            <div className="p-4 rounded-xl bg-black/40 border border-white/10">
+              <p className="text-sm font-bold text-white">{hearing.location}</p>
+              {hearing.courtBranch && <p className="text-xs text-slate-400 mt-1">{hearing.courtBranch}</p>}
+            </div>
+          </div>
+
+          {(hearing.meetingLink || hearing.meetingPassword) && (
+            <div className="space-y-3">
+              <p className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-2">
+                <Video className="h-3.5 w-3.5" /> Conectividade Virtual
+              </p>
+              <div className="p-4 rounded-xl bg-primary/5 border border-primary/20 space-y-3">
+                {hearing.meetingLink && (
+                  <Button variant="outline" className="w-full justify-between h-10 border-primary/30 text-primary hover:bg-primary/10" asChild>
+                    <a href={hearing.meetingLink} target="_blank">
+                      <span className="flex items-center gap-2"><ExternalLink className="h-4 w-4" /> Abrir Sala Virtual</span>
+                      <ChevronRight className="h-4 w-4" />
+                    </a>
+                  </Button>
+                )}
+                {hearing.meetingPassword && (
+                  <div className="flex items-center justify-between px-3 py-2 bg-black/40 rounded-lg border border-white/5">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">Senha de Acesso:</span>
+                    <code className="text-sm font-black text-white">{hearing.meetingPassword}</code>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {hearing.notes && (
+            <div className="space-y-3">
+              <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
+                <FileText className="h-3.5 w-3.5 text-primary" /> Notas da Pauta
+              </p>
+              <div className="p-4 rounded-xl bg-white/5 border border-white/10 italic text-sm text-slate-300 leading-relaxed">
+                "{hearing.notes}"
+              </div>
+            </div>
+          )}
+        </div>
+
+        <DialogFooter className="border-t border-white/5 pt-6 bg-white/5 p-6 rounded-b-lg">
+          <DialogClose asChild><Button variant="ghost" className="w-full text-slate-400 uppercase text-[10px] font-black tracking-widest h-12">Fechar Detalhes</Button></DialogClose>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function AudienciasPage() {
   const { firestore, isUserLoading, user } = useFirebase();
   const [refreshKey, setRefreshKey] = React.useState(0);
-  const [viewMode, setViewMode] = React.useState<'list' | 'calendar' | 'history'>('list');
+  const [viewMode, setViewMode] = React.useState<'list' | 'calendar' | 'history'>('calendar');
   const [currentDate, setCurrentDate] = React.useState(new Date());
   const [selectedDay, setSelectedDay] = React.useState<Date | null>(new Date());
   const [selectedLawyerFilter, setSelectedLawyerFilter] = React.useState<string>('all');
   const [returnHearing, setReturnHearing] = React.useState<Hearing | null>(null);
+  const [detailsHearing, setDetailsHearing] = React.useState<Hearing | null>(null);
   const [isProcessing, setIsProcessing] = React.useState<string | null>(null);
   const { toast } = useToast();
   const router = useRouter();
@@ -277,11 +395,11 @@ export default function AudienciasPage() {
 
         <Tabs value={viewMode} onValueChange={v => setViewMode(v as any)} className="w-full">
             <TabsList className="bg-[#0f172a] p-1 border border-white/10 mb-6 h-12">
-                <TabsTrigger value="list" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground px-6 h-10 font-bold">
-                  <ListIcon className="h-4 w-4"/> Próximos Compromissos
-                </TabsTrigger>
                 <TabsTrigger value="calendar" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground px-6 h-10 font-bold">
                   <CalendarDays className="h-4 w-4"/> Calendário Mensal
+                </TabsTrigger>
+                <TabsTrigger value="list" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground px-6 h-10 font-bold">
+                  <ListIcon className="h-4 w-4"/> Próximos Compromissos
                 </TabsTrigger>
                 <TabsTrigger value="history" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground px-6 h-10 font-bold">
                   <History className="h-4 w-4"/> Histórico de Atos
@@ -332,7 +450,7 @@ export default function AudienciasPage() {
                                                       <div className="flex-1 min-w-0">
                                                           <div className="flex flex-wrap items-center gap-2 mb-2">
                                                               <Badge variant="outline" className={cn(
-                                                                "text-[9px] font-black uppercase px-2 gap-1.5 h-5",
+                                                                "text-[8px] font-black uppercase px-2 gap-1.5 h-5",
                                                                 isMeeting ? "border-emerald-500/30 text-emerald-400" : "border-primary/30 text-primary"
                                                               )}>
                                                                 {getTypeIcon(h.type)}
@@ -342,7 +460,9 @@ export default function AudienciasPage() {
                                                                   <User className="h-2.5 w-2.5" /> Dr(a). {h.lawyerName || 'Pendente'}
                                                               </Badge>
                                                           </div>
-                                                          <h4 className="font-black text-lg text-white truncate group-hover:text-primary transition-colors">{p?.name || h.processName}</h4>
+                                                          <h4 className="font-black text-lg text-white truncate group-hover:text-primary transition-colors cursor-pointer" onClick={() => setDetailsHearing(h)}>
+                                                            {p?.name || h.processName}
+                                                          </h4>
                                                           <p className="text-[10px] text-slate-500 font-mono mt-1 flex items-center gap-1.5">
                                                             {isMeeting ? <Video className="h-3 w-3 text-emerald-500 shrink-0" /> : <MapPin className="h-3 w-3 text-primary shrink-0" />} 
                                                             {h.location}
@@ -358,6 +478,10 @@ export default function AudienciasPage() {
                                                                   <Button variant="ghost" size="icon" className="text-white/30 hover:text-white rounded-xl h-10 w-10" disabled={isUpdating}><MoreVertical className="h-5 w-5" /></Button>
                                                               </DropdownMenuTrigger>
                                                               <DropdownMenuContent align="end" className="bg-[#0f172a] border-white/10 w-56 p-1">
+                                                                  <DropdownMenuItem onClick={() => setDetailsHearing(h)} className="font-bold gap-2 text-white">
+                                                                      <Eye className="h-4 w-4 text-blue-400" /> Ver Detalhes
+                                                                  </DropdownMenuItem>
+                                                                  <DropdownMenuSeparator className="bg-white/5" />
                                                                   <DropdownMenuItem onClick={() => handleUpdateStatus(h, 'REALIZADA')} className="font-bold gap-2 text-white hover:bg-emerald-500/10">
                                                                       <CheckCircle2 className="h-4 w-4 text-emerald-500" /> Marcar Concluído
                                                                   </DropdownMenuItem>
@@ -447,42 +571,82 @@ export default function AudienciasPage() {
                 </Card>
 
                 <div className="lg:col-span-4">
-                  <Card className="bg-[#0f172a] border-white/5 h-full shadow-2xl">
-                    <CardHeader className="border-b border-white/5 pb-4 bg-white/5 rounded-t-lg">
+                  <Card className="bg-[#0f172a] border-white/5 h-full shadow-2xl flex flex-col">
+                    <CardHeader className="border-b border-white/5 pb-4 bg-white/5 rounded-t-lg shrink-0">
                       <CardTitle className="text-xs font-black uppercase tracking-[0.2em] text-primary">
                         {selectedDay ? format(selectedDay, "dd 'de' MMMM", { locale: ptBR }) : 'Selecione um dia'}
                       </CardTitle>
                     </CardHeader>
-                    <CardContent className="p-0">
+                    <CardContent className="p-0 flex-1 overflow-hidden">
                       <ScrollArea className="h-[550px]">
                         <div className="p-4 space-y-4">
                           {hearingsForSelectedDay.length > 0 ? (
-                            hearingsForSelectedDay.map(h => (
-                              <div key={h.id} className={cn(
-                                "p-5 rounded-2xl border space-y-4 transition-all group",
-                                h.type === 'ATENDIMENTO' ? "bg-emerald-500/[0.03] border-emerald-500/20" : "bg-black/30 border-white/5 hover:border-primary/20"
-                              )}>
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-2">
-                                    <Clock className={cn("h-3.5 w-3.5", h.type === 'ATENDIMENTO' ? "text-emerald-400" : "text-primary")} />
-                                    <span className="text-xs font-black text-white">{format(h.date.toDate(), 'HH:mm')}</span>
+                            hearingsForSelectedDay.map(h => {
+                              const config = statusConfig[h.status || 'PENDENTE'];
+                              const StatusIcon = config.icon;
+                              const isUpdating = isProcessing === h.id;
+
+                              return (
+                                <div key={h.id} className={cn(
+                                  "p-5 rounded-2xl border space-y-4 transition-all group",
+                                  h.type === 'ATENDIMENTO' ? "bg-emerald-500/[0.03] border-emerald-500/20" : "bg-black/30 border-white/5 hover:border-primary/20"
+                                )}>
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                      <Clock className={cn("h-3.5 w-3.5", h.type === 'ATENDIMENTO' ? "text-emerald-400" : "text-primary")} />
+                                      <span className="text-xs font-black text-white tabular-nums">{format(h.date.toDate(), 'HH:mm')}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <Badge variant="outline" className={cn("text-[8px] font-black uppercase tracking-widest px-2 h-5 border-none", config.color)}>
+                                        {config.label}
+                                      </Badge>
+                                      <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                          <Button variant="ghost" size="icon" className="h-7 w-7 text-white/20 hover:text-white" disabled={isUpdating}>
+                                            <MoreVertical className="h-4 w-4" />
+                                          </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end" className="bg-[#0f172a] border-white/10 w-56 p-1">
+                                          <DropdownMenuItem onClick={() => setDetailsHearing(h)} className="font-bold gap-2 text-white">
+                                            <Eye className="h-4 w-4 text-blue-400" /> Ver Detalhes
+                                          </DropdownMenuItem>
+                                          <DropdownMenuSeparator className="bg-white/5" />
+                                          <DropdownMenuItem onClick={() => handleUpdateStatus(h, 'REALIZADA')} className="font-bold gap-2 text-white hover:bg-emerald-500/10">
+                                            <CheckCircle2 className="h-4 w-4 text-emerald-500" /> Marcar Concluído
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem onClick={() => handleUpdateStatus(h, 'ADIADA')} className="font-bold gap-2 text-white">
+                                            <Clock3 className="h-4 w-4 text-amber-500" /> Adiar
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem className="text-rose-500 font-bold gap-2" onClick={() => handleUpdateStatus(h, 'CANCELADA')}>
+                                            <XCircle className="h-4 w-4" /> Cancelar
+                                          </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                      </DropdownMenu>
+                                    </div>
                                   </div>
-                                  <Badge variant="outline" className={cn("text-[8px] font-black uppercase tracking-widest px-2 h-5 border-none", statusConfig[h.status || 'PENDENTE'].color)}>
-                                    {h.status}
-                                  </Badge>
+                                  <div className="space-y-1">
+                                    <p className="text-[10px] font-black uppercase text-slate-500 tracking-tighter">{h.type}</p>
+                                    <p 
+                                      className="text-xs font-black text-slate-200 leading-snug line-clamp-2 hover:text-primary cursor-pointer transition-colors"
+                                      onClick={() => setDetailsHearing(h)}
+                                    >
+                                      {processesMap.get(h.processId)?.name || h.processName}
+                                    </p>
+                                  </div>
+                                  <div className="pt-2 border-t border-white/5 flex items-center justify-between">
+                                    <p className="text-[10px] text-slate-500 flex items-start gap-1.5 flex-1 mr-2">
+                                      {h.type === 'ATENDIMENTO' ? <Video className="h-3 w-3 text-emerald-500 shrink-0 mt-0.5" /> : <MapPin className="h-3 w-3 text-primary shrink-0 mt-0.5" />}
+                                      <span className="line-clamp-1">{h.location}</span>
+                                    </p>
+                                    {h.meetingLink && (
+                                      <Button variant="ghost" size="icon" className="h-6 w-6 text-primary hover:bg-primary/10 rounded-full" asChild>
+                                        <a href={h.meetingLink} target="_blank"><Video className="h-3.5 w-3.5" /></a>
+                                      </Button>
+                                    )}
+                                  </div>
                                 </div>
-                                <div className="space-y-1">
-                                  <p className="text-[10px] font-black uppercase text-slate-500 tracking-tighter">{h.type}</p>
-                                  <p className="text-xs font-black text-slate-200 leading-snug line-clamp-2">{processesMap.get(h.processId)?.name || h.processName}</p>
-                                </div>
-                                <div className="pt-2 border-t border-white/5">
-                                  <p className="text-[10px] text-slate-500 flex items-start gap-1.5">
-                                    {h.type === 'ATENDIMENTO' ? <Video className="h-3 w-3 text-emerald-500 shrink-0 mt-0.5" /> : <MapPin className="h-3 w-3 text-primary shrink-0 mt-0.5" />}
-                                    <span className="line-clamp-2">{h.location}</span>
-                                  </p>
-                                </div>
-                              </div>
-                            ))
+                              );
+                            })
                           ) : (
                             <div className="flex flex-col items-center justify-center py-32 text-center opacity-20">
                               <CalendarIcon className="h-12 w-12 mb-3" />
@@ -530,7 +694,10 @@ export default function AudienciasPage() {
                                         <Badge variant="secondary" className="bg-white/10 text-slate-400 border-none text-[8px] font-black h-4.5 px-1.5">{h.type}</Badge>
                                         {isPendingReturn && <Badge className="bg-amber-500/20 text-amber-400 border-none text-[8px] font-black h-4.5 px-1.5 animate-pulse">REQUER RETORNO</Badge>}
                                       </div>
-                                      <span className="text-slate-300 font-bold group-hover:text-primary transition-colors truncate max-w-[200px]">
+                                      <span 
+                                        className="text-slate-300 font-bold group-hover:text-primary transition-colors truncate max-w-[200px] cursor-pointer"
+                                        onClick={() => setDetailsHearing(h)}
+                                      >
                                         {process?.name || h.processName}
                                       </span>
                                     </div>
@@ -556,6 +723,9 @@ export default function AudienciasPage() {
                                         </Button>
                                       </DropdownMenuTrigger>
                                       <DropdownMenuContent align="end" className="bg-[#0f172a] border-white/10 w-56 p-1">
+                                        <DropdownMenuItem onClick={() => setDetailsHearing(h)} className="font-bold gap-2 text-white">
+                                          <Eye className="h-4 w-4 text-blue-400" /> Ver Detalhes
+                                        </DropdownMenuItem>
                                         {isPendingReturn && (
                                           <DropdownMenuItem onClick={() => setReturnHearing(h)} className="font-bold gap-2 text-amber-400 focus:bg-amber-500/10">
                                             <History className="h-4 w-4" /> Dar Retorno
@@ -568,7 +738,7 @@ export default function AudienciasPage() {
                                         <DropdownMenuItem onClick={() => {
                                           if (process) router.push(`/dashboard/processos?clientId=${process.clientId}`);
                                         }} className="font-bold gap-2 text-white">
-                                          <Eye className="h-4 w-4 text-primary" /> Ver Processo
+                                          <FolderKanban className="h-4 w-4 text-primary" /> Ir para o Processo
                                         </DropdownMenuItem>
                                       </DropdownMenuContent>
                                     </DropdownMenu>
@@ -587,6 +757,13 @@ export default function AudienciasPage() {
           open={!!returnHearing} 
           onOpenChange={(o) => !o && setReturnHearing(null)}
           onSuccess={() => setRefreshKey(k => k + 1)}
+        />
+
+        <HearingDetailsDialog
+          hearing={detailsHearing}
+          process={detailsHearing ? processesMap.get(detailsHearing.processId) : undefined}
+          open={!!detailsHearing}
+          onOpenChange={(o) => !o && setDetailsHearing(null)}
         />
     </div>
   );
