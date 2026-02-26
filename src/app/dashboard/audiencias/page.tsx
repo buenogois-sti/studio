@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -78,7 +79,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { HearingReturnDialog } from '@/components/process/HearingReturnDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Table,
   TableBody,
@@ -219,6 +220,7 @@ function HearingDetailsDialog({
 
 export default function AudienciasPage() {
   const { firestore, isUserLoading, user } = useFirebase();
+  const searchParams = useSearchParams();
   const [refreshKey, setRefreshKey] = React.useState(0);
   const [viewMode, setViewMode] = React.useState<'list' | 'calendar' | 'history'>('calendar');
   const [currentDate, setCurrentDate] = React.useState(new Date());
@@ -248,7 +250,7 @@ export default function AudienciasPage() {
     if (!firestore || !userProfile) return null;
     const base = collection(firestore, 'hearings');
 
-    if (userProfile.role === 'admin' || userProfile.role === 'assistant') {
+    if (userProfile.role === 'admin' || userProfile.role === 'assistant' || userProfile.role === 'financial') {
       if (selectedLawyerFilter !== 'all') {
         return query(base, where('lawyerId', '==', selectedLawyerFilter), where('date', '>=', stableHistoryCutoff), orderBy('date', 'asc'), limit(100));
       }
@@ -263,6 +265,18 @@ export default function AudienciasPage() {
   const processesQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'processes'), limit(100)) : null, [firestore]);
   const { data: processesData } = useCollection<Process>(processesQuery);
   const processesMap = React.useMemo(() => new Map(processesData?.map(p => [p.id, p])), [processesData]);
+
+  // Lógica para abrir retorno automático via URL (ReturnId do Google Agenda)
+  React.useEffect(() => {
+    const returnId = searchParams.get('returnId');
+    if (returnId && hearingsData && !returnHearing) {
+      const target = hearingsData.find(h => h.id === returnId);
+      if (target) {
+        setReturnHearing(target);
+        setViewMode('history');
+      }
+    }
+  }, [searchParams, hearingsData, returnHearing]);
 
   const handleUpdateStatus = React.useCallback(async (hearing: Hearing, status: HearingStatus) => {
       if (isProcessing) return;
@@ -342,7 +356,7 @@ export default function AudienciasPage() {
             </div>
             
             <div className="flex items-center gap-3">
-                {(userProfile?.role === 'admin' || userProfile?.role === 'assistant') && (
+                {(userProfile?.role === 'admin' || userProfile?.role === 'assistant' || userProfile?.role === 'financial') && (
                   <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 animate-in fade-in">
                     <Filter className="h-3.5 w-3.5 text-primary" />
                     <Select value={selectedLawyerFilter} onValueChange={setSelectedLawyerFilter} disabled={isLoading}>

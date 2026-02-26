@@ -38,10 +38,14 @@ function buildCalendarDescription(data: {
   const whatsappLink = cleanPhone ? `https://wa.me/${cleanPhone.startsWith('55') ? cleanPhone : '55' + cleanPhone}` : 'Telefone não disponível';
 
   const typeLabel = data.isMeeting ? '🗓️ ATENDIMENTO / REUNIÃO' : '📌 PROCESSO JUDICIAL';
+  const returnUrl = `https://www.buenogoisadvogado.com.br/dashboard/audiencias?returnId=${data.id}`;
 
   const sections = [
     typeLabel,
     data.isMeeting ? `Finalidade: ${data.legalArea}` : `Tipo: ${data.legalArea}`,
+    ``,
+    `🔗 DAR RETORNO NO LEXFLOW:`,
+    `${returnUrl}`,
     ``,
     `🔢 Número do Processo:`,
     `${data.processNumber}`,
@@ -157,6 +161,7 @@ export async function createHearing(data: {
       notificationMethod: notificationMethod || null,
       notificationDate: clientNotified ? FieldValue.serverTimestamp() : null,
       createdAt: FieldValue.serverTimestamp(),
+      hasFollowUp: false
     };
 
     const hearingRef = await firestoreAdmin.collection('hearings').add(hearingPayload);
@@ -175,11 +180,12 @@ export async function createHearing(data: {
       updatedAt: FieldValue.serverTimestamp()
     });
 
-    // Sincronização com o Google Agenda (RESPEITANDO O RESPONSÁVEL)
+    // Sincronização com o Google Workspace (Agenda e Tasks)
     try {
-      const { calendar } = await getGoogleClientsForStaff(lawyerId);
+      const { calendar, tasks } = await getGoogleClientsForStaff(lawyerId);
       const startDateTime = new Date(hearingDate);
       const endDateTime = add(startDateTime, { hours: 1 });
+      const reminderTime = add(startDateTime, { hours: 1, minutes: 30 }); // 1h30 após o início
 
       const isMeeting = type === 'ATENDIMENTO';
 
@@ -202,6 +208,7 @@ export async function createHearing(data: {
         isMeeting
       });
 
+      // 1. Criar Evento na Agenda
       const summaryPrefix = isMeeting ? '🗓️ REUNIÃO' : (type === 'PERICIA' ? '🔍 Perícia' : '⚖️ Audiência');
       const event = {
         summary: `${summaryPrefix} [${type}] | ${clientInfo.name} (Dr. ${lawyerName})`,
@@ -219,15 +226,29 @@ export async function createHearing(data: {
       };
 
       const createdEvent = await calendar.events.insert({
-        calendarId: 'primary', // Como estamos usando o token do Staff, 'primary' é o dele
+        calendarId: 'primary',
         requestBody: event,
       });
+
+      // 2. Criar Tarefa de Lembrete de Retorno (Google Tasks)
+      try {
+        await tasks.tasks.insert({
+          tasklist: '@default',
+          requestBody: {
+            title: `📝 EMITIR RELATÓRIO: ${clientInfo.name}`,
+            notes: `O ato processual encerrou. Clique para preencher o retorno: https://www.buenogoisadvogado.com.br/dashboard/audiencias?returnId=${hearingRef.id}`,
+            due: reminderTime.toISOString(),
+          }
+        });
+      } catch (tError) {
+        console.warn("Tasks sync failed:", tError);
+      }
 
       if (createdEvent.data.id) {
         await hearingRef.update({ googleCalendarEventId: createdEvent.data.id });
       }
     } catch (calendarError: any) {
-      console.warn("Calendar sync partially failed:", calendarError.message);
+      console.warn("Workspace sync partially failed:", calendarError.message);
     }
 
     // Notificar o advogado alvo
@@ -363,6 +384,9 @@ export async function processHearingReturn(hearingId: string, data: {
 
     // 3.2. Agendar nova data (se designada em ata e data selecionada)
     if (data.scheduleNewHearing && !data.dateNotSet && data.newHearingDate && data.newHearingTime) {
+      // Nota: Chamamos a função de criação aqui. Como é uma Server Action dentro de outra,
+      // idealmente usaríamos o mesmo batch, mas a função createHearing gerencia o Calendar.
+      // Em produção Bueno Gois, isso garante a sincronia imediata.
       await createHearing({
         processId: hearingData.processId,
         processName: hearingData.processName,
