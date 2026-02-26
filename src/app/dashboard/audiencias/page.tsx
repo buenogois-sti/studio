@@ -34,7 +34,8 @@ import {
   ExternalLink,
   RotateCcw,
   Video,
-  FileText
+  FileText,
+  FolderKanban
 } from 'lucide-react';
 import { 
   format, 

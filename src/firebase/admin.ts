@@ -1,4 +1,3 @@
-
 import admin from 'firebase-admin';
 import { firebaseConfig } from './config';
 
@@ -12,7 +11,6 @@ if (!admin.apps.length) {
     if (serviceAccountJson) {
       const serviceAccount = JSON.parse(serviceAccountJson);
       
-      // Limpeza de Project ID para evitar erros de caractere invisível
       const serviceProjectId = serviceAccount.project_id?.trim();
       const configProjectId = firebaseConfig.projectId?.trim();
 
@@ -20,10 +18,10 @@ if (!admin.apps.length) {
       console.log(`[Firebase Admin] JSON Project ID: "${serviceProjectId}"`);
       console.log(`[Firebase Admin] Config Project ID: "${configProjectId}"`);
 
-      // Validação Crítica de Project ID
       if (serviceProjectId !== configProjectId) {
-        console.error(`[Firebase Admin] ❌ PROJECT ID MISMATCH DETECTED!`);
-        console.error(`[Firebase Admin] Token será assinado para '${serviceProjectId}' mas o cliente espera '${configProjectId}'.`);
+        console.error(`[Firebase Admin] ❌ CRITICAL PROJECT ID MISMATCH!`);
+        console.error(`[Firebase Admin] Token is being signed for project '${serviceProjectId}' but browser config expects '${configProjectId}'.`);
+        console.error(`[Firebase Admin] SOLUTION: Update FIREBASE_SERVICE_ACCOUNT_JSON with credentials for '${configProjectId}'.`);
       }
 
       admin.initializeApp({
