@@ -23,7 +23,8 @@ import {
   ShieldCheck,
   X,
   Video,
-  Key
+  Key,
+  Edit
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -32,8 +33,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
-import type { Process, HearingType, Staff, Client, NotificationMethod } from '@/lib/types';
-import { createHearing } from '@/lib/hearing-actions';
+import type { Process, Hearing, HearingType, Staff, Client, NotificationMethod } from '@/lib/types';
+import { createHearing, updateHearing } from '@/lib/hearing-actions';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, limit, doc, getDoc } from 'firebase/firestore';
 import { LocationSearch } from '@/components/shared/LocationSearch';
@@ -49,7 +50,7 @@ const hearingSchema = z.object({
   time: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Hora inválida.'),
   location: z.string().min(3, 'O local é obrigatório.'),
   courtBranch: z.string().optional().or(z.literal('')),
-  type: z.enum(['CONCILIACAO', 'INSTRUCAO', 'UNA', 'JULGAMENTO', 'OUTRA']),
+  type: z.enum(['CONCILIACAO', 'INSTRUCAO', 'UNA', 'JULGAMENTO', 'PERICIA', 'ATENDIMENTO', 'OUTRA']),
   responsibleParty: z.string().min(3, 'O responsável é obrigatório.'),
   notes: z.string().optional(),
   meetingLink: z.string().optional().or(z.literal('')),
@@ -59,17 +60,20 @@ const hearingSchema = z.object({
 });
 
 interface QuickHearingDialogProps {
-  process: Process | null;
+  process?: Process | null;
+  hearing?: Hearing | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
 }
 
-export function QuickHearingDialog({ process, open, onOpenChange, onSuccess }: QuickHearingDialogProps) {
+export function QuickHearingDialog({ process, hearing, open, onOpenChange, onSuccess }: QuickHearingDialogProps) {
   const [isSaving, setIsSaving] = React.useState(false);
   const [clientData, setClientData] = React.useState<Client | null>(null);
   const { toast } = useToast();
   const { firestore } = useFirebase();
+
+  const isEdit = !!hearing;
 
   const staffQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'staff'), limit(50)) : null, [firestore]);
   const { data: staffData } = useCollection<Staff>(staffQuery);
@@ -94,25 +98,56 @@ export function QuickHearingDialog({ process, open, onOpenChange, onSuccess }: Q
   });
 
   React.useEffect(() => {
-    if (process && open && firestore) {
-      form.setValue('location', process.court || '');
-      form.setValue('courtBranch', process.courtBranch || '');
-      
-      if (process.leadLawyerId) {
-        form.setValue('lawyerId', process.leadLawyerId);
-        const leader = lawyers.find(s => s.id === process.leadLawyerId);
-        if (leader) {
-          form.setValue('responsibleParty', `Dr(a). ${leader.firstName} ${leader.lastName}`);
+    if (open) {
+      if (hearing) {
+        const hDate = hearing.date.toDate();
+        form.reset({
+          lawyerId: hearing.lawyerId,
+          date: format(hDate, 'yyyy-MM-dd'),
+          time: format(hDate, 'HH:mm'),
+          type: hearing.type,
+          location: hearing.location,
+          courtBranch: hearing.courtBranch || '',
+          responsibleParty: hearing.responsibleParty || '',
+          notes: hearing.notes || '',
+          meetingLink: hearing.meetingLink || '',
+          meetingPassword: hearing.meetingPassword || '',
+          clientNotified: !!hearing.clientNotified,
+          notificationMethod: hearing.notificationMethod || 'whatsapp',
+        });
+
+        if (hearing.processId && firestore) {
+          getDoc(doc(firestore, 'processes', hearing.processId)).then(pSnap => {
+            if (pSnap.exists()) {
+              const pData = pSnap.data();
+              if (pData?.clientId) {
+                getDoc(doc(firestore, 'clients', pData.clientId)).then(cSnap => {
+                  if (cSnap.exists()) setClientData({ id: cSnap.id, ...cSnap.data() } as Client);
+                });
+              }
+            }
+          });
+        }
+      } else if (process) {
+        form.setValue('location', process.court || '');
+        form.setValue('courtBranch', process.courtBranch || '');
+        
+        if (process.leadLawyerId) {
+          form.setValue('lawyerId', process.leadLawyerId);
+          const leader = lawyers.find(s => s.id === process.leadLawyerId);
+          if (leader) {
+            form.setValue('responsibleParty', `Dr(a). ${leader.firstName}`);
+          }
+        }
+
+        if (process.clientId && firestore) {
+          getDoc(doc(firestore, 'clients', process.clientId)).then(snap => {
+            if (snap.exists()) setClientData({ id: snap.id, ...snap.data() } as Client);
+          });
         }
       }
-
-      if (process.clientId) {
-        getDoc(doc(firestore, 'clients', process.clientId)).then(snap => {
-          if (snap.exists()) setClientData({ id: snap.id, ...snap.data() } as Client);
-        });
-      }
     }
-  }, [process, open, lawyers.length, firestore, form]);
+  }, [process, hearing, open, lawyers.length, firestore, form]);
 
   const getLocalDate = (dateStr: string) => {
     const [year, month, day] = dateStr.split('-').map(Number);
@@ -155,7 +190,7 @@ export function QuickHearingDialog({ process, open, onOpenChange, onSuccess }: Q
     const dateObj = getLocalDate(values.date);
     const dateFmt = format(dateObj, "dd/MM/yyyy", { locale: ptBR });
     
-    const subject = `Agendamento de Audiência - ${process?.name}`;
+    const subject = `Agendamento de Audiência - ${process?.name || hearing?.processName}`;
     let body = `Prezado(a) ${clientData.firstName},\n\nComunicamos o agendamento de audiência para o seu processo:\n\nTipo: ${values.type}\nData: ${dateFmt}\nHorário: ${values.time}\nLocal: ${values.location}`;
     
     if (values.meetingLink) {
@@ -174,25 +209,35 @@ export function QuickHearingDialog({ process, open, onOpenChange, onSuccess }: Q
   };
 
   const onSubmit = async (values: z.infer<typeof hearingSchema>) => {
-    if (!process) return;
+    const targetProcess = process || { id: hearing?.processId || '', name: hearing?.processName || '' };
+    if (!targetProcess.id) return;
+
     setIsSaving(true);
     try {
       const hearingDateTime = new Date(`${values.date}T${values.time}`);
       
-      await createHearing({
-        ...values,
-        status: 'PENDENTE',
-        processId: process.id,
-        processName: process.name,
-        hearingDate: hearingDateTime.toISOString(),
-      });
+      if (isEdit && hearing) {
+        await updateHearing(hearing.id, {
+          ...values,
+          date: hearingDateTime as any
+        });
+        toast({ title: 'Alterações Salvas!', description: 'O compromisso foi atualizado no LexFlow e no Calendar.' });
+      } else {
+        await createHearing({
+          ...values,
+          status: 'PENDENTE',
+          processId: targetProcess.id,
+          processName: targetProcess.name,
+          hearingDate: hearingDateTime.toISOString(),
+        });
+        toast({ title: 'Audiência Agendada!', description: 'O compromisso foi distribuído na pauta do escritório.' });
+      }
 
-      toast({ title: 'Audiência Agendada!', description: 'O compromisso foi distribuído na pauta do escritório.' });
       onSuccess?.();
       onOpenChange(false);
       form.reset();
     } catch (error: any) {
-      toast({ variant: 'destructive', title: 'Erro ao agendar', description: error.message });
+      toast({ variant: 'destructive', title: 'Erro ao processar', description: error.message });
     } finally {
       setIsSaving(false);
     }
@@ -203,11 +248,11 @@ export function QuickHearingDialog({ process, open, onOpenChange, onSuccess }: Q
       <DialogContent className="sm:max-w-3xl max-w-[95vw] overflow-hidden bg-[#020617] border-white/10 text-white h-[90vh] flex flex-col p-0 shadow-2xl">
         <DialogHeader className="p-6 border-b border-white/5 bg-white/5 shrink-0">
           <DialogTitle className="flex items-center gap-2 text-white font-headline text-xl">
-            <Gavel className="h-6 w-6 text-primary" />
-            Pauta Global de Audiências
+            {isEdit ? <Edit className="h-6 w-6 text-primary" /> : <Gavel className="h-6 w-6 text-primary" />}
+            {isEdit ? 'Editar Compromisso Agendado' : 'Pauta Global de Audiências'}
           </DialogTitle>
           <DialogDescription className="text-slate-400">
-            Escalando o profissional e notificando o cliente para: <span className="font-bold text-white">{process?.name}</span>
+            {isEdit ? 'Ajuste os dados e o profissional escalado para:' : 'Escalando o profissional e notificando o cliente para:'} <span className="font-bold text-white">{process?.name || hearing?.processName}</span>
           </DialogDescription>
         </DialogHeader>
 
@@ -262,6 +307,8 @@ export function QuickHearingDialog({ process, open, onOpenChange, onSuccess }: Q
                             <SelectItem value="CONCILIACAO">Conciliação</SelectItem>
                             <SelectItem value="INSTRUCAO">Instrução</SelectItem>
                             <SelectItem value="JULGAMENTO">Sentença/Julgamento</SelectItem>
+                            <SelectItem value="PERICIA">Perícia</SelectItem>
+                            <SelectItem value="ATENDIMENTO">Atendimento / Reunião</SelectItem>
                             <SelectItem value="OUTRA">Outra</SelectItem>
                           </SelectContent>
                         </Select>
@@ -415,29 +462,20 @@ export function QuickHearingDialog({ process, open, onOpenChange, onSuccess }: Q
                       <Mail className="h-4 w-4" /> Enviar p/ E-mail
                     </Button>
                   </div>
-
-                  <div className="flex flex-wrap gap-2 pt-2">
-                    <span className="text-[10px] font-black text-slate-500 uppercase w-full mb-1">Outros meios de aviso:</span>
-                    {['phone', 'personal', 'court', 'other'].map((method) => (
-                      <Button 
-                        key={method}
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className={cn(
-                          "text-[9px] uppercase font-black h-7 border border-white/5",
-                          form.watch('notificationMethod') === method && "bg-primary/10 text-primary border-primary/20"
-                        )}
-                        onClick={() => {
-                          form.setValue('notificationMethod', method as any);
-                          form.setValue('clientNotified', true);
-                        }}
-                      >
-                        {method === 'phone' ? 'Telefone' : method === 'personal' ? 'Pessoalmente' : method === 'court' ? 'Em Audiência' : 'Outro'}
-                      </Button>
-                    ))}
-                  </div>
                 </div>
+
+                <FormField
+                  control={form.control}
+                  name="notes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Pauta da Audiência / Observações</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Ex: Chamar testemunha X no dia..." className="h-12 bg-black/40 border-white/10" {...field} />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
               </form>
             </Form>
           </div>
@@ -454,7 +492,7 @@ export function QuickHearingDialog({ process, open, onOpenChange, onSuccess }: Q
             onClick={() => form.handleSubmit(onSubmit)()}
           >
             {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
-            Confirmar Escala e Distribuir
+            {isEdit ? 'Salvar Alterações' : 'Confirmar Escala e Distribuir'}
           </Button>
         </DialogFooter>
       </DialogContent>

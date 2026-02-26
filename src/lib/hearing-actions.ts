@@ -7,11 +7,12 @@ import { add, formatISO, format } from 'date-fns';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/options';
 import { createNotification } from './notification-actions';
-import type { HearingStatus, HearingType, NotificationMethod, TimelineEvent } from './types';
+import type { Hearing, HearingStatus, HearingType, NotificationMethod, TimelineEvent } from './types';
 import { summarizeAddress } from './utils';
 import { Timestamp, FieldValue } from 'firebase-admin/firestore';
 import { v4 as uuidv4 } from 'uuid';
 import { ptBR } from 'date-fns/locale';
+import { revalidatePath } from 'next/cache';
 
 /**
  * Constrói a descrição detalhada para o Google Agenda seguindo o padrão Bueno Gois.
@@ -266,6 +267,100 @@ export async function createHearing(data: {
   } catch (error: any) {
     console.error('Error creating hearing/meeting:', error);
     throw new Error(error.message || 'Falha ao realizar agendamento.');
+  }
+}
+
+export async function updateHearing(hearingId: string, data: Partial<Hearing>) {
+  if (!firestoreAdmin) throw new Error('Servidor indisponível.');
+  const session = await getServerSession(authOptions);
+  if (!session) throw new Error('Não autenticado.');
+
+  try {
+    const hearingRef = firestoreAdmin.collection('hearings').doc(hearingId);
+    const hearingSnap = await hearingRef.get();
+    if (!hearingSnap.exists) throw new Error('Audiência não encontrada.');
+    const oldData = hearingSnap.data() as Hearing;
+
+    const lawyerDoc = await firestoreAdmin.collection('staff').doc(data.lawyerId || oldData.lawyerId).get();
+    const lawyerData = lawyerDoc.data();
+    const lawyerName = lawyerData ? `${lawyerData.firstName} ${lawyerData.lastName}` : oldData.lawyerName;
+
+    const updatePayload: any = {
+      ...data,
+      lawyerName,
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+
+    if (data.date) {
+      updatePayload.date = Timestamp.fromDate(new Date(data.date as any));
+    }
+
+    await hearingRef.update(updatePayload);
+
+    // Sincronizar com Google Calendar se houver ID
+    if (oldData.googleCalendarEventId) {
+      try {
+        const { calendar } = await getGoogleClientsForStaff(data.lawyerId || oldData.lawyerId);
+        
+        const processDoc = await firestoreAdmin.collection('processes').doc(oldData.processId).get();
+        const processData = processDoc.data();
+        
+        let clientInfo = { name: 'Não informado', phone: 'Não informado' };
+        if (processData?.clientId) {
+          const clientDoc = await firestoreAdmin.collection('clients').doc(processData.clientId).get();
+          const clientData = clientDoc.data();
+          if (clientData) {
+            clientInfo = {
+              name: `${clientData.firstName} ${clientData.lastName}`.trim(),
+              phone: clientData.mobile || clientData.phone || 'Não informado'
+            };
+          }
+        }
+
+        const startDateTime = new Date(data.date || oldData.date.toDate());
+        const endDateTime = add(startDateTime, { hours: 1 });
+
+        const description = buildCalendarDescription({
+          legalArea: processData?.legalArea || 'N/A',
+          processNumber: processData?.processNumber || 'N/A',
+          clientName: clientInfo.name,
+          clientPhone: clientInfo.phone,
+          location: data.location || oldData.location,
+          courtBranch: data.courtBranch || oldData.courtBranch,
+          responsibleParty: data.responsibleParty || oldData.responsibleParty,
+          status: data.status || oldData.status,
+          notes: data.notes || oldData.notes,
+          meetingLink: data.meetingLink || oldData.meetingLink,
+          meetingPassword: data.meetingPassword || oldData.meetingPassword,
+          id: hearingId,
+          createdByName: oldData.createdByName,
+          clientNotified: data.clientNotified ?? oldData.clientNotified,
+          notificationMethod: data.notificationMethod || oldData.notificationMethod,
+          isMeeting: (data.type || oldData.type) === 'ATENDIMENTO'
+        });
+
+        const summaryPrefix = (data.type || oldData.type) === 'ATENDIMENTO' ? '🗓️ REUNIÃO' : ((data.type || oldData.type) === 'PERICIA' ? '🔍 Perícia' : '⚖️ Audiência');
+
+        await calendar.events.patch({
+          calendarId: 'primary',
+          eventId: oldData.googleCalendarEventId,
+          requestBody: {
+            summary: `${summaryPrefix} [${data.type || oldData.type}] | ${clientInfo.name} (Dr. ${lawyerName})`,
+            location: data.meetingLink || data.location || oldData.location,
+            description: description,
+            start: { dateTime: formatISO(startDateTime), timeZone: 'America/Sao_Paulo' },
+            end: { dateTime: formatISO(endDateTime), timeZone: 'America/Sao_Paulo' },
+          }
+        });
+      } catch (e) {
+        console.warn('[updateHearing] Falha ao atualizar Google Calendar:', e);
+      }
+    }
+
+    revalidatePath('/dashboard/audiencias');
+    return { success: true };
+  } catch (error: any) {
+    throw new Error(error.message);
   }
 }
 

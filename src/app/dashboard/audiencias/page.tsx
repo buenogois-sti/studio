@@ -36,7 +36,8 @@ import {
   RotateCcw,
   Video,
   FileText,
-  FolderKanban
+  FolderKanban,
+  Edit
 } from 'lucide-react';
 import { 
   format, 
@@ -97,6 +98,7 @@ import {
   DialogFooter,
   DialogClose,
 } from '@/components/ui/dialog';
+import { QuickHearingDialog } from '@/components/process/QuickHearingDialog';
 
 const statusConfig: Record<HearingStatus, { label: string; icon: any; color: string }> = {
     PENDENTE: { label: 'Pendente', icon: Clock3, color: 'text-blue-500 bg-blue-500/10' },
@@ -228,6 +230,7 @@ export default function AudienciasPage() {
   const [selectedLawyerFilter, setSelectedLawyerFilter] = React.useState<string>('all');
   const [returnHearing, setReturnHearing] = React.useState<Hearing | null>(null);
   const [detailsHearing, setDetailsHearing] = React.useState<Hearing | null>(null);
+  const [editingHearing, setEditingHearing] = React.useState<Hearing | null>(null);
   const [isProcessing, setIsProcessing] = React.useState<string | null>(null);
   const { toast } = useToast();
   const router = useRouter();
@@ -496,6 +499,9 @@ export default function AudienciasPage() {
                                                                   <DropdownMenuItem onClick={() => setDetailsHearing(h)} className="font-bold gap-2 text-white">
                                                                       <Eye className="h-4 w-4 text-blue-400" /> Ver Detalhes
                                                                   </DropdownMenuItem>
+                                                                  <DropdownMenuItem onClick={() => setEditingHearing(h)} className="font-bold gap-2 text-white focus:bg-primary/10">
+                                                                      <Edit className="h-4 w-4 text-primary" /> Editar Compromisso
+                                                                  </DropdownMenuItem>
                                                                   <DropdownMenuSeparator className="bg-white/5" />
                                                                   <DropdownMenuItem onClick={() => handleUpdateStatus(h, 'REALIZADA')} className="font-bold gap-2 text-white hover:bg-emerald-500/10">
                                                                       <CheckCircle2 className="h-4 w-4 text-emerald-500" /> Marcar Concluído
@@ -625,6 +631,9 @@ export default function AudienciasPage() {
                                           <DropdownMenuItem onClick={() => setDetailsHearing(h)} className="font-bold gap-2 text-white">
                                             <Eye className="h-4 w-4 text-blue-400" /> Ver Detalhes
                                           </DropdownMenuItem>
+                                          <DropdownMenuItem onClick={() => setEditingHearing(h)} className="font-bold gap-2 text-white focus:bg-primary/10">
+                                            <Edit className="h-4 w-4 text-primary" /> Editar Detalhes
+                                          </DropdownMenuItem>
                                           <DropdownMenuSeparator className="bg-white/5" />
                                           <DropdownMenuItem onClick={() => handleUpdateStatus(h, 'REALIZADA')} className="font-bold gap-2 text-white hover:bg-emerald-500/10">
                                             <CheckCircle2 className="h-4 w-4 text-emerald-500" /> Marcar Concluído
@@ -741,6 +750,9 @@ export default function AudienciasPage() {
                                         <DropdownMenuItem onClick={() => setDetailsHearing(h)} className="font-bold gap-2 text-white">
                                           <Eye className="h-4 w-4 text-blue-400" /> Ver Detalhes
                                         </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => setEditingHearing(h)} className="font-bold gap-2 text-white focus:bg-primary/10">
+                                          <Edit className="h-4 w-4 text-primary" /> Editar Detalhes
+                                        </DropdownMenuItem>
                                         {isPendingReturn && (
                                           <DropdownMenuItem onClick={() => setReturnHearing(h)} className="font-bold gap-2 text-amber-400 focus:bg-amber-500/10">
                                             <History className="h-4 w-4" /> Dar Retorno
@@ -779,6 +791,13 @@ export default function AudienciasPage() {
           process={detailsHearing ? processesMap.get(detailsHearing.processId) : undefined}
           open={!!detailsHearing}
           onOpenChange={(o) => !o && setDetailsHearing(null)}
+        />
+
+        <QuickHearingDialog 
+          hearing={editingHearing}
+          open={!!editingHearing}
+          onOpenChange={(o) => !o && setEditingHearing(null)}
+          onSuccess={() => setRefreshKey(k => k + 1)}
         />
     </div>
   );
