@@ -138,7 +138,7 @@ const ChecklistCard = React.memo(({
     </CardContent>
     <CardFooter className="bg-white/5 border-t border-white/5 p-4">
       <Button 
-        className="w-full bg-white/5 hover:bg-primary hover:text-primary-foreground font-black uppercase tracking-widest text-[10px] h-10 gap-2 transition-all"
+        className="w-full bg-primary/10 hover:bg-primary text-primary hover:text-primary-foreground font-black uppercase tracking-widest text-[10px] h-10 gap-2 transition-all border border-primary/20"
         onClick={() => onExecute(template)}
       >
         <Play className="h-3 w-3" /> Executar Checklist
@@ -202,7 +202,7 @@ export default function ChecklistsPage() {
         </div>
         <div className="flex items-center gap-3">
           {isAdmin && (
-            <Button onClick={() => { setSelectedTemplate(null); setIsEditorOpen(true); }} className="bg-primary text-primary-foreground font-black h-10 px-6">
+            <Button onClick={() => { setSelectedTemplate(null); setIsEditorOpen(true); }} className="bg-primary text-primary-foreground font-black h-10 px-6 shadow-lg shadow-primary/20">
               <Plus className="mr-2 h-4 w-4" /> Novo Modelo
             </Button>
           )}
