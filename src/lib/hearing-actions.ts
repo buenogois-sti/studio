@@ -3,7 +3,7 @@
 
 import { firestoreAdmin } from '@/firebase/admin';
 import { getGoogleClientsForStaff } from '@/lib/drive';
-import { add, formatISO, format } from 'date-fns';
+import { add, formatISO, format, parseISO } from 'date-fns';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/options';
 import { createNotification } from './notification-actions';
@@ -13,6 +13,20 @@ import { Timestamp, FieldValue } from 'firebase-admin/firestore';
 import { v4 as uuidv4 } from 'uuid';
 import { ptBR } from 'date-fns/locale';
 import { revalidatePath } from 'next/cache';
+
+/**
+ * Utility to ensure a date string has the correct Brazil offset (-03:00)
+ */
+function ensureBrazilOffset(dateStr: string): string {
+  if (!dateStr) return dateStr;
+  // If it already has an offset or Z, leave it
+  if (dateStr.includes('-03:00') || dateStr.endsWith('Z')) return dateStr;
+  // If it has 'T' but no offset, append -03:00
+  if (dateStr.includes('T') && !dateStr.includes('+') && !dateStr.match(/-\d{2}:\d{2}$/)) {
+    return `${dateStr}:00-03:00`;
+  }
+  return dateStr;
+}
 
 /**
  * Constrói a descrição detalhada para o Google Agenda seguindo o padrão Bueno Gois.
@@ -114,8 +128,11 @@ export async function createHearing(data: {
     throw new Error('Não autenticado.');
   }
 
+  // Ensure date has correct offset for Brazil
+  const normalizedDate = ensureBrazilOffset(data.hearingDate);
+
   const { 
-    processId, lawyerId, hearingDate, location, 
+    processId, lawyerId, location, 
     courtBranch, responsibleParty, status, type, notes,
     meetingLink, meetingPassword,
     clientNotified, notificationMethod 
@@ -143,13 +160,15 @@ export async function createHearing(data: {
     const lawyerData = lawyerDoc.data();
     const lawyerName = lawyerData ? `${lawyerData.firstName} ${lawyerData.lastName}` : 'Advogado';
 
+    const hearingDateTime = parseISO(normalizedDate);
+
     const hearingPayload = {
       processId,
       lawyerId,
       lawyerName,
       createdById: session.user.id,
       createdByName: session.user.name || 'Sistema',
-      date: Timestamp.fromDate(new Date(hearingDate)),
+      date: Timestamp.fromDate(hearingDateTime),
       location: type === 'ATENDIMENTO' ? location : summarizeAddress(location),
       courtBranch: courtBranch || '',
       responsibleParty,
@@ -171,7 +190,7 @@ export async function createHearing(data: {
     const timelineEvent: TimelineEvent = {
       id: uuidv4(),
       type: type === 'ATENDIMENTO' ? 'meeting' : 'hearing',
-      description: `${type === 'ATENDIMENTO' ? 'ATENDIMENTO AGENDADO' : 'AUDIÊNCIA AGENDADA'}: ${type} para o dia ${format(new Date(hearingDate), 'dd/MM/yyyy HH:mm', { locale: ptBR })}. Local: ${location}.${meetingLink ? ' Link virtual configurado.' : ''}`,
+      description: `${type === 'ATENDIMENTO' ? 'ATENDIMENTO AGENDADO' : 'AUDIÊNCIA AGENDADA'}: ${type} para o dia ${format(hearingDateTime, 'dd/MM/yyyy HH:mm', { locale: ptBR })}. Local: ${location}.${meetingLink ? ' Link virtual configurado.' : ''}`,
       date: Timestamp.now() as any,
       authorName: session.user.name || 'Sistema'
     };
@@ -184,9 +203,9 @@ export async function createHearing(data: {
     // Sincronização com o Google Workspace (Agenda e Tasks)
     try {
       const { calendar, tasks } = await getGoogleClientsForStaff(lawyerId);
-      const startDateTime = new Date(hearingDate);
+      const startDateTime = hearingDateTime;
       const endDateTime = add(startDateTime, { hours: 1 });
-      const reminderTime = add(startDateTime, { hours: 1, minutes: 30 }); // 1h30 após o início
+      const reminderTime = add(startDateTime, { hours: 1, minutes: 30 });
 
       const isMeeting = type === 'ATENDIMENTO';
 
@@ -263,6 +282,7 @@ export async function createHearing(data: {
       });
     }
     
+    revalidatePath('/dashboard/audiencias');
     return { success: true, id: hearingRef.id };
   } catch (error: any) {
     console.error('Error creating hearing/meeting:', error);
@@ -291,8 +311,11 @@ export async function updateHearing(hearingId: string, data: Partial<Hearing>) {
       updatedAt: FieldValue.serverTimestamp(),
     };
 
+    let updatedDateTime: Date | null = null;
     if (data.date) {
-      updatePayload.date = Timestamp.fromDate(new Date(data.date as any));
+      const normalizedDate = ensureBrazilOffset(data.date as any);
+      updatedDateTime = parseISO(normalizedDate);
+      updatePayload.date = Timestamp.fromDate(updatedDateTime);
     }
 
     await hearingRef.update(updatePayload);
@@ -317,7 +340,7 @@ export async function updateHearing(hearingId: string, data: Partial<Hearing>) {
           }
         }
 
-        const startDateTime = new Date(data.date || oldData.date.toDate());
+        const startDateTime = updatedDateTime || oldData.date.toDate();
         const endDateTime = add(startDateTime, { hours: 1 });
 
         const description = buildCalendarDescription({
@@ -403,6 +426,7 @@ export async function updateHearingStatus(hearingId: string, status: HearingStat
             }
         }
 
+        revalidatePath('/dashboard/audiencias');
         return { success: true };
     } catch (e: any) {
         throw new Error(e.message || 'Falha ao atualizar status.');
@@ -479,14 +503,12 @@ export async function processHearingReturn(hearingId: string, data: {
 
     // 3.2. Agendar nova data (se designada em ata e data selecionada)
     if (data.scheduleNewHearing && !data.dateNotSet && data.newHearingDate && data.newHearingTime) {
-      // Nota: Chamamos a função de criação aqui. Como é uma Server Action dentro de outra,
-      // idealmente usaríamos o mesmo batch, mas a função createHearing gerencia o Calendar.
-      // Em produção Bueno Gois, isso garante a sincronia imediata.
+      const newHearingDateISO = `${data.newHearingDate}T${data.newHearingTime}`;
       await createHearing({
         processId: hearingData.processId,
         processName: hearingData.processName,
         lawyerId: hearingData.lawyerId,
-        hearingDate: `${data.newHearingDate}T${data.newHearingTime}`,
+        hearingDate: newHearingDateISO,
         location: hearingData.location,
         courtBranch: hearingData.courtBranch,
         responsibleParty: hearingData.responsibleParty,
@@ -497,6 +519,7 @@ export async function processHearingReturn(hearingId: string, data: {
     }
 
     await batch.commit();
+    revalidatePath('/dashboard/audiencias');
     return { success: true };
   } catch (error: any) {
     throw new Error(error.message);

@@ -46,7 +46,7 @@ export const processSchema = z.object({
   // Campos para agendamento rápido
   quickHearingDate: z.string().optional().or(z.literal('')),
   quickHearingTime: z.string().optional().or(z.literal('')),
-  quickHearingType: z.enum(['UNA', 'CONCILIACAO', 'INSTRUCAO', 'JULGAMENTO', 'PERICIA', 'OUTRA']).optional(),
+  quickHearingType: z.enum(['UNA', 'CONCILIACAO', 'INSTRUCAO', 'JULGAMENTO', 'PERICIA', 'ATENDIMENTO', 'OUTRA']).optional(),
   quickHearingLocation: z.string().optional().or(z.literal('')),
   quickHearingLink: z.string().optional().or(z.literal('')),
   quickHearingPassword: z.string().optional().or(z.literal('')),
@@ -240,11 +240,13 @@ export const useProcessForm = (process?: Process | null, onSave?: () => void) =>
         // 2. Agendamento Rápido de Audiência
         if (quickHearingDate && quickHearingTime) {
           try {
+            // Send as local ISO-like string, the server action will append the offset
+            const localHearingDateTime = `${quickHearingDate}T${quickHearingTime}`;
             await createHearing({
               processId: savedProcessId,
               processName: values.name,
               lawyerId: values.leadLawyerId,
-              hearingDate: `${quickHearingDate}T${quickHearingTime}`,
+              hearingDate: localHearingDateTime,
               location: quickHearingLocation || values.court || 'Fórum / Videoconferência',
               courtBranch: values.courtBranch,
               responsibleParty: values.name,

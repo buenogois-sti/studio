@@ -214,12 +214,13 @@ export function QuickHearingDialog({ process, hearing, open, onOpenChange, onSuc
 
     setIsSaving(true);
     try {
-      const hearingDateTime = new Date(`${values.date}T${values.time}`);
+      // Send as local ISO-like string, the server action will append the offset
+      const hearingDateTimeStr = `${values.date}T${values.time}`;
       
       if (isEdit && hearing) {
         await updateHearing(hearing.id, {
           ...values,
-          date: hearingDateTime as any
+          date: hearingDateTimeStr as any
         });
         toast({ title: 'Alterações Salvas!', description: 'O compromisso foi atualizado no LexFlow e no Calendar.' });
       } else {
@@ -228,7 +229,7 @@ export function QuickHearingDialog({ process, hearing, open, onOpenChange, onSuc
           status: 'PENDENTE',
           processId: targetProcess.id,
           processName: targetProcess.name,
-          hearingDate: hearingDateTime.toISOString(),
+          hearingDate: hearingDateTimeStr,
         });
         toast({ title: 'Audiência Agendada!', description: 'O compromisso foi distribuído na pauta do escritório.' });
       }

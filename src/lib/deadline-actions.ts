@@ -8,10 +8,26 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/options';
 import { v4 as uuidv4 } from 'uuid';
 import { getGoogleClientsForStaff } from '@/lib/drive';
-import { formatISO, format } from 'date-fns';
+import { formatISO, format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { createNotification } from './notification-actions';
 import { revalidatePath } from 'next/cache';
+
+/**
+ * Utility to ensure a date string has the correct Brazil offset (-03:00)
+ */
+function ensureBrazilOffset(dateStr: string): string {
+  if (!dateStr) return dateStr;
+  if (dateStr.includes('-03:00') || dateStr.endsWith('Z')) return dateStr;
+  if (dateStr.includes('T') && !dateStr.includes('+') && !dateStr.match(/-\d{2}:\d{2}$/)) {
+    return `${dateStr}:00-03:00`;
+  }
+  // For plain dates YYYY-MM-DD
+  if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+    return `${dateStr}T09:00:00-03:00`;
+  }
+  return dateStr;
+}
 
 /**
  * Constrói a descrição detalhada do prazo para o Google Agenda e Tasks seguindo o padrão Bueno Gois.
@@ -117,11 +133,17 @@ export async function createLegalDeadline(data: {
         }
     }
 
+    const normalizedStartDate = ensureBrazilOffset(data.startDate);
+    const normalizedEndDate = ensureBrazilOffset(data.endDate);
+
+    const startDateTime = parseISO(normalizedStartDate);
+    const endDateTime = parseISO(normalizedEndDate);
+
     const deadlinePayload: Omit<LegalDeadline, 'id'> = {
       processId: data.processId,
       type: data.type,
-      startDate: Timestamp.fromDate(new Date(data.startDate)) as any,
-      endDate: Timestamp.fromDate(new Date(data.endDate)) as any,
+      startDate: Timestamp.fromDate(startDateTime) as any,
+      endDate: Timestamp.fromDate(endDateTime) as any,
       daysCount: data.daysCount,
       isBusinessDays: data.isBusinessDays,
       publicationText: data.publicationText || '',
@@ -135,7 +157,7 @@ export async function createLegalDeadline(data: {
 
     const calendarDescription = buildDeadlineCalendarDescription({
       type: data.type,
-      endDate: new Date(data.endDate),
+      endDate: endDateTime,
       legalArea: processData?.legalArea || 'N/A',
       processName: processData?.name || 'Processo',
       processNumber: processNumber,
@@ -148,24 +170,24 @@ export async function createLegalDeadline(data: {
       id: deadlineRef.id
     });
 
-    // 1. Sincronização com Google Agenda e Google Tasks (RESPEITANDO O RESPONSÁVEL DO PROCESSO)
+    // 1. Sincronização com Google Agenda e Google Tasks
     let googleCalendarEventId: string | undefined;
     let googleTaskId: string | undefined;
 
     try {
       const { calendar, tasks } = await getGoogleClientsForStaff(leadLawyerId);
       
-      const fatalDate = new Date(data.endDate);
-      fatalDate.setHours(9, 0, 0, 0);
-      const endDateTime = new Date(fatalDate);
-      endDateTime.setHours(10, 0, 0, 0);
+      const fatalDateStart = new Date(endDateTime);
+      fatalDateStart.setHours(9, 0, 0, 0);
+      const fatalDateEnd = new Date(endDateTime);
+      fatalDateEnd.setHours(10, 0, 0, 0);
 
       // Criar Evento no Calendário
       const event = {
         summary: `🚨 PRAZO: ${data.type} | ${clientInfo.name}`,
         description: calendarDescription,
-        start: { dateTime: formatISO(fatalDate), timeZone: 'America/Sao_Paulo' },
-        end: { dateTime: formatISO(endDateTime), timeZone: 'America/Sao_Paulo' },
+        start: { dateTime: formatISO(fatalDateStart), timeZone: 'America/Sao_Paulo' },
+        end: { dateTime: formatISO(fatalDateEnd), timeZone: 'America/Sao_Paulo' },
         reminders: {
           useDefault: false,
           overrides: [
@@ -184,15 +206,15 @@ export async function createLegalDeadline(data: {
 
       // Criar Tarefa no Google Tasks
       try {
-        const taskDate = new Date(data.endDate);
-        taskDate.setUTCHours(0, 0, 0, 0); 
+        const taskDue = new Date(endDateTime);
+        taskDue.setUTCHours(0, 0, 0, 0); 
 
         const createdTask = await tasks.tasks.insert({
           tasklist: '@default',
           requestBody: {
             title: `🚨 PRAZO: ${data.type} | ${processData?.name}`,
             notes: calendarDescription,
-            due: taskDate.toISOString(),
+            due: taskDue.toISOString(),
           }
         });
         googleTaskId = createdTask.data.id || undefined;
@@ -211,10 +233,10 @@ export async function createLegalDeadline(data: {
     const timelineEvent: TimelineEvent = {
       id: uuidv4(),
       type: 'deadline',
-      description: `PRAZO LANÇADO: ${data.type} (${data.daysCount} ${methodLabel}). Vencimento: ${new Date(data.endDate).toLocaleDateString('pt-BR')}. Tarefa criada no Workspace do responsável.`,
+      description: `PRAZO LANÇADO: ${data.type} (${data.daysCount} ${methodLabel}). Vencimento: ${format(endDateTime, 'dd/MM/yyyy')}. Tarefa criada no Workspace do responsável.`,
       date: Timestamp.now() as any,
       authorName: session.user.name || 'Sistema',
-      endDate: Timestamp.fromDate(new Date(data.endDate)) as any,
+      endDate: Timestamp.fromDate(endDateTime) as any,
       isBusinessDays: data.isBusinessDays
     };
 
@@ -269,10 +291,16 @@ export async function updateLegalDeadline(id: string, data: {
     const processData = processDoc.data() as Process | undefined;
     const leadLawyerId = processData?.leadLawyerId || oldData.authorId;
 
+    const normalizedStartDate = ensureBrazilOffset(data.startDate);
+    const normalizedEndDate = ensureBrazilOffset(data.endDate);
+
+    const startDateTime = parseISO(normalizedStartDate);
+    const endDateTime = parseISO(normalizedEndDate);
+
     const updatePayload = {
       type: data.type,
-      startDate: Timestamp.fromDate(new Date(data.startDate)),
-      endDate: Timestamp.fromDate(new Date(data.endDate)),
+      startDate: Timestamp.fromDate(startDateTime),
+      endDate: Timestamp.fromDate(endDateTime),
       daysCount: data.daysCount,
       isBusinessDays: data.isBusinessDays,
       publicationText: data.publicationText || '',
@@ -309,7 +337,7 @@ export async function updateLegalDeadline(id: string, data: {
 
       const newDescription = buildDeadlineCalendarDescription({
         type: data.type,
-        endDate: new Date(data.endDate),
+        endDate: endDateTime,
         legalArea: processData?.legalArea || 'N/A',
         processName: processData?.name || 'Processo',
         processNumber: processData?.processNumber || 'N/A',
@@ -323,10 +351,10 @@ export async function updateLegalDeadline(id: string, data: {
       });
 
       if (oldData.googleCalendarEventId) {
-        const fatalDate = new Date(data.endDate);
-        fatalDate.setHours(9, 0, 0, 0);
-        const endDateTime = new Date(fatalDate);
-        endDateTime.setHours(10, 0, 0, 0);
+        const fatalDateStart = new Date(endDateTime);
+        fatalDateStart.setHours(9, 0, 0, 0);
+        const fatalDateEnd = new Date(endDateTime);
+        fatalDateEnd.setHours(10, 0, 0, 0);
 
         await calendar.events.patch({
           calendarId: 'primary',
@@ -334,15 +362,15 @@ export async function updateLegalDeadline(id: string, data: {
           requestBody: {
             description: newDescription,
             summary: `${oldData.status === 'CUMPRIDO' ? '✅ ' : '🚨 '}PRAZO: ${data.type} | ${clientInfo.name}`,
-            start: { dateTime: formatISO(fatalDate), timeZone: 'America/Sao_Paulo' },
-            end: { dateTime: formatISO(endDateTime), timeZone: 'America/Sao_Paulo' },
+            start: { dateTime: formatISO(fatalDateStart), timeZone: 'America/Sao_Paulo' },
+            end: { dateTime: formatISO(fatalDateEnd), timeZone: 'America/Sao_Paulo' },
           }
         });
       }
 
       if (oldData.googleTaskId) {
-        const taskDate = new Date(data.endDate);
-        taskDate.setUTCHours(0, 0, 0, 0);
+        const taskDue = new Date(endDateTime);
+        taskDue.setUTCHours(0, 0, 0, 0);
 
         await tasks.tasks.patch({
           tasklist: '@default',
@@ -350,7 +378,7 @@ export async function updateLegalDeadline(id: string, data: {
           requestBody: {
             title: `🚨 PRAZO: ${data.type} | ${processData?.name}`,
             notes: newDescription,
-            due: taskDate.toISOString(),
+            due: taskDue.toISOString(),
           }
         });
       }
