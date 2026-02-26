@@ -62,6 +62,7 @@ interface QuickMeetingDialogProps {
 export function QuickMeetingDialog({ process, open, onOpenChange, onSuccess }: QuickMeetingDialogProps) {
   const [isSaving, setIsSaving] = React.useState(false);
   const [clientData, setClientData] = React.useState<Client | null>(null);
+  const [processData, setProcessData] = React.useState<Process | null>(null);
   const { toast } = useToast();
   const { firestore } = useFirebase();
 
@@ -87,6 +88,7 @@ export function QuickMeetingDialog({ process, open, onOpenChange, onSuccess }: Q
 
   React.useEffect(() => {
     if (process && open && firestore) {
+      setProcessData(process);
       if (process.leadLawyerId) {
         form.setValue('lawyerId', process.leadLawyerId);
         const leader = lawyers.find(s => s.id === process.leadLawyerId);
@@ -114,19 +116,35 @@ export function QuickMeetingDialog({ process, open, onOpenChange, onSuccess }: Q
     const dateObj = new Date(year, month - 1, day);
     const dateFmt = format(dateObj, "dd/MM (EEEE)", { locale: ptBR });
     
-    let message = `Olá, ${clientData.firstName}! Sou da Bueno Gois Advogados.\n\nAgendamos um atendimento para falarmos sobre seu processo:\n📅 Data: *${dateFmt}*\n🕘 Horário: *${values.time}*\n📍 Local/Modo: *${values.location}*`.trim();
-    
+    const msgParts = [
+      `Olá, ${clientData.firstName.trim()}! Sou da Bueno Gois Advogados.`,
+      '',
+      `Agendamos um atendimento para falarmos sobre seu processo:`,
+      `📅 Data: *${dateFmt}*`,
+      `🕘 Horário: *${values.time}*`,
+      `📍 Local/Modo: *${values.location}*`
+    ];
+
     if (values.meetingLink) {
-      message += `\n\n🔗 *LINK DA REUNIÃO:* ${values.meetingLink}`;
+      msgParts.push('');
+      msgParts.push(`🔗 *LINK DA REUNIÃO:* ${values.meetingLink}`);
       if (values.meetingPassword) {
-        message += `\n🔑 *SENHA:* ${values.meetingPassword}`;
+        msgParts.push(`🔑 *SENHA:* ${values.meetingPassword}`);
       }
     }
 
-    message += `\n\nFavor confirmar se este horário está livre para você.`;
-    
+    const currentProcess = process || processData;
+    const pNumber = currentProcess?.processNumber || '---';
+
+    msgParts.push('');
+    msgParts.push(`🔢 *PROCESSO:* ${pNumber}`);
+    msgParts.push('');
+    msgParts.push('Favor confirmar se este horário está livre para você.');
+
+    const message = msgParts.join('\n');
     const cleanPhone = clientData.mobile.replace(/\D/g, '');
     const url = `https://wa.me/${cleanPhone.startsWith('55') ? cleanPhone : '55' + cleanPhone}?text=${encodeURIComponent(message)}`;
+    
     window.open(url, '_blank');
     form.setValue('clientNotified', true);
     form.setValue('notificationMethod', 'whatsapp');
@@ -138,7 +156,6 @@ export function QuickMeetingDialog({ process, open, onOpenChange, onSuccess }: Q
     try {
       const meetingDateTime = new Date(`${values.date}T${values.time}`);
       
-      // Reutiliza a infra de audiência mas com tipo ATENDIMENTO
       await createHearing({
         ...values,
         status: 'PENDENTE',
@@ -361,7 +378,7 @@ export function QuickMeetingDialog({ process, open, onOpenChange, onSuccess }: Q
             className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90 font-black uppercase tracking-widest text-[11px] h-12 shadow-xl shadow-primary/20"
             onClick={() => form.handleSubmit(onSubmit)()}
           >
-            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
+            {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
             Confirmar e Sincronizar Agenda
           </Button>
         </DialogFooter>

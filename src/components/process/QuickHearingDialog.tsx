@@ -70,6 +70,7 @@ interface QuickHearingDialogProps {
 export function QuickHearingDialog({ process, hearing, open, onOpenChange, onSuccess }: QuickHearingDialogProps) {
   const [isSaving, setIsSaving] = React.useState(false);
   const [clientData, setClientData] = React.useState<Client | null>(null);
+  const [processData, setProcessData] = React.useState<Process | null>(null);
   const { toast } = useToast();
   const { firestore } = useFirebase();
 
@@ -119,7 +120,8 @@ export function QuickHearingDialog({ process, hearing, open, onOpenChange, onSuc
         if (hearing.processId && firestore) {
           getDoc(doc(firestore, 'processes', hearing.processId)).then(pSnap => {
             if (pSnap.exists()) {
-              const pData = pSnap.data();
+              const pData = { id: pSnap.id, ...pSnap.data() } as Process;
+              setProcessData(pData);
               if (pData?.clientId) {
                 getDoc(doc(firestore, 'clients', pData.clientId)).then(cSnap => {
                   if (cSnap.exists()) setClientData({ id: cSnap.id, ...cSnap.data() } as Client);
@@ -129,6 +131,7 @@ export function QuickHearingDialog({ process, hearing, open, onOpenChange, onSuc
           });
         }
       } else if (process) {
+        setProcessData(process);
         form.setValue('location', process.court || '');
         form.setValue('courtBranch', process.courtBranch || '');
         
@@ -163,19 +166,36 @@ export function QuickHearingDialog({ process, hearing, open, onOpenChange, onSuc
     const dateObj = getLocalDate(values.date);
     const dateFmt = format(dateObj, "dd/MM (EEEE)", { locale: ptBR });
     
-    let message = `Olá, ${clientData.firstName}! Sou do escritório Bueno Gois Advogados.\n\nInformamos que sua audiência de *${values.type}* foi agendada:\n📅 Data: *${dateFmt}*\n🕘 Horário: *${values.time}*\n📍 Local: *${values.location}*`.trim();
-    
+    // Construção robusta para evitar erro de codificação
+    const msgParts = [
+      `Olá, ${clientData.firstName.trim()}! Sou do escritório Bueno Gois Advogados.`,
+      '',
+      `Informamos que sua audiência de *${values.type}* foi agendada:`,
+      `📅 Data: *${dateFmt}*`,
+      `🕘 Horário: *${values.time}*`,
+      `📍 Local: *${values.location}*`
+    ];
+
     if (values.meetingLink) {
-      message += `\n\n🔗 *LINK DA SALA VIRTUAL:* ${values.meetingLink}`;
+      msgParts.push('');
+      msgParts.push(`🔗 *LINK DA SALA VIRTUAL:* ${values.meetingLink}`);
       if (values.meetingPassword) {
-        message += `\n🔑 *SENHA:* ${values.meetingPassword}`;
+        msgParts.push(`🔑 *SENHA:* ${values.meetingPassword}`);
       }
     }
 
-    message += `\n\nProcesso: ${process?.processNumber || 'N/A'}\n\nFavor confirmar o recebimento desta mensagem.`;
+    const currentProcess = process || processData;
+    const pNumber = currentProcess?.processNumber || '---';
     
+    msgParts.push('');
+    msgParts.push(`🔢 *PROCESSO:* ${pNumber}`);
+    msgParts.push('');
+    msgParts.push('Favor confirmar o recebimento desta mensagem.');
+
+    const message = msgParts.join('\n');
     const cleanPhone = clientData.mobile.replace(/\D/g, '');
     const url = `https://wa.me/${cleanPhone.startsWith('55') ? cleanPhone : '55' + cleanPhone}?text=${encodeURIComponent(message)}`;
+    
     window.open(url, '_blank');
     form.setValue('clientNotified', true);
     form.setValue('notificationMethod', 'whatsapp');
@@ -190,8 +210,9 @@ export function QuickHearingDialog({ process, hearing, open, onOpenChange, onSuc
     const dateObj = getLocalDate(values.date);
     const dateFmt = format(dateObj, "dd/MM/yyyy", { locale: ptBR });
     
-    const subject = `Agendamento de Audiência - ${process?.name || hearing?.processName}`;
-    let body = `Prezado(a) ${clientData.firstName},\n\nComunicamos o agendamento de audiência para o seu processo:\n\nTipo: ${values.type}\nData: ${dateFmt}\nHorário: ${values.time}\nLocal: ${values.location}`;
+    const currentProcess = process || processData;
+    const subject = `Agendamento de Audiência - ${currentProcess?.name || 'Seu Processo'}`;
+    let body = `Prezado(a) ${clientData.firstName},\n\nComunicamos o agendamento de audiência para o seu processo:\n\nTipo: ${values.type}\nData: ${dateFmt}\nHorário: ${values.time}\nLocal: ${values.location}\nProcesso: ${currentProcess?.processNumber || 'N/A'}`;
     
     if (values.meetingLink) {
       body += `\n\nLink da Sala Virtual: ${values.meetingLink}`;
@@ -209,12 +230,11 @@ export function QuickHearingDialog({ process, hearing, open, onOpenChange, onSuc
   };
 
   const onSubmit = async (values: z.infer<typeof hearingSchema>) => {
-    const targetProcess = process || { id: hearing?.processId || '', name: hearing?.processName || '' };
+    const targetProcess = process || processData || { id: hearing?.processId || '', name: hearing?.processName || '' };
     if (!targetProcess.id) return;
 
     setIsSaving(true);
     try {
-      // Send as local ISO-like string, the server action will append the offset
       const hearingDateTimeStr = `${values.date}T${values.time}`;
       
       if (isEdit && hearing) {
@@ -253,7 +273,7 @@ export function QuickHearingDialog({ process, hearing, open, onOpenChange, onSuc
             {isEdit ? 'Editar Compromisso Agendado' : 'Pauta Global de Audiências'}
           </DialogTitle>
           <DialogDescription className="text-slate-400">
-            {isEdit ? 'Ajuste os dados e o profissional escalado para:' : 'Escalando o profissional e notificando o cliente para:'} <span className="font-bold text-white">{process?.name || hearing?.processName}</span>
+            {isEdit ? 'Ajuste os dados e o profissional escalado para:' : 'Escalando o profissional e notificando o cliente para:'} <span className="font-bold text-white">{process?.name || processData?.name || hearing?.processName}</span>
           </DialogDescription>
         </DialogHeader>
 

@@ -794,6 +794,7 @@ export default function AudienciasPage() {
         />
 
         <QuickHearingDialog 
+          process={editingHearing ? processesMap.get(editingHearing.processId) : null}
           hearing={editingHearing}
           open={!!editingHearing}
           onOpenChange={(o) => !o && setEditingHearing(null)}
