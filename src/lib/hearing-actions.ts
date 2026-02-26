@@ -13,6 +13,8 @@ import { Timestamp, FieldValue } from 'firebase-admin/firestore';
 import { v4 as uuidv4 } from 'uuid';
 import { ptBR } from 'date-fns/locale';
 import { revalidatePath } from 'next/cache';
+import { createFinancialEventAndTitles } from './finance-actions';
+import { createLegalDeadline } from './deadline-actions';
 
 /**
  * Utility to ensure a date string has the correct Brazil offset (-03:00)
@@ -275,7 +277,7 @@ export async function createHearing(data: {
     if (lawyerId !== session.user.id) {
       await createNotification({
         userId: lawyerId,
-        title: isMeeting ? "Novo Atendimento Agendado" : "Pauta Atualizada",
+        title: "Novo Atendimento Agendado",
         description: `${session.user.name} agendou um compromisso (${type}) para você no processo ${processData?.name}.`,
         type: 'hearing',
         href: `/dashboard/audiencias`,
@@ -443,6 +445,10 @@ export async function processHearingReturn(hearingId: string, data: {
   newHearingDate?: string;
   newHearingTime?: string;
   dateNotSet?: boolean;
+  hasAgreement?: boolean;
+  agreementValue?: number;
+  agreementInstallments?: number;
+  agreementFirstDueDate?: string;
 }) {
   if (!firestoreAdmin) throw new Error('Servidor indisponível.');
   const session = await getServerSession(authOptions);
@@ -479,11 +485,41 @@ export async function processHearingReturn(hearingId: string, data: {
       updatedAt: FieldValue.serverTimestamp()
     });
 
-    // 3. Agendar iterações futuras (Respeitando o advogado do ato)
+    // 3. Processar Acordo (se houver)
+    if (data.hasAgreement && data.agreementValue && data.agreementValue > 0) {
+      await createFinancialEventAndTitles({
+        processId: hearingData.processId,
+        type: 'ACORDO',
+        eventDate: hearingData.date.toDate(),
+        description: `Acordo Judicial em Audiência (${hearingData.type})`,
+        totalValue: data.agreementValue,
+        installments: data.agreementInstallments || 1,
+        firstDueDate: data.agreementFirstDueDate ? new Date(data.agreementFirstDueDate) : new Date(),
+      });
+    }
+
+    // 4. Lançar Prazo Fatal Oficial (se marcado)
+    if (data.createLegalDeadline && data.nextStepDeadline && data.nextStepType) {
+      const start = hearingData.date.toDate();
+      const end = new Date(data.nextStepDeadline);
+      const daysCount = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+
+      await createLegalDeadline({
+        processId: hearingData.processId,
+        type: data.nextStepType,
+        startDate: format(start, 'yyyy-MM-dd'),
+        endDate: data.nextStepDeadline,
+        daysCount: daysCount,
+        isBusinessDays: true, // Padrão Bueno Gois para prazos judiciais
+        observations: `Gerado automaticamente via retorno de audiência (${hearingData.type}).`
+      });
+    }
+
+    // 5. Agendar iterações futuras (Respeitando o advogado do ato)
     const { tasks } = await getGoogleClientsForStaff(hearingData.lawyerId);
 
-    // 3.1. Tarefa de seguimento genérica
-    if (data.nextStepType && data.nextStepDeadline) {
+    // 5.1. Tarefa de seguimento genérica (Se não for prazo fatal oficial)
+    if (!data.createLegalDeadline && data.nextStepType && data.nextStepDeadline) {
       try {
         const taskDate = new Date(data.nextStepDeadline);
         taskDate.setUTCHours(0, 0, 0, 0);
@@ -501,7 +537,7 @@ export async function processHearingReturn(hearingId: string, data: {
       }
     }
 
-    // 3.2. Agendar nova data (se designada em ata e data selecionada)
+    // 5.2. Agendar nova data (se designada em ata e data selecionada)
     if (data.scheduleNewHearing && !data.dateNotSet && data.newHearingDate && data.newHearingTime) {
       const newHearingDateISO = `${data.newHearingDate}T${data.newHearingTime}`;
       await createHearing({
