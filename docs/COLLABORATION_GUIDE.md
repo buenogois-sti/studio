@@ -1,7 +1,7 @@
 
 # 🤝 Guia de Colaboração e Versão - LexFlow
 
-Este documento explica como gerenciar o acesso e o controle de versão do sistema.
+Este documento explica como gerenciar o acesso, o controle de versão e a troca de contas no sistema.
 
 ## 1. Acesso ao Código (Firebase Studio)
 
@@ -16,27 +16,22 @@ Se você deseja que outro colaborador veja e edite o código neste ambiente:
 ## 2. Controle de Versão (GitHub)
 
 ### Conectando ao GitHub
-1. Clique no ícone do GitHub no menu lateral esquerdo.
-2. Clique em **"Connect GitHub account"**.
-3. Escolha o repositório correto.
+1. Clique no ícone de **Source Control** (o terceiro ícone de cima para baixo na barra lateral esquerda, que parece um nó de árvore).
+2. Se aparecer o botão **"Publish Branch"**, significa que o projeto ainda não está sincronizado com um repositório remoto.
+3. Clique no botão ou procure a opção de publicar no GitHub para iniciar a autorização.
 
-### ⚠️ Erro de Permissão ou Troca de Conta
-Se você estiver logado na conta errada ou ver o erro *"You don't have permissions to push"*:
+### ⚠️ Como trocar de conta ou Sair (Sign Out)
+Se você conectou a conta errada ou não tem permissão de escrita:
 
-1. **Sair da Conta Atual**:
-   - Clique no ícone do GitHub no menu lateral.
-   - Clique no ícone de perfil (ou engrenagem) na parte inferior do painel lateral de Source Control.
-   - Selecione **"Sign Out"**.
-2. **Entrar com a Conta Correta**:
-   - Clique novamente em **"Connect GitHub account"**.
-   - Garanta que você está autorizando a conta que tem permissão de "Write" (Escrita) no repositório da Bueno Gois.
-3. **Revogação Manual (Se necessário)**:
-   - Se o Studio continuar logando na conta errada, acesse [GitHub.com](https://github.com) > Settings > Applications > Authorized GitHub Apps e remova o "Firebase Studio". Depois tente logar novamente.
+1. **Localize o ícone de Perfil**: Olhe para a barra lateral esquerda, no **extremo inferior** (perto do ícone de engrenagem de configurações).
+2. **Gerenciar Contas**: Clique no ícone que parece um bonequinho (Profile/Accounts).
+3. **Sair**: Clique no nome da sua conta do GitHub e selecione **"Sign Out"**.
+4. **Reconectar**: Volte à aba de Source Control e clique em **"Connect GitHub account"** para entrar com a conta correta (a que tem acesso ao repositório da Bueno Gois).
 
 ## 3. Fluxo de Trabalho
 - **Sincronização**: O Studio salva os arquivos em tempo real no volume compartilhado.
-- **Commits**: Sempre escreva mensagens claras (ex: "feat: adiciona rotina de retorno").
-- **Push**: Envie suas alterações ao GitHub para manter o backup externo atualizado.
+- **Commits**: Escreva mensagens claras (ex: "feat: adiciona rotina de retorno").
+- **Push/Publish**: Envie suas alterações para manter o repositório no GitHub atualizado.
 
 ---
-**Dúvidas?** Consulte o suporte técnico.
+**Dúvidas?** Consulte o suporte técnico da Bueno Gois.
