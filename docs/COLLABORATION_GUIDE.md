@@ -24,19 +24,26 @@ Para versionar o código e permitir que múltiplos desenvolvedores trabalhem de 
 3. **Vínculo de Repositório**: Escolha "Connect existing repository" ou "Create new repository".
 4. **Commits e Push**: Ao realizar alterações, elas aparecerão na aba de Controle de Origem. Escreva uma mensagem de commit e clique em "Commit & Push" para enviar para a nuvem.
 
-## 3. Sincronização de Alterações
+## 3. Desconectando do GitHub
+
+Caso precise trocar de conta ou encerrar a sessão:
+
+1. **Sair da Conta**: No painel do GitHub no menu lateral, clique no ícone de perfil/configurações e selecione **"Sign Out"**.
+2. **Revogar Acesso (Opcional)**: Se quiser remover o vínculo permanentemente, acesse sua conta no [GitHub.com](https://github.com), vá em **Settings > Applications > Authorized GitHub Apps** e revogue o acesso do Firebase Studio.
+
+## 4. Sincronização de Alterações
 
 - **Arquivos**: Todos os arquivos editados no Studio são salvos em um sistema de arquivos persistente vinculado ao projeto.
 - **Tempo Real**: Se um colaborador fizer uma alteração e outro abrir o projeto logo em seguida, ele verá o código atualizado.
 - **Conflitos**: Caso usem GitHub, lembre-se de sempre dar um "Pull" antes de começar a trabalhar para evitar conflitos de versão.
 
-## 4. Acesso à Plataforma (Usuários Finais)
+## 5. Acesso à Plataforma (Usuários Finais)
 
 Para que um membro da equipe utilize o sistema (sem mexer no código):
 
 1. **Login**: Ele deve acessar a URL de produção.
 2. **Convite**: Um Administrador deve cadastrar o e-mail dele em **Configurações > Usuários** dentro do sistema.
-3. **Permissões**: O sistema reconhecerá o e-mail no ato do login via Google e aplicará o perfil (Advogado, Financeiro, etc) definido.
+3. **Permissões**: O sistema reconhecerá o e-mail no ato do login via Google e aplicará o perfil definido.
 
 ---
 **Dúvidas?** Consulte o suporte técnico interno.
