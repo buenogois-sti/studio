@@ -6,7 +6,7 @@ Plataforma integrada de gestão jurídica com tecnologia de elite para o escrit�
 ## 🚀 Principais Módulos Implementados
 - **CRM Inteligente**: Gestão de leads e clientes com integração WhatsApp e fluxos de triagem automatizados.
 - **Controle de Processos**: Cadastro detalhado com qualificação precisa de réus e sincronização robusta com Google Drive.
-- **Agenda de Elite**: Sincronização inteligente com Google Calendar e Tasks, respeitando a agenda individual de cada advogado e suportando atos virtuais (links e senhas).
+- **Agenda de Elite  **: Sincronização inteligente com Google Calendar e Tasks, respeitando a agenda individual de cada advogado e suportando atos virtuais (links e senhas).
 - **Retorno de Audiência**: Fluxo de desfecho pós-ato para lançamento imediato de acordos, novos prazos fatais e reagendamentos.
 - **Prazos Jurídicos**: Motor de contagem automática (Dias Úteis/Corridos - CPC) com alertas de urgência e sincronização de tarefas.
 - **Checklists Operacionais**: Biblioteca de modelos disponível para toda a equipe, garantindo a padronização Bueno Gois com gestão segura por administradores.
