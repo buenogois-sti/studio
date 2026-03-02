@@ -21,43 +21,31 @@ Se você deseja que outro colaborador veja e edite o código neste ambiente:
 3. Clique no botão ou procure a opção de publicar no GitHub para iniciar a autorização.
 
 ### ⚠️ Como Limpar Permissões ou Sair (Sign Out)
-Se você conectou a conta errada ou não tem permissão de escrita (Erro 403):
+Se você conectou a conta errada ou não tem permissão de escrita (Erro 403 / "You don't have permissions"):
 
 1. **Localize o ícone de Perfil**: Olhe para a barra lateral esquerda, no **extremo inferior** (perto do ícone de engrenagem de configurações). É um ícone de um bonequinho.
 2. **Gerenciar Contas**: Clique no ícone de perfil.
 3. **Sair**: Clique no nome da sua conta do GitHub e selecione **"Sign Out"**.
-4. **Reconectar**: Volte à aba de Source Control e clique em **"Connect GitHub account"** para entrar com a conta correta.
+4. **Reconectar**: Volte à aba de Source Control e tente o Push novamente. Ele solicitará uma nova conexão.
 
 ## 3. Gestão via Terminal (Alternativa Rápida)
 
-Se a interface não estiver respondendo, você pode usar o terminal do Studio (Ctrl + `):
+Se a interface não estiver respondendo ou o erro de permissão persistir, use o terminal (Ctrl + `):
 
-### Verificar usuário atual
+### Resolver erro de permissão (403) usando Token (PAT)
+Esta é a forma mais garantida de forçar o acesso com a conta correta:
+1. No GitHub, vá em *Settings > Developer Settings > Personal Access Tokens > Tokens (classic)*.
+2. Gere um token com permissão `repo` e copie o código.
+3. No terminal do Studio, execute:
 ```bash
-git config user.name
-git config user.email
+git remote set-url origin https://SEU_TOKEN_AQUI@github.com/buenogois-sti/studio.git
 ```
 
-### Limpar credenciais antigas
+### Limpar credenciais globais
 ```bash
 git config --global --unset user.name
 git config --global --unset user.email
 git config --global --unset credential.helper
-```
-
-### Configurar novo usuário
-```bash
-git config --global user.name "Seu Nome"
-git config --global user.email "seu-email@exemplo.com"
-```
-
-### Resolver erro de permissão (403) usando Token
-Se você precisar forçar a conexão com uma nova conta usando um **Personal Access Token (PAT)**:
-1. No GitHub, vá em *Settings > Developer Settings > Personal Access Tokens > Tokens (classic)*.
-2. Gere um token com permissão `repo`.
-3. No terminal do Studio, execute:
-```bash
-git remote set-url origin https://SEU_TOKEN_AQUI@github.com/buenogois-sti/studio.git
 ```
 
 ## 4. Fluxo de Trabalho
