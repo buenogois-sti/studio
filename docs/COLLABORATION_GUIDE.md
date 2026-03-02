@@ -20,13 +20,13 @@ Se você deseja que outro colaborador veja e edite o código neste ambiente:
 2. Se aparecer o botão **"Publish Branch"**, significa que o projeto ainda não está sincronizado com um repositório remoto.
 3. Clique no botão ou procure a opção de publicar no GitHub para iniciar a autorização.
 
-### ⚠️ Como trocar de conta ou Sair (Sign Out)
-Se você conectou a conta errada ou não tem permissão de escrita:
+### ⚠️ Como Limpar Permissões ou Sair (Sign Out)
+Se você conectou a conta errada ou não tem permissão de escrita (Erro 403):
 
-1. **Localize o ícone de Perfil**: Olhe para a barra lateral esquerda, no **extremo inferior** (perto do ícone de engrenagem de configurações).
-2. **Gerenciar Contas**: Clique no ícone que parece um bonequinho (Profile/Accounts).
+1. **Localize o ícone de Perfil**: Olhe para a barra lateral esquerda, no **extremo inferior** (perto do ícone de engrenagem de configurações). É um ícone de um bonequinho.
+2. **Gerenciar Contas**: Clique no ícone de perfil.
 3. **Sair**: Clique no nome da sua conta do GitHub e selecione **"Sign Out"**.
-4. **Reconectar**: Volte à aba de Source Control e clique em **"Connect GitHub account"** para entrar com a conta correta (a que tem acesso ao repositório da Bueno Gois).
+4. **Reconectar**: Volte à aba de Source Control e clique em **"Connect GitHub account"** para entrar com a conta correta.
 
 ## 3. Gestão via Terminal (Alternativa Rápida)
 
@@ -38,16 +38,24 @@ git config user.name
 git config user.email
 ```
 
+### Limpar credenciais antigas
+```bash
+git config --global --unset user.name
+git config --global --unset user.email
+git config --global --unset credential.helper
+```
+
 ### Configurar novo usuário
 ```bash
 git config --global user.name "Seu Nome"
 git config --global user.email "seu-email@exemplo.com"
 ```
 
-### Resolver erro de permissão (403)
+### Resolver erro de permissão (403) usando Token
 Se você precisar forçar a conexão com uma nova conta usando um **Personal Access Token (PAT)**:
-1. Gere um token no GitHub (Settings > Developer Settings > Personal Access Tokens).
-2. No terminal do Studio, execute:
+1. No GitHub, vá em *Settings > Developer Settings > Personal Access Tokens > Tokens (classic)*.
+2. Gere um token com permissão `repo`.
+3. No terminal do Studio, execute:
 ```bash
 git remote set-url origin https://SEU_TOKEN_AQUI@github.com/buenogois-sti/studio.git
 ```
