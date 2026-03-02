@@ -49,7 +49,7 @@ function LandingLogo({ className }: { className?: string }) {
         <Link href="/" className="flex items-center gap-3">
             <img 
               src="/logo.png" 
-              alt="Bueno Góis Advogados" 
+              alt="Logo" 
               className="h-14 w-auto md:h-20"
             />
         </Link>
@@ -61,70 +61,70 @@ const services = [
     {
       icon: Briefcase,
       title: 'Rescisão de Contrato',
-      description: 'Defendo casos de demissão sem justa causa, demissão por justa causa, pedido de demissão e rescisão indireta. Garanto o pagamento correto de todas as verbas.',
+      description: 'Defesa especializada em demissões e rescisões contratuais, garantindo o pagamento integral das verbas devidas.',
     },
     {
       icon: Clock,
       title: 'Horas Extras',
-      description: 'Reivindico horas extras não pagas, adicional noturno, trabalho em feriados e domingos. Calculo corretamente todos os valores devidos.',
+      description: 'Recuperação de valores referentes a horas extras, adicional noturno e descansos não remunerados.',
     },
     {
       icon: Shield,
       title: 'Assédio Moral',
-      description: 'Defendo casos de assédio moral, assédio sexual, discriminação e danos morais no trabalho. Protejo sua dignidade e garanto indenizações justas.',
+      description: 'Proteção contra abusos no ambiente de trabalho e indenizações por danos morais e discriminação.',
     },
     {
       icon: HeartHandshake,
       title: 'Acidentes de Trabalho',
-      description: 'Atuo em casos de acidentes de trabalho, doenças ocupacionais e responsabilidade do empregador. Garanto todos os benefícios previdenciários.',
+      description: 'Amparo jurídico em casos de acidentes e doenças ocupacionais, com foco em estabilidade e benefícios.',
     },
     {
       icon: Landmark,
       title: 'FGTS e Benefícios',
-      description: 'Reivindico depósitos FGTS não realizados, correção de valores e benefícios previdenciários. Garanto que você receba todos os direitos devidos.',
+      description: 'Reivindicação de depósitos não realizados e correções monetárias de contas inativas.',
     },
     {
       icon: FileText,
       title: 'Verbas Rescisórias',
-      description: 'Garanto o pagamento correto de férias, 13º salário, aviso prévio, multa do FGTS e outras verbas. Calculo todos os valores devidos.',
+      description: 'Cálculo e cobrança de férias, 13º salário, aviso prévio e multas rescisórias.',
     },
     {
       icon: Users,
       title: 'Reconhecimento de Vínculo',
-      description: 'Defendo reconhecimento de vínculo empregatício em casos de trabalho informal, terceirização irregular e falsa cooperativa.',
+      description: 'Regularização de trabalho informal e reconhecimento de direitos em pejotização irregular.',
     },
     {
       icon: Handshake,
-      title: 'Adicionais e Benefícios',
-      description: 'Reivindico adicionais de insalubridade, periculosidade, transferência, gratificações e outros benefícios trabalhistas.',
+      title: 'Acordos Estratégicos',
+      description: 'Mediação e negociação para encerramento célere de conflitos com os melhores termos.',
     },
     {
       icon: Building,
-      title: 'Direito Coletivo',
-      description: 'Atuo em ações coletivas, dissídios coletivos, negociações sindicais e acordos coletivos. Defendo os interesses dos trabalhadores.',
+      title: 'Assessoria de Elite',
+      description: 'Atendimento premium voltado para resultados rápidos e transparência total com o cliente.',
     },
 ]
 
 const testimonials = [
     {
-        name: 'Ana Paula Santos',
-        text: 'Olha, vou falar a verdade: achei que ia perder tudo. Fui mandada embora grávida e tava desesperada. O Dr. Alan e a equipe dele foram anjos na minha vida. Resolveram meu caso e hoje meu filho tem o que precisa. Só gratidão!',
+        name: 'A. P. S.',
+        text: 'O atendimento foi impecável. Resolveram meu caso de rescisão muito rápido e sempre me mantiveram informada de tudo.',
     },
     {
-        name: 'Roberto Oliveira',
-        text: 'Tava há 3 meses sem receber e a empresa só me enrolando. Fui na Bueno Gois e no primeiro papo já senti confiança. Não é só sobre dinheiro, é sobre respeito. O pessoal luta pela gente de verdade. Nota 10!',
+        name: 'R. O.',
+        text: 'Escritório de confiança. Consegui reaver minhas horas extras que a empresa se recusava a pagar por anos.',
     },
     {
-        name: 'Maria Fernanda Costa',
-        text: 'Trabalhei feito doida fazendo hora extra que nunca via a cor do dinheiro. Eles botaram tudo no papel e ganharam a causa. São brutos na justiça mas muito humanos com a gente. Recomendo pra todo mundo que tá sendo injustiçado.',
+        name: 'M. F. C.',
+        text: 'Excelentes profissionais. Recomendo para quem busca justiça e um atendimento humano de verdade.',
     },
     {
-        name: 'João Carlos Lima',
-        text: 'Sofri um acidente feio na fábrica e me descartaram como se eu fosse lixo. Esse escritório me devolveru a dignidade. O processo demorou o tempo da justiça, mas eles nunca me deixaram sem resposta. Pode confiar sem medo.',
+        name: 'J. C. L.',
+        text: 'A melhor escolha que fiz. Resolveram minha estabilidade após o acidente de trabalho com muita firmeza.',
     },
     {
-        name: 'Eliana Mendes',
-        text: 'Gente, eu tava perdida! Meu patrão me mandou embora e não queria pagar nada. O pessoal da Bueno Gois resolveu tudo tão rápido que nem acreditei. Hoje durmo tranquila com meus direitos no bolso.',
+        name: 'E. M.',
+        text: 'Rápido, prático e eficiente. O link do WhatsApp facilita muito o contato direto com os advogados.',
     }
 ]
 
@@ -230,13 +230,13 @@ AnimatedGradientBg.displayName = 'AnimatedGradientBg';
 export function LandingClient({ initialSettings, initialSeo }: { initialSettings: any, initialSeo: any }) {
   const { firestore } = useFirebase();
   const [headerBg, setHeaderBg] = useState(false);
-  const whatsappUrl = "https://wa.me/5511980590128?text=Olá!%20Vi%20o%20site%20da%20Bueno%20Gois%20Advogados%20e%20gostaria%20de%20saber%20mais%20sobre%20seus%20serviços.";
 
   const settingsRef = useMemoFirebase(() => firestore ? doc(firestore, 'system_settings', 'general') : null, [firestore]);
   const { data: settings } = useDoc<any>(settingsRef);
   
   const currentSettings = settings || initialSettings;
-  const instagramUrl = currentSettings?.instagram || "https://www.instagram.com/buenogoisadvogado/";
+  const whatsappUrl = `https://wa.me/${currentSettings?.phone?.replace(/\D/g, '') || '00000000000'}?text=Olá!%20Gostaria%20de%20saber%20mais%20sobre%20seus%20serviços.`;
+  const instagramUrl = currentSettings?.instagram || "#";
 
   useEffect(() => {
     let rafId: number;
@@ -246,7 +246,7 @@ export function LandingClient({ initialSettings, initialSeo }: { initialSettings
     const handleScroll = () => {
       rafId = requestAnimationFrame(() => {
         const scrollY = window.scrollY;
-        if (Math.abs(scrollY - lastScrollY) < 10) return; // Debounce manual de 10px
+        if (Math.abs(scrollY - lastScrollY) < 10) return;
         
         lastScrollY = scrollY;
         root.style.setProperty('--scroll-y', `${scrollY}px`);
@@ -280,7 +280,7 @@ export function LandingClient({ initialSettings, initialSeo }: { initialSettings
             ))}
           </nav>
           <div className="flex items-center gap-4">
-            <Link href={instagramUrl} target="_blank" className="text-white hover:text-primary transition-all duration-300 hover:scale-110 p-2" aria-label="Siga-nos no Instagram">
+            <Link href={instagramUrl} target="_blank" className="text-white hover:text-primary transition-all duration-300 hover:scale-110 p-2">
               <Instagram className="h-6 w-6" />
             </Link>
           </div>
@@ -299,7 +299,7 @@ export function LandingClient({ initialSettings, initialSeo }: { initialSettings
                       <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-primary/5 rounded-3xl blur-3xl" />
                       <img
                         src="/lawyer-portrait.png"
-                        alt="Dr. Alan Bueno De Gois"
+                        alt="Advogado Especialista"
                         width={500}
                         height={600}
                         className="relative object-contain object-bottom filter drop-shadow-[0_35px_60px_rgba(245,208,48,0.3)] mx-auto"
@@ -312,10 +312,10 @@ export function LandingClient({ initialSettings, initialSeo }: { initialSettings
               <AnimatedSection className="space-y-8">
                 <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/20 border border-primary/30">
                   <Sparkles className="w-4 h-4 text-primary animate-pulse" />
-                  <span className="text-sm font-bold text-primary">+10 Anos de Experiência</span>
+                  <span className="text-sm font-bold text-primary">Atendimento Especializado</span>
                 </div>
                 <h1 className="font-headline text-5xl md:text-6xl xl:text-7xl font-bold leading-tight text-white">Defenda <span className="text-primary">Seus Direitos</span> Trabalhistas</h1>
-                <p className="text-xl text-white/90 max-w-2xl leading-relaxed text-justify">Advocacia trabalhista especializada em <span className="text-primary font-semibold">rescisão de contrato</span>, <span className="text-primary font-semibold">horas extras</span> e <span className="text-primary font-semibold">assédio moral</span>.</p>
+                <p className="text-xl text-white/90 max-w-2xl leading-relaxed">Experiência e compromisso na defesa do trabalhador. Atendimento estratégico focado em resultados.</p>
                 <div className="flex flex-wrap gap-4">
                   <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-base py-7 px-8 rounded-xl shadow-[0_20px_60px_rgba(245,208,48,0.4)] transition-all duration-300 hover:scale-105" asChild>
                     <Link href={whatsappUrl} target="_blank"><MessageCircle className="mr-3 h-5 w-5" /> Consulta Gratuita <ArrowRight className="ml-3 h-5 w-5" /></Link>
@@ -330,7 +330,7 @@ export function LandingClient({ initialSettings, initialSeo }: { initialSettings
           <AnimatedGradientBg />
           <div className="container mx-auto relative z-10 px-4">
             <AnimatedSection className="text-center mb-16">
-              <h2 className="font-headline text-4xl md:text-5xl font-bold text-gray-900 mb-6">Serviços Jurídicos</h2>
+              <h2 className="font-headline text-4xl md:text-5xl font-bold text-gray-900 mb-6">Nossas Áreas de Atuação</h2>
               <div className="w-24 h-1.5 bg-primary mx-auto mb-6 rounded-full" />
             </AnimatedSection>
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -339,7 +339,7 @@ export function LandingClient({ initialSettings, initialSeo }: { initialSettings
                   <Card className="group relative bg-white border-2 border-gray-150 p-8 flex flex-col h-full hover:border-primary/40 transition-all duration-300 hover:shadow-2xl cursor-pointer shadow-sm">
                     <div className="w-16 h-16 rounded-xl bg-primary/10 flex items-center justify-center mb-6 group-hover:bg-primary transition-all duration-300"><service.icon className="w-8 h-8 text-primary group-hover:text-primary-foreground transition-colors" /></div>
                     <h3 className="font-headline text-2xl font-bold text-gray-900 mb-4">{service.title}</h3>
-                    <p className="text-gray-600 flex-grow leading-relaxed mb-6 text-justify">{service.description}</p>
+                    <p className="text-gray-600 flex-grow leading-relaxed mb-6">{service.description}</p>
                     <Link href={whatsappUrl} target="_blank" className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#152c4b] text-white font-semibold rounded-lg hover:bg-[#1a3659] transition-all">Consultar Gratuitamente <ChevronRight className="h-5 w-5" /></Link>
                   </Card>
                 </AnimatedSection>
@@ -355,7 +355,7 @@ export function LandingClient({ initialSettings, initialSeo }: { initialSettings
             <div className="space-y-6">
               <LandingLogo />
               <p className="text-sm text-slate-400 leading-relaxed">
-                Justiça e excelência na defesa dos direitos do trabalhador. Atendimento estratégico e humanizado em São Bernardo do Campo.
+                Justiça e excelência na defesa dos direitos. Atendimento humano e especializado voltado para a solução de conflitos.
               </p>
             </div>
             
@@ -364,21 +364,21 @@ export function LandingClient({ initialSettings, initialSeo }: { initialSettings
               <ul className="space-y-4 text-sm text-slate-300">
                 <li className="flex items-center justify-center md:justify-start gap-3">
                   <Smartphone className="h-4 w-4 text-primary" />
-                  <span>(11) 98059-0128</span>
+                  <span>{currentSettings?.phone || "Telefone de Contato"}</span>
                 </li>
                 <li className="flex items-center justify-center md:justify-start gap-3">
                   <AtSign className="h-4 w-4 text-primary" />
-                  <span>contato@buenogoisadvogado.com.br</span>
+                  <span>{currentSettings?.adminEmail || "Email Administrativo"}</span>
                 </li>
               </ul>
             </div>
 
             <div className="space-y-6">
-              <h4 className="text-xs font-black uppercase tracking-[0.2em] text-primary">Localização</h4>
+              <h4 className="text-xs font-black uppercase tracking-[0.2em] text-primary">Onde Atendemos</h4>
               <ul className="space-y-4 text-sm text-slate-300">
                 <li className="flex items-start justify-center md:justify-start gap-3">
                   <MapPin className="h-4 w-4 text-primary shrink-0 mt-1" />
-                  <span>Rua Marechal Deodoro, 1594 - Sala 2<br />Centro, São Bernardo do Campo - SP<br />CEP 09715-070</span>
+                  <span>{currentSettings?.address || "Endereço do Escritório"}</span>
                 </li>
               </ul>
             </div>
@@ -386,10 +386,9 @@ export function LandingClient({ initialSettings, initialSeo }: { initialSettings
 
           <div className="pt-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-6">
             <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-              &copy; {new Date().getFullYear()} {currentSettings?.officeName || 'Bueno Gois Advogados e Associados'}
+              &copy; {new Date().getFullYear()} {currentSettings?.officeName || 'LexFlow Escritório de Advocacia'}
             </p>
             <div className="flex items-center gap-6">
-              <span className="text-[9px] font-bold text-slate-600 uppercase tracking-tighter">OAB/SP 00.000</span>
               <Link href="/login" className="text-[9px] font-black uppercase tracking-widest text-slate-500 hover:text-primary transition-colors border border-white/10 px-3 py-1 rounded">Acesso Restrito</Link>
             </div>
           </div>
@@ -397,10 +396,10 @@ export function LandingClient({ initialSettings, initialSeo }: { initialSettings
       </footer>
 
       <WhatsAppFloating
-        phoneNumber="5511980590128"
-        message="Olá! Vi o site da Bueno Gois Advogados e gostaria de saber mais sobre os serviços de advocacia trabalhista."
-        welcomeMessage="Olá! 👋 Sou da Bueno Gois Advogados. Como posso ajudar hoje?"
-        userName="Bueno Gois Adv."
+        phoneNumber={currentSettings?.phone?.replace(/\D/g, '') || "00000000000"}
+        message="Olá! Gostaria de saber mais sobre os serviços de advocacia."
+        welcomeMessage="Olá! 👋 Como podemos ajudar você hoje?"
+        userName={currentSettings?.officeName || "Advocacia"}
         delay={2500}
         autoHideDelay={10000}
       />

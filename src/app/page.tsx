@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Metadata } from 'next';
 import { firestoreAdmin } from '@/firebase/admin';
@@ -5,9 +6,9 @@ import { LandingClient } from '@/components/landing/LandingClient';
 
 export async function generateMetadata(): Promise<Metadata> {
   let seoData = {
-    title: "Bueno Gois Advogados | Advocacia Trabalhista em São Bernardo do Campo",
-    description: "Escritório de advocacia especializado em direitos do trabalhador, rescisões e horas extras. Atendimento humano e estratégico em SBC.",
-    keywords: "advogado trabalhista, sbc, são bernardo do campo, rescisão, horas extras"
+    title: "LexFlow | Gestão Jurídica de Elite",
+    description: "Plataforma integrada de gestão jurídica com tecnologia de elite.",
+    keywords: "advocacia, gestão jurídica, software jurídico"
   };
 
   try {
@@ -31,15 +32,15 @@ export async function generateMetadata(): Promise<Metadata> {
     viewport: 'width=device-width, initial-scale=1',
     robots: 'index, follow',
     alternates: {
-      canonical: 'https://buenogoisadvogado.com.br',
+      canonical: 'https://seusite.com.br',
     },
     openGraph: {
       title: seoData.title,
       description: seoData.description,
       type: 'website',
       locale: 'pt_BR',
-      url: 'https://buenogoisadvogado.com.br',
-      siteName: 'Bueno Gois Advogados',
+      url: 'https://seusite.com.br',
+      siteName: 'LexFlow',
     }
   };
 }
@@ -64,16 +65,16 @@ export default async function Page() {
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "LegalService",
-    "name": "Bueno Gois Advogados e Associados",
-    "description": initialSeo?.description || "Escritório de advocacia especializado em Direito do Trabalho em SBC.",
-    "url": "https://buenogoisadvogado.com.br",
-    "telephone": "+551128975218",
+    "name": initialSettings?.officeName || "Bueno Gois Advogados",
+    "description": initialSeo?.description || "Escritório de advocacia especializado.",
+    "url": "https://seusite.com.br",
+    "telephone": initialSettings?.phone || "+550000000000",
     "address": {
       "@type": "PostalAddress",
-      "streetAddress": "Rua Marechal Deodoro, 1594 - Sala 2",
-      "addressLocality": "São Bernardo do Campo",
-      "addressRegion": "SP",
-      "postalCode": "09715-070",
+      "streetAddress": initialSettings?.address || "Endereço da Sede",
+      "addressLocality": "Cidade",
+      "addressRegion": "UF",
+      "postalCode": "00000-000",
       "addressCountry": "BR"
     }
   };
