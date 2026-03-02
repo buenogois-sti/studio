@@ -13,7 +13,7 @@ Se você deseja que outro colaborador veja e edite o código neste ambiente:
 4. **Atribuir Papel**: Atribua o papel de **Editor**.
 5. **Acesso**: O colaborador receberá um e-mail. Ao aceitar, o projeto aparecerá para ele no Firebase Studio.
 
-## 2. Controle de Versão (GitHub)
+## 2. Controle de Versão (GitHub - Interface)
 
 ### Conectando ao GitHub
 1. Clique no ícone de **Source Control** (o terceiro ícone de cima para baixo na barra lateral esquerda, que parece um nó de árvore).
@@ -28,7 +28,31 @@ Se você conectou a conta errada ou não tem permissão de escrita:
 3. **Sair**: Clique no nome da sua conta do GitHub e selecione **"Sign Out"**.
 4. **Reconectar**: Volte à aba de Source Control e clique em **"Connect GitHub account"** para entrar com a conta correta (a que tem acesso ao repositório da Bueno Gois).
 
-## 3. Fluxo de Trabalho
+## 3. Gestão via Terminal (Alternativa Rápida)
+
+Se a interface não estiver respondendo, você pode usar o terminal do Studio (Ctrl + `):
+
+### Verificar usuário atual
+```bash
+git config user.name
+git config user.email
+```
+
+### Configurar novo usuário
+```bash
+git config --global user.name "Seu Nome"
+git config --global user.email "seu-email@exemplo.com"
+```
+
+### Resolver erro de permissão (403)
+Se você precisar forçar a conexão com uma nova conta usando um **Personal Access Token (PAT)**:
+1. Gere um token no GitHub (Settings > Developer Settings > Personal Access Tokens).
+2. No terminal do Studio, execute:
+```bash
+git remote set-url origin https://SEU_TOKEN_AQUI@github.com/buenogois-sti/studio.git
+```
+
+## 4. Fluxo de Trabalho
 - **Sincronização**: O Studio salva os arquivos em tempo real no volume compartilhado.
 - **Commits**: Escreva mensagens claras (ex: "feat: adiciona rotina de retorno").
 - **Push/Publish**: Envie suas alterações para manter o repositório no GitHub atualizado.
