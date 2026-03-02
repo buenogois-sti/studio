@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/select"
 import { SheetFooter } from '@/components/ui/sheet';
 import { H2 } from '@/components/ui/typography';
-import { Loader2, Search, MapPin, Calendar, Building, User } from 'lucide-react';
+import { Loader2, Search, MapPin, Calendar, Building, User, Smartphone, CreditCard, ShieldCheck } from 'lucide-react';
 
 import { useFirebase } from '@/firebase';
 import { collection, serverTimestamp, Timestamp, doc, addDoc, updateDoc } from 'firebase/firestore';
@@ -166,10 +166,6 @@ export function ClientForm({
               title: 'Endereço encontrado!',
               description: `${data.logradouro}, ${data.localidade}`
             });
-            setTimeout(() => {
-              const numInput = document.getElementsByName('address_number')[0];
-              if (numInput) numInput.focus();
-            }, 100);
         }
     } catch (error) {
         toast({
@@ -279,28 +275,31 @@ export function ClientForm({
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8 px-1 py-4">
-        <fieldset disabled={isSaving} className="space-y-6">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-10">
+        <fieldset disabled={isSaving} className="space-y-10">
           
-          <section>
-            <H2>{isPJ ? 'Dados da Empresa' : 'Dados Pessoais'}</H2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+          <section className="space-y-4">
+            <div className="flex items-center gap-2 mb-2">
+              <User className="h-5 w-5 text-primary" />
+              <H2 className="text-white border-primary/20">{isPJ ? 'Dados da Empresa' : 'Dados Pessoais'}</H2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white/5 p-6 rounded-2xl border border-white/10">
               <FormField
                 control={form.control}
                 name="status"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Status do Cadastro *</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormLabel className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Status do Cadastro *</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <SelectTrigger ref={field.ref}>
+                        <SelectTrigger className="h-11 bg-background">
                           <SelectValue placeholder="Selecionar status..." />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="active">Ativo</SelectItem>
-                        <SelectItem value="lead">Lead</SelectItem>
-                        <SelectItem value="inactive">Inativo</SelectItem>
+                        <SelectItem value="active">🟢 Ativo</SelectItem>
+                        <SelectItem value="lead">🟠 Lead</SelectItem>
+                        <SelectItem value="inactive">⚪ Inativo</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -312,10 +311,10 @@ export function ClientForm({
                 name="clientType"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Tipo de Pessoa *</FormLabel>
+                    <FormLabel className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Tipo de Pessoa *</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <SelectTrigger ref={field.ref}>
+                        <SelectTrigger className="h-11 bg-background">
                           <SelectValue placeholder="Selecionar tipo..." />
                         </SelectTrigger>
                       </FormControl>
@@ -332,9 +331,9 @@ export function ClientForm({
                 name="document"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{isPJ ? 'CNPJ *' : 'CPF *'}</FormLabel>
+                    <FormLabel className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">{isPJ ? 'CNPJ *' : 'CPF *'}</FormLabel>
                     <FormControl>
-                      <Input placeholder={isPJ ? "00.000.000/0000-00" : "000.000.000-00"} {...field} />
+                      <Input placeholder={isPJ ? "00.000.000/0000-00" : "000.000.000-00"} className="h-11 bg-background font-mono" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -345,9 +344,9 @@ export function ClientForm({
                 name="firstName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{isPJ ? 'Razão Social *' : 'Nome *'}</FormLabel>
+                    <FormLabel className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">{isPJ ? 'Razão Social *' : 'Nome *'}</FormLabel>
                     <FormControl>
-                      <Input placeholder={isPJ ? "Nome oficial da empresa" : "Primeiro nome"} {...field} />
+                      <Input placeholder={isPJ ? "Nome oficial da empresa" : "Primeiro nome"} className="h-11 bg-background font-bold" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -358,52 +357,24 @@ export function ClientForm({
                 name="lastName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{isPJ ? 'Nome Fantasia' : 'Sobrenome *'}</FormLabel>
+                    <FormLabel className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">{isPJ ? 'Nome Fantasia' : 'Sobrenome *'}</FormLabel>
                     <FormControl>
-                      <Input placeholder={isPJ ? "Como a empresa é conhecida" : "Sobrenome completo"} {...field} />
+                      <Input placeholder={isPJ ? "Como a empresa é conhecida" : "Sobrenome completo"} className="h-11 bg-background" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
-              {isPJ ? (
-                <>
-                  <FormField
-                    control={form.control}
-                    name="stateRegistration"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Inscrição Estadual (IE)</FormLabel>
-                        <FormControl><Input placeholder="Isento ou nº" {...field} /></FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="municipalRegistration"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Inscrição Municipal (IM)</FormLabel>
-                        <FormControl><Input placeholder="Nº de registro na prefeitura" {...field} /></FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </>
-              ) : (
+              {!isPJ && (
                 <>
                   <FormField
                     control={form.control}
                     name="nationality"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Nacionalidade</FormLabel>
-                        <FormControl>
-                          <Input placeholder="brasileiro(a)" {...field} />
-                        </FormControl>
-                        <FormMessage />
+                        <FormLabel className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Nacionalidade</FormLabel>
+                        <FormControl><Input placeholder="brasileiro(a)" className="h-11 bg-background" {...field} /></FormControl>
                       </FormItem>
                     )}
                   />
@@ -412,11 +383,8 @@ export function ClientForm({
                     name="civilStatus"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Estado Civil</FormLabel>
-                        <FormControl>
-                          <Input placeholder="solteiro(a)" {...field} />
-                        </FormControl>
-                        <FormMessage />
+                        <FormLabel className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Estado Civil</FormLabel>
+                        <FormControl><Input placeholder="solteiro(a)" className="h-11 bg-background" {...field} /></FormControl>
                       </FormItem>
                     )}
                   />
@@ -425,11 +393,8 @@ export function ClientForm({
                     name="profession"
                     render={({ field }) => (
                       <FormItem className="md:col-span-2">
-                        <FormLabel>Profissão</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Ex: ajudante geral" {...field} />
-                        </FormControl>
-                        <FormMessage />
+                        <FormLabel className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Profissão</FormLabel>
+                        <FormControl><Input placeholder="Ex: ajudante geral" className="h-11 bg-background" {...field} /></FormControl>
                       </FormItem>
                     )}
                   />
@@ -438,76 +403,40 @@ export function ClientForm({
                     name="rg"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>RG</FormLabel>
-                        <FormControl>
-                          <Input placeholder="00.000.000-0" {...field} />
-                        </FormControl>
-                        <FormMessage />
+                        <FormLabel className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">RG</FormLabel>
+                        <FormControl><Input placeholder="00.000.000-0" className="h-11 bg-background font-mono" {...field} /></FormControl>
                       </FormItem>
                     )}
                   />
-                  <FormField
-                    control={form.control}
-                    name="rgIssuer"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="flex items-center gap-2"><Building className="h-3.5 w-3.5" /> Órgão Emissor</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Ex: SSP/SP" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="rgIssuanceDate"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="flex items-center gap-2"><Calendar className="h-3.5 w-3.5" /> Data Expedição</FormLabel>
-                        <FormControl>
-                          <Input type="date" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="rgIssuer"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Emissor</FormLabel>
+                          <FormControl><Input placeholder="Ex: SSP/SP" className="h-11 bg-background" {...field} /></FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="rgIssuanceDate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Expedição</FormLabel>
+                          <FormControl><Input type="date" className="h-11 bg-background" {...field} /></FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                   <FormField
                     control={form.control}
                     name="motherName"
                     render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Nome da Mãe</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Nome completo da mãe" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="ctps"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>CTPS</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Nº da Carteira de Trabalho" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="pis"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>PIS/PASEP</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Nº do PIS/PASEP" {...field} />
-                        </FormControl>
-                        <FormMessage />
+                      <FormItem className="md:col-span-2">
+                        <FormLabel className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Nome da Mãe</FormLabel>
+                        <FormControl><Input placeholder="Nome completo da mãe" className="h-11 bg-background" {...field} /></FormControl>
                       </FormItem>
                     )}
                   />
@@ -518,11 +447,11 @@ export function ClientForm({
                 control={form.control}
                 name="legalArea"
                 render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Área Jurídica de Atendimento</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormItem className="md:col-span-2">
+                      <FormLabel className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Área Jurídica de Atendimento</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
-                            <SelectTrigger ref={field.ref}>
+                            <SelectTrigger className="h-11 bg-background">
                                 <SelectValue placeholder="Selecionar..." />
                             </SelectTrigger>
                           </FormControl>
@@ -538,19 +467,19 @@ export function ClientForm({
           </section>
 
           {isPJ && (
-            <section className="animate-in fade-in slide-in-from-top-2">
+            <section className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-500">
               <div className="flex items-center gap-2 mb-2">
-                <User className="h-5 w-5 text-primary" />
-                <H2>Representante Legal (PJ)</H2>
+                <ShieldCheck className="h-5 w-5 text-primary" />
+                <H2 className="text-white border-primary/20">Representante Legal</H2>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 bg-muted/20 p-6 rounded-2xl border">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white/5 p-6 rounded-2xl border border-white/10">
                 <FormField
                   control={form.control}
                   name="representativeName"
                   render={({ field }) => (
                     <FormItem className="md:col-span-2">
-                      <FormLabel>Nome Completo do Representante</FormLabel>
-                      <FormControl><Input placeholder="Ex: João da Silva" {...field} /></FormControl>
+                      <FormLabel className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Nome do Representante</FormLabel>
+                      <FormControl><Input placeholder="Ex: João da Silva" className="h-11 bg-background font-bold" {...field} /></FormControl>
                     </FormItem>
                   )}
                 />
@@ -559,18 +488,8 @@ export function ClientForm({
                   name="representativeCpf"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>CPF do Representante</FormLabel>
-                      <FormControl><Input placeholder="000.000.000-00" {...field} /></FormControl>
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="representativeRg"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>RG do Representante</FormLabel>
-                      <FormControl><Input placeholder="00.000.000-0" {...field} /></FormControl>
+                      <FormLabel className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">CPF Representante</FormLabel>
+                      <FormControl><Input placeholder="000.000.000-00" className="h-11 bg-background font-mono" {...field} /></FormControl>
                     </FormItem>
                   )}
                 />
@@ -578,9 +497,9 @@ export function ClientForm({
                   control={form.control}
                   name="representativeRole"
                   render={({ field }) => (
-                    <FormItem className="md:col-span-2">
-                      <FormLabel>Cargo / Vínculo (Ex: Sócio Administrador)</FormLabel>
-                      <FormControl><Input placeholder="Ex: Sócio Administrador" {...field} /></FormControl>
+                    <FormItem>
+                      <FormLabel className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Cargo / Vínculo</FormLabel>
+                      <FormControl><Input placeholder="Ex: Sócio Administrador" className="h-11 bg-background" {...field} /></FormControl>
                     </FormItem>
                   )}
                 />
@@ -588,18 +507,19 @@ export function ClientForm({
             </section>
           )}
 
-          <section>
-            <H2>Contato & Endereço</H2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+          <section className="space-y-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Smartphone className="h-5 w-5 text-blue-400" />
+              <H2 className="text-white border-primary/20">Contato & Endereço</H2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white/5 p-6 rounded-2xl border border-white/10">
               <FormField
                   control={form.control}
                   name="email"
                   render={({ field }) => (
                       <FormItem className="md:col-span-2">
-                        <FormLabel>Email *</FormLabel>
-                        <FormControl>
-                            <Input placeholder="contato@empresa.com.br" {...field} />
-                        </FormControl>
+                        <FormLabel className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Email Principal *</FormLabel>
+                        <FormControl><Input placeholder="contato@empresa.com.br" className="h-11 bg-background" {...field} /></FormControl>
                         <FormMessage />
                       </FormItem>
                   )}
@@ -609,10 +529,8 @@ export function ClientForm({
                 name="mobile"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Celular / WhatsApp Principal *</FormLabel>
-                    <FormControl>
-                      <Input placeholder="(00) 00000-0000" {...field} />
-                    </FormControl>
+                    <FormLabel className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">WhatsApp / Celular *</FormLabel>
+                    <FormControl><Input placeholder="(00) 00000-0000" className="h-11 bg-background font-bold text-emerald-400" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -622,54 +540,36 @@ export function ClientForm({
                 name="phone"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Telefone Fixo / PABX</FormLabel>
-                    <FormControl>
-                      <Input placeholder="(00) 0000-0000" {...field} />
-                    </FormControl>
-                    <FormMessage />
+                    <FormLabel className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Telefone Fixo</FormLabel>
+                    <FormControl><Input placeholder="(00) 0000-0000" className="h-11 bg-background" {...field} /></FormControl>
                   </FormItem>
                 )}
               />
               
-              <div className="md:col-span-2">
-                <FormField
-                    control={form.control}
-                    name="address_zipCode"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>CEP</FormLabel>
-                            <div className="relative">
-                              <FormControl>
-                                  <Input placeholder="00000-000" className="pr-10" {...field} />
-                              </FormControl>
-                              <button 
-                                type="button" 
-                                onClick={handleCepSearch} 
-                                disabled={isSearchingCep || isSaving}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-primary transition-colors"
-                              >
-                                {isSearchingCep ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-                              </button>
-                            </div>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-              </div>
+              <FormField
+                  control={form.control}
+                  name="address_zipCode"
+                  render={({ field }) => (
+                      <FormItem>
+                          <FormLabel className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">CEP</FormLabel>
+                          <div className="flex gap-2">
+                            <FormControl><Input placeholder="00000-000" className="h-11 bg-background font-mono" {...field} maxLength={9} /></FormControl>
+                            <Button type="button" variant="outline" size="icon" className="h-11 w-11 shrink-0" onClick={handleCepSearch} disabled={isSearchingCep || !field.value}>
+                              {isSearchingCep ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                            </Button>
+                          </div>
+                          <FormMessage />
+                      </FormItem>
+                  )}
+              />
 
               <FormField
                   control={form.control}
                   name="address_street"
                   render={({ field }) => (
                       <FormItem className="md:col-span-2">
-                      <FormLabel>Logradouro</FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                          <Input placeholder="Rua, avenida, etc" className="pl-10" {...field} />
-                        </div>
-                      </FormControl>
-                      <FormMessage />
+                      <FormLabel className="text-[10px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2"><MapPin className="h-3 w-3" /> Logradouro</FormLabel>
+                      <FormControl><Input placeholder="Rua, avenida, etc" className="h-11 bg-background" {...field} /></FormControl>
                       </FormItem>
                   )}
               />
@@ -678,24 +578,8 @@ export function ClientForm({
                 name="address_number"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Número</FormLabel>
-                    <FormControl>
-                      <Input placeholder="123" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="address_complement"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Complemento</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Conjunto, sala, andar" {...field} />
-                    </FormControl>
-                    <FormMessage />
+                    <FormLabel className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Número</FormLabel>
+                    <FormControl><Input placeholder="123" className="h-11 bg-background" {...field} /></FormControl>
                   </FormItem>
                 )}
               />
@@ -704,54 +588,49 @@ export function ClientForm({
                 name="address_neighborhood"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Bairro</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Centro" {...field} />
-                    </FormControl>
-                    <FormMessage />
+                    <FormLabel className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Bairro</FormLabel>
+                    <FormControl><Input placeholder="Bairro" className="h-11 bg-background" {...field} /></FormControl>
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="address_city"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Cidade</FormLabel>
-                    <FormControl>
-                      <Input placeholder="São Bernardo do Campo" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="address_state"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Estado</FormLabel>
-                    <FormControl>
-                      <Input placeholder="SP" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="grid grid-cols-2 gap-4 md:col-span-2">
+                <FormField
+                  control={form.control}
+                  name="address_city"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Cidade</FormLabel>
+                      <FormControl><Input placeholder="Cidade" className="h-11 bg-background" {...field} /></FormControl>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="address_state"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Estado (UF)</FormLabel>
+                      <FormControl><Input placeholder="SP" className="h-11 bg-background uppercase" {...field} maxLength={2} /></FormControl>
+                    </FormItem>
+                  )}
+                />
+              </div>
             </div>
           </section>
 
-          <section>
-              <H2>Dados Bancários p/ Recebimento</H2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+          <section className="space-y-4">
+              <div className="flex items-center gap-2 mb-2">
+                <CreditCard className="h-5 w-5 text-emerald-400" />
+                <H2 className="text-white border-primary/20">Dados Bancários para Recebimento</H2>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white/5 p-6 rounded-2xl border border-white/10">
                   <FormField
                       control={form.control}
                       name="bankBeneficiary"
                       render={({ field }) => (
                           <FormItem className="md:col-span-2">
-                              <FormLabel>Nome do Favorecido</FormLabel>
-                              <FormControl><Input placeholder={isPJ ? "Razão Social da Empresa" : "Deixe em branco se for o próprio cliente"} {...field} /></FormControl>
-                              <FormMessage />
+                              <FormLabel className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Nome do Favorecido</FormLabel>
+                              <FormControl><Input placeholder="Titular da conta" className="h-11 bg-background" {...field} /></FormControl>
                           </FormItem>
                       )}
                   />
@@ -760,42 +639,40 @@ export function ClientForm({
                       name="bankName"
                       render={({ field }) => (
                           <FormItem>
-                              <FormLabel>Banco</FormLabel>
-                              <FormControl><Input placeholder="Ex: Itaú, Santander..." {...field} /></FormControl>
-                              <FormMessage />
+                              <FormLabel className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Banco</FormLabel>
+                              <FormControl><Input placeholder="Ex: Itaú, Santander..." className="h-11 bg-background" {...field} /></FormControl>
                           </FormItem>
                       )}
                   />
-                  <FormField
-                      control={form.control}
-                      name="agency"
-                      render={({ field }) => (
-                          <FormItem>
-                              <FormLabel>Agência</FormLabel>
-                              <FormControl><Input placeholder="0000" {...field} /></FormControl>
-                              <FormMessage />
-                          </FormItem>
-                      )}
-                  />
-                  <FormField
-                      control={form.control}
-                      name="account"
-                      render={({ field }) => (
-                          <FormItem>
-                              <FormLabel>Conta Corrente</FormLabel>
-                              <FormControl><Input placeholder="00000-0" {...field} /></FormControl>
-                              <FormMessage />
-                          </FormItem>
-                      )}
-                  />
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                        control={form.control}
+                        name="agency"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Agência</FormLabel>
+                                <FormControl><Input placeholder="0000" className="h-11 bg-background" {...field} /></FormControl>
+                            </FormItem>
+                        )}
+                    />
+                    <FormField
+                        control={form.control}
+                        name="account"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Conta Corrente</FormLabel>
+                                <FormControl><Input placeholder="00000-0" className="h-11 bg-background" {...field} /></FormControl>
+                            </FormItem>
+                        )}
+                    />
+                  </div>
                   <FormField
                       control={form.control}
                       name="pixKey"
                       render={({ field }) => (
-                          <FormItem>
-                              <FormLabel>Chave PIX</FormLabel>
-                              <FormControl><Input placeholder="CNPJ, E-mail ou Telefone" {...field} /></FormControl>
-                              <FormMessage />
+                          <FormItem className="md:col-span-2">
+                              <FormLabel className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Chave PIX Oficial</FormLabel>
+                              <FormControl><Input placeholder="CPF, E-mail ou Telefone" className="h-11 bg-background" {...field} /></FormControl>
                           </FormItem>
                       )}
                   />
@@ -804,14 +681,14 @@ export function ClientForm({
 
         </fieldset>
 
-        <SheetFooter className="pt-4">
-           <Button type="button" variant="outline" onClick={onSave} disabled={isSaving}>
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={isSaving}>
-                {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isSaving ? 'Salvando...' : (client ? 'Salvar Alterações' : 'Salvar Cadastro')}
-            </Button>
+        <SheetFooter className="sticky bottom-0 bg-background/95 backdrop-blur-md border-t border-white/5 pt-6 pb-6 px-1 z-50 mt-10">
+           <div className="flex w-full justify-between items-center gap-4">
+                <Button type="button" variant="ghost" onClick={onSave} disabled={isSaving} className="text-slate-400 hover:text-white font-bold h-12 uppercase text-[10px] tracking-widest">Cancelar</Button>
+                <Button type="submit" disabled={isSaving} className="min-w-[200px] h-12 bg-primary text-primary-foreground font-black uppercase tracking-widest text-[11px] shadow-xl shadow-primary/20">
+                    {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    {isSaving ? 'Salvando...' : (client ? 'Salvar Alterações' : 'Finalizar Cadastro')}
+                </Button>
+           </div>
         </SheetFooter>
       </form>
     </Form>

@@ -1,4 +1,3 @@
-
 'use client';
 import * as React from 'react';
 import {
@@ -265,8 +264,22 @@ export default function ClientsPage() {
         </div>
       )}
 
-      <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-        <SheetContent className="sm:max-w-5xl bg-[#020617] border-border"><SheetHeader><SheetTitle className="text-white text-2xl font-black font-headline">{editingClient ? 'Editar Cadastro' : 'Novo Cliente'}</SheetTitle><SheetDescription className="text-slate-400">Preencha os dados conforme documentação oficial.</SheetDescription></SheetHeader><ClientForm onSave={() => setIsSheetOpen(false)} client={editingClient} /></SheetContent>
+      <Sheet open={isSheetOpen} onOpenChange={(open) => { if (!open) setEditingClient(null); setIsSheetOpen(open); }}>
+        <SheetContent className="sm:max-w-5xl w-full flex flex-col p-0 bg-[#020617] border-border overflow-hidden shadow-2xl">
+          <SheetHeader className="p-6 border-b border-white/5 bg-white/5 shrink-0 text-left">
+            <SheetTitle className="text-white text-2xl font-black font-headline tracking-tight uppercase">
+              {editingClient ? 'Editar Cadastro' : 'Novo Cliente Elite'}
+            </SheetTitle>
+            <SheetDescription className="text-slate-400">
+              Preencha os dados conforme documentação oficial para habilitar automação documental.
+            </SheetDescription>
+          </SheetHeader>
+          <ScrollArea className="flex-1">
+            <div className="p-6">
+              <ClientForm onSave={() => setIsSheetOpen(false)} client={editingClient} />
+            </div>
+          </ScrollArea>
+        </SheetContent>
       </Sheet>
 
       <ClientDetailsSheet client={selectedClientForDetails} open={isDetailsOpen} onOpenChange={setIsDetailsOpen} />
