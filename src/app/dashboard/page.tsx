@@ -20,7 +20,8 @@ import {
   Wallet,
   Receipt,
   Briefcase,
-  Clock
+  Clock,
+  AlertTriangle
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import {
@@ -49,6 +50,7 @@ import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { analyzeOfficeStatus, type OfficeInsightsOutput } from '@/ai/flows/office-insights-flow';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 // --- SUB-COMPONENTES DE VISÃO MEMOIZADOS ---
 
@@ -345,11 +347,8 @@ export default function Dashboard() {
   const { firestore, user } = useFirebase();
   const { data: session, status } = useSession();
 
-  // Estabiliza a data de início do mês para evitar re-subscriptions cíclicas no Firebase
-  const stableStartOfMonth = React.useMemo(() => {
-    return Timestamp.fromDate(startOfMonth(new Date()));
-  }, []);
-
+  // Estabiliza as datas para evitar subscrições cíclicas no Firebase
+  const stableStartOfMonth = React.useMemo(() => Timestamp.fromDate(startOfMonth(new Date())), []);
   const stableNow = React.useMemo(() => Timestamp.now(), []);
 
   const userProfileRef = useMemoFirebase(() => (firestore && session?.user?.id ? doc(firestore, 'users', session.user.id) : null), [firestore, session]);
@@ -361,7 +360,7 @@ export default function Dashboard() {
     if (!firestore) return null;
     return query(collection(firestore, 'financial_titles'), where('dueDate', '>=', stableStartOfMonth), limit(role === 'admin' ? 10 : 5));
   }, [firestore, role, stableStartOfMonth]);
-  const { data: titlesData, isLoading: isLoadingTitles } = useCollection<FinancialTitle>(titlesQuery);
+  const { data: titlesData, isLoading: isLoadingTitles, error: titlesError } = useCollection<FinancialTitle>(titlesQuery);
 
   const processesQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -369,7 +368,7 @@ export default function Dashboard() {
     if (role === 'lawyer') return query(base, where('leadLawyerId', '==', session?.user?.id), orderBy('updatedAt', 'desc'), limit(10));
     return query(base, orderBy('createdAt', 'desc'), limit(10));
   }, [firestore, role, session]);
-  const { data: processesData, isLoading: isLoadingProcesses } = useCollection<Process>(processesQuery);
+  const { data: processesData, isLoading: isLoadingProcesses, error: processesError } = useCollection<Process>(processesQuery);
 
   const hearingsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -377,13 +376,13 @@ export default function Dashboard() {
     if (role === 'lawyer') return query(base, where('lawyerId', '==', session?.user?.id), where('date', '>=', stableNow), orderBy('date', 'asc'), limit(5));
     return query(base, where('date', '>=', stableNow), orderBy('date', 'asc'), limit(5));
   }, [firestore, role, session, stableNow]);
-  const { data: hearingsData, isLoading: isLoadingHearings } = useCollection<Hearing>(hearingsQuery);
+  const { data: hearingsData, isLoading: isLoadingHearings, error: hearingsError } = useCollection<Hearing>(hearingsQuery);
 
   const deadlinesQuery = useMemoFirebase(() => {
     if (!firestore || role !== 'lawyer') return null;
     return query(collection(firestore, 'deadlines'), where('authorId', '==', session?.user?.id), where('status', '==', 'PENDENTE'), orderBy('endDate', 'asc'), limit(3));
   }, [firestore, role, session]);
-  const { data: deadlinesData } = useCollection<LegalDeadline>(deadlinesQuery);
+  const { data: deadlinesData, error: deadlinesError } = useCollection<LegalDeadline>(deadlinesQuery);
 
   const personalCreditsQuery = useMemoFirebase(() => {
     if (!firestore || role !== 'lawyer') return null;
@@ -394,7 +393,7 @@ export default function Dashboard() {
   const logsQuery = useMemoFirebase(() => (firestore && session?.user?.id ? query(collection(firestore, `users/${session.user.id}/logs`), orderBy('timestamp', 'desc'), limit(3)) : null), [firestore, session]);
   const { data: logsData } = useCollection<Log>(logsQuery);
 
-  const isLoading = status === 'loading' || isLoadingTitles || isLoadingProcesses || isLoadingHearings;
+  const anyError = titlesError || processesError || hearingsError || deadlinesError;
 
   const stats = React.useMemo(() => {
     const s = { 
@@ -448,6 +447,30 @@ export default function Dashboard() {
     });
     return months;
   }, [processesData]);
+
+  if (anyError) {
+    return (
+      <div className="p-6">
+        <Alert variant="destructive" className="bg-rose-500/10 border-rose-500/20 text-rose-400 shadow-lg">
+          <AlertTriangle className="h-5 w-5" />
+          <AlertTitle className="text-lg font-black uppercase tracking-tighter">Índice Necessário no Firestore</AlertTitle>
+          <AlertDescription className="text-xs mt-2 space-y-4">
+            <p>O Dashboard não pode carregar as informações estratégicas porque falta um índice composto no banco de dados.</p>
+            <div className="bg-black/40 p-4 rounded-xl border border-white/10 font-mono text-[10px] leading-relaxed">
+              <p className="text-white font-bold mb-2">Instruções para o Desenvolvedor:</p>
+              Abra o console do navegador (F12) e clique no link gerado pelo erro do Firebase para criar o índice automaticamente. 
+              Geralmente envolve campos como 'leadLawyerId' e 'updatedAt'.
+            </div>
+            <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="mt-2 border-rose-500/30">
+              <RefreshCw className="h-3 w-3 mr-2" /> Recarregar Página
+            </Button>
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
+  const isLoading = status === 'loading' || isLoadingTitles || isLoadingProcesses || isLoadingHearings;
 
   return (
     <div className="flex flex-col gap-8 pb-10">
