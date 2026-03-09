@@ -31,7 +31,7 @@ export type Client = {
   clientType?: string;
   avatar: string;
   document: string;
-  email: string;
+  email?: string;
   status?: ClientStatus;
   motherName?: string;
   rg?: string;

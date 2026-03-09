@@ -1,3 +1,4 @@
+
 'use client';
 import * as React from 'react';
 import { z } from 'zod';
@@ -35,7 +36,7 @@ const clientSchema = z.object({
   clientType: z.string().min(1, { message: 'Selecione o tipo de cliente.' }),
   firstName: z.string().min(2, { message: 'O nome / razão social deve ter pelo menos 2 caracteres.' }),
   lastName: z.string().optional().or(z.literal('')),
-  email: z.string().email({ message: 'Por favor, insira um email válido.' }),
+  email: z.string().email({ message: 'Por favor, insira um email válido.' }).optional().or(z.literal('')),
   document: z.string().min(11, { message: 'O documento deve ser um CPF ou CNPJ válido.' }),
   motherName: z.string().optional().or(z.literal('')),
   rg: z.string().optional().or(z.literal('')),
@@ -518,7 +519,7 @@ export function ClientForm({
                   name="email"
                   render={({ field }) => (
                       <FormItem className="md:col-span-2">
-                        <FormLabel className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Email Principal *</FormLabel>
+                        <FormLabel className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Email Principal</FormLabel>
                         <FormControl><Input placeholder="contato@empresa.com.br" className="h-11 bg-background" {...field} /></FormControl>
                         <FormMessage />
                       </FormItem>
