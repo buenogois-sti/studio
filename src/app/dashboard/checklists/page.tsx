@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -417,7 +416,7 @@ const ChecklistViewDialog = React.memo(function ChecklistViewDialog({ open, onOp
             </div>
             <div>
               <DialogTitle className="text-xl font-black font-headline text-white leading-tight">Estrutura: {template.title}</DialogTitle>
-              <DialogDescription className="text-slate-400 mt-1">{template.category} • {template.items.length} itens de verificação</Badge></DialogDescription>
+              <DialogDescription className="text-slate-400 mt-1">{template.category} • {template.items.length} itens de verificação</DialogDescription>
             </div>
           </div>
         </DialogHeader>
