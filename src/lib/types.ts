@@ -392,6 +392,7 @@ export type ChecklistTemplate = {
   category: string;
   items: ChecklistItem[];
   legalArea?: string;
+  isActive: boolean;
   createdAt: Timestamp;
   updatedAt: Timestamp;
   createdBy: string;

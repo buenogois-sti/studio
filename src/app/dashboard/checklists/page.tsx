@@ -29,7 +29,10 @@ import {
   Calculator,
   Printer,
   Scale,
-  Zap
+  Zap,
+  Eye,
+  EyeOff,
+  Power
 } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy, limit, Timestamp } from 'firebase/firestore';
@@ -63,7 +66,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { upsertChecklistTemplate, deleteChecklistTemplate, saveChecklistExecution } from '@/lib/checklist-actions';
+import { upsertChecklistTemplate, deleteChecklistTemplate, saveChecklistExecution, toggleChecklistStatus } from '@/lib/checklist-actions';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -92,15 +95,22 @@ const ChecklistCard = React.memo(({
   isAdmin, 
   onEdit, 
   onExecute, 
-  onDelete 
+  onDelete,
+  onView,
+  onToggleStatus
 }: { 
   template: ChecklistTemplate; 
   isAdmin: boolean; 
   onEdit: (t: ChecklistTemplate) => void;
   onExecute: (t: ChecklistTemplate) => void;
   onDelete: (id: string) => void;
+  onView: (t: ChecklistTemplate) => void;
+  onToggleStatus: (id: string, current: boolean) => void;
 }) => (
-  <Card className="bg-[#0f172a] border-white/5 border-2 hover:border-primary/20 transition-all group overflow-hidden">
+  <Card className={cn(
+    "bg-[#0f172a] border-white/5 border-2 hover:border-primary/20 transition-all group overflow-hidden flex flex-col",
+    !template.isActive && "opacity-60 grayscale-[0.5]"
+  )}>
     <CardHeader className="pb-2">
       <div className="flex items-start justify-between">
         <div className="flex flex-wrap gap-1.5">
@@ -110,38 +120,56 @@ const ChecklistCard = React.memo(({
               {template.legalArea}
             </Badge>
           )}
+          {!template.isActive && (
+            <Badge className="bg-rose-500/20 text-rose-400 border-none text-[9px] font-black uppercase tracking-widest">Inativo</Badge>
+          )}
         </div>
-        {isAdmin && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-white/20 hover:text-white"><MoreVertical className="h-4 w-4" /></Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-[#0f172a] border-white/10 text-white shadow-2xl p-1">
-              <DropdownMenuItem onClick={() => onEdit(template)} className="gap-2 focus:bg-white/5">
-                <Edit className="h-4 w-4 text-primary" /> Editar Modelo
-              </DropdownMenuItem>
-              <DropdownMenuSeparator className="bg-white/5" />
-              <DropdownMenuItem onClick={() => onDelete(template.id)} className="text-rose-500 gap-2 focus:bg-rose-500/10">
-                <Trash2 className="h-4 w-4" /> Excluir Permanentemente
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-white/20 hover:text-white"><MoreVertical className="h-4 w-4" /></Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="bg-[#0f172a] border-white/10 text-white shadow-2xl p-1">
+            <DropdownMenuLabel className="text-[10px] font-black uppercase text-slate-500 px-2 py-1.5 tracking-widest">Opções</DropdownMenuLabel>
+            <DropdownMenuItem onClick={() => onView(template)} className="gap-2 focus:bg-white/5">
+              <Eye className="h-4 w-4 text-blue-400" /> Visualizar Estrutura
+            </DropdownMenuItem>
+            
+            {isAdmin && (
+              <>
+                <DropdownMenuItem onClick={() => onEdit(template)} className="gap-2 focus:bg-white/5">
+                  <Edit className="h-4 w-4 text-primary" /> Editar Modelo
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onToggleStatus(template.id, template.isActive)} className="gap-2 focus:bg-white/5">
+                  {template.isActive ? (
+                    <><EyeOff className="h-4 w-4 text-amber-400" /> Desativar Modelo</>
+                  ) : (
+                    <><Power className="h-4 w-4 text-emerald-400" /> Ativar Modelo</>
+                  )}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="bg-white/5" />
+                <DropdownMenuItem onClick={() => onDelete(template.id)} className="text-rose-500 gap-2 focus:bg-rose-500/10">
+                  <Trash2 className="h-4 w-4" /> Excluir Permanentemente
+                </DropdownMenuItem>
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
       <CardTitle className="text-lg font-black text-white mt-2 leading-tight group-hover:text-primary transition-colors">{template.title}</CardTitle>
-      <CardDescription className="text-xs text-slate-400 line-clamp-2 mt-1">{template.description}</CardDescription>
+      <CardDescription className="text-xs text-slate-400 line-clamp-2 mt-1 min-h-[32px]">{template.description}</CardDescription>
     </CardHeader>
-    <CardContent className="pb-4">
+    <CardContent className="pb-4 flex-1">
       <div className="flex items-center gap-2 text-[10px] text-slate-500 font-bold uppercase">
         <Target className="h-3 w-3 text-primary" /> {template.items.length} Passos de Verificação
       </div>
     </CardContent>
     <CardFooter className="bg-white/5 border-t border-white/5 p-4">
       <Button 
+        disabled={!template.isActive}
         className="w-full bg-primary/10 hover:bg-primary text-primary hover:text-primary-foreground font-black uppercase tracking-widest text-[10px] h-10 gap-2 transition-all border border-primary/20"
         onClick={() => onExecute(template)}
       >
-        <Play className="h-3 w-3" /> Executar Checklist
+        <Play className="h-3 w-3" /> {template.isActive ? 'Executar Checklist' : 'Modelo Desativado'}
       </Button>
     </CardFooter>
   </Card>
@@ -156,6 +184,7 @@ export default function ChecklistsPage() {
   const [isEditorOpen, setIsEditorOpen] = React.useState(false);
   const [isExecutorOpen, setIsExecutorOpen] = React.useState(false);
   const [isDetailsOpen, setIsDetailsOpen] = React.useState(false);
+  const [isViewOpen, setIsViewOpen] = React.useState(false);
   const [selectedTemplate, setSelectedTemplate] = React.useState<ChecklistTemplate | null>(null);
   const [selectedExecution, setSelectedExecution] = React.useState<ChecklistExecution | null>(null);
   
@@ -175,9 +204,12 @@ export default function ChecklistsPage() {
 
   const filteredTemplates = React.useMemo(() => {
     if (!templates) return [];
-    if (!searchTerm.trim()) return templates;
-    const q = searchTerm.toLowerCase();
-    return templates.filter(t => t.title.toLowerCase().includes(q) || t.category.toLowerCase().includes(q));
+    let list = [...templates];
+    if (searchTerm.trim()) {
+      const q = searchTerm.toLowerCase();
+      list = list.filter(t => t.title.toLowerCase().includes(q) || t.category.toLowerCase().includes(q));
+    }
+    return list;
   }, [templates, searchTerm]);
 
   const handleEditTemplate = React.useCallback((t: ChecklistTemplate) => {
@@ -188,6 +220,19 @@ export default function ChecklistsPage() {
   const handleExecuteTemplate = React.useCallback((t: ChecklistTemplate) => {
     setSelectedTemplate(t);
     setIsExecutorOpen(true);
+  }, []);
+
+  const handleViewTemplate = React.useCallback((t: ChecklistTemplate) => {
+    setSelectedTemplate(t);
+    setIsViewOpen(true);
+  }, []);
+
+  const handleToggleStatus = React.useCallback(async (id: string, current: boolean) => {
+    try {
+      await toggleChecklistStatus(id, current);
+    } catch (e: any) {
+      console.error(e);
+    }
   }, []);
 
   return (
@@ -246,6 +291,8 @@ export default function ChecklistsPage() {
                   onEdit={handleEditTemplate}
                   onExecute={handleExecuteTemplate}
                   onDelete={deleteChecklistTemplate}
+                  onView={handleViewTemplate}
+                  onToggleStatus={handleToggleStatus}
                 />
               ))}
             </div>
@@ -346,9 +393,63 @@ export default function ChecklistsPage() {
         execution={selectedExecution}
         templates={templates || []}
       />
+
+      <ChecklistViewDialog
+        key={selectedTemplate?.id ? `view-${selectedTemplate.id}` : 'view-none'}
+        open={isViewOpen}
+        onOpenChange={setIsViewOpen}
+        template={selectedTemplate}
+      />
     </div>
   );
 }
+
+const ChecklistViewDialog = React.memo(function ChecklistViewDialog({ open, onOpenChange, template }: { open: boolean; onOpenChange: (o: boolean) => void; template: ChecklistTemplate | null }) {
+  if (!template) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-2xl bg-[#020617] border-white/10 text-white flex flex-col p-0 shadow-2xl overflow-hidden">
+        <DialogHeader className="p-6 border-b border-white/5 bg-white/5 shrink-0">
+          <div className="flex items-center gap-4">
+            <div className="h-14 w-14 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0 shadow-inner">
+              <Eye className="h-7 w-7 text-blue-400" />
+            </div>
+            <div>
+              <DialogTitle className="text-xl font-black font-headline text-white leading-tight">Estrutura: {template.title}</DialogTitle>
+              <DialogDescription className="text-slate-400 mt-1">{template.category} • {template.items.length} itens de verificação</Badge></DialogDescription>
+            </div>
+          </div>
+        </DialogHeader>
+
+        <ScrollArea className="max-h-[60vh]">
+          <div className="p-6 space-y-4">
+            {template.items.map((item, idx) => (
+              <div key={item.id} className="p-4 rounded-xl bg-white/5 border border-white/10 flex gap-4 items-start">
+                <div className="h-7 w-7 rounded-lg bg-black/40 border border-white/10 flex items-center justify-center text-[10px] font-black text-slate-500 shrink-0">
+                  {idx + 1}
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-bold text-slate-200 mb-2">{item.label} {item.required && <span className="text-rose-500 ml-1">*</span>}</p>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="bg-white/5 text-[8px] font-black uppercase text-slate-500 border-none px-1.5 h-4.5">
+                      Tipo: {item.type}
+                    </Badge>
+                    {item.required && <Badge className="bg-rose-500/10 text-rose-400 border-none text-[8px] font-black uppercase h-4.5">Obrigatório</Badge>}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </ScrollArea>
+
+        <DialogFooter className="p-6 border-t border-white/5 bg-white/5 shrink-0">
+          <DialogClose asChild><Button variant="ghost" className="w-full text-slate-400 font-bold uppercase text-[10px] tracking-widest h-12">Fechar Visualização</Button></DialogClose>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+});
 
 const ChecklistEditorDialog = React.memo(function ChecklistEditorDialog({ open, onOpenChange, template }: { open: boolean; onOpenChange: (o: boolean) => void; template: ChecklistTemplate | null }) {
   const [isSaving, setIsSaving] = React.useState(false);
@@ -406,7 +507,8 @@ const ChecklistEditorDialog = React.memo(function ChecklistEditorDialog({ open, 
         description,
         category,
         legalArea,
-        items
+        items,
+        isActive: template?.isActive ?? true
       });
       toast({ title: 'Modelo Salvo!', description: 'O checklist já está disponível para uso.' });
       onOpenChange(false);

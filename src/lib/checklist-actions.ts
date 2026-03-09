@@ -24,6 +24,7 @@ export async function upsertChecklistTemplate(data: Partial<ChecklistTemplate>) 
     const payload = {
       ...data,
       id,
+      isActive: data.isActive ?? true,
       updatedAt: FieldValue.serverTimestamp(),
       ...(data.id ? {} : { 
         createdAt: FieldValue.serverTimestamp(),
@@ -35,6 +36,26 @@ export async function upsertChecklistTemplate(data: Partial<ChecklistTemplate>) 
     await ref.set(payload, { merge: true });
     revalidatePath('/dashboard/checklists');
     return { success: true, id };
+  } catch (error: any) {
+    throw new Error(error.message);
+  }
+}
+
+/**
+ * Alterna o status de um modelo de checklist.
+ */
+export async function toggleChecklistStatus(id: string, currentStatus: boolean) {
+  if (!firestoreAdmin) throw new Error('Servidor indisponível.');
+  const session = await getServerSession(authOptions);
+  if (!session || session.user.role !== 'admin') throw new Error('Não autorizado.');
+
+  try {
+    await firestoreAdmin.collection('checklist_templates').doc(id).update({
+      isActive: !currentStatus,
+      updatedAt: FieldValue.serverTimestamp()
+    });
+    revalidatePath('/dashboard/checklists');
+    return { success: true };
   } catch (error: any) {
     throw new Error(error.message);
   }
