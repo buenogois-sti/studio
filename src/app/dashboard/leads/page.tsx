@@ -47,11 +47,12 @@ import {
   Edit,
   Save,
   UserCheck,
-  UserCog
+  UserCog,
+  AlertTriangle
 } from 'lucide-react';
 
 import { useFirebase, useCollection, useMemoFirebase, useDoc } from '@/firebase';
-import { collection, query, orderBy, doc, Timestamp, limit, updateDoc, where, arrayUnion, arrayRemove, deleteDoc } from 'firebase/firestore';
+import { collection, query, orderBy, doc, Timestamp, limit, updateDoc, where, arrayUnion, arrayRemove, deleteDoc, getDoc, DocumentSnapshot } from 'firebase/firestore';
 import type { Lead, Client, Staff, LeadStatus, LeadPriority, UserProfile, TimelineEvent, OpposingParty, ChecklistTemplate, Process } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -354,8 +355,11 @@ function ScheduleInterviewDialog({ lead, open, onOpenChange, onSuccess }: { lead
   React.useEffect(() => {
     if (lead && open && firestore) {
       const staffRef = doc(firestore, 'staff', lead.lawyerId);
-      getDoc(staffRef).then(snap => {
-        if (snap.exists()) setLawyerName(`${snap.data().firstName} ${snap.data().lastName}`);
+      getDoc(staffRef).then((snap: DocumentSnapshot) => {
+        if (snap.exists()) {
+          const data = snap.data() as Staff;
+          setLawyerName(`${data.firstName} ${data.lastName}`);
+        }
       });
     }
   }, [lead, open, firestore]);
@@ -1174,7 +1178,7 @@ export default function LeadsPage() {
       setIsSearchingHybrid(true);
       try {
         const processResults = await searchProcesses(searchTerm);
-        const results: Array<{ type: 'lead' | 'process', data: any }> = processResults.map(p => ({ type: 'process', data: p }));
+        const results: Array<{ type: 'lead' | 'process', data: any }> = processResults.map(p => ({ type: 'process' as const, data: p }));
         
         if (leadsData) {
           const q = searchTerm.toLowerCase();
@@ -1183,7 +1187,7 @@ export default function LeadsPage() {
             (l.clientName || '').toLowerCase().includes(q) ||
             (l.clientDocument || '').includes(q)
           );
-          results.push(...filteredLeads.map(l => ({ type: 'lead', data: l })));
+          results.push(...filteredLeads.map(l => ({ type: 'lead' as const, data: l })));
         }
         
         setHybridResults(results.slice(0, 10));

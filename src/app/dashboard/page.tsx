@@ -1,4 +1,3 @@
-
 'use client';
 import * as React from 'react';
 import {
@@ -265,7 +264,7 @@ function UpcomingActsCard({ data, isLoading, title = "Próximos Atos" }: any) {
       <CardContent className="pt-6">
         {isLoading ? (
           <div className="space-y-4">
-            {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-16 w-full bg-white/5 rounded-xl" />)}
+            {[...Array(3)].map((_, i) => <Skeleton className="h-16 w-full bg-white/5 rounded-xl" />)}
           </div>
         ) : (
           <div className="space-y-6 text-slate-300">
@@ -352,7 +351,10 @@ export default function Dashboard() {
   const stableStartOfMonth = React.useMemo(() => Timestamp.fromDate(startOfMonth(new Date())), []);
   const stableNow = React.useMemo(() => Timestamp.now(), []);
 
-  const userProfileRef = useMemoFirebase(() => (firestore && session?.user?.id ? doc(firestore, 'users', session.user.id) : null), [firestore, session]);
+  const userProfileRef = useMemoFirebase(
+    () => (firestore && session?.user?.id ? doc(firestore, 'users', session.user.id) : null),
+    [firestore, session]
+  );
   const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
   const role = userProfile?.role || 'assistant';
 

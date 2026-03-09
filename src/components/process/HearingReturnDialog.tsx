@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -13,7 +12,8 @@ import {
   FileText, 
   Handshake,
   TrendingUp,
-  X
+  X,
+  Info
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -154,7 +154,7 @@ export function HearingReturnDialog({ hearing, open, onOpenChange, onSuccess }: 
 
         <ScrollArea className="flex-1">
           <Form {...form}>
-            <form id="hearing-return-form" onSubmit={form.handleSubmit(onSubmit)} className="p-6 space-y-8">
+            <form id="hearing-return-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
               
               <section className="space-y-4">
                 <FormField
