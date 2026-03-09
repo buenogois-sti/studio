@@ -1,3 +1,4 @@
+
 # Firebase Custom Token Flow Diagram
 
 ```
@@ -164,3 +165,4 @@ Se vir este erro, volta ao diagnóstico:
 ❌ [Firebase Auth] PROJECT ID MISMATCH DETECTED
    SERVER PROJECT: xyz-123
    CLIENT PROJECT: studio-7080106838-23904
+```

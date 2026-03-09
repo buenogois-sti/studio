@@ -21,7 +21,8 @@ import {
   Receipt,
   Briefcase,
   Clock,
-  AlertTriangle
+  AlertTriangle,
+  RefreshCw
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import {
@@ -344,7 +345,7 @@ function ChartCard({ data, title }: any) {
 // --- MAIN PAGE ---
 
 export default function Dashboard() {
-  const { firestore, user } = useFirebase();
+  const { firestore, user, userError } = useFirebase();
   const { data: session, status } = useSession();
 
   // Estabiliza as datas para evitar subscrições cíclicas no Firebase
@@ -393,7 +394,7 @@ export default function Dashboard() {
   const logsQuery = useMemoFirebase(() => (firestore && session?.user?.id ? query(collection(firestore, `users/${session.user.id}/logs`), orderBy('timestamp', 'desc'), limit(3)) : null), [firestore, session]);
   const { data: logsData } = useCollection<Log>(logsQuery);
 
-  const anyError = titlesError || processesError || hearingsError || deadlinesError;
+  const anyError = userError || titlesError || processesError || hearingsError || deadlinesError;
 
   const stats = React.useMemo(() => {
     const s = { 
@@ -449,20 +450,31 @@ export default function Dashboard() {
   }, [processesData]);
 
   if (anyError) {
+    const isAuthError = (anyError as any)?.code === 'auth/invalid-custom-token';
     return (
       <div className="p-6">
         <Alert variant="destructive" className="bg-rose-500/10 border-rose-500/20 text-rose-400 shadow-lg">
           <AlertTriangle className="h-5 w-5" />
-          <AlertTitle className="text-lg font-black uppercase tracking-tighter">Índice Necessário no Firestore</AlertTitle>
+          <AlertTitle className="text-lg font-black uppercase tracking-tighter">
+            {isAuthError ? 'Erro de Sincronização de Projeto' : 'Configuração Pendente no Firestore'}
+          </AlertTitle>
           <AlertDescription className="text-xs mt-2 space-y-4">
-            <p>O Dashboard não pode carregar as informações estratégicas porque falta um índice composto no banco de dados.</p>
+            {isAuthError ? (
+              <p>O token de acesso foi gerado para um projeto diferente deste cliente. Isso ocorre quando a variável <code>FIREBASE_SERVICE_ACCOUNT_JSON</code> no servidor não corresponde ao projeto configurado no navegador.</p>
+            ) : (
+              <p>O Dashboard não pode carregar as informações estratégicas porque falta um índice composto no banco de dados.</p>
+            )}
+            
             <div className="bg-black/40 p-4 rounded-xl border border-white/10 font-mono text-[10px] leading-relaxed">
-              <p className="text-white font-bold mb-2">Instruções para o Desenvolvedor:</p>
-              Abra o console do navegador (F12) e clique no link gerado pelo erro do Firebase para criar o índice automaticamente. 
-              Geralmente envolve campos como 'leadLawyerId' e 'updatedAt'.
+              <p className="text-white font-bold mb-2">Instruções para Resolução:</p>
+              {isAuthError ? (
+                <>1. Verifique se o <code>project_id</code> no JSON de credenciais é o mesmo do <code>src/firebase/config.ts</code>.<br />2. Atualize as variáveis de ambiente no seu servidor (Vercel/Docker).<br />3. Consulte o arquivo <code>docs/firebase-auth-flow.md</code> para o guia completo.</>
+              ) : (
+                <>Abra o console do navegador (F12) e clique no link gerado pelo erro do Firebase para criar o índice automaticamente. Geralmente envolve campos como 'leadLawyerId' e 'updatedAt'.</>
+              )}
             </div>
             <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="mt-2 border-rose-500/30">
-              <RefreshCw className="h-3 w-3 mr-2" /> Recarregar Página
+              <RefreshCw className="h-3 w-3 mr-2" /> Recarregar Sistema
             </Button>
           </AlertDescription>
         </Alert>
