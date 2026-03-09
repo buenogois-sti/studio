@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -45,7 +44,10 @@ import {
   Timer,
   Gavel,
   ShieldAlert,
-  LayoutList
+  LayoutList,
+  Edit,
+  Save,
+  UserCheck
 } from 'lucide-react';
 
 import { useFirebase, useCollection, useMemoFirebase, useDoc } from '@/firebase';
@@ -337,13 +339,65 @@ function TaskInteractionDialog({
   );
 }
 
+function ScheduleInterviewDialog({ lead, open, onOpenChange, onSuccess }: { lead: Lead | null; open: boolean; onOpenChange: (o: boolean) => void; onSuccess: () => void }) {
+  const [isSaving, setIsSaving] = React.useState(false);
+  const { toast } = useToast();
+  
+  const form = useForm<z.infer<typeof scheduleInterviewSchema>>({
+    resolver: zodResolver(scheduleInterviewSchema),
+    defaultValues: { date: format(new Date(), 'yyyy-MM-dd'), time: '14:00', location: 'Escritório (SBC)', notes: '' }
+  });
+
+  const onSubmit = async (values: z.infer<typeof scheduleInterviewSchema>) => {
+    if (!lead) return;
+    setIsSaving(true);
+    try {
+      await scheduleLeadInterview(lead.id, values);
+      toast({ title: 'Entrevista Agendada!', description: 'O compromisso foi sincronizado com o Google Agenda.' });
+      onSuccess();
+      onOpenChange(false);
+    } catch (e: any) { toast({ variant: 'destructive', title: 'Erro ao agendar', description: e.message }); } finally { setIsSaving(false); }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="bg-[#0f172a] border-white/10 text-white">
+        <DialogHeader>
+          <DialogTitle className="text-white font-headline">Agendar Entrevista Técnica</DialogTitle>
+          <DialogDescription className="text-slate-400">Designar horário para detalhamento dos fatos com o cliente.</DialogDescription>
+        </DialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <FormField control={form.control} name="date" render={({ field }) => (
+                <FormItem><FormLabel className="text-[10px] font-black uppercase text-slate-500">Data</FormLabel><FormControl><Input type="date" className="bg-black/40 border-white/10" {...field} /></FormControl></FormItem>
+              )} />
+              <FormField control={form.control} name="time" render={({ field }) => (
+                <FormItem><FormLabel className="text-[10px] font-black uppercase text-slate-500">Hora</FormLabel><FormControl><Input type="time" className="bg-black/40 border-white/10" {...field} /></FormControl></FormItem>
+              )} />
+            </div>
+            <FormField control={form.control} name="location" render={({ field }) => (
+              <FormItem><FormLabel className="text-[10px] font-black uppercase text-slate-500">Modo / Local</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger className="bg-black/40 border-white/10"><SelectValue /></SelectTrigger></FormControl><SelectContent className="bg-[#0f172a] text-white"><SelectItem value="Escritório (SBC)">🏢 Escritório Presencial</SelectItem><SelectItem value="Google Meet (Online)">🎥 Google Meet</SelectItem><SelectItem value="WhatsApp Vídeo">📱 WhatsApp Vídeo</SelectItem></SelectContent></Select></FormItem>
+            )} />
+            <FormField control={form.control} name="notes" render={({ field }) => (
+              <FormItem><FormLabel className="text-[10px] font-black uppercase text-slate-500">Notas p/ Agenda</FormLabel><FormControl><Textarea className="bg-black/40 border-white/10" {...field} /></FormControl></FormItem>
+            )} />
+            <DialogFooter><Button type="submit" disabled={isSaving} className="w-full bg-primary text-primary-foreground font-black">{isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Confirmar e Agendar'}</Button></DialogFooter>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function LeadDetailsSheet({ 
   lead, 
   client, 
   open, 
   onOpenChange, 
   onProtocolClick,
-  lawyers
+  lawyers,
+  initialTab = 'ficha'
 }: { 
   lead: Lead | null; 
   client?: Client; 
@@ -351,6 +405,7 @@ function LeadDetailsSheet({
   onOpenChange: (o: boolean) => void;
   onProtocolClick: (l: Lead) => void;
   lawyers: Staff[];
+  initialTab?: 'ficha' | 'timeline';
 }) {
   const { firestore } = useFirebase();
   const { data: session } = useSession();
@@ -361,6 +416,11 @@ function LeadDetailsSheet({
   const [isDraftingOpen, setIsDraftingOpen] = React.useState(false);
   const [isSchedulingOpen, setIsSchedulingOpen] = React.useState(false);
   const [activeTaskDialog, setActiveTaskDialog] = React.useState<string | null>(null);
+  const [activeTab, setActiveTab] = React.useState(initialTab);
+
+  React.useEffect(() => {
+    if (open) setActiveTab(initialTab);
+  }, [open, initialTab]);
 
   const interviewQuery = useMemoFirebase(
     () => (firestore && lead ? query(collection(firestore, 'checklist_templates'), where('category', '==', 'Entrevista de Triagem'), where('legalArea', '==', lead.legalArea), limit(1)) : null),
@@ -488,201 +548,234 @@ function LeadDetailsSheet({
           <SheetTitle className="text-2xl sm:text-3xl font-black font-headline text-white leading-tight uppercase tracking-tight text-left">{lead.title}</SheetTitle>
         </SheetHeader>
 
-        <ScrollArea className="flex-1">
-          <div className="p-6 space-y-8 pb-32">
-            
-            <div className="p-4 rounded-2xl bg-white/[0.03] border-2 border-white/5 flex items-center gap-4 relative overflow-hidden group">
-              <div className="h-14 w-14 rounded-xl bg-blue-500/10 flex items-center justify-center border-2 border-blue-500/20 shrink-0">
-                <UserCircle className="h-8 w-8 text-blue-400" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <h4 className="text-lg font-black text-white truncate tracking-tight">{client?.firstName} {client?.lastName}</h4>
-                <div className="flex gap-4 mt-1">
-                  <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-bold">
-                    <Mail className="h-3 w-3 text-primary" /> {client?.email || 'N/A'}
-                  </div>
-                  <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-bold">
-                    <Smartphone className="h-3 w-3 text-emerald-500" /> {client?.mobile || 'N/A'}
-                  </div>
-                </div>
-              </div>
-            </div>
+        <Tabs value={activeTab} onValueChange={v => setActiveTab(v as any)} className="flex-1 flex flex-col min-h-0">
+          <TabsList className="bg-white/5 border-b border-white/5 h-12 w-full justify-start rounded-none px-6 gap-6">
+            <TabsTrigger value="ficha" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent text-slate-400 data-[state=active]:text-white font-bold h-full px-0 gap-2">
+              <LayoutList className="h-4 w-4" /> Ficha Técnica
+            </TabsTrigger>
+            <TabsTrigger value="timeline" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent text-slate-400 data-[state=active]:text-white font-bold h-full px-0 gap-2">
+              <History className="h-4 w-4" /> Rastreabilidade (Timeline)
+            </TabsTrigger>
+          </TabsList>
 
-            <section className="space-y-4">
-              <div className="flex items-center justify-between px-1">
-                <div className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-500 tracking-widest">
-                  <Activity className="h-3.5 w-3.5 text-primary" /> Próximos Passos: {stage.label}
-                </div>
-                <span className="text-[10px] font-black text-white bg-white/5 px-2 py-0.5 rounded-lg border border-white/10">{completedCount}/{totalTasks}</span>
-              </div>
+          <ScrollArea className="flex-1">
+            <div className="p-6 space-y-10 pb-32">
               
-              <div className="grid gap-2">
-                {stage.tasks.map(task => {
-                  const isDone = lead.completedTasks?.includes(task);
-                  return (
-                    <div 
-                      key={task} 
-                      className={cn(
-                        "flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer group",
-                        isDone ? "bg-emerald-500/[0.03] border-emerald-500/20" : "bg-white/[0.02] border-white/5 hover:border-primary/30"
-                      )} 
-                      onClick={() => handleToggleTask(task)}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className={cn(
-                          "h-5 w-5 rounded-lg border flex items-center justify-center transition-all",
-                          isDone ? "bg-emerald-500 border-emerald-500 text-white" : "border-white/10 group-hover:border-primary/50"
-                        )}>
-                          {isDone && <Check className="h-3 w-3 stroke-[3]" />}
-                        </div>
-                        <span className={cn("text-xs font-bold tracking-tight", isDone ? "text-emerald-400/70" : "text-slate-200")}>{task}</span>
+              <TabsContent value="ficha" className="m-0 space-y-10 animate-in fade-in duration-300">
+                {/* Dados do Cliente */}
+                <div className="p-4 rounded-2xl bg-white/[0.03] border-2 border-white/5 flex items-center gap-4 relative overflow-hidden group">
+                  <div className="h-14 w-14 rounded-xl bg-blue-500/10 flex items-center justify-center border-2 border-blue-500/20 shrink-0">
+                    <UserCircle className="h-8 w-8 text-blue-400" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h4 className="text-lg font-black text-white truncate tracking-tight">{client?.firstName} {client?.lastName}</h4>
+                    <div className="flex gap-4 mt-1">
+                      <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-bold">
+                        <Mail className="h-3 w-3 text-primary" /> {client?.email || 'N/A'}
                       </div>
-                      {!isDone && ['Qualificação do Lead', 'Identificação da área jurídica', 'Direcionamento ao Adv. Responsável'].includes(task) && (
-                        <ArrowRight className="h-3.5 w-3.5 text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
-                      )}
+                      <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-bold">
+                        <Smartphone className="h-3 w-3 text-emerald-500" /> {client?.mobile || 'N/A'}
+                      </div>
                     </div>
-                  );
-                })}
-              </div>
-            </section>
-
-            {lead.status === 'ATENDIMENTO' && (
-              <section className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-500">
-                <div className="flex items-center gap-2 text-[10px] font-black uppercase text-amber-400 tracking-widest">
-                  <ClipboardList className="h-3.5 w-3.5" /> Entrevista Técnica ({lead.legalArea})
+                  </div>
                 </div>
-                <div className="grid grid-cols-1 gap-4">
-                  {activeInterview ? (
-                    activeInterview.items.map((item) => {
-                      const currentAnswer = lead.interviewAnswers?.[item.id] || '';
+
+                {/* Editável: Informações Técnicas */}
+                <section className="space-y-6">
+                  <div className="flex items-center gap-2 text-[10px] font-black uppercase text-primary tracking-widest px-1">
+                    <Edit className="h-3.5 w-3.5" /> Informações Técnicas (Editável)
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white/5 p-6 rounded-3xl border border-white/10">
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-black uppercase text-slate-500">Origem da Captação</Label>
+                      <Select defaultValue={lead.captureSource} onValueChange={(val) => updateLeadDetails(lead.id, { captureSource: val })}>
+                        <SelectTrigger className="bg-black/40 border-white/10 h-11"><SelectValue /></SelectTrigger>
+                        <SelectContent className="bg-[#0f172a] text-white">
+                          <SelectItem value="Google Search">Google Search</SelectItem>
+                          <SelectItem value="Google Ads">Google Ads</SelectItem>
+                          <SelectItem value="Instagram">Instagram</SelectItem>
+                          <SelectItem value="Indicação por Terceiro">Indicação por Terceiro</SelectItem>
+                          <SelectItem value="Antigo Cliente">Antigo Cliente</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-black uppercase text-slate-500">Área Jurídica</Label>
+                      <Select defaultValue={lead.legalArea} onValueChange={(val) => updateLeadDetails(lead.id, { legalArea: val })}>
+                        <SelectTrigger className="bg-black/40 border-white/10 h-11"><SelectValue /></SelectTrigger>
+                        <SelectContent className="bg-[#0f172a] text-white">
+                          <SelectItem value="Trabalhista">⚖️ Trabalhista</SelectItem>
+                          <SelectItem value="Cível">🏢 Cível</SelectItem>
+                          <SelectItem value="Previdenciário">👴 Previdenciário</SelectItem>
+                          <SelectItem value="Família">🏠 Família</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-black uppercase text-slate-500">Advogado Responsável</Label>
+                      <Select defaultValue={lead.lawyerId} onValueChange={(val) => updateLeadDetails(lead.id, { lawyerId: val })}>
+                        <SelectTrigger className="bg-black/40 border-white/10 h-11"><SelectValue /></SelectTrigger>
+                        <SelectContent className="bg-[#0f172a] text-white">
+                          {lawyers.map(l => (
+                            <SelectItem key={l.id} value={l.id}>Dr(a). {l.firstName}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-black uppercase text-slate-500">Prioridade</Label>
+                      <Select defaultValue={lead.priority} onValueChange={(val: any) => updateLeadDetails(lead.id, { priority: val })}>
+                        <SelectTrigger className="bg-black/40 border-white/10 h-11"><SelectValue /></SelectTrigger>
+                        <SelectContent className="bg-[#0f172a] text-white">
+                          <SelectItem value="BAIXA">Baixa</SelectItem>
+                          <SelectItem value="MEDIA">Média</SelectItem>
+                          <SelectItem value="ALTA">Alta</SelectItem>
+                          <SelectItem value="CRITICA">Crítica</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </section>
+
+                <section className="space-y-4">
+                  <div className="flex items-center justify-between px-1">
+                    <div className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-500 tracking-widest">
+                      <Activity className="h-3.5 w-3.5 text-primary" /> Checklist da Etapa: {stage.label}
+                    </div>
+                    <span className="text-[10px] font-black text-white bg-white/5 px-2 py-0.5 rounded-lg border border-white/10">{completedCount}/{totalTasks}</span>
+                  </div>
+                  
+                  <div className="grid gap-2">
+                    {stage.tasks.map(task => {
+                      const isDone = lead.completedTasks?.includes(task);
                       return (
-                        <div key={item.id} className="space-y-3 p-5 rounded-2xl bg-white/[0.03] border border-white/5 group hover:border-primary/20 transition-all">
-                          <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest block mb-2 group-hover:text-primary transition-colors">{item.label} {item.required && '*'}</Label>
-                          
-                          {item.type === 'YES_NO' ? (
-                            <RadioGroup 
-                              value={currentAnswer} 
-                              onValueChange={(val) => handleSaveInterviewAnswer(item.id, val)}
-                              className="flex flex-wrap gap-4"
-                            >
-                              <div 
-                                className={cn(
-                                  "flex items-center space-x-3 px-5 py-3 rounded-xl border-2 transition-all cursor-pointer",
-                                  currentAnswer === 'SIM' ? "bg-emerald-500/10 border-emerald-500/50" : "bg-black/20 border-transparent hover:border-white/10"
-                                )} 
-                                onClick={() => handleSaveInterviewAnswer(item.id, 'SIM')}
-                              >
-                                <RadioGroupItem value="SIM" id={`q-sim-${item.id}`} className="border-emerald-500 text-emerald-500" />
-                                <Label htmlFor={`q-sim-${item.id}`} className="text-xs font-black text-emerald-400 cursor-pointer tracking-widest">SIM</Label>
-                              </div>
-                              <div 
-                                className={cn(
-                                  "flex items-center space-x-3 px-5 py-3 rounded-xl border-2 transition-all cursor-pointer",
-                                  currentAnswer === 'NAO' ? "bg-rose-500/10 border-rose-500/50" : "bg-black/20 border-transparent hover:border-white/10"
-                                )} 
-                                onClick={() => handleSaveInterviewAnswer(item.id, 'NAO')}
-                              >
-                                <RadioGroupItem value="NAO" id={`q-nao-${item.id}`} className="border-rose-500 text-rose-500" />
-                                <Label htmlFor={`q-nao-${item.id}`} className="text-xs font-black text-rose-400 cursor-pointer tracking-widest">NÃO</Label>
-                              </div>
-                            </RadioGroup>
-                          ) : (
-                            <Textarea 
-                              placeholder="Digite o relato detalhado..." 
-                              className="bg-black/40 border-white/5 text-sm rounded-xl min-h-[100px] leading-relaxed"
-                              defaultValue={currentAnswer}
-                              onBlur={(e) => handleSaveInterviewAnswer(item.id, e.target.value)}
-                            />
-                          )}
+                        <div 
+                          key={task} 
+                          className={cn(
+                            "flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer group",
+                            isDone ? "bg-emerald-500/[0.03] border-emerald-500/20" : "bg-white/[0.02] border-white/5 hover:border-primary/30"
+                          )} 
+                          onClick={() => handleToggleTask(task)}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className={cn(
+                              "h-5 w-5 rounded-lg border flex items-center justify-center transition-all",
+                              isDone ? "bg-emerald-500 border-emerald-500 text-white" : "border-white/10 group-hover:border-primary/50"
+                            )}>
+                              {isDone && <Check className="h-3 w-3 stroke-[3]" />}
+                            </div>
+                            <span className={cn("text-xs font-bold tracking-tight", isDone ? "text-emerald-400/70" : "text-slate-200")}>{task}</span>
+                          </div>
                         </div>
                       );
-                    })
-                  ) : (
-                    <div className="text-center py-10 opacity-40 bg-white/[0.02] border border-dashed border-white/10 rounded-2xl">
-                      <p className="text-xs font-bold uppercase text-slate-500">Nenhuma entrevista personalizada para {lead.legalArea}.</p>
-                      <p className="text-[10px] mt-1 uppercase">Configure em Checklists &gt; Entrevistas.</p>
-                    </div>
-                  )}
-                </div>
-              </section>
-            )}
+                    })}
+                  </div>
+                </section>
 
-            <section className="space-y-4">
-              <div className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-500 tracking-widest px-1">
-                <History className="h-3.5 w-3.5 text-primary" /> Histórico & Notas
-              </div>
-              <div className="space-y-4">
-                <div className="flex gap-2 items-end">
-                  <div className="flex-1 space-y-1.5">
-                    <Label className="text-[9px] font-bold uppercase text-slate-600 ml-1">Nova anotação</Label>
+                {lead.status === 'ATENDIMENTO' && (
+                  <section className="space-y-4">
+                    <div className="flex items-center gap-2 text-[10px] font-black uppercase text-amber-400 tracking-widest">
+                      <ClipboardList className="h-3.5 w-3.5" /> Entrevista Consolidada
+                    </div>
+                    <div className="grid grid-cols-1 gap-4">
+                      {activeInterview ? (
+                        activeInterview.items.map((item) => {
+                          const currentAnswer = lead.interviewAnswers?.[item.id] || '';
+                          return (
+                            <div key={item.id} className="space-y-3 p-5 rounded-2xl bg-white/[0.03] border border-white/5">
+                              <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest block mb-2">{item.label}</Label>
+                              <Textarea 
+                                className="bg-black/40 border-white/5 text-sm rounded-xl min-h-[80px]"
+                                defaultValue={currentAnswer}
+                                onBlur={(e) => handleSaveInterviewAnswer(item.id, e.target.value)}
+                              />
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <div className="text-center py-10 opacity-40 bg-white/[0.02] border border-dashed border-white/10 rounded-2xl">
+                          <p className="text-xs font-bold text-slate-500">Sem entrevista personalizada ativa.</p>
+                        </div>
+                      )}
+                    </div>
+                  </section>
+                )}
+              </TabsContent>
+
+              <TabsContent value="timeline" className="m-0 space-y-8 animate-in fade-in duration-300">
+                <div className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-500 tracking-widest px-1">
+                  <History className="h-3.5 w-3.5 text-primary" /> Histórico de Rastreabilidade
+                </div>
+                
+                <div className="relative space-y-8 before:absolute before:inset-0 before:ml-5 before:-translate-x-px before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-border/30 before:to-transparent">
+                  {lead.timeline?.slice().reverse().map((event) => (
+                    <div key={event.id} className="relative flex items-start gap-6 group">
+                      <div className={cn(
+                          "flex items-center justify-center w-10 h-10 rounded-full bg-[#0f172a] border-2 border-border/50 z-10 shadow-sm transition-colors",
+                          event.type === 'system' ? "border-primary/50" : "border-slate-700"
+                      )}>
+                        {event.type === 'system' ? <Zap className="h-4 w-4 text-primary" /> : <MessageSquare className="h-4 w-4 text-slate-500" />}
+                      </div>
+                      <div className="flex-1 p-4 rounded-xl bg-white/[0.02] border border-white/5 hover:border-white/10 transition-all">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-black uppercase text-muted-foreground bg-background px-2 py-0.5 rounded border border-border/50">
+                              {format(event.date.toDate(), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                            </span>
+                            <div className="flex items-center gap-1 text-[10px] text-muted-foreground font-bold">
+                              <UserCheck className="h-3 w-3 text-primary" />
+                              {event.authorName}
+                            </div>
+                          </div>
+                        </div>
+                        <p className="text-sm leading-relaxed text-slate-300 font-medium">{event.description}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <Separator className="bg-white/5" />
+
+                <div className="space-y-4">
+                  <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
+                    <Plus className="h-3 w-3 text-primary" /> Adicionar Nota Manual
+                  </Label>
+                  <div className="flex gap-2">
                     <Textarea 
-                      placeholder="Registre pontos relevantes da triagem..." 
+                      placeholder="Registre um novo andamento..." 
                       className="bg-black/40 border border-white/10 text-sm h-24 rounded-2xl" 
                       value={newNote} 
                       onChange={e => setNewNote(e.target.value)} 
                     />
+                    <Button className="h-24 px-6 rounded-2xl bg-primary text-primary-foreground" onClick={handleAddNote} disabled={isSaving || !newNote.trim()}>
+                      {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                    </Button>
                   </div>
-                  <Button className="h-24 px-6 rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/20" onClick={handleAddNote} disabled={isSaving || !newNote.trim()}>
-                    {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-5 w-5" />}
-                  </Button>
                 </div>
-              </div>
-            </section>
-          </div>
-        </ScrollArea>
+              </TabsContent>
 
-        <SheetFooter className="p-6 border-t border-white/5 bg-white/[0.02] shrink-0 flex items-center justify-between gap-4">
-          <Button 
-            variant="ghost" 
-            className="text-slate-400 font-bold uppercase text-[10px] tracking-widest h-12"
-            onClick={() => onOpenChange(false)}
-          >
-            Fechar
-          </Button>
-          
-          <div className="flex gap-3 flex-1 justify-end min-h-[48px]">
+            </div>
+          </ScrollArea>
+
+          <SheetFooter className="p-6 border-t border-white/5 bg-white/[0.02] shrink-0 flex items-center justify-between gap-4">
+            <Button variant="ghost" className="text-slate-400 font-bold uppercase text-[10px] h-12" onClick={() => onOpenChange(false)}>Fechar</Button>
+            
             {isReadyToAdvance && (
               <Button
-                className={cn(
-                  "h-12 px-8 font-black uppercase tracking-widest text-[10px] rounded-xl transition-all duration-500 animate-in zoom-in slide-in-from-right-4",
-                  "bg-primary text-primary-foreground shadow-[0_0_30px_rgba(245,208,48,0.3)] hover:scale-105"
-                )}
+                className="h-12 px-8 font-black uppercase tracking-widest text-[10px] rounded-xl bg-primary text-primary-foreground shadow-xl"
                 onClick={handleAdvanceStage}
                 disabled={isAdvancing}
               >
-                {isAdvancing ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                ) : lead.status === 'DISTRIBUICAO' ? (
-                  <CheckCircle2 className="h-4 w-4 mr-2 text-emerald-500" />
-                ) : (
-                  <ArrowRight className="h-4 w-4 mr-2" />
-                )}
-                {lead.status === 'DISTRIBUICAO' 
-                  ? 'Protocolar Processo' 
-                  : `Avançar para ${nextStage ? stageConfig[nextStage as LeadStatus].label : 'Próxima Etapa'}`}
+                {isAdvancing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ArrowRight className="h-4 w-4 mr-2" />}
+                {lead.status === 'DISTRIBUICAO' ? 'Protocolar Processo' : `Avançar para ${nextStage ? stageConfig[nextStage as LeadStatus].label : 'Próxima Etapa'}`}
               </Button>
             )}
-          </div>
-        </SheetFooter>
-        <DocumentDraftingDialog 
-          lead={lead} 
-          open={isDraftingOpen} 
-          onOpenChange={setIsDraftingOpen} 
-        />
-        <ScheduleInterviewDialog
-          lead={lead}
-          open={isSchedulingOpen}
-          onOpenChange={setIsSchedulingOpen}
-          onSuccess={() => {}}
-        />
-        <TaskInteractionDialog
-          lead={lead}
-          task={activeTaskDialog || ''}
-          open={!!activeTaskDialog}
-          onOpenChange={(o) => !o && setActiveTaskDialog(null)}
-          lawyers={lawyers}
-          onSuccess={() => {}}
-        />
+          </SheetFooter>
+        </Tabs>
+
+        <DocumentDraftingDialog lead={lead} open={isDraftingOpen} onOpenChange={setIsDraftingOpen} />
+        <ScheduleInterviewDialog lead={lead} open={isSchedulingOpen} onOpenChange={setIsSchedulingOpen} onSuccess={() => {}} />
+        <TaskInteractionDialog lead={lead} task={activeTaskDialog || ''} open={!!activeTaskDialog} onOpenChange={(o) => !o && setActiveTaskDialog(null)} lawyers={lawyers} onSuccess={() => {}} />
       </SheetContent>
     </Sheet>
   );
@@ -939,6 +1032,7 @@ export default function LeadsPage() {
   const [isNewLeadOpen, setIsNewLeadOpen] = React.useState(false);
   const [selectedLeadId, setSelectedLeadId] = React.useState<string | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = React.useState(false);
+  const [initialDetailTab, setInitialDetailTab] = React.useState<'ficha' | 'timeline'>('ficha');
   const [isConversionOpen, setIsConversionOpen] = React.useState(false);
   const [isProcessing, setIsProcessing] = React.useState<string | null>(null);
   
@@ -1028,7 +1122,7 @@ export default function LeadsPage() {
       list = list.filter(l => {
         if (l.status === 'NOVO') return true;
         if (l.lawyerId === userProfile.id) return true;
-        if (userProfile.role === 'assistant') return false; // Assistente não vê atendimentos designados a outros
+        if (userProfile.role === 'assistant') return false; 
         return false;
       });
     }
@@ -1083,6 +1177,12 @@ export default function LeadsPage() {
     }
   };
 
+  const openLeadDetails = (leadId: string, tab: 'ficha' | 'timeline' = 'ficha') => {
+    setSelectedLeadId(leadId);
+    setInitialDetailTab(tab);
+    setIsDetailsOpen(true);
+  };
+
   const isLoading = isLoadingLeads;
 
   return (
@@ -1117,10 +1217,8 @@ export default function LeadsPage() {
                           className="w-full text-left p-4 hover:bg-white/5 transition-all rounded-xl border border-transparent hover:border-white/5 group flex items-start gap-3"
                           onClick={() => {
                             if (item.type === 'lead') {
-                              setSelectedLeadId(item.data.id);
-                              setIsDetailsOpen(true);
+                              openLeadDetails(item.data.id, 'ficha');
                             } else {
-                              // Selecionar processo para checklist autônomo
                               toast({ title: 'Processo Selecionado', description: `Iniciando checklist autônomo para ${item.data.name}.` });
                             }
                             setSearchTerm('');
@@ -1299,7 +1397,7 @@ export default function LeadsPage() {
                             lead.priority === 'CRITICA' && "bg-rose-500/[0.02]",
                             isInactivityAlert && "bg-amber-500/[0.02]"
                           )}
-                          onClick={() => { setSelectedLeadId(lead.id); setIsDetailsOpen(true); }}
+                          onClick={() => openLeadDetails(lead.id, 'ficha')}
                         >
                           <TableCell className="px-6 py-5">
                             <div className="flex items-center gap-3">
@@ -1370,10 +1468,10 @@ export default function LeadsPage() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" className="bg-[#0f172a] border-white/10 w-56 p-1">
-                                <DropdownMenuItem className="font-bold gap-2 focus:bg-primary/10">
+                                <DropdownMenuItem className="font-bold gap-2 focus:bg-primary/10" onClick={() => openLeadDetails(lead.id, 'ficha')}>
                                   <Info className="h-4 w-4 text-primary" /> Ficha de Triagem
                                 </DropdownMenuItem>
-                                <DropdownMenuItem className="font-bold gap-2">
+                                <DropdownMenuItem className="font-bold gap-2" onClick={() => openLeadDetails(lead.id, 'timeline')}>
                                   <History className="h-4 w-4" /> Timeline
                                 </DropdownMenuItem>
                                 {isAdmin && (
@@ -1413,6 +1511,7 @@ export default function LeadsPage() {
           onOpenChange={setIsDetailsOpen} 
           onProtocolClick={(l) => { setSelectedLeadId(l.id); setIsConversionOpen(true); }} 
           lawyers={lawyers}
+          initialTab={initialDetailTab}
         />
         
         <NewLeadSheet open={isNewLeadOpen} onOpenChange={setIsNewLeadOpen} lawyers={lawyers} onCreated={() => {}} />

@@ -1,4 +1,3 @@
-
 'use server';
 
 import { firestoreAdmin } from '@/firebase/admin';
@@ -36,7 +35,7 @@ export async function createLead(data: {
   try {
     const leadRef = firestoreAdmin.collection('leads').doc();
     
-    // Buscar dados do cliente para denormalização (facilita a busca)
+    // Buscar dados do cliente para denormalização
     const clientDoc = await firestoreAdmin.collection('clients').doc(data.clientId).get();
     const clientData = clientDoc.data();
 
@@ -45,6 +44,15 @@ export async function createLead(data: {
       : undefined;
 
     const now = Timestamp.now();
+    
+    const timelineEvent: TimelineEvent = {
+      id: uuidv4(),
+      type: 'system',
+      description: `TRIAGEM INICIADA: Lead criado por ${session.user.name}.`,
+      date: now as any,
+      authorName: session.user.name || 'Sistema'
+    };
+
     const payload: any = {
       clientId: data.clientId,
       clientName: clientData ? `${clientData.firstName} ${clientData.lastName}`.trim() : 'Cliente não identificado',
@@ -64,6 +72,7 @@ export async function createLead(data: {
       stageEntryDates: {
         'NOVO': now
       },
+      timeline: [timelineEvent],
       createdAt: now,
       updatedAt: now,
     };
@@ -93,15 +102,50 @@ export async function createLead(data: {
 
 /**
  * Atualiza campos específicos de um lead (Qualificação, Área, Advogado).
+ * Registra mudanças na timeline para rastreabilidade.
  */
 export async function updateLeadDetails(id: string, data: Partial<Lead>) {
   if (!firestoreAdmin) throw new Error('Servidor indisponível.');
+  const session = await getServerSession(authOptions);
+  
   try {
     const now = Timestamp.now();
-    await firestoreAdmin.collection('leads').doc(id).update({
+    const leadRef = firestoreAdmin.collection('leads').doc(id);
+    const leadDoc = await leadRef.get();
+    const currentData = leadDoc.data() as Lead;
+
+    const timelineEvents: TimelineEvent[] = [];
+
+    // Rastrear mudança de advogado
+    if (data.lawyerId && data.lawyerId !== currentData.lawyerId) {
+      const staffDoc = await firestoreAdmin.collection('staff').doc(data.lawyerId).get();
+      const staffName = staffDoc.exists ? `${staffDoc.data()?.firstName} ${staffDoc.data()?.lastName}` : 'Novo Advogado';
+      timelineEvents.push({
+        id: uuidv4(),
+        type: 'system',
+        description: `DIRECIONAMENTO: Atendimento redirecionado para ${staffName} por ${session?.user?.name || 'Sistema'}.`,
+        date: now as any,
+        authorName: session?.user?.name || 'Sistema'
+      });
+    }
+
+    // Rastrear mudança de área
+    if (data.legalArea && data.legalArea !== currentData.legalArea) {
+      timelineEvents.push({
+        id: uuidv4(),
+        type: 'system',
+        description: `ÁREA ATUALIZADA: Área jurídica alterada de "${currentData.legalArea}" para "${data.legalArea}".`,
+        date: now as any,
+        authorName: session?.user?.name || 'Sistema'
+      });
+    }
+
+    await leadRef.update({
       ...data,
+      timeline: FieldValue.arrayUnion(...timelineEvents),
       updatedAt: now
     });
+
     revalidatePath('/dashboard/leads');
     return { success: true };
   } catch (error: any) {
@@ -114,11 +158,22 @@ export async function updateLeadDetails(id: string, data: Partial<Lead>) {
  */
 export async function updateLeadStatus(id: string, status: LeadStatus) {
   if (!firestoreAdmin) throw new Error('Servidor indisponível.');
+  const session = await getServerSession(authOptions);
+  
   try {
     const now = Timestamp.now();
+    const timelineEvent: TimelineEvent = {
+      id: uuidv4(),
+      type: 'system',
+      description: `MUDANÇA DE FASE: Movido para "${status}" por ${session?.user?.name || 'Sistema'}.`,
+      date: now as any,
+      authorName: session?.user?.name || 'Sistema'
+    };
+
     await firestoreAdmin.collection('leads').doc(id).update({
       status,
       [`stageEntryDates.${status}`]: now,
+      timeline: FieldValue.arrayUnion(timelineEvent),
       updatedAt: now
     });
     revalidatePath('/dashboard/leads');
@@ -215,7 +270,17 @@ export async function convertLeadToProcess(leadId: string, data: {
 
     const batch = firestoreAdmin.batch();
     batch.set(processRef, processPayload);
-    batch.update(leadRef, { status: 'CONVERTIDO', updatedAt: Timestamp.now() });
+    batch.update(leadRef, { 
+      status: 'CONVERTIDO', 
+      updatedAt: Timestamp.now(),
+      timeline: FieldValue.arrayUnion({
+        id: uuidv4(),
+        type: 'system',
+        description: `LEAD CONVERTIDO: Processo protocolado sob o nº ${data.processNumber}. Atendimento encerrado no CRM.`,
+        date: Timestamp.now() as any,
+        authorName: session.user.name || 'Sistema'
+      })
+    });
     batch.update(clientRef, { status: 'active', updatedAt: Timestamp.now() });
 
     await batch.commit();
