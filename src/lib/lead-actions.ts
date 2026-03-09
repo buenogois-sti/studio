@@ -8,7 +8,7 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/options';
 import { createNotification } from './notification-actions';
 import { revalidatePath } from 'next/cache';
 import { v4 as uuidv4 } from 'uuid';
-import { getGoogleApiClientsForUser } from './drive';
+import { getGoogleApiClientsForUser, getGoogleClientsForStaff } from './drive';
 import { formatISO, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -318,23 +318,24 @@ export async function scheduleLeadInterview(leadId: string, data: {
     const clientDoc = await firestoreAdmin.collection('clients').doc(leadData.clientId).get();
     const clientData = clientDoc.data();
 
-    const { calendar } = await getGoogleApiClientsForUser();
+    // Sincroniza usando a agenda do ADVOGADO designado
+    const { calendar, tasks } = await getGoogleClientsForStaff(leadData.lawyerId);
     
     const startDateTime = new Date(`${data.date}T${data.time}`);
     const endDateTime = new Date(startDateTime.getTime() + 60 * 60 * 1000); // 1h de duração
 
     const eventDescription = [
-      `📅 ENTREVISTA TÉCNICA DE TRIAGEM`,
+      `💬 ENTREVISTA TÉCNICA DE TRIAGEM`,
       `Lead: ${leadData.title}`,
       `Cliente: ${clientData?.firstName} ${clientData?.lastName || ''}`,
       `WhatsApp: ${clientData?.mobile || 'N/A'}`,
       `Área: ${leadData.legalArea}`,
       ``,
       `📍 Local/Modo: ${data.location}`,
-      `📝 Observações do Agendamento:`,
-      `${data.notes || 'Sem observações.'}`,
+      `📝 Notas da Triagem:`,
+      `${data.notes || 'Sem observações adicionais.'}`,
       ``,
-      `🔗 Link LexFlow: https://buenogois.com.br/dashboard/leads`,
+      `🔗 Link LexFlow: https://www.buenogoisadvogado.com.br/dashboard/leads`,
       `🔐 ID Interno: ${leadId}`
     ].join('\n');
 
@@ -358,11 +359,12 @@ export async function scheduleLeadInterview(leadId: string, data: {
       requestBody: calendarEvent,
     });
 
+    const now = Timestamp.now();
     const timelineEvent: TimelineEvent = {
       id: uuidv4(),
       type: 'system',
-      description: `ENTREVISTA AGENDADA: Para o dia ${format(startDateTime, 'dd/MM/yy')} às ${data.time}. Local: ${data.location}. Evento criado na agenda Google.`,
-      date: Timestamp.now() as any,
+      description: `ENTREVISTA AGENDADA: Para o dia ${format(startDateTime, 'dd/MM/yy')} às ${data.time}. Local: ${data.location}. Evento sincronizado na agenda do advogado designado.`,
+      date: now as any,
       authorName: session.user.name || 'Sistema'
     };
 
@@ -371,16 +373,28 @@ export async function scheduleLeadInterview(leadId: string, data: {
       completedTasks.push('Entrevista técnica realizada');
     }
 
+    // Move AUTOMATICAMENTE para fase de ATENDIMENTO
     await leadRef.update({
+      status: 'ATENDIMENTO',
+      [`stageEntryDates.ATENDIMENTO`]: now,
       timeline: FieldValue.arrayUnion(timelineEvent),
       completedTasks,
-      updatedAt: FieldValue.serverTimestamp()
+      updatedAt: now
+    });
+
+    // Notificar o advogado alvo
+    await createNotification({
+      userId: leadData.lawyerId,
+      title: "Nova Entrevista na sua Pauta",
+      description: `Um novo atendimento foi agendado para o lead: ${leadData.title}. Verifique sua agenda.`,
+      type: 'hearing',
+      href: '/dashboard/leads'
     });
 
     revalidatePath('/dashboard/leads');
     return { success: true, googleEventId: createdEvent.data.id };
   } catch (error: any) {
     console.error('[scheduleLeadInterview] Error:', error);
-    throw new Error(error.message || 'Falha ao agendar compromisso.');
+    throw new Error(error.message || 'Falha ao agendar compromisso na agenda do advogado.');
   }
 }

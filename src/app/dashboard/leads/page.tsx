@@ -226,7 +226,7 @@ function TaskInteractionDialog({
   open: boolean; 
   onOpenChange: (o: boolean) => void; 
   lawyers: Staff[];
-  onSuccess: () => void;
+  onSuccess: (lawyerId?: string) => void;
 }) {
   const { toast } = useToast();
   const [isSaving, setIsSaving] = React.useState(false);
@@ -244,7 +244,7 @@ function TaskInteractionDialog({
       });
       
       toast({ title: 'Informações Salvas!' });
-      onSuccess();
+      onSuccess(data.lawyerId);
       onOpenChange(false);
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Erro ao salvar', description: e.message });
@@ -326,7 +326,7 @@ function TaskInteractionDialog({
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-[10px] text-slate-500 italic mt-2">Após este passo, o atendimento ficará disponível exclusivamente para este advogado.</p>
+              <p className="text-[10px] text-slate-500 italic mt-2">Após este passo, o sistema abrirá o agendamento para este profissional e o caso será entregue a ele.</p>
             </div>
           )}
         </div>
@@ -342,18 +342,29 @@ function TaskInteractionDialog({
 function ScheduleInterviewDialog({ lead, open, onOpenChange, onSuccess }: { lead: Lead | null; open: boolean; onOpenChange: (o: boolean) => void; onSuccess: () => void }) {
   const [isSaving, setIsSaving] = React.useState(false);
   const { toast } = useToast();
+  const { firestore } = useFirebase();
+  const [lawyerName, setLawyerName] = React.useState('Advogado');
   
   const form = useForm<z.infer<typeof scheduleInterviewSchema>>({
     resolver: zodResolver(scheduleInterviewSchema),
-    defaultValues: { date: format(new Date(), 'yyyy-MM-dd'), time: '14:00', location: 'Escritório (SBC)', notes: '' }
+    defaultValues: { date: format(new Date(), 'yyyy-MM-dd'), time: '14:00', location: 'Sede Bueno Gois (Presencial)', notes: '' }
   });
+
+  React.useEffect(() => {
+    if (lead && open && firestore) {
+      const staffRef = doc(firestore, 'staff', lead.lawyerId);
+      getDoc(staffRef).then(snap => {
+        if (snap.exists()) setLawyerName(`${snap.data().firstName} ${snap.data().lastName}`);
+      });
+    }
+  }, [lead, open, firestore]);
 
   const onSubmit = async (values: z.infer<typeof scheduleInterviewSchema>) => {
     if (!lead) return;
     setIsSaving(true);
     try {
       await scheduleLeadInterview(lead.id, values);
-      toast({ title: 'Entrevista Agendada!', description: 'O compromisso foi sincronizado com o Google Agenda.' });
+      toast({ title: 'Atendimento Agendado!', description: `Evento sincronizado na agenda do Dr(a). ${lawyerName}.` });
       onSuccess();
       onOpenChange(false);
     } catch (e: any) { toast({ variant: 'destructive', title: 'Erro ao agendar', description: e.message }); } finally { setIsSaving(false); }
@@ -361,28 +372,57 @@ function ScheduleInterviewDialog({ lead, open, onOpenChange, onSuccess }: { lead
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-[#0f172a] border-white/10 text-white">
+      <DialogContent className="bg-[#0f172a] border-white/10 text-white shadow-2xl sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle className="text-white font-headline">Agendar Entrevista Técnica</DialogTitle>
-          <DialogDescription className="text-slate-400">Designar horário para detalhamento dos fatos com o cliente.</DialogDescription>
+          <DialogTitle className="text-white font-headline flex items-center gap-2">
+            <CalendarDays className="h-5 w-5 text-primary" /> Agendar Entrevista Técnica
+          </DialogTitle>
+          <DialogDescription className="text-slate-400">
+            Definir horário na agenda do Dr(a). <span className="text-white font-bold">{lawyerName}</span>.
+          </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <div className="grid grid-cols-2 gap-4">
               <FormField control={form.control} name="date" render={({ field }) => (
-                <FormItem><FormLabel className="text-[10px] font-black uppercase text-slate-500">Data</FormLabel><FormControl><Input type="date" className="bg-black/40 border-white/10" {...field} /></FormControl></FormItem>
+                <FormItem>
+                  <FormLabel className="text-[10px] font-black uppercase text-slate-500">Data</FormLabel>
+                  <FormControl><Input type="date" className="h-11 bg-black/40 border-white/10" {...field} /></FormControl>
+                </FormItem>
               )} />
               <FormField control={form.control} name="time" render={({ field }) => (
-                <FormItem><FormLabel className="text-[10px] font-black uppercase text-slate-500">Hora</FormLabel><FormControl><Input type="time" className="bg-black/40 border-white/10" {...field} /></FormControl></FormItem>
+                <FormItem>
+                  <FormLabel className="text-[10px] font-black uppercase text-slate-500">Horário</FormLabel>
+                  <FormControl><Input type="time" className="h-11 bg-black/40 border-white/10" {...field} /></FormControl>
+                </FormItem>
               )} />
             </div>
             <FormField control={form.control} name="location" render={({ field }) => (
-              <FormItem><FormLabel className="text-[10px] font-black uppercase text-slate-500">Modo / Local</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger className="bg-black/40 border-white/10"><SelectValue /></SelectTrigger></FormControl><SelectContent className="bg-[#0f172a] text-white"><SelectItem value="Escritório (SBC)">🏢 Escritório Presencial</SelectItem><SelectItem value="Google Meet (Online)">🎥 Google Meet</SelectItem><SelectItem value="WhatsApp Vídeo">📱 WhatsApp Vídeo</SelectItem></SelectContent></Select></FormItem>
+              <FormItem>
+                <FormLabel className="text-[10px] font-black uppercase text-slate-500">Modo / Local de Atendimento</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl><SelectTrigger className="h-11 bg-black/40 border-white/10"><SelectValue /></SelectTrigger></FormControl>
+                  <SelectContent className="bg-[#0f172a] text-white">
+                    <SelectItem value="Sede Bueno Gois (Presencial)">🏢 Sede Bueno Gois (Presencial)</SelectItem>
+                    <SelectItem value="Google Meet (Online)">🎥 Google Meet (Online)</SelectItem>
+                    <SelectItem value="WhatsApp Vídeo (Virtual)">📱 WhatsApp Vídeo</SelectItem>
+                    <SelectItem value="Visita Técnica (Local)">🚗 Visita Local</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FormItem>
             )} />
             <FormField control={form.control} name="notes" render={({ field }) => (
-              <FormItem><FormLabel className="text-[10px] font-black uppercase text-slate-500">Notas p/ Agenda</FormLabel><FormControl><Textarea className="bg-black/40 border-white/10" {...field} /></FormControl></FormItem>
+              <FormItem>
+                <FormLabel className="text-[10px] font-black uppercase text-slate-500">Notas Estratégicas p/ Agenda</FormLabel>
+                <FormControl><Textarea className="bg-black/40 border-white/10 min-h-[100px] resize-none" placeholder="Pontos chaves que o advogado deve saber..." {...field} /></FormControl>
+              </FormItem>
             )} />
-            <DialogFooter><Button type="submit" disabled={isSaving} className="w-full bg-primary text-primary-foreground font-black">{isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Confirmar e Agendar'}</Button></DialogFooter>
+            <DialogFooter className="bg-white/5 -m-6 mt-4 p-6">
+              <Button type="submit" disabled={isSaving} className="w-full h-12 bg-primary text-primary-foreground font-black uppercase tracking-widest text-[11px] shadow-xl shadow-primary/20">
+                {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ShieldCheck className="h-4 w-4 mr-2" />}
+                Confirmar Agendamento e Sincronizar
+              </Button>
+            </DialogFooter>
           </form>
         </Form>
       </DialogContent>
@@ -454,6 +494,13 @@ function LeadDetailsSheet({
       });
     } catch (e: any) { 
       toast({ variant: 'destructive', title: 'Erro ao atualizar tarefa' }); 
+    }
+  };
+
+  const handleTaskDialogSuccess = (lawyerId?: string) => {
+    if (activeTaskDialog === 'Direcionamento ao Adv. Responsável') {
+      // Assim que designar o advogado, abre o agendamento
+      setIsSchedulingOpen(true);
     }
   };
 
@@ -775,7 +822,14 @@ function LeadDetailsSheet({
 
         <DocumentDraftingDialog lead={lead} open={isDraftingOpen} onOpenChange={setIsDraftingOpen} />
         <ScheduleInterviewDialog lead={lead} open={isSchedulingOpen} onOpenChange={setIsSchedulingOpen} onSuccess={() => {}} />
-        <TaskInteractionDialog lead={lead} task={activeTaskDialog || ''} open={!!activeTaskDialog} onOpenChange={(o) => !o && setActiveTaskDialog(null)} lawyers={lawyers} onSuccess={() => {}} />
+        <TaskInteractionDialog 
+          lead={lead} 
+          task={activeTaskDialog || ''} 
+          open={!!activeTaskDialog} 
+          onOpenChange={(o) => !o && setActiveTaskDialog(null)} 
+          lawyers={lawyers} 
+          onSuccess={handleTaskDialogSuccess} 
+        />
       </SheetContent>
     </Sheet>
   );
