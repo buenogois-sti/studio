@@ -13,7 +13,6 @@ import {
   UserCircle,
   FolderKanban,
   AlertCircle,
-  Scale,
   ArrowRight,
   X,
   Target,
@@ -47,7 +46,8 @@ import {
   LayoutList,
   Edit,
   Save,
-  UserCheck
+  UserCheck,
+  UserCog
 } from 'lucide-react';
 
 import { useFirebase, useCollection, useMemoFirebase, useDoc } from '@/firebase';
@@ -115,6 +115,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { searchProcesses } from '@/lib/process-actions';
+import { ClientForm } from '@/components/client/ClientForm';
 
 // Sequência Bueno Gois atualizada
 const STAGES: LeadStatus[] = ['NOVO', 'ATENDIMENTO', 'CONTRATUAL', 'BUROCRACIA', 'DISTRIBUICAO'];
@@ -436,6 +437,7 @@ function LeadDetailsSheet({
   open, 
   onOpenChange, 
   onProtocolClick,
+  onEditClient,
   lawyers,
   initialTab = 'ficha'
 }: { 
@@ -444,6 +446,7 @@ function LeadDetailsSheet({
   open: boolean; 
   onOpenChange: (o: boolean) => void;
   onProtocolClick: (l: Lead) => void;
+  onEditClient: (c: Client) => void;
   lawyers: Staff[];
   initialTab?: 'ficha' | 'timeline';
 }) {
@@ -461,6 +464,17 @@ function LeadDetailsSheet({
   React.useEffect(() => {
     if (open) setActiveTab(initialTab);
   }, [open, initialTab]);
+
+  const clientIntegrity = React.useMemo(() => {
+    if (!client) return 0;
+    const fields = [
+      client.firstName, client.document, client.email, client.mobile, 
+      client.address?.street, client.address?.zipCode, client.rg,
+      client.bankInfo?.pixKey
+    ];
+    const filled = fields.filter(f => !!f).length;
+    return Math.round((filled / fields.length) * 100);
+  }, [client]);
 
   const interviewQuery = useMemoFirebase(
     () => (firestore && lead ? query(collection(firestore, 'checklist_templates'), where('category', '==', 'Entrevista de Triagem'), where('legalArea', '==', lead.legalArea), limit(1)) : null),
@@ -609,6 +623,28 @@ function LeadDetailsSheet({
             <div className="p-6 space-y-10 pb-32">
               
               <TabsContent value="ficha" className="m-0 space-y-10 animate-in fade-in duration-300">
+                {/* Alerta de Integridade Bueno Gois */}
+                {client && clientIntegrity < 100 && (
+                  <div className="p-5 rounded-3xl bg-amber-500/5 border-2 border-amber-500/20 flex flex-col sm:flex-row items-center justify-between gap-4 animate-in slide-in-from-top-4 duration-500">
+                    <div className="flex items-center gap-4">
+                      <div className="h-12 w-12 rounded-2xl bg-amber-500/10 flex items-center justify-center text-amber-500 shrink-0 border border-amber-500/20">
+                        <AlertTriangle className="h-6 w-6" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-black text-amber-200 uppercase tracking-tight">Cadastro Incompleto ({clientIntegrity}%)</p>
+                        <p className="text-[10px] text-amber-400/70 font-bold uppercase">RG, CPF e Endereço são obrigatórios para gerar documentos com IA.</p>
+                      </div>
+                    </div>
+                    <Button 
+                      size="sm" 
+                      onClick={() => onEditClient(client)}
+                      className="bg-amber-500 hover:bg-amber-600 text-black font-black uppercase text-[9px] h-9 px-6 rounded-xl shadow-lg shadow-amber-900/20"
+                    >
+                      <UserCog className="h-3.5 w-3.5 mr-2" /> Completar Cadastro
+                    </Button>
+                  </div>
+                )}
+
                 {/* Dados do Cliente */}
                 <div className="p-4 rounded-2xl bg-white/[0.03] border-2 border-white/5 flex items-center gap-4 relative overflow-hidden group">
                   <div className="h-14 w-14 rounded-xl bg-blue-500/10 flex items-center justify-center border-2 border-blue-500/20 shrink-0">
@@ -1018,7 +1054,7 @@ function LeadConversionDialog({ lead, open, onOpenChange, onConfirm, lawyers }: 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-3xl max-w-[95vw] bg-[#020617] border-white/10 text-white p-0 h-[90vh] flex flex-col shadow-2xl">
+      <DialogContent className="sm:max-w-[500px] bg-[#020617] border-white/10 text-white p-0 h-[90vh] flex flex-col shadow-2xl">
         <DialogHeader className="p-6 border-b border-white/5 bg-white/5 shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -1089,6 +1125,8 @@ export default function LeadsPage() {
   const [initialDetailTab, setInitialDetailTab] = React.useState<'ficha' | 'timeline'>('ficha');
   const [isConversionOpen, setIsConversionOpen] = React.useState(false);
   const [isProcessing, setIsProcessing] = React.useState<string | null>(null);
+  const [editingClient, setEditingClient] = React.useState<Client | null>(null);
+  const [isClientSheetOpen, setIsClientSheetOpen] = React.useState(false);
   
   // Filtros Avançados
   const [sourceFilter, setSourceFilter] = React.useState<string>('all');
@@ -1235,6 +1273,11 @@ export default function LeadsPage() {
     setSelectedLeadId(leadId);
     setInitialDetailTab(tab);
     setIsDetailsOpen(true);
+  };
+
+  const handleEditClient = (client: Client) => {
+    setEditingClient(client);
+    setIsClientSheetOpen(true);
   };
 
   const isLoading = isLoadingLeads;
@@ -1564,6 +1607,7 @@ export default function LeadsPage() {
           open={isDetailsOpen} 
           onOpenChange={setIsDetailsOpen} 
           onProtocolClick={(l) => { setSelectedLeadId(l.id); setIsConversionOpen(true); }} 
+          onEditClient={handleEditClient}
           lawyers={lawyers}
           initialTab={initialDetailTab}
         />
@@ -1571,6 +1615,24 @@ export default function LeadsPage() {
         <NewLeadSheet open={isNewLeadOpen} onOpenChange={setIsNewLeadOpen} lawyers={lawyers} onCreated={() => {}} />
         
         <LeadConversionDialog lead={activeLead} open={isConversionOpen} onOpenChange={setIsConversionOpen} onConfirm={handleConfirmProtocol} lawyers={lawyers} />
+
+        <Sheet open={isClientSheetOpen} onOpenChange={setIsClientSheetOpen}>
+          <SheetContent className="sm:max-w-5xl w-full flex flex-col p-0 bg-[#020617] border-border overflow-hidden shadow-2xl">
+            <SheetHeader className="p-6 border-b border-white/5 bg-white/5 shrink-0 text-left">
+              <SheetTitle className="text-white text-2xl font-black font-headline tracking-tight uppercase">
+                Completar Cadastro: {editingClient?.firstName}
+              </SheetTitle>
+              <SheetDescription className="text-slate-400">
+                RG, CPF e Endereço são essenciais para a validade jurídica dos documentos.
+              </SheetDescription>
+            </SheetHeader>
+            <ScrollArea className="flex-1">
+              <div className="p-6">
+                <ClientForm onSave={() => setIsClientSheetOpen(false)} client={editingClient} />
+              </div>
+            </ScrollArea>
+          </SheetContent>
+        </Sheet>
       </div>
     </TooltipProvider>
   );
