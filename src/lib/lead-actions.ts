@@ -23,6 +23,8 @@ export async function createLead(data: {
   legalArea: string;
   priority: LeadPriority;
   captureSource: string;
+  referralName?: string;
+  referralType?: string;
   isUrgent: boolean;
   prescriptionDate?: string;
   description?: string;
@@ -52,6 +54,8 @@ export async function createLead(data: {
       legalArea: data.legalArea,
       priority: data.priority,
       captureSource: data.captureSource,
+      referralName: data.referralName || '',
+      referralType: data.referralType || '',
       isUrgent: data.isUrgent,
       description: data.description || '',
       status: 'NOVO' as LeadStatus,
@@ -82,6 +86,24 @@ export async function createLead(data: {
 
     revalidatePath('/dashboard/leads');
     return { success: true, id: leadRef.id };
+  } catch (error: any) {
+    throw new Error(error.message);
+  }
+}
+
+/**
+ * Atualiza campos específicos de um lead (Qualificação, Área, Advogado).
+ */
+export async function updateLeadDetails(id: string, data: Partial<Lead>) {
+  if (!firestoreAdmin) throw new Error('Servidor indisponível.');
+  try {
+    const now = Timestamp.now();
+    await firestoreAdmin.collection('leads').doc(id).update({
+      ...data,
+      updatedAt: now
+    });
+    revalidatePath('/dashboard/leads');
+    return { success: true };
   } catch (error: any) {
     throw new Error(error.message);
   }
@@ -280,8 +302,8 @@ export async function scheduleLeadInterview(leadId: string, data: {
     };
 
     const completedTasks = leadData.completedTasks || [];
-    if (!completedTasks.includes('Agendamento de entrevista')) {
-      completedTasks.push('Agendamento de entrevista');
+    if (!completedTasks.includes('Entrevista técnica realizada')) {
+      completedTasks.push('Entrevista técnica realizada');
     }
 
     await leadRef.update({

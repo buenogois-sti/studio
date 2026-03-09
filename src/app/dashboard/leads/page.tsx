@@ -44,12 +44,13 @@ import {
   Thermometer,
   Timer,
   Gavel,
-  ShieldAlert
+  ShieldAlert,
+  LayoutList
 } from 'lucide-react';
 
 import { useFirebase, useCollection, useMemoFirebase, useDoc } from '@/firebase';
 import { collection, query, orderBy, doc, Timestamp, limit, updateDoc, where, arrayUnion, arrayRemove, deleteDoc } from 'firebase/firestore';
-import type { Lead, Client, Staff, LeadStatus, LeadPriority, UserProfile, TimelineEvent, OpposingParty, ChecklistTemplate } from '@/lib/types';
+import type { Lead, Client, Staff, LeadStatus, LeadPriority, UserProfile, TimelineEvent, OpposingParty, ChecklistTemplate, Process } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -81,7 +82,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Textarea } from '@/components/ui/textarea';
-import { createLead, updateLeadStatus, convertLeadToProcess, scheduleLeadInterview } from '@/lib/lead-actions';
+import { createLead, updateLeadStatus, convertLeadToProcess, scheduleLeadInterview, updateLeadDetails } from '@/lib/lead-actions';
 import { ClientSearchInput } from '@/components/process/ClientSearchInput';
 import { ClientCreationModal } from '@/components/process/ClientCreationModal';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -111,6 +112,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { searchProcesses } from '@/lib/process-actions';
 
 // Sequência Bueno Gois atualizada
 const STAGES: LeadStatus[] = ['NOVO', 'ATENDIMENTO', 'CONTRATUAL', 'BUROCRACIA', 'DISTRIBUICAO'];
@@ -182,6 +184,8 @@ const leadFormSchema = z.object({
   legalArea: z.string().min(1, 'Selecione a área.'),
   priority: z.enum(['BAIXA', 'MEDIA', 'ALTA', 'CRITICA']).default('MEDIA'),
   captureSource: z.string().min(1, 'Selecione a fonte.'),
+  referralName: z.string().optional(),
+  referralType: z.string().optional(),
   isUrgent: z.boolean().default(false),
   prescriptionDate: z.string().optional().or(z.literal('')),
   description: z.string().optional(),
@@ -207,39 +211,41 @@ const scheduleInterviewSchema = z.object({
   notes: z.string().optional(),
 });
 
-function ScheduleInterviewDialog({ 
+function TaskInteractionDialog({ 
   lead, 
+  task, 
   open, 
   onOpenChange,
-  onSuccess
+  lawyers,
+  onSuccess 
 }: { 
   lead: Lead | null; 
+  task: string; 
   open: boolean; 
-  onOpenChange: (o: boolean) => void;
+  onOpenChange: (o: boolean) => void; 
+  lawyers: Staff[];
   onSuccess: () => void;
 }) {
-  const [isSaving, setIsSaving] = React.useState(false);
   const { toast } = useToast();
-  const form = useForm<z.infer<typeof scheduleInterviewSchema>>({
-    resolver: zodResolver(scheduleInterviewSchema),
-    defaultValues: {
-      date: format(new Date(), 'yyyy-MM-dd'),
-      time: '09:00',
-      location: 'Sede - Bueno Gois Advogados',
-      notes: ''
-    }
-  });
+  const [isSaving, setIsSaving] = React.useState(false);
 
-  const onSubmit = async (values: z.infer<typeof scheduleInterviewSchema>) => {
+  const handleSave = async (data: any) => {
     if (!lead) return;
     setIsSaving(true);
     try {
-      await scheduleLeadInterview(lead.id, values);
-      toast({ title: 'Entrevista Agendada!', description: 'O compromisso foi salvo na sua agenda Google.' });
+      const completed = lead.completedTasks || [];
+      const updatedTasks = [...new Set([...completed, task])];
+      
+      await updateLeadDetails(lead.id, { 
+        ...data, 
+        completedTasks: updatedTasks 
+      });
+      
+      toast({ title: 'Informações Salvas!' });
       onSuccess();
       onOpenChange(false);
     } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Logística de agendamento indisponível', description: e.message });
+      toast({ variant: 'destructive', title: 'Erro ao salvar', description: e.message });
     } finally {
       setIsSaving(false);
     }
@@ -251,86 +257,81 @@ function ScheduleInterviewDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md bg-[#020617] border-white/10 text-white shadow-2xl">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <CalendarDays className="h-5 w-5 text-primary" /> Agendar Entrevista Técnica
+          <DialogTitle className="text-white font-headline flex items-center gap-2">
+            <Zap className="h-5 w-5 text-primary" /> {task}
           </DialogTitle>
-          <DialogDescription className="text-slate-400">
-            O compromisso será sincronizado com o Google Agenda do responsável.
-          </DialogDescription>
+          <DialogDescription className="text-slate-400">Complete as informações para prosseguir com a triagem.</DialogDescription>
         </DialogHeader>
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-4">
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="date"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-[10px] font-black uppercase text-slate-500">Data</FormLabel>
-                    <FormControl><Input type="date" className="bg-black/40 border-white/10 h-10" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="time"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-[10px] font-black uppercase text-slate-500">Horário</FormLabel>
-                    <FormControl><Input type="time" className="bg-black/40 border-white/10 h-10" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+        <div className="py-4 space-y-6">
+          {task === 'Qualificação do Lead' && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase text-slate-500">Origem da Captação</Label>
+                <Select defaultValue={lead.captureSource} onValueChange={(val) => handleSave({ captureSource: val })}>
+                  <SelectTrigger className="bg-black/40 border-white/10">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#0f172a] border-white/10 text-white">
+                    <SelectItem value="Google Search">Google Search</SelectItem>
+                    <SelectItem value="Google Ads">Google Ads</SelectItem>
+                    <SelectItem value="Instagram">Instagram</SelectItem>
+                    <SelectItem value="Indicação por Terceiro">Indicação por Terceiro</SelectItem>
+                    <SelectItem value="Antigo Cliente">Antigo Cliente</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase text-slate-500">Quem indicou? (Se aplicável)</Label>
+                <Input 
+                  placeholder="Nome do terceiro..." 
+                  className="bg-black/40 border-white/10" 
+                  defaultValue={lead.referralName}
+                  onBlur={(e) => handleSave({ referralName: e.target.value })}
+                />
+              </div>
             </div>
+          )}
 
-            <FormField
-              control={form.control}
-              name="location"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-[10px] font-black uppercase text-slate-500">Local / Modo de Atendimento</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger className="bg-black/40 border-white/10 h-10">
-                        <SelectValue />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent className="bg-[#0f172a] text-white">
-                      <SelectItem value="Sede - Bueno Gois Advogados">🏢 Presencial na Sede</SelectItem>
-                      <SelectItem value="Reunião Online (Google Meet)">🎥 Reunião Online (Meet)</SelectItem>
-                      <SelectItem value="Atendimento via WhatsApp Video">📱 WhatsApp Vídeo</SelectItem>
-                      <SelectItem value="Diligência Externa">🚗 Diligência Externa</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </FormItem>
-              )}
-            />
+          {task === 'Identificação da área jurídica' && (
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase text-slate-500">Área Jurídica de Atuação</Label>
+              <Select defaultValue={lead.legalArea} onValueChange={(val) => handleSave({ legalArea: val })}>
+                <SelectTrigger className="bg-black/40 border-white/10">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-[#0f172a] border-white/10 text-white">
+                  <SelectItem value="Trabalhista">⚖️ Trabalhista</SelectItem>
+                  <SelectItem value="Cível">🏢 Cível</SelectItem>
+                  <SelectItem value="Previdenciário">👴 Previdenciário</SelectItem>
+                  <SelectItem value="Família">🏠 Família</SelectItem>
+                  <SelectItem value="Outro">🔘 Outro</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
-            <FormField
-              control={form.control}
-              name="notes"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-[10px] font-black uppercase text-slate-500">Notas Adicionais</FormLabel>
-                  <FormControl>
-                    <Textarea placeholder="Ex: Cliente virá com as CTPS originais..." className="bg-black/40 border-white/10 text-xs resize-none h-20" {...field} />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
+          {task === 'Direcionamento ao Adv. Responsável' && (
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase text-slate-500">Advogado Titular do Caso</Label>
+              <Select defaultValue={lead.lawyerId} onValueChange={(val) => handleSave({ lawyerId: val })}>
+                <SelectTrigger className="bg-black/40 border-white/10">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-[#0f172a] border-white/10 text-white">
+                  {lawyers.map(l => (
+                    <SelectItem key={l.id} value={l.id}>Dr(a). {l.firstName} {l.lastName}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[10px] text-slate-500 italic mt-2">Após este passo, o atendimento ficará disponível exclusivamente para este advogado.</p>
+            </div>
+          )}
+        </div>
 
-            <DialogFooter className="pt-4">
-              <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={isSaving}>Cancelar</Button>
-              <Button type="submit" disabled={isSaving} className="bg-primary text-primary-foreground font-black uppercase tracking-widest text-[10px]">
-                {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ShieldCheck className="h-4 w-4 mr-2" />}
-                Confirmar Agendamento
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
+        <DialogFooter className="bg-white/5 p-4 -m-6 mt-4">
+          <DialogClose asChild><Button variant="ghost" className="text-slate-400 uppercase text-[10px] font-black tracking-widest">Fechar</Button></DialogClose>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -342,12 +343,14 @@ function LeadDetailsSheet({
   open, 
   onOpenChange, 
   onProtocolClick,
+  lawyers
 }: { 
   lead: Lead | null; 
   client?: Client; 
   open: boolean; 
   onOpenChange: (o: boolean) => void;
   onProtocolClick: (l: Lead) => void;
+  lawyers: Staff[];
 }) {
   const { firestore } = useFirebase();
   const { data: session } = useSession();
@@ -357,6 +360,7 @@ function LeadDetailsSheet({
   const [newNote, setNewNote] = React.useState('');
   const [isDraftingOpen, setIsDraftingOpen] = React.useState(false);
   const [isSchedulingOpen, setIsSchedulingOpen] = React.useState(false);
+  const [activeTaskDialog, setActiveTaskDialog] = React.useState<string | null>(null);
 
   const interviewQuery = useMemoFirebase(
     () => (firestore && lead ? query(collection(firestore, 'checklist_templates'), where('category', '==', 'Entrevista de Triagem'), where('legalArea', '==', lead.legalArea), limit(1)) : null),
@@ -367,6 +371,13 @@ function LeadDetailsSheet({
 
   const handleToggleTask = async (task: string) => {
     if (!lead || !firestore) return;
+    
+    // Passos interativos abrem diálogo
+    if (['Qualificação do Lead', 'Identificação da área jurídica', 'Direcionamento ao Adv. Responsável'].includes(task)) {
+      setActiveTaskDialog(task);
+      return;
+    }
+
     const completed = lead.completedTasks || [];
     const isCompleted = completed.includes(task);
     
@@ -526,6 +537,9 @@ function LeadDetailsSheet({
                         </div>
                         <span className={cn("text-xs font-bold tracking-tight", isDone ? "text-emerald-400/70" : "text-slate-200")}>{task}</span>
                       </div>
+                      {!isDone && ['Qualificação do Lead', 'Identificação da área jurídica', 'Direcionamento ao Adv. Responsável'].includes(task) && (
+                        <ArrowRight className="h-3.5 w-3.5 text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+                      )}
                     </div>
                   );
                 })}
@@ -659,6 +673,14 @@ function LeadDetailsSheet({
           lead={lead}
           open={isSchedulingOpen}
           onOpenChange={setIsSchedulingOpen}
+          onSuccess={() => {}}
+        />
+        <TaskInteractionDialog
+          lead={lead}
+          task={activeTaskDialog || ''}
+          open={!!activeTaskDialog}
+          onOpenChange={(o) => !o && setActiveTaskDialog(null)}
+          lawyers={lawyers}
           onSuccess={() => {}}
         />
       </SheetContent>
@@ -952,22 +974,70 @@ export default function LeadsPage() {
   const lawyers = staffData?.filter(s => s.role === 'lawyer' || s.role === 'partner') || [];
   const staffMap = React.useMemo(() => new Map(staffData?.map(s => [s.id, s])), [staffData]);
 
+  // Busca Híbrida: Leads e Processos
+  const [hybridResults, setHybridResults] = React.useState<Array<{ type: 'lead' | 'process', data: any }>>([]);
+  const [isSearchingHybrid, setIsSearchingHybrid] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!searchTerm.trim() || searchTerm.length < 2) {
+      setHybridResults([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setIsSearchingHybrid(true);
+      try {
+        const processResults = await searchProcesses(searchTerm);
+        const results: Array<{ type: 'lead' | 'process', data: any }> = processResults.map(p => ({ type: 'process', data: p }));
+        
+        if (leadsData) {
+          const q = searchTerm.toLowerCase();
+          const filteredLeads = leadsData.filter(l => 
+            l.title.toLowerCase().includes(q) || 
+            (l.clientName || '').toLowerCase().includes(q) ||
+            (l.clientDocument || '').includes(q)
+          );
+          results.push(...filteredLeads.map(l => ({ type: 'lead', data: l })));
+        }
+        
+        setHybridResults(results.slice(0, 10));
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setIsSearchingHybrid(false);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm, leadsData]);
+
   const activeLead = React.useMemo(() => {
     if (!selectedLeadId || !leadsData) return null;
     return leadsData.find(l => l.id === selectedLeadId) || null;
   }, [selectedLeadId, leadsData]);
 
   const filteredLeads = React.useMemo(() => {
-    if (!leadsData) return [];
+    if (!leadsData || !userProfile) return [];
     let list = [...leadsData].sort((a, b) => b.updatedAt.seconds - a.updatedAt.seconds);
     
-    // Todos podem ver os leads, então não filtramos mais por advogado.
+    // REGRA DE VISIBILIDADE BUENO GOIS:
+    // 1. Admins veem tudo.
+    // 2. Secretários veem apenas o que está em NOVO (Triagem).
+    // 3. Advogados veem o que está em NOVO + Atendimentos onde são os responsáveis.
+    if (userProfile.role !== 'admin') {
+      list = list.filter(l => {
+        if (l.status === 'NOVO') return true;
+        if (l.lawyerId === userProfile.id) return true;
+        if (userProfile.role === 'assistant') return false; // Assistente não vê atendimentos designados a outros
+        return false;
+      });
+    }
     
     // Aplicar Filtros Avançados
     if (sourceFilter !== 'all') list = list.filter(l => l.captureSource === sourceFilter);
     if (priorityFilter !== 'all') list = list.filter(l => l.priority === priorityFilter);
 
-    if (searchTerm.trim()) {
+    if (searchTerm.trim() && hybridResults.length === 0) {
       const q = searchTerm.toLowerCase();
       list = list.filter(l => 
         l.title.toLowerCase().includes(q) || 
@@ -977,7 +1047,7 @@ export default function LeadsPage() {
     }
 
     return list;
-  }, [leadsData, searchTerm, sourceFilter, priorityFilter]);
+  }, [leadsData, searchTerm, sourceFilter, priorityFilter, userProfile, hybridResults]);
 
   const handleConfirmProtocol = async (data: z.infer<typeof conversionSchema>) => {
     if (!activeLead) return;
@@ -1027,21 +1097,51 @@ export default function LeadsPage() {
             <p className="text-sm text-muted-foreground">Triagem e conversão estratégica Bueno Gois.</p>
           </div>
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-            <div className="relative flex-1 sm:w-80">
+            <div className="relative flex-1 sm:w-96">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
               <Input 
-                placeholder="Busque pelo título, nome ou CPF..." 
+                placeholder="Busque Lead ou Processo por CPF/Nome..." 
                 className="pl-9 pr-20 bg-[#0f172a] border-white/10 h-11 text-sm rounded-xl text-white" 
                 value={searchTerm} 
                 onChange={e => setSearchTerm(e.target.value)} 
               />
-              {searchTerm && (
-                <button 
-                  onClick={() => setSearchTerm('')} 
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-black uppercase text-primary hover:text-white transition-colors"
-                >
-                  Limpar
-                </button>
+              {isSearchingHybrid && <Loader2 className="absolute right-14 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-primary" />}
+              
+              {hybridResults.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-2 bg-[#0f172a] border border-white/10 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-[60] overflow-hidden animate-in fade-in slide-in-from-top-2">
+                  <ScrollArea className="max-h-[350px]">
+                    <div className="p-2 space-y-1">
+                      {hybridResults.map((item, idx) => (
+                        <button
+                          key={`${item.type}-${idx}`}
+                          className="w-full text-left p-4 hover:bg-white/5 transition-all rounded-xl border border-transparent hover:border-white/5 group flex items-start gap-3"
+                          onClick={() => {
+                            if (item.type === 'lead') {
+                              setSelectedLeadId(item.data.id);
+                              setIsDetailsOpen(true);
+                            } else {
+                              // Selecionar processo para checklist autônomo
+                              toast({ title: 'Processo Selecionado', description: `Iniciando checklist autônomo para ${item.data.name}.` });
+                            }
+                            setSearchTerm('');
+                          }}
+                        >
+                          {item.type === 'process' ? <FolderKanban className="h-4 w-4 text-primary shrink-0 mt-1" /> : <Zap className="h-4 w-4 text-amber-500 shrink-0 mt-1" />}
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-bold text-white group-hover:text-primary transition-colors truncate">
+                              {item.type === 'process' ? item.data.name : item.data.title}
+                            </p>
+                            <p className="text-[10px] text-slate-500 font-mono uppercase mt-0.5">
+                              {item.type === 'process' 
+                                ? `PROCESSO: ${item.data.processNumber || 'Sem Nº'} - Cliente: ${item.data.clientName || 'N/A'}` 
+                                : `LEAD: ${item.data.clientName || 'Sem nome'} (${item.data.clientDocument || 'Sem CPF'})`}
+                            </p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </div>
               )}
             </div>
             <Button onClick={() => setIsNewLeadOpen(true)} className="bg-primary text-primary-foreground font-black uppercase text-[10px] tracking-widest h-11 px-8 rounded-xl shadow-lg shadow-primary/20">
@@ -1086,7 +1186,7 @@ export default function LeadsPage() {
             <TabsList className="bg-[#0f172a] p-1 border border-white/5 h-12 flex overflow-x-auto no-scrollbar justify-start gap-1 w-full lg:w-auto">
               {STAGES.map(stage => {
                 const config = stageConfig[stage];
-                const count = leadsData?.filter(l => l.status === stage).length || 0;
+                const count = filteredLeads.filter(l => l.status === stage).length || 0;
                 return (
                   <Tooltip key={stage} delayDuration={300}>
                     <TooltipTrigger asChild>
@@ -1312,6 +1412,7 @@ export default function LeadsPage() {
           open={isDetailsOpen} 
           onOpenChange={setIsDetailsOpen} 
           onProtocolClick={(l) => { setSelectedLeadId(l.id); setIsConversionOpen(true); }} 
+          lawyers={lawyers}
         />
         
         <NewLeadSheet open={isNewLeadOpen} onOpenChange={setIsNewLeadOpen} lawyers={lawyers} onCreated={() => {}} />

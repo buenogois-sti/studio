@@ -114,6 +114,8 @@ export type Lead = {
   status: LeadStatus;
   priority: LeadPriority;
   captureSource: string;
+  referralName?: string;
+  referralType?: string;
   isUrgent: boolean;
   prescriptionDate?: Timestamp;
   description?: string;
