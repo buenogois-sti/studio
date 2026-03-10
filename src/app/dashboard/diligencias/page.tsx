@@ -19,7 +19,9 @@ import {
   X,
   PlusCircle,
   AlertCircle,
-  FolderKanban
+  FolderKanban,
+  Edit,
+  Eye
 } from 'lucide-react';
 import { format, isSameDay, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -47,6 +49,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Link from 'next/link';
+import { HearingReturnDialog } from '@/components/process/HearingReturnDialog';
 
 const statusConfig = {
   PENDENTE: { label: 'Pendente', icon: Clock, color: 'text-blue-500 bg-blue-500/10' },
@@ -62,6 +65,7 @@ export default function DiligenciasPage() {
   const [isProcessing, setIsProcessing] = React.useState<string | null>(null);
   const [refreshKey, setRefreshKey] = React.useState(0);
   const [selectedLawyerFilter, setSelectedLawyerFilter] = React.useState<string>('all');
+  const [returnDiligence, setReturnDiligence] = React.useState<Hearing | null>(null);
 
   const userProfileRef = useMemoFirebase(
     () => (firestore && user?.uid ? doc(firestore, 'users', user.uid) : null),
@@ -201,6 +205,7 @@ export default function DiligenciasPage() {
             data={filteredDiligencias.filter(d => d.status === 'PENDENTE')} 
             isLoading={isLoading} 
             onUpdateStatus={handleUpdateStatus}
+            onReturn={(d: any) => setReturnDiligence(d)}
             isProcessing={isProcessing}
             processesMap={processesMap}
           />
@@ -211,16 +216,24 @@ export default function DiligenciasPage() {
             data={filteredDiligencias} 
             isLoading={isLoading} 
             onUpdateStatus={handleUpdateStatus}
+            onReturn={(d: any) => setReturnDiligence(d)}
             isProcessing={isProcessing}
             processesMap={processesMap}
           />
         </TabsContent>
       </Tabs>
+
+      <HearingReturnDialog 
+        hearing={returnDiligence} 
+        open={!!returnDiligence} 
+        onOpenChange={(o) => !o && setReturnDiligence(null)}
+        onSuccess={() => setRefreshKey(k => k + 1)}
+      />
     </div>
   );
 }
 
-function DiligenceList({ data, isLoading, onUpdateStatus, isProcessing, processesMap }: any) {
+function DiligenceList({ data, isLoading, onReturn, isProcessing, processesMap }: any) {
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -289,17 +302,17 @@ function DiligenceList({ data, isLoading, onUpdateStatus, isProcessing, processe
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="bg-[#0f172a] border-white/10 w-56">
-                      <DropdownMenuItem onClick={() => onUpdateStatus(d.id, 'REALIZADA')} className="font-bold gap-2 text-emerald-400">
-                        <CheckCircle2 className="h-4 w-4" /> Marcar Concluída
+                      <DropdownMenuItem onClick={() => onReturn(d)} className="font-bold gap-2 text-emerald-400 focus:bg-emerald-500/10">
+                        <History className="h-4 w-4" /> Dar Retorno (Baixa)
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild className="font-bold gap-2 text-white">
                         <Link href={`/dashboard/processos?clientId=${process?.clientId}`}>
-                          <ExternalLink className="h-4 w-4 text-primary" /> Ver Processo
+                          <Eye className="h-4 w-4 text-blue-400" /> Ver Processo
                         </Link>
                       </DropdownMenuItem>
                       <DropdownMenuSeparator className="bg-white/5" />
                       <DropdownMenuItem className="text-rose-500 font-bold gap-2">
-                        <X className="h-4 w-4" /> Cancelar
+                        <X className="h-4 w-4" /> Cancelar Diligência
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
