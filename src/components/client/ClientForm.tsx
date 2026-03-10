@@ -150,8 +150,13 @@ export function ClientForm({
 
     setIsSearchingCep(true);
     try {
-        const response = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
-        if (!response.ok) throw new Error('Falha na resposta da API');
+        const response = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`, {
+          method: 'GET',
+          mode: 'cors'
+        });
+        
+        if (!response.ok) throw new Error('Servidor de CEP indisponível');
+        
         const data = await response.json();
         if (data.erro) {
             toast({
@@ -168,11 +173,12 @@ export function ClientForm({
               description: `${data.logradouro}, ${data.localidade}`
             });
         }
-    } catch (error) {
+    } catch (error: any) {
+        console.warn("[ClientForm] Falha na busca de CEP:", error.message);
         toast({
             variant: 'destructive',
-            title: 'Erro ao buscar CEP',
-            description: 'Não foi possível conectar à API de CEP.',
+            title: 'Erro de Conexão',
+            description: 'Não foi possível buscar o endereço. Verifique sua rede.',
         });
     } finally {
       setIsSearchingCep(false);

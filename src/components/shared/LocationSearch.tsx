@@ -27,6 +27,7 @@ export function LocationSearch({ value, onSelect, onAddressDetail, placeholder =
   const [recentLocations, setRecentLocations] = React.useState<string[]>([]);
   const inputRef = React.useRef<HTMLInputElement>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
+  const abortControllerRef = React.useRef<AbortController | null>(null);
 
   React.useEffect(() => {
     try {
@@ -67,22 +68,51 @@ export function LocationSearch({ value, onSelect, onAddressDetail, placeholder =
     }
 
     const timer = setTimeout(async () => {
+      // Cancela busca anterior se houver
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+      
       setIsSearching(true);
       try {
         const response = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(search)}&countrycodes=br&limit=5`
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(search)}&countrycodes=br&limit=5`,
+          { 
+            signal: controller.signal,
+            headers: {
+              'Accept-Language': 'pt-BR',
+              // Nominatim exige um User-Agent identificável para evitar bloqueios
+              'User-Agent': 'LexFlow-BuenoGois/1.0'
+            }
+          }
         );
+        
+        if (!response.ok) throw new Error('API Indisponível');
+        
         const data = await response.json();
         const results = data.map((item: any) => item.display_name);
         setApiResults(results);
-      } catch (error) {
-        console.error("Erro ao buscar endereço na API:", error);
+      } catch (error: any) {
+        if (error.name !== 'AbortError') {
+          console.warn("[LocationSearch] Falha na busca de endereço:", error.message);
+          setApiResults([]);
+        }
       } finally {
-        setIsSearching(false);
+        if (!controller.signal.aborted) {
+          setIsSearching(false);
+        }
       }
     }, 600);
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
   }, [search]);
 
   const addRecentLocation = React.useCallback((location: string) => {
@@ -215,7 +245,7 @@ export function LocationSearch({ value, onSelect, onAddressDetail, placeholder =
               ))}
             </div>
             
-            {search && (
+            {search && !isSearching && apiResults.length === 0 && (
               <div className="p-1 border-t">
                 <button
                   type="button"

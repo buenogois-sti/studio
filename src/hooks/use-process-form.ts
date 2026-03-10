@@ -1,4 +1,6 @@
 
+'use server';
+
 import { useCallback, useMemo } from 'react';
 import { z } from 'zod';
 import { useToast } from '@/components/ui/use-toast';
@@ -225,22 +227,20 @@ export const useProcessForm = (process?: Process | null, onSave?: () => void) =>
         });
       }
 
-      // 1. Sincronização Drive
+      // 1. Sincronização Drive (Non-blocking)
       if (savedProcessId) {
-        try {
-          await fetch('/api/drive/sync-process', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ processId: savedProcessId }),
-          });
-        } catch (error) {
-          console.error('Erro ao sincronizar processo no Drive:', error);
-        }
+        fetch('/api/drive/sync-process', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ processId: savedProcessId }),
+        }).catch(err => {
+          // Ignora falhas de rede na sincronização para não interromper o fluxo do usuário
+          console.warn('[useProcessForm] Falha silenciosa no sync de rede:', err.message);
+        });
 
         // 2. Agendamento Rápido de Audiência
         if (quickHearingDate && quickHearingTime) {
           try {
-            // Send as local ISO-like string, the server action will append the offset
             const localHearingDateTime = `${quickHearingDate}T${quickHearingTime}`;
             await createHearing({
               processId: savedProcessId,
@@ -256,9 +256,8 @@ export const useProcessForm = (process?: Process | null, onSave?: () => void) =>
               meetingPassword: quickHearingPassword,
               notes: 'Agendado automaticamente durante o cadastro do processo.',
             });
-            console.log('[useProcessForm] Quick hearing scheduled successfully');
           } catch (hError) {
-            console.error('[useProcessForm] Error scheduling quick hearing:', hError);
+            console.warn('[useProcessForm] Erro ao agendar ato rápido:', hError);
           }
         }
       }
