@@ -23,6 +23,11 @@ if (!admin.apps.length) {
         console.error(`[Firebase Admin] ❌ CRITICAL PROJECT ID MISMATCH!`);
         console.error(`[Firebase Admin] Token is being signed for project '${serviceProjectId}' but browser config expects '${configProjectId}'.`);
         console.error(`[Firebase Admin] SOLUTION: Update FIREBASE_SERVICE_ACCOUNT_JSON with credentials for '${configProjectId}'.`);
+        
+        // Em desenvolvimento local, lançamos erro explícito para não deixar passar
+        if (process.env.NODE_ENV === 'development') {
+          throw new Error(`Project ID Mismatch: Server="${serviceProjectId}", Client="${configProjectId}"`);
+        }
       }
 
       admin.initializeApp({

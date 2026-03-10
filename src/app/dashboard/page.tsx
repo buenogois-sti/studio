@@ -1,3 +1,4 @@
+
 'use client';
 import * as React from 'react';
 import {
@@ -21,7 +22,10 @@ import {
   Briefcase,
   Clock,
   AlertTriangle,
-  RefreshCw
+  RefreshCw,
+  ExternalLink,
+  ShieldAlert,
+  Terminal
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import {
@@ -476,9 +480,16 @@ export default function Dashboard() {
                 <>Abra o console do navegador (F12) e clique no link gerado pelo erro do Firebase para criar o índice automaticamente. Geralmente envolve campos como 'leadLawyerId' e 'updatedAt'.</>
               )}
             </div>
-            <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="mt-2 border-rose-500/30">
-              <RefreshCw className="h-3 w-3 mr-2" /> Recarregar Sistema
-            </Button>
+            <div className="flex gap-3">
+              <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="mt-2 border-rose-500/30">
+                <RefreshCw className="h-3 w-3 mr-2" /> Recarregar Sistema
+              </Button>
+              {isAuthError && (
+                <Button variant="ghost" size="sm" className="mt-2 text-rose-400" asChild>
+                  <a href="https://vercel.com" target="_blank">Abrir Vercel <ExternalLink className="h-3 w-3 ml-2" /></a>
+                </Button>
+              )}
+            </div>
           </AlertDescription>
         </Alert>
       </div>
