@@ -181,16 +181,19 @@ const AnimatedSection = React.memo(({ children, className = '', delay = 0 }: { c
 AnimatedSection.displayName = 'AnimatedSection';
 
 const FloatingParticles = React.memo(() => {
-  const particles = useMemo(() => 
-    Array.from({ length: 6 }, (_, i) => ({
+  const [particles, setParticles] = useState<any[]>([]);
+
+  useEffect(() => {
+    const generated = Array.from({ length: 6 }, (_, i) => ({
       id: i,
       size: Math.random() * 2 + 2,
       x: Math.random() * 100,
       y: Math.random() * 100,
       duration: Math.random() * 15 + 10,
       delay: i * 0.5,
-    })), []
-  );
+    }));
+    setParticles(generated);
+  }, []);
 
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-30">
