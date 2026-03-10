@@ -46,7 +46,7 @@ import Link from 'next/link';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { useFirebase, useCollection, useMemoFirebase, useDoc } from '@/firebase';
 import { collection, query, orderBy, limit, Timestamp, where, doc } from 'firebase/firestore';
-import type { Client, FinancialTitle, Process, Hearing, Log, UserProfile, StaffCredit, LegalDeadline } from '@/lib/types';
+import type { Client, FinancialTitle, Process, Hearing, Log, UserProfile, StaffCredit, LegalDeadline, Staff } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format, isBefore, startOfMonth, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -362,6 +362,14 @@ export default function Dashboard() {
   const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
   const role = userProfile?.role || 'assistant';
 
+  // Resolução de Staff ID para filtros do advogado
+  const staffQuery = useMemoFirebase(() => firestore ? collection(firestore, 'staff') : null, [firestore]);
+  const { data: staffData } = useCollection<Staff>(staffQuery);
+  const currentStaffMember = React.useMemo(() => {
+    if (!staffData || !session?.user?.email) return null;
+    return staffData.find(s => s.email.toLowerCase() === session.user.email?.toLowerCase());
+  }, [staffData, session?.user?.email]);
+
   // QUERIES DINÂMICAS POR ROLE
   const titlesQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -372,35 +380,40 @@ export default function Dashboard() {
   const processesQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     const base = collection(firestore, 'processes');
-    if (role === 'lawyer') return query(base, where('leadLawyerId', '==', session?.user?.id), orderBy('updatedAt', 'desc'), limit(10));
-    return query(base, orderBy('createdAt', 'desc'), limit(10));
-  }, [firestore, role, session]);
+    // Se for advogado, filtra pelo ID do STAFF correspondente
+    if (role === 'lawyer' && currentStaffMember) {
+      return query(base, where('leadLawyerId', '==', currentStaffMember.id), orderBy('updatedAt', 'desc'), limit(15));
+    }
+    return query(base, orderBy('createdAt', 'desc'), limit(15));
+  }, [firestore, role, currentStaffMember]);
   const { data: processesData, isLoading: isLoadingProcesses, error: processesError } = useCollection<Process>(processesQuery);
 
   const hearingsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     const base = collection(firestore, 'hearings');
-    if (role === 'lawyer') return query(base, where('lawyerId', '==', session?.user?.id), where('date', '>=', stableNow), orderBy('date', 'asc'), limit(5));
+    // Filtro inteligente para advogado logado
+    if (role === 'lawyer' && currentStaffMember) {
+      return query(base, where('lawyerId', '==', currentStaffMember.id), where('date', '>=', stableNow), orderBy('date', 'asc'), limit(5));
+    }
     return query(base, where('date', '>=', stableNow), orderBy('date', 'asc'), limit(5));
-  }, [firestore, role, session, stableNow]);
+  }, [firestore, role, currentStaffMember, stableNow]);
   const { data: hearingsData, isLoading: isLoadingHearings, error: hearingsError } = useCollection<Hearing>(hearingsQuery);
 
   const deadlinesQuery = useMemoFirebase(() => {
-    if (!firestore || role !== 'lawyer') return null;
-    return query(collection(firestore, 'deadlines'), where('authorId', '==', session?.user?.id), where('status', '==', 'PENDENTE'), orderBy('endDate', 'asc'), limit(3));
-  }, [firestore, role, session]);
+    if (!firestore || role !== 'lawyer' || !currentStaffMember) return null;
+    return query(collection(firestore, 'deadlines'), where('authorId', '==', currentStaffMember.id), where('status', '==', 'PENDENTE'), orderBy('endDate', 'asc'), limit(3));
+  }, [firestore, role, currentStaffMember]);
   const { data: deadlinesData, error: deadlinesError } = useCollection<LegalDeadline>(deadlinesQuery);
 
   const personalCreditsQuery = useMemoFirebase(() => {
-    if (!firestore || role !== 'lawyer') return null;
-    return query(collection(firestore, `staff/${session?.user?.id}/credits`), where('status', '==', 'DISPONIVEL'));
-  }, [firestore, role, session]);
+    if (!firestore || role !== 'lawyer' || !currentStaffMember) return null;
+    return query(collection(firestore, `staff/${currentStaffMember.id}/credits`), where('status', '==', 'DISPONIVEL'));
+  }, [firestore, role, currentStaffMember]);
   const { data: creditsData } = useCollection<StaffCredit>(personalCreditsQuery);
 
   const logsQuery = useMemoFirebase(() => (firestore && session?.user?.id ? query(collection(firestore, `users/${session.user.id}/logs`), orderBy('timestamp', 'desc'), limit(3)) : null), [firestore, session]);
   const { data: logsData } = useCollection<Log>(logsQuery);
 
-  // CRITICAL: Hooks like useMemo must be called before early returns
   const stats = React.useMemo(() => {
     const s = { 
       totalRevenue: 0, pendingReceivables: 0, totalOverdue: 0, activeProcessesCount: 0, 
@@ -482,7 +495,7 @@ export default function Dashboard() {
             </div>
             <div className="flex gap-3">
               <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="mt-2 border-rose-500/30">
-                <RefreshCw className="h-3 w-3 mr-2" /> Recarregar Sistema
+                <RefreshCw className="h-3 w-3 mr-2" /> Recarregar Página
               </Button>
               {isAuthError && (
                 <Button variant="ghost" size="sm" className="mt-2 text-rose-400" asChild>

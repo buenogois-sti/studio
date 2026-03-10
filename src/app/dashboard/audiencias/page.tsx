@@ -100,6 +100,7 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import { QuickHearingDialog } from '@/components/process/QuickHearingDialog';
+import { useSession } from 'next-auth/react';
 
 const statusConfig: Record<HearingStatus, { label: string; icon: any; color: string }> = {
     PENDENTE: { label: 'Pendente', icon: Clock3, color: 'text-blue-500 bg-blue-500/10' },
@@ -224,6 +225,7 @@ function HearingDetailsDialog({
 
 export default function AudienciasPage() {
   const { firestore, isUserLoading, user } = useFirebase();
+  const { data: session } = useSession();
   const searchParams = useSearchParams();
   const [refreshKey, setRefreshKey] = React.useState(0);
   const [viewMode, setViewMode] = React.useState<'list' | 'calendar' | 'history'>('calendar');
@@ -251,19 +253,31 @@ export default function AudienciasPage() {
   const { data: staffData } = useCollection<Staff>(staffQuery);
   const lawyers = staffData?.filter(s => s.role === 'lawyer' || s.role === 'partner' || s.role === 'intern') || [];
 
+  // Resolvendo staffId do usuário logado (Bueno Gois Identity Resolution)
+  const currentStaffMember = React.useMemo(() => {
+    if (!staffData || !session?.user?.email) return null;
+    return staffData.find(s => s.email.toLowerCase() === session.user.email?.toLowerCase());
+  }, [staffData, session?.user?.email]);
+
   const hearingsQuery = useMemoFirebase(() => {
     if (!firestore || !userProfile) return null;
     const base = collection(firestore, 'hearings');
 
+    // Admin/Assistant vêem tudo por padrão
     if (userProfile.role === 'admin' || userProfile.role === 'assistant' || userProfile.role === 'financial') {
       if (selectedLawyerFilter !== 'all') {
-        return query(base, where('lawyerId', '==', selectedLawyerFilter), where('date', '>=', stableHistoryCutoff), orderBy('date', 'asc'), limit(100));
+        return query(base, where('lawyerId', '==', selectedLawyerFilter), where('date', '>=', stableHistoryCutoff), orderBy('date', 'asc'), limit(150));
       }
-      return query(base, where('date', '>=', stableHistoryCutoff), orderBy('date', 'asc'), limit(200));
+      return query(base, where('date', '>=', stableHistoryCutoff), orderBy('date', 'asc'), limit(250));
     }
     
-    return query(base, where('lawyerId', '==', userProfile.id), where('date', '>=', stableHistoryCutoff), orderBy('date', 'asc'), limit(100));
-  }, [firestore, userProfile, selectedLawyerFilter, refreshKey, stableHistoryCutoff]);
+    // Advogado vê apenas sua pauta vinculada ao seu registro de STAFF
+    if (currentStaffMember) {
+      return query(base, where('lawyerId', '==', currentStaffMember.id), where('date', '>=', stableHistoryCutoff), orderBy('date', 'asc'), limit(150));
+    }
+
+    return null;
+  }, [firestore, userProfile, selectedLawyerFilter, refreshKey, stableHistoryCutoff, currentStaffMember]);
 
   const { data: hearingsData, isLoading: isLoadingHearings, error: hearingsError } = useCollection<Hearing>(hearingsQuery);
 
@@ -436,7 +450,8 @@ export default function AudienciasPage() {
                   <Card className="bg-[#0f172a] border-white/5 overflow-hidden shadow-2xl">
                       <div className="divide-y divide-white/5">
                           {weekDays.map(day => {
-                              const daily = hearingsData?.filter(h => isSameDay(h.date.toDate(), day) && h.status === 'PENDENTE') || [];
+                              // Mostra todos os atos do dia (exceto cancelados) para o usuário saber o que já foi feito
+                              const daily = hearingsData?.filter(h => isSameDay(h.date.toDate(), day) && h.status !== 'CANCELADA') || [];
                               if (daily.length === 0) return null;
 
                               return (
@@ -454,7 +469,8 @@ export default function AudienciasPage() {
                                       <div className="grid gap-4">
                                           {daily.map(h => {
                                               const p = processesMap.get(h.processId);
-                                              const StatusIcon = statusConfig[h.status || 'PENDENTE'].icon;
+                                              const currentStatusConfig = statusConfig[h.status || 'PENDENTE'];
+                                              const StatusIcon = currentStatusConfig.icon;
                                               const isUpdating = isProcessing === h.id;
                                               const isMeeting = h.type === 'ATENDIMENTO';
                                               const isDiligence = h.type === 'DILIGENCIA';
@@ -462,6 +478,7 @@ export default function AudienciasPage() {
                                               return (
                                                   <div key={h.id} className={cn(
                                                     "flex flex-col md:flex-row md:items-center gap-6 p-5 rounded-2xl border transition-all duration-300 group",
+                                                    h.status === 'REALIZADA' ? "bg-emerald-500/[0.01] border-emerald-500/10 opacity-70" :
                                                     isMeeting ? "bg-emerald-500/[0.02] border-emerald-500/10 hover:border-emerald-500/30" : 
                                                     isDiligence ? "bg-blue-500/[0.02] border-blue-500/10 hover:border-blue-500/30" :
                                                     "bg-black/20 border-white/5 hover:border-primary/20"
@@ -494,9 +511,9 @@ export default function AudienciasPage() {
                                                           </p>
                                                       </div>
                                                       <div className="flex items-center gap-3">
-                                                          <Badge variant="outline" className={cn("gap-1.5 h-8 px-4 text-[10px] font-black uppercase tracking-widest", statusConfig[h.status || 'PENDENTE'].color)}>
+                                                          <Badge variant="outline" className={cn("gap-1.5 h-8 px-4 text-[10px] font-black uppercase tracking-widest", currentStatusConfig.color)}>
                                                               {isUpdating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <StatusIcon className="h-3.5 w-3.5" />}
-                                                              {statusConfig[h.status || 'PENDENTE'].label}
+                                                              {currentStatusConfig.label}
                                                           </Badge>
                                                           <DropdownMenu>
                                                               <DropdownMenuTrigger asChild>
