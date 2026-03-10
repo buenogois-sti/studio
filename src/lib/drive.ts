@@ -69,8 +69,7 @@ export async function getGoogleApiClientsForUser(): Promise<GoogleApiClients> {
 
 /**
  * Obtém clientes da API do Google para um membro específico da equipe.
- * Se o membro tiver um token de atualização, usa o dele para agir em seu nome.
- * Caso contrário, cai de volta para o usuário da sessão.
+ * Isso permite que a secretaria agende algo no calendário INDIVIDUAL do advogado.
  */
 export async function getGoogleClientsForStaff(staffId: string): Promise<GoogleApiClients> {
     if (!firestoreAdmin) throw new Error("Firestore Admin não inicializado.");
@@ -80,15 +79,16 @@ export async function getGoogleClientsForStaff(staffId: string): Promise<GoogleA
     const staffData = staffDoc.data() as Staff | undefined;
     
     if (!staffData || !staffData.email) {
+        console.log(`[Drive] Staff ${staffId} sem e-mail. Usando conta da sessão atual.`);
         return getGoogleApiClientsForUser();
     }
 
-    // Se o alvo for o próprio usuário logado, retorna direto
+    // Se o alvo for o próprio usuário logado, retorna direto para evitar overhead
     if (staffData.email.toLowerCase() === session?.user?.email?.toLowerCase()) {
         return getGoogleApiClientsForUser();
     }
 
-    // Tenta encontrar o refresh token do usuário alvo
+    // Tenta encontrar o refresh token do usuário alvo na coleção de usuários do sistema
     try {
         const userQuery = await firestoreAdmin.collection('users')
             .where('email', '==', staffData.email.toLowerCase())
@@ -98,6 +98,8 @@ export async function getGoogleClientsForStaff(staffId: string): Promise<GoogleA
         const userData = userQuery.docs[0]?.data();
         
         if (userData?.googleRefreshToken) {
+            console.log(`[Drive] Sincronizando com calendário INDIVIDUAL de: ${staffData.email}`);
+            
             const oauth2Client = new google.auth.OAuth2(
                 process.env.GOOGLE_CLIENT_ID,
                 process.env.GOOGLE_CLIENT_SECRET
@@ -123,12 +125,14 @@ export async function getGoogleClientsForStaff(staffId: string): Promise<GoogleA
                     targetEmail: staffData.email
                 };
             }
+        } else {
+            console.warn(`[Drive] Aviso: O usuário ${staffData.email} ainda não logou no sistema para autorizar seu calendário individual. Sincronizando com a conta do solicitante.`);
         }
     } catch (error) {
-        console.error(`[Drive] Falha ao obter credenciais para ${staffData.email}:`, error);
+        console.error(`[Drive] Erro crítico ao resolver credenciais para ${staffData.email}:`, error);
     }
 
-    // Fallback: Usa o usuário logado
+    // Fallback: Se não conseguir agir em nome do outro, usa o usuário logado
     return getGoogleApiClientsForUser();
 }
 
@@ -137,7 +141,6 @@ export async function getGoogleClientsForStaff(staffId: string): Promise<GoogleA
  */
 async function getOrCreateRootFolder(drive: drive_v3.Drive, name: string): Promise<string> {
     try {
-        // Busca a pasta pelo nome especificamente dentro do Shared Drive ID
         const res = await drive.files.list({
             q: `'${SHARED_ROOT_FOLDER_ID}' in parents and mimeType='application/vnd.google-apps.folder' and name='${name}' and trashed=false`,
             fields: 'files(id, name)',
@@ -147,12 +150,9 @@ async function getOrCreateRootFolder(drive: drive_v3.Drive, name: string): Promi
         });
 
         if (res.data.files && res.data.files.length > 0) {
-            console.log(`[DriveRoot] Pasta encontrada no Shared Drive: ${name} (${res.data.files[0].id})`);
             return res.data.files[0].id!;
         }
 
-        // Se não encontrar, cria dentro do Shared Drive
-        console.log(`[DriveRoot] Pasta "${name}" não encontrada. Criando dentro do diretório compartilhado.`);
         const newFolder = await drive.files.create({
             requestBody: {
                 name,
@@ -166,7 +166,7 @@ async function getOrCreateRootFolder(drive: drive_v3.Drive, name: string): Promi
         return newFolder.data.id!;
     } catch (error: any) {
         console.error(`[DriveRoot] Erro ao gerenciar pasta raiz "${name}":`, error.message);
-        throw new Error(`Falha ao acessar o diretório compartilhado Bueno Gois no Google Drive.`);
+        throw new Error(`Falha ao acessar o diretório compartilhado Bueno Gois.`);
     }
 }
 
@@ -191,7 +191,6 @@ async function findItemByName(drive: drive_v3.Drive, parentId: string, name: str
         
         return res.data.files && res.data.files.length > 0 ? res.data.files[0].id! : null;
     } catch (error: any) {
-        console.error(`[DriveSearch] Erro ao buscar "${name}":`, error.message);
         return null;
     }
 }
@@ -249,7 +248,7 @@ export async function syncClientToDrive(clientId: string, clientName: string): P
         return { success: true };
     } catch (error: any) {
         console.error("[syncClientToDrive] Erro:", error.message);
-        return { success: false, error: error.message || "Erro desconhecido na sincronização do cliente." };
+        return { success: false, error: error.message };
     }
 }
 
@@ -279,13 +278,12 @@ export async function syncLeadToDrive(leadId: string): Promise<{ success: boolea
         return { success: true, id: leadFolderId };
     } catch (error: any) {
         console.error("[syncLeadToDrive] Erro:", error.message);
-        return { success: false, error: error.message || "Erro na sincronização do Lead." };
+        return { success: false, error: error.message };
     }
 }
 
 /**
  * Sincroniza um processo, garantindo que ele esteja dentro do cliente.
- * Removida a redundância da pasta global "00 - PROCESSOS".
  */
 export async function syncProcessToDrive(processId: string): Promise<{ success: boolean; error?: string }> {
     if (!firestoreAdmin) return { success: false, error: "Servidor de dados inacessível." };
@@ -303,7 +301,6 @@ export async function syncProcessToDrive(processId: string): Promise<{ success: 
 
         const { drive } = await getGoogleApiClientsForUser();
 
-        // Se o cliente não tem pasta, sincroniza o cliente primeiro
         if (!clientData.driveFolderId) {
             const syncRes = await syncClientToDrive(clientData.id, `${clientData.firstName} ${clientData.lastName}`);
             if (!syncRes.success) throw new Error(syncRes.error);
@@ -322,8 +319,6 @@ export async function syncProcessToDrive(processId: string): Promise<{ success: 
             await ensureFolder(drive, physicalProcessFolderId, name);
         }
 
-        // Removida a criação de atalhos na pasta global "00 - PROCESSOS" por ser redundante.
-
         await processRef.update({
             driveFolderId: physicalProcessFolderId,
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -333,6 +328,6 @@ export async function syncProcessToDrive(processId: string): Promise<{ success: 
         return { success: true };
     } catch (error: any) {
         console.error("[syncProcessToDrive] Erro:", error.message);
-        return { success: false, error: error.message || "Erro desconhecido na sincronização do processo." };
+        return { success: false, error: error.message };
     }
 }
