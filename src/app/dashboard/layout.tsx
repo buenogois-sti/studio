@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -49,7 +50,8 @@ import {
   CheckSquare,
   LayoutDashboard,
   Users,
-  MapPin
+  MapPin,
+  Gavel
 } from 'lucide-react';
 import type { UserProfile } from '@/lib/types';
 import {
@@ -82,8 +84,8 @@ const sidebarSections = [
     items: [
       { href: '/dashboard/processos', label: 'Processos', icon: FolderKanban, roles: ['admin', 'lawyer', 'assistant', 'financial'] },
       { href: '/dashboard/prazos', label: 'Agenda de Prazos', icon: Timer, roles: ['admin', 'lawyer', 'assistant'] },
-      { href: '/dashboard/audiencias', label: 'Pauta de Audiências', icon: Calendar, roles: ['admin', 'lawyer', 'assistant'] },
-      { href: '/dashboard/diligencias', label: 'Diligências', icon: MapPin, roles: ['admin', 'lawyer', 'assistant'] },
+      { href: '/dashboard/audiencias', label: 'Pauta de Audiências', icon: Gavel, roles: ['admin', 'lawyer', 'assistant'] },
+      { href: '/dashboard/diligencias', label: 'Atos Operacionais', icon: MapPin, roles: ['admin', 'lawyer', 'assistant'] },
       { href: '/dashboard/acervo', label: 'Acervo de Modelos', icon: Library, roles: ['admin', 'lawyer', 'assistant'] },
       { href: '/dashboard/arquivo', label: 'Arquivo Digital', icon: Archive, roles: ['admin', 'lawyer', 'assistant'] },
     ]
@@ -112,7 +114,7 @@ const BreadcrumbMap: { [key: string]: string } = {
   '/dashboard/processos': 'Processos',
   '/dashboard/prazos': 'Prazos Judiciais',
   '/dashboard/audiencias': 'Audiências',
-  '/dashboard/diligencias': 'Diligências',
+  '/dashboard/diligencias': 'Atos Operacionais',
   '/dashboard/reembolsos': 'Reembolsos',
   '/dashboard/financeiro': 'Financeiro',
   '/dashboard/repasses': 'Carteira & Repasses',

@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -21,7 +22,10 @@ import {
   AlertCircle,
   FolderKanban,
   Edit,
-  Eye
+  Eye,
+  Gavel,
+  ShieldCheck,
+  AlertTriangle
 } from 'lucide-react';
 import { format, isSameDay, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -50,6 +54,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Link from 'next/link';
 import { HearingReturnDialog } from '@/components/process/HearingReturnDialog';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const statusConfig = {
   PENDENTE: { label: 'Pendente', icon: Clock, color: 'text-blue-500 bg-blue-500/10' },
@@ -79,11 +84,18 @@ export default function DiligenciasPage() {
   const diligenciasQuery = useMemoFirebase(() => {
     if (!firestore || !userProfile) return null;
     const base = collection(firestore, 'hearings');
-    const q = query(base, where('type', '==', 'DILIGENCIA'), orderBy('date', 'asc'));
+    const operationalTypes = ['DILIGENCIA', 'PERICIA'];
+    
+    let q;
+    if (selectedLawyerFilter !== 'all') {
+      q = query(base, where('lawyerId', '==', selectedLawyerFilter), where('type', 'in', operationalTypes), orderBy('date', 'asc'));
+    } else {
+      q = query(base, where('type', 'in', operationalTypes), orderBy('date', 'asc'));
+    }
     return q;
-  }, [firestore, userProfile, refreshKey]);
+  }, [firestore, userProfile, refreshKey, selectedLawyerFilter]);
 
-  const { data: diligenciasData, isLoading: isLoadingDiligencias } = useCollection<Hearing>(diligenciasQuery);
+  const { data: diligenciasData, isLoading: isLoadingDiligencias, error: diligenciasError } = useCollection<Hearing>(diligenciasQuery);
 
   const processesQuery = useMemoFirebase(() => firestore ? collection(firestore, 'processes') : null, [firestore]);
   const { data: processesData } = useCollection<Process>(processesQuery);
@@ -98,11 +110,9 @@ export default function DiligenciasPage() {
         process?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         d.location.toLowerCase().includes(searchTerm.toLowerCase());
       
-      const matchesLawyer = selectedLawyerFilter === 'all' || d.lawyerId === selectedLawyerFilter;
-      
-      return matchesSearch && matchesLawyer;
+      return matchesSearch;
     });
-  }, [diligenciasData, searchTerm, selectedLawyerFilter, processesMap]);
+  }, [diligenciasData, searchTerm, processesMap]);
 
   const handleUpdateStatus = async (id: string, status: HearingStatus) => {
     setIsProcessing(id);
@@ -119,12 +129,29 @@ export default function DiligenciasPage() {
 
   const isLoading = isUserLoading || isLoadingDiligencias;
 
+  if (diligenciasError) {
+    return (
+      <div className="p-6">
+        <Alert variant="destructive" className="bg-rose-500/10 border-rose-500/20 text-rose-400">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Índice Necessário</AlertTitle>
+          <AlertDescription className="text-xs mt-2 space-y-4">
+            <p>O Firestore exige um índice para filtrar por tipo 'DILIGENCIA'/'PERICIA' e ordenar por data.</p>
+            <Button variant="outline" size="sm" className="mt-2 text-[10px] uppercase font-bold border-rose-500/30" asChild>
+              <a href="https://console.firebase.google.com" target="_blank">Gerar Índice no Console</a>
+            </Button>
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-8 pb-10">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <H1 className="text-white text-3xl font-black">Agenda de Diligências</H1>
-          <p className="text-sm text-muted-foreground">Gestão de tarefas externas, vistorias e despachos da equipe.</p>
+          <H1 className="text-white text-3xl font-black">Atos Operacionais</H1>
+          <p className="text-sm text-muted-foreground">Gestão de diligências externas, vistorias e perícias da banca.</p>
         </div>
         <div className="flex items-center gap-2">
           <div className="relative w-full max-w-xs">
@@ -142,7 +169,7 @@ export default function DiligenciasPage() {
             className="h-10 border-primary/20 text-primary hover:bg-primary/5 font-bold"
           >
             <Link href="/dashboard/processos">
-              <FolderKanban className="mr-2 h-4 w-4" /> Acessar Processos
+              <FolderKanban className="mr-2 h-4 w-4" /> Ir p/ Processos
             </Link>
           </Button>
         </div>
@@ -155,7 +182,7 @@ export default function DiligenciasPage() {
               <Briefcase className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Pendentes</p>
+              <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Ativos</p>
               <p className="text-2xl font-black text-white">{filteredDiligencias.filter(d => d.status === 'PENDENTE').length}</p>
             </div>
           </CardContent>
@@ -166,7 +193,7 @@ export default function DiligenciasPage() {
               <CheckCircle2 className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Concluídas</p>
+              <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Concluídos</p>
               <p className="text-2xl font-black text-white">{filteredDiligencias.filter(d => d.status === 'REALIZADA').length}</p>
             </div>
           </CardContent>
@@ -177,7 +204,7 @@ export default function DiligenciasPage() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <TabsList className="bg-[#0f172a] p-1 border border-white/10 h-12">
             <TabsTrigger value="pendentes" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground px-6 h-10 font-bold">
-              Ativas
+              Pendentes
             </TabsTrigger>
             <TabsTrigger value="todas" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground px-6 h-10 font-bold">
               Histórico
@@ -188,10 +215,10 @@ export default function DiligenciasPage() {
             <Filter className="h-4 w-4 text-slate-500" />
             <Select value={selectedLawyerFilter} onValueChange={setSelectedLawyerFilter}>
               <SelectTrigger className="w-[200px] h-10 bg-[#0f172a] border-white/10 text-white">
-                <SelectValue placeholder="Filtrar responsável..." />
+                <SelectValue placeholder="Responsável..." />
               </SelectTrigger>
               <SelectContent className="bg-[#0f172a] border-white/10 text-white">
-                <SelectItem value="all">Todos os Colaboradores</SelectItem>
+                <SelectItem value="all">Todos</SelectItem>
                 {staffData?.map(s => (
                   <SelectItem key={s.id} value={s.id}>{s.firstName} {s.lastName}</SelectItem>
                 ))}
@@ -247,7 +274,6 @@ function DiligenceList({ data, isLoading, onReturn, isProcessing, processesMap }
       <div className="text-center py-20 bg-white/5 rounded-3xl border-2 border-dashed border-white/10 opacity-40">
         <Briefcase className="h-12 w-12 mx-auto mb-4" />
         <p className="font-bold text-white uppercase tracking-widest text-[10px]">Nenhuma diligência encontrada</p>
-        <p className="text-[9px] text-slate-500 uppercase mt-2">Agende uma nova diligência diretamente no menu do processo</p>
       </div>
     );
   }
@@ -269,21 +295,24 @@ function DiligenceList({ data, isLoading, onReturn, isProcessing, processesMap }
                 </div>
                 <div className="min-w-0 space-y-1">
                   <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="text-[8px] font-black uppercase bg-blue-500/10 text-blue-400 border-none px-1.5 h-4.5">DILIGÊNCIA</Badge>
+                    <Badge variant="outline" className={cn(
+                      "text-[8px] font-black uppercase border-none px-1.5 h-4.5",
+                      d.type === 'PERICIA' ? "bg-purple-500/10 text-purple-400" : "bg-blue-500/10 text-blue-400"
+                    )}>{d.type}</Badge>
                     <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest flex items-center gap-1">
                       <Clock className="h-3 w-3" /> {format(d.date.toDate(), 'HH:mm')}
                     </span>
                   </div>
                   <h4 className="font-bold text-white group-hover:text-primary transition-colors truncate">{d.responsibleParty}</h4>
                   <p className="text-[10px] text-slate-400 font-medium truncate flex items-center gap-1.5">
-                    <FolderKanban className="h-3 w-3 text-primary" /> {process?.name || 'Processo não encontrado'}
+                    <FolderKanban className="h-3 w-3 text-primary" /> {process?.name || 'Vínculo Externo'}
                   </p>
                 </div>
               </div>
 
               <div className="flex items-center gap-6">
                 <div className="hidden lg:flex flex-col items-end">
-                  <p className="text-[9px] font-black uppercase text-slate-500 tracking-widest mb-1">Localização</p>
+                  <p className="text-[9px] font-black uppercase text-slate-500 tracking-widest mb-1">Local</p>
                   <div className="flex items-center gap-1.5 text-xs text-slate-300">
                     <MapPin className="h-3.5 w-3.5 text-primary" />
                     <span className="truncate max-w-[200px]">{d.location}</span>
@@ -303,7 +332,7 @@ function DiligenceList({ data, isLoading, onReturn, isProcessing, processesMap }
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="bg-[#0f172a] border-white/10 w-56">
                       <DropdownMenuItem onClick={() => onReturn(d)} className="font-bold gap-2 text-emerald-400 focus:bg-emerald-500/10">
-                        <History className="h-4 w-4" /> Dar Retorno (Baixa)
+                        <History className="h-4 w-4" /> Emitir Relatório
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild className="font-bold gap-2 text-white">
                         <Link href={`/dashboard/processos?clientId=${process?.clientId}`}>
@@ -312,7 +341,7 @@ function DiligenceList({ data, isLoading, onReturn, isProcessing, processesMap }
                       </DropdownMenuItem>
                       <DropdownMenuSeparator className="bg-white/5" />
                       <DropdownMenuItem className="text-rose-500 font-bold gap-2">
-                        <X className="h-4 w-4" /> Cancelar Diligência
+                        <X className="h-4 w-4" /> Cancelar
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>

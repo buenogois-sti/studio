@@ -111,8 +111,6 @@ const statusConfig: Record<HearingStatus, { label: string; icon: any; color: str
 
 const getTypeIcon = (type: string) => {
   if (type === 'ATENDIMENTO') return <Users className="h-3.5 w-3.5" />;
-  if (type === 'PERICIA') return <Activity className="h-3.5 w-3.5" />;
-  if (type === 'DILIGENCIA') return <Briefcase className="h-3.5 w-3.5" />;
   return <Gavel className="h-3.5 w-3.5" />;
 };
 
@@ -253,7 +251,6 @@ export default function AudienciasPage() {
   const { data: staffData } = useCollection<Staff>(staffQuery);
   const lawyers = staffData?.filter(s => s.role === 'lawyer' || s.role === 'partner' || s.role === 'intern') || [];
 
-  // Resolvendo staffId do usuário logado (Bueno Gois Identity Resolution)
   const currentStaffMember = React.useMemo(() => {
     if (!staffData || !session?.user?.email) return null;
     return staffData.find(s => s.email.toLowerCase() === session.user.email?.toLowerCase());
@@ -262,18 +259,17 @@ export default function AudienciasPage() {
   const hearingsQuery = useMemoFirebase(() => {
     if (!firestore || !userProfile) return null;
     const base = collection(firestore, 'hearings');
+    const audienciasTypes = ['UNA', 'CONCILIACAO', 'INSTRUCAO', 'JULGAMENTO', 'ATENDIMENTO', 'OUTRA'];
 
-    // Admin/Assistant vêem tudo por padrão
     if (userProfile.role === 'admin' || userProfile.role === 'assistant' || userProfile.role === 'financial') {
       if (selectedLawyerFilter !== 'all') {
-        return query(base, where('lawyerId', '==', selectedLawyerFilter), where('date', '>=', stableHistoryCutoff), orderBy('date', 'asc'), limit(150));
+        return query(base, where('lawyerId', '==', selectedLawyerFilter), where('type', 'in', audienciasTypes), where('date', '>=', stableHistoryCutoff), orderBy('date', 'asc'), limit(150));
       }
-      return query(base, where('date', '>=', stableHistoryCutoff), orderBy('date', 'asc'), limit(250));
+      return query(base, where('type', 'in', audienciasTypes), where('date', '>=', stableHistoryCutoff), orderBy('date', 'asc'), limit(250));
     }
     
-    // Advogado vê apenas sua pauta vinculada ao seu registro de STAFF
     if (currentStaffMember) {
-      return query(base, where('lawyerId', '==', currentStaffMember.id), where('date', '>=', stableHistoryCutoff), orderBy('date', 'asc'), limit(150));
+      return query(base, where('lawyerId', '==', currentStaffMember.id), where('type', 'in', audienciasTypes), where('date', '>=', stableHistoryCutoff), orderBy('date', 'asc'), limit(150));
     }
 
     return null;
@@ -285,7 +281,6 @@ export default function AudienciasPage() {
   const { data: processesData } = useCollection<Process>(processesQuery);
   const processesMap = React.useMemo(() => new Map(processesData?.map(p => [p.id, p])), [processesData]);
 
-  // Lógica para abrir retorno automático via URL (ReturnId do Google Agenda)
   React.useEffect(() => {
     const returnId = searchParams.get('returnId');
     if (returnId && hearingsData && !returnHearing) {
@@ -354,7 +349,7 @@ export default function AudienciasPage() {
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Configuração Necessária (Firestore Index)</AlertTitle>
           <AlertDescription className="text-xs mt-2 space-y-4">
-            <p>O Firebase requer um índice composto para esta visualização filtrada.</p>
+            <p>O Firebase requer um índice composto para esta visualização filtrada por tipo e data.</p>
             <Button variant="outline" size="sm" className="mt-2 text-[10px] uppercase font-bold border-rose-500/30" asChild>
               <a href="https://console.firebase.google.com" target="_blank">Abrir Console Firebase</a>
             </Button>
@@ -368,9 +363,9 @@ export default function AudienciasPage() {
     <div className="flex flex-col gap-8 pb-10">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
-                <H1 className="text-white text-3xl font-black">Agenda de Compromissos</H1>
+                <H1 className="text-white text-3xl font-black">Agenda de Audiências</H1>
                 <p className="text-sm text-muted-foreground">
-                  {userProfile?.role === 'lawyer' ? 'Seus compromissos estratégicos e judiciais.' : 'Visão global de atendimentos e pauta da banca.'}
+                  {userProfile?.role === 'lawyer' ? 'Seus atos processuais e atendimentos agendados.' : 'Visão global da pauta de audiências da banca.'}
                 </p>
             </div>
             
@@ -411,8 +406,8 @@ export default function AudienciasPage() {
               <div className="flex items-center gap-3">
                 <AlertCircle className="h-5 w-5 text-amber-500" />
                 <div>
-                  <p className="text-sm font-bold text-amber-200">Retornos Jurídicos Pendentes</p>
-                  <p className="text-xs text-amber-400/70">Existem {pendingReturns.length} compromisso(s) realizado(s) aguardando o seguimento operacional.</p>
+                  <p className="text-sm font-bold text-amber-200">Retornos Pendentes</p>
+                  <p className="text-xs text-amber-400/70">Existem {pendingReturns.length} ato(s) realizado(s) aguardando o relatório de retorno.</p>
                 </div>
               </div>
               <Button 
@@ -444,13 +439,12 @@ export default function AudienciasPage() {
                 {isLoading ? (
                   <div className="flex flex-col items-center justify-center py-32 space-y-4">
                     <Loader2 className="h-12 w-12 animate-spin text-primary" />
-                    <p className="text-sm font-black uppercase tracking-widest text-muted-foreground">Buscando compromissos...</p>
+                    <p className="text-sm font-black uppercase tracking-widest text-muted-foreground">Buscando pauta...</p>
                   </div>
                 ) : (
                   <Card className="bg-[#0f172a] border-white/5 overflow-hidden shadow-2xl">
                       <div className="divide-y divide-white/5">
                           {weekDays.map(day => {
-                              // Mostra todos os atos do dia (exceto cancelados) para o usuário saber o que já foi feito
                               const daily = hearingsData?.filter(h => isSameDay(h.date.toDate(), day) && h.status !== 'CANCELADA') || [];
                               if (daily.length === 0) return null;
 
@@ -473,18 +467,16 @@ export default function AudienciasPage() {
                                               const StatusIcon = currentStatusConfig.icon;
                                               const isUpdating = isProcessing === h.id;
                                               const isMeeting = h.type === 'ATENDIMENTO';
-                                              const isDiligence = h.type === 'DILIGENCIA';
                                               
                                               return (
                                                   <div key={h.id} className={cn(
                                                     "flex flex-col md:flex-row md:items-center gap-6 p-5 rounded-2xl border transition-all duration-300 group",
                                                     h.status === 'REALIZADA' ? "bg-emerald-500/[0.01] border-emerald-500/10 opacity-70" :
                                                     isMeeting ? "bg-emerald-500/[0.02] border-emerald-500/10 hover:border-emerald-500/30" : 
-                                                    isDiligence ? "bg-blue-500/[0.02] border-blue-500/10 hover:border-blue-500/30" :
                                                     "bg-black/20 border-white/5 hover:border-primary/20"
                                                   )}>
                                                       <div className="flex items-center gap-3 min-w-[100px] border-r border-white/5 pr-4">
-                                                          <Clock className={cn("h-4 w-4", isMeeting ? "text-emerald-400" : isDiligence ? "text-blue-400" : "text-primary")} />
+                                                          <Clock className={cn("h-4 w-4", isMeeting ? "text-emerald-400" : "text-primary")} />
                                                           <span className="text-base font-black text-white tabular-nums">{format(h.date.toDate(), 'HH:mm')}</span>
                                                       </div>
                                                       <div className="flex-1 min-w-0">
@@ -492,7 +484,6 @@ export default function AudienciasPage() {
                                                               <Badge variant="outline" className={cn(
                                                                 "text-[8px] font-black uppercase px-2 gap-1.5 h-5",
                                                                 isMeeting ? "border-emerald-500/30 text-emerald-400" : 
-                                                                isDiligence ? "border-blue-500/30 text-blue-400" :
                                                                 "border-primary/30 text-primary"
                                                               )}>
                                                                 {getTypeIcon(h.type)}
@@ -506,7 +497,7 @@ export default function AudienciasPage() {
                                                             {p?.name || h.processName}
                                                           </h4>
                                                           <p className="text-[10px] text-slate-500 font-mono mt-1 flex items-center gap-1.5">
-                                                            {isMeeting ? <Video className="h-3 w-3 text-emerald-500 shrink-0" /> : isDiligence ? <MapPin className="h-3 w-3 text-blue-500 shrink-0" /> : <MapPin className="h-3 w-3 text-primary shrink-0" />} 
+                                                            {isMeeting ? <Video className="h-3 w-3 text-emerald-500 shrink-0" /> : <MapPin className="h-3 w-3 text-primary shrink-0" />} 
                                                             {h.location}
                                                           </p>
                                                       </div>
@@ -605,8 +596,7 @@ export default function AudienciasPage() {
                                 "w-1.5 h-1.5 rounded-full",
                                 h.status === 'REALIZADA' ? "bg-emerald-500" : 
                                 h.status === 'CANCELADA' ? "bg-rose-500" : 
-                                h.type === 'ATENDIMENTO' ? "bg-emerald-400" : 
-                                h.type === 'DILIGENCIA' ? "bg-blue-400" : "bg-primary"
+                                h.type === 'ATENDIMENTO' ? "bg-emerald-400" : "bg-primary"
                               )} />
                             ))}
                           </div>
@@ -631,18 +621,16 @@ export default function AudienciasPage() {
                               const config = statusConfig[h.status || 'PENDENTE'];
                               const StatusIcon = config.icon;
                               const isUpdating = isProcessing === h.id;
-                              const isDiligence = h.type === 'DILIGENCIA';
 
                               return (
                                 <div key={h.id} className={cn(
                                   "p-5 rounded-2xl border space-y-4 transition-all group",
                                   h.type === 'ATENDIMENTO' ? "bg-emerald-500/[0.03] border-emerald-500/20" : 
-                                  isDiligence ? "bg-blue-500/[0.03] border-blue-500/20" :
                                   "bg-black/30 border-white/5 hover:border-primary/20"
                                 )}>
                                   <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
-                                      <Clock className={cn("h-3.5 w-3.5", h.type === 'ATENDIMENTO' ? "text-emerald-400" : isDiligence ? "text-blue-400" : "text-primary")} />
+                                      <Clock className={cn("h-3.5 w-3.5", h.type === 'ATENDIMENTO' ? "text-emerald-400" : "text-primary")} />
                                       <span className="text-xs font-black text-white tabular-nums">{format(h.date.toDate(), 'HH:mm')}</span>
                                     </div>
                                     <div className="flex items-center gap-2">
