@@ -1,3 +1,4 @@
+
 'use server';
 
 import { firestoreAdmin } from '@/firebase/admin';
@@ -11,6 +12,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { getGoogleApiClientsForUser, getGoogleClientsForStaff } from './drive';
 import { formatISO, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+
+const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL?.replace(/\/$/, '') || 'http://localhost:9002';
 
 /**
  * Cria um novo lead na pauta de triagem com tarefas iniciais concluídas.
@@ -335,7 +338,7 @@ export async function scheduleLeadInterview(leadId: string, data: {
       `📝 Notas da Triagem:`,
       `${data.notes || 'Sem observações adicionais.'}`,
       ``,
-      `🔗 Link LexFlow: https://www.buenogoisadvogado.com.br/dashboard/leads`,
+      `🔗 Link LexFlow: ${BASE_URL}/dashboard/leads`,
       `🔐 ID Interno: ${leadId}`
     ].join('\n');
 
@@ -386,7 +389,7 @@ export async function scheduleLeadInterview(leadId: string, data: {
     await createNotification({
       userId: leadData.lawyerId,
       title: "Nova Entrevista na sua Pauta",
-      description: `Um novo atendimento foi agendado para o lead: ${leadData.title}. Verifique sua agenda.`,
+      description: `Um novo atendimento foi agendado para the lead: ${leadData.title}. Verifique sua agenda.`,
       type: 'hearing',
       href: '/dashboard/leads'
     });

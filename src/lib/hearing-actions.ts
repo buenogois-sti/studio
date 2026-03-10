@@ -16,6 +16,8 @@ import { revalidatePath } from 'next/cache';
 import { createFinancialEventAndTitles } from './finance-actions';
 import { createLegalDeadline } from './deadline-actions';
 
+const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL?.replace(/\/$/, '') || 'http://localhost:9002';
+
 /**
  * Utility to ensure a date string has the correct Brazil offset (-03:00)
  */
@@ -55,7 +57,7 @@ function buildCalendarDescription(data: {
   const whatsappLink = cleanPhone ? `https://wa.me/${cleanPhone.startsWith('55') ? cleanPhone : '55' + cleanPhone}` : 'Telefone não disponível';
 
   const typeLabel = data.isMeeting ? '🗓️ ATENDIMENTO / REUNIÃO' : '📌 PROCESSO JUDICIAL';
-  const returnUrl = `https://www.buenogoisadvogado.com.br/dashboard/audiencias?returnId=${data.id}`;
+  const returnUrl = `${BASE_URL}/dashboard/audiencias?returnId=${data.id}`;
 
   const sections = [
     typeLabel,
@@ -258,7 +260,7 @@ export async function createHearing(data: {
           tasklist: '@default',
           requestBody: {
             title: `📝 EMITIR RELATÓRIO: ${clientInfo.name}`,
-            notes: `O ato processual encerrou. Clique para preencher o retorno: https://www.buenogoisadvogado.com.br/dashboard/audiencias?returnId=${hearingRef.id}`,
+            notes: `O ato processual encerrou. Clique para preencher o retorno: ${BASE_URL}/dashboard/audiencias?returnId=${hearingRef.id}`,
             due: reminderTime.toISOString(),
           }
         });

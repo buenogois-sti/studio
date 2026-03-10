@@ -1,3 +1,4 @@
+
 # 🚀 Guia de Deploy - Vercel (Produção Bueno Gois)
 
 Este guia detalha como hospedar o **LexFlow** na Vercel com o domínio personalizado.
@@ -13,16 +14,17 @@ Este guia detalha como hospedar o **LexFlow** na Vercel com o domínio personali
 
 No painel da Vercel (*Settings > Environment Variables*), adicione estas chaves EXATAMENTE como configurado no Google/Firebase:
 
-| Nome | Valor Recomendado |
-|------|-------|
-| `NEXTAUTH_SECRET` | (Sua chave secreta gerada) |
-| `NEXTAUTH_URL` | `https://www.buenogoisadvogado.com.br` |
-| `GOOGLE_CLIENT_ID` | `1052927104977-t77npqdjgl938qgcrmnmih626gqrkrpa.apps.googleusercontent.com` |
-| `GOOGLE_CLIENT_SECRET` | (Sua chave secreta do Google) |
-| `FIREBASE_SERVICE_ACCOUNT_JSON` | (O JSON completo do Firebase em uma única linha) |
-| `GEMINI_API_KEY` | (Sua chave da API Google AI) |
+| Nome | Valor Recomendado | Observação |
+|------|-------|------------|
+| `NEXTAUTH_SECRET` | (Sua chave secreta) | Use `openssl rand -base64 32` |
+| `NEXTAUTH_URL` | `https://www.buenogoisadvogado.com.br` | **NÃO** coloque barra no final |
+| `NEXT_PUBLIC_BASE_URL` | `https://www.buenogoisadvogado.com.br` | **NÃO** coloque barra no final |
+| `GOOGLE_CLIENT_ID` | `1052927104977-t77...` | ID do Google Cloud |
+| `GOOGLE_CLIENT_SECRET` | (Sua chave secreta) | Secret do Google Cloud |
+| `FIREBASE_SERVICE_ACCOUNT_JSON` | (O JSON completo) | Deve pertencer ao projeto `studio-7080106838-23904` |
+| `GEMINI_API_KEY` | (Sua chave da API) | API Key do Google AI Studio |
 
-> **Atenção:** O `NEXTAUTH_URL` deve ser exatamente o domínio que você usa no navegador para acessar o sistema.
+> **Atenção:** O `NEXTAUTH_URL` e o `NEXT_PUBLIC_BASE_URL` devem ser idênticos e **sem a barra final**. Se colocar a barra, links automáticos de agenda podem falhar.
 
 ---
 
