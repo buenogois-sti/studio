@@ -23,9 +23,7 @@ const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL?.replace(/\/$/, '') || 'http:/
  */
 function ensureBrazilOffset(dateStr: string): string {
   if (!dateStr) return dateStr;
-  // If it already has an offset or Z, leave it
   if (dateStr.includes('-03:00') || dateStr.endsWith('Z')) return dateStr;
-  // If it has 'T' but no offset, append -03:00
   if (dateStr.includes('T') && !dateStr.includes('+') && !dateStr.match(/-\d{2}:\d{2}$/)) {
     return `${dateStr}:00-03:00`;
   }
@@ -63,7 +61,7 @@ function buildCalendarDescription(data: {
     typeLabel,
     data.isMeeting ? `Finalidade: ${data.legalArea}` : `Tipo: ${data.legalArea}`,
     ``,
-    `🔗 DAR RETORNO NO LEXFLOW:`,
+    `🔗 DAR RETORNO NO LEXFLOW (RELATÓRIO):`,
     `${returnUrl}`,
     ``,
     `🔢 Número do Processo:`,
@@ -132,7 +130,6 @@ export async function createHearing(data: {
     throw new Error('Não autenticado.');
   }
 
-  // Ensure date has correct offset for Brazil
   const normalizedDate = ensureBrazilOffset(data.hearingDate);
 
   const { 
@@ -190,11 +187,11 @@ export async function createHearing(data: {
 
     const hearingRef = await firestoreAdmin.collection('hearings').add(hearingPayload);
 
-    // Timeline do Processo
+    // Timeline
     const timelineEvent: TimelineEvent = {
       id: uuidv4(),
       type: type === 'ATENDIMENTO' ? 'meeting' : 'hearing',
-      description: `${type === 'ATENDIMENTO' ? 'ATENDIMENTO AGENDADO' : 'AUDIÊNCIA AGENDADA'}: ${type} para o dia ${format(hearingDateTime, 'dd/MM/yyyy HH:mm', { locale: ptBR })}. Local: ${location}.${meetingLink ? ' Link virtual configurado.' : ''}`,
+      description: `${type === 'ATENDIMENTO' ? 'ATENDIMENTO AGENDADO' : 'AUDIÊNCIA AGENDADA'}: ${type} para o dia ${format(hearingDateTime, 'dd/MM/yyyy HH:mm', { locale: ptBR })}. Local: ${location}.`,
       date: Timestamp.now() as any,
       authorName: session.user.name || 'Sistema'
     };
@@ -204,12 +201,14 @@ export async function createHearing(data: {
       updatedAt: FieldValue.serverTimestamp()
     });
 
-    // Sincronização com o Google Workspace (Agenda e Tasks)
+    // Sincronização Workspace com a nova rotina de alertas
     try {
       const { calendar, tasks } = await getGoogleClientsForStaff(lawyerId);
       const startDateTime = hearingDateTime;
       const endDateTime = add(startDateTime, { hours: 1 });
-      const reminderTime = add(startDateTime, { hours: 1, minutes: 30 });
+      
+      // Lembrete de retorno sugerido: 1h30 após o início
+      const reportReminderTime = add(startDateTime, { hours: 1, minutes: 30 });
 
       const isMeeting = type === 'ATENDIMENTO';
 
@@ -232,7 +231,7 @@ export async function createHearing(data: {
         isMeeting
       });
 
-      // 1. Criar Evento na Agenda
+      // 1. Criar Evento na Agenda com a nova política de alertas Bueno Gois
       const summaryPrefix = isMeeting ? '🗓️ REUNIÃO' : (type === 'PERICIA' ? '🔍 Perícia' : '⚖️ Audiência');
       const event = {
         summary: `${summaryPrefix} [${type}] | ${clientInfo.name} (Dr. ${lawyerName})`,
@@ -243,8 +242,10 @@ export async function createHearing(data: {
         reminders: {
           useDefault: false,
           overrides: [
-            { method: 'popup', minutes: 1440 },
-            { method: 'popup', minutes: 120 },
+            { method: 'email', minutes: 1440 }, // 24h antes
+            { method: 'popup', minutes: 1440 }, // 24h antes
+            { method: 'popup', minutes: 360 },  // 6h antes
+            { method: 'popup', minutes: 60 },   // 1h antes
           ],
         },
       };
@@ -254,14 +255,14 @@ export async function createHearing(data: {
         requestBody: event,
       });
 
-      // 2. Criar Tarefa de Lembrete de Retorno (Google Tasks)
+      // 2. Criar Tarefa de Lembrete de Retorno (Google Tasks) - Rotina Inteligente
       try {
         await tasks.tasks.insert({
           tasklist: '@default',
           requestBody: {
             title: `📝 EMITIR RELATÓRIO: ${clientInfo.name}`,
-            notes: `O ato processual encerrou. Clique para preencher o retorno: ${BASE_URL}/dashboard/audiencias?returnId=${hearingRef.id}`,
-            due: reminderTime.toISOString(),
+            notes: `O ato processual deve ter sido encerrado. Clique para preencher o retorno oficial no LexFlow: ${BASE_URL}/dashboard/audiencias?returnId=${hearingRef.id}`,
+            due: reportReminderTime.toISOString(),
           }
         });
       } catch (tError) {
@@ -275,12 +276,11 @@ export async function createHearing(data: {
       console.warn("Workspace sync partially failed:", calendarError.message);
     }
 
-    // Notificar o advogado alvo
     if (lawyerId !== session.user.id) {
       await createNotification({
         userId: lawyerId,
         title: "Novo Atendimento Agendado",
-        description: `${session.user.name} agendou um compromisso (${type}) para você no processo ${processData?.name}.`,
+        description: `${session.user.name} agendou um compromisso (${type}) para você no processo ${processData?.name}. Alertas de 24h, 6h e 1h configurados.`,
         type: 'hearing',
         href: `/dashboard/audiencias`,
       });
@@ -372,11 +372,20 @@ export async function updateHearing(hearingId: string, data: Partial<Hearing>) {
           calendarId: 'primary',
           eventId: oldData.googleCalendarEventId,
           requestBody: {
-            summary: `${summaryPrefix} [${data.type || oldData.type}] | ${clientInfo.name} (Dr. ${lawyerName})`,
+            summary: `${oldData.status === 'REALIZADA' ? '✅ ' : ''}${summaryPrefix} [${data.type || oldData.type}] | ${clientInfo.name} (Dr. ${lawyerName})`,
             location: data.meetingLink || data.location || oldData.location,
             description: description,
             start: { dateTime: formatISO(startDateTime), timeZone: 'America/Sao_Paulo' },
             end: { dateTime: formatISO(endDateTime), timeZone: 'America/Sao_Paulo' },
+            reminders: {
+              useDefault: false,
+              overrides: [
+                { method: 'email', minutes: 1440 },
+                { method: 'popup', minutes: 1440 },
+                { method: 'popup', minutes: 360 },
+                { method: 'popup', minutes: 60 },
+              ],
+            },
           }
         });
       } catch (e) {

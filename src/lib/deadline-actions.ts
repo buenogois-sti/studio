@@ -170,7 +170,7 @@ export async function createLegalDeadline(data: {
       id: deadlineRef.id
     });
 
-    // 1. Sincronização com Google Agenda e Google Tasks
+    // Sincronização com Google Agenda e Google Tasks
     let googleCalendarEventId: string | undefined;
     let googleTaskId: string | undefined;
 
@@ -182,7 +182,7 @@ export async function createLegalDeadline(data: {
       const fatalDateEnd = new Date(endDateTime);
       fatalDateEnd.setHours(10, 0, 0, 0);
 
-      // Criar Evento no Calendário
+      // Criar Evento no Calendário com Alertas Reforçados
       const event = {
         summary: `🚨 PRAZO: ${data.type} | ${clientInfo.name}`,
         description: calendarDescription,
@@ -191,9 +191,9 @@ export async function createLegalDeadline(data: {
         reminders: {
           useDefault: false,
           overrides: [
-            { method: 'popup', minutes: 1440 },
-            { method: 'popup', minutes: 720 },
-            { method: 'email', minutes: 1440 }
+            { method: 'popup', minutes: 1440 }, // 24h
+            { method: 'popup', minutes: 720 },  // 12h
+            { method: 'email', minutes: 1440 }  // 24h
           ],
         },
       };
@@ -253,7 +253,7 @@ export async function createLegalDeadline(data: {
       await createNotification({
         userId: leadLawyerId,
         title: "Novo Prazo na sua Agenda",
-        description: `${data.type} para ${processData?.name} agendado por ${session.user.name}.`,
+        description: `${data.type} para ${processData?.name} agendado por ${session.user.name}. Alertas de 24h e 12h ativos.`,
         type: 'deadline',
         href: `/dashboard/prazos`,
       });
@@ -364,6 +364,14 @@ export async function updateLegalDeadline(id: string, data: {
             summary: `${oldData.status === 'CUMPRIDO' ? '✅ ' : '🚨 '}PRAZO: ${data.type} | ${clientInfo.name}`,
             start: { dateTime: formatISO(fatalDateStart), timeZone: 'America/Sao_Paulo' },
             end: { dateTime: formatISO(fatalDateEnd), timeZone: 'America/Sao_Paulo' },
+            reminders: {
+              useDefault: false,
+              overrides: [
+                { method: 'popup', minutes: 1440 },
+                { method: 'popup', minutes: 720 },
+                { method: 'email', minutes: 1440 }
+              ],
+            },
           }
         });
       }
