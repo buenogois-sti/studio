@@ -347,9 +347,21 @@ export default function AudienciasPage() {
       <div className="p-6">
         <Alert variant="destructive" className="bg-rose-500/10 border-rose-500/20 text-rose-400">
           <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Configuração Necessária (Firestore Index)</AlertTitle>
+          <AlertTitle>Índice Composto Necessário</AlertTitle>
           <AlertDescription className="text-xs mt-2 space-y-4">
-            <p>O Firebase requer um índice composto para esta visualização filtrada por tipo e data.</p>
+            <p>O Firestore exige a criação de índices manuais para filtrar por tipos de audiência e ordenar por data.</p>
+            
+            <div className="bg-black/20 p-4 rounded-lg space-y-4 border border-white/10">
+              <div className="space-y-1">
+                <p className="font-black text-white uppercase tracking-tighter text-[10px]">Índice 1 (Geral):</p>
+                <code className="block bg-black/40 p-2 rounded text-[10px] text-primary">Coleção: hearings | Campos: type (ASC), date (ASC)</code>
+              </div>
+              <div className="space-y-1">
+                <p className="font-black text-white uppercase tracking-tighter text-[10px]">Índice 2 (Filtrado por Advogado):</p>
+                <code className="block bg-black/40 p-2 rounded text-[10px] text-primary">Coleção: hearings | Campos: lawyerId (ASC), type (ASC), date (ASC)</code>
+              </div>
+            </div>
+
             <Button variant="outline" size="sm" className="mt-2 text-[10px] uppercase font-bold border-rose-500/30" asChild>
               <a href="https://console.firebase.google.com" target="_blank">Abrir Console Firebase</a>
             </Button>
@@ -658,7 +670,7 @@ export default function AudienciasPage() {
                                             <Clock3 className="h-4 w-4 text-amber-500" /> Adiar
                                           </DropdownMenuItem>
                                           <DropdownMenuItem className="text-rose-500 font-bold gap-2" onClick={() => handleUpdateStatus(h, 'CANCELADA')}>
-                                            <XCircle className="h-4 w-4" /> Cancelar
+                                            <X className="h-4 w-4" /> Cancelar
                                           </DropdownMenuItem>
                                         </DropdownMenuContent>
                                       </DropdownMenu>

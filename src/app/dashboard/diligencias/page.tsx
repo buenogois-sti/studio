@@ -54,7 +54,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Link from 'next/link';
 import { HearingReturnDialog } from '@/components/process/HearingReturnDialog';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from '@/Alert';
 
 const statusConfig = {
   PENDENTE: { label: 'Pendente', icon: Clock, color: 'text-blue-500 bg-blue-500/10' },
@@ -134,11 +134,23 @@ export default function DiligenciasPage() {
       <div className="p-6">
         <Alert variant="destructive" className="bg-rose-500/10 border-rose-500/20 text-rose-400">
           <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Índice Necessário</AlertTitle>
+          <AlertTitle>Índice Composto Necessário</AlertTitle>
           <AlertDescription className="text-xs mt-2 space-y-4">
-            <p>O Firestore exige um índice para filtrar por tipo 'DILIGENCIA'/'PERICIA' e ordenar por data.</p>
+            <p>O Firestore exige a criação de índices manuais para filtrar por tipo e ordenar por data.</p>
+            
+            <div className="bg-black/20 p-4 rounded-lg space-y-4 border border-white/10">
+              <div className="space-y-1">
+                <p className="font-black text-white uppercase tracking-tighter text-[10px]">Índice 1 (Geral):</p>
+                <code className="block bg-black/40 p-2 rounded text-[10px] text-primary">Coleção: hearings | Campos: type (ASC), date (ASC)</code>
+              </div>
+              <div className="space-y-1">
+                <p className="font-black text-white uppercase tracking-tighter text-[10px]">Índice 2 (Filtrado por Advogado):</p>
+                <code className="block bg-black/40 p-2 rounded text-[10px] text-primary">Coleção: hearings | Campos: lawyerId (ASC), type (ASC), date (ASC)</code>
+              </div>
+            </div>
+
             <Button variant="outline" size="sm" className="mt-2 text-[10px] uppercase font-bold border-rose-500/30" asChild>
-              <a href="https://console.firebase.google.com" target="_blank">Gerar Índice no Console</a>
+              <a href="https://console.firebase.google.com" target="_blank">Abrir Console Firebase</a>
             </Button>
           </AlertDescription>
         </Alert>

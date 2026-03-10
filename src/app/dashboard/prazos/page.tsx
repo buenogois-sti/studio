@@ -157,17 +157,18 @@ export default function PrazosPage() {
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Índice Composto Necessário</AlertTitle>
           <AlertDescription className="text-xs mt-2 space-y-4">
-            <p>Para visualizar sua agenda de prazos filtrada, o Firebase exige a criação de um índice manual.</p>
-            <div className="bg-black/20 p-4 rounded-lg space-y-2 border border-white/10">
-              <p className="font-bold text-white uppercase tracking-tighter text-[10px]">Instruções para Admin:</p>
-              <ol className="list-decimal list-inside space-y-1 text-slate-300">
-                <li>Acesse o Console do Firebase e vá em Índices.</li>
-                <li>ID da Coleção: <strong>deadlines</strong></li>
-                <li>Campo 1: <strong>authorId</strong> (Ascendente)</li>
-                <li>Campo 2: <strong>endDate</strong> (Ascendente)</li>
-                <li>Escopo: <strong>Coleção</strong></li>
-              </ol>
+            <p>Para visualizar sua agenda de prazos filtrada, o Firebase exige a criação de um índice manual devido ao filtro de autor e data.</p>
+            
+            <div className="bg-black/20 p-4 rounded-lg space-y-4 border border-white/10">
+              <div className="space-y-1">
+                <p className="font-black text-white uppercase tracking-tighter text-[10px]">Configuração do Índice:</p>
+                <code className="block bg-black/40 p-2 rounded text-[10px] text-primary">Coleção: deadlines | Campos: authorId (ASC), endDate (ASC)</code>
+              </div>
             </div>
+
+            <Button variant="outline" size="sm" className="mt-2 text-[10px] uppercase font-bold border-rose-500/30" asChild>
+              <a href="https://console.firebase.google.com" target="_blank">Abrir Console Firebase</a>
+            </Button>
           </AlertDescription>
         </Alert>
       </div>
@@ -186,7 +187,7 @@ export default function PrazosPage() {
             {userProfile?.role === 'lawyer' ? 'Seus compromissos processuais fatais.' : 'Controle global de obrigações do escritório.'}
           </p>
         </div>
-        <div className="relative w-full max-w-sm">
+        <div className="relative w-full max-sm:w-full max-w-sm">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input 
             placeholder="Pesquisar por processo ou tipo..." 
