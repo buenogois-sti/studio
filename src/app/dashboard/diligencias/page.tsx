@@ -17,7 +17,8 @@ import {
   RefreshCw,
   Video,
   X,
-  PlusCircle
+  PlusCircle,
+  AlertCircle
 } from 'lucide-react';
 import { format, isSameDay, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -126,19 +127,16 @@ export default function DiligenciasPage() {
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input 
               placeholder="Pesquisar diligência..." 
-              className="pl-8 pr-8 h-9 bg-card border-border/50 text-white" 
+              className="pl-8 pr-8 h-10 bg-card border-border/50 text-white" 
               value={searchTerm} 
               onChange={(e) => setSearchTerm(e.target.value)} 
             />
           </div>
           <Button 
-            variant="outline" 
-            size="sm" 
-            className="h-9 border-white/10 text-white hover:bg-white/5" 
-            onClick={() => setRefreshKey(prev => prev + 1)}
+            onClick={() => setIsNewDiligenceOpen(true)}
+            className="h-10 bg-primary text-primary-foreground font-bold shadow-lg shadow-primary/20"
           >
-            <RefreshCw className={cn("h-4 w-4 mr-2", isLoading && "animate-spin")} />
-            Sincronizar
+            <PlusCircle className="mr-2 h-4 w-4" /> Agendar Diligência
           </Button>
         </div>
       </div>
@@ -150,7 +148,7 @@ export default function DiligenciasPage() {
               <Briefcase className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-[10px] font-black uppercase text-slate-500">Pendentes</p>
+              <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Pendentes</p>
               <p className="text-2xl font-black text-white">{filteredDiligencias.filter(d => d.status === 'PENDENTE').length}</p>
             </div>
           </CardContent>
@@ -161,7 +159,7 @@ export default function DiligenciasPage() {
               <CheckCircle2 className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-[10px] font-black uppercase text-slate-500">Concluídas</p>
+              <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Concluídas</p>
               <p className="text-2xl font-black text-white">{filteredDiligencias.filter(d => d.status === 'REALIZADA').length}</p>
             </div>
           </CardContent>
@@ -182,7 +180,7 @@ export default function DiligenciasPage() {
           <div className="flex items-center gap-2">
             <Filter className="h-4 w-4 text-slate-500" />
             <Select value={selectedLawyerFilter} onValueChange={setSelectedLawyerFilter}>
-              <SelectTrigger className="w-[200px] h-9 bg-[#0f172a] border-white/10 text-white">
+              <SelectTrigger className="w-[200px] h-10 bg-[#0f172a] border-white/10 text-white">
                 <SelectValue placeholder="Filtrar responsável..." />
               </SelectTrigger>
               <SelectContent className="bg-[#0f172a] border-white/10 text-white">
@@ -215,6 +213,13 @@ export default function DiligenciasPage() {
           />
         </TabsContent>
       </Tabs>
+
+      <QuickDiligenceDialog 
+        process={null}
+        open={isNewDiligenceOpen} 
+        onOpenChange={setIsNewDiligenceOpen} 
+        onSuccess={() => setRefreshKey(prev => prev + 1)}
+      />
     </div>
   );
 }
@@ -241,7 +246,7 @@ function DiligenceList({ data, isLoading, onUpdateStatus, isProcessing, processe
     <div className="grid gap-4">
       {data.map((d: Hearing) => {
         const process = processesMap.get(d.processId);
-        const config = statusConfig[d.status];
+        const config = (statusConfig as any)[d.status];
         const StatusIcon = config.icon;
 
         return (
