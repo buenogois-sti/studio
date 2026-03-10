@@ -359,12 +359,14 @@ export default function Dashboard() {
     () => (firestore && session?.user?.id ? doc(firestore, 'users', session.user.id) : null),
     [firestore, session]
   );
-  const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
+  
   const role = userProfile?.role || 'assistant';
 
   // Resolução de Staff ID para filtros do advogado
   const staffQuery = useMemoFirebase(() => firestore ? collection(firestore, 'staff') : null, [firestore]);
   const { data: staffData } = useCollection<Staff>(staffQuery);
+  
   const currentStaffMember = React.useMemo(() => {
     if (!staffData || !session?.user?.email) return null;
     return staffData.find(s => s.email.toLowerCase() === session.user.email?.toLowerCase());
@@ -468,6 +470,7 @@ export default function Dashboard() {
   }, [processesData]);
 
   const anyError = userError || titlesError || processesError || hearingsError || deadlinesError;
+  const isLoading = status === 'loading' || isLoadingTitles || isLoadingProcesses || isLoadingHearings;
 
   if (anyError) {
     const isAuthError = (anyError as any)?.code === 'auth/invalid-custom-token';
@@ -508,8 +511,6 @@ export default function Dashboard() {
       </div>
     );
   }
-
-  const isLoading = status === 'loading' || isLoadingTitles || isLoadingProcesses || isLoadingHearings;
 
   return (
     <div className="flex flex-col gap-8 pb-10">

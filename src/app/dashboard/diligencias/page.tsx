@@ -54,7 +54,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Link from 'next/link';
 import { HearingReturnDialog } from '@/components/process/HearingReturnDialog';
-import { Alert, AlertDescription, AlertTitle } from '@/Alert';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const statusConfig = {
   PENDENTE: { label: 'Pendente', icon: Clock, color: 'text-blue-500 bg-blue-500/10' },

@@ -86,8 +86,6 @@ export default function PrazosPage() {
   const { data: processesData } = useCollection<Process>(processesQuery);
   const processesMap = React.useMemo(() => new Map(processesData?.map(p => [p.id, p])), [processesData]);
 
-  const isLoading = isUserLoading || isProfileLoading || isLoadingDeadlines;
-
   const filteredDeadlines = React.useMemo(() => {
     if (!deadlinesData) return [];
     return deadlinesData.filter(d => {
@@ -149,6 +147,8 @@ export default function PrazosPage() {
       router.push(`/dashboard/processos?clientId=${process.clientId}`);
     }
   };
+
+  const isLoading = isUserLoading || isProfileLoading || isLoadingDeadlines;
 
   if (deadlinesError) {
     return (
