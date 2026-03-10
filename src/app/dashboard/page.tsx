@@ -264,7 +264,7 @@ function UpcomingActsCard({ data, isLoading, title = "Próximos Atos" }: any) {
       <CardContent className="pt-6">
         {isLoading ? (
           <div className="space-y-4">
-            {[...Array(3)].map((_, i) => <Skeleton className="h-16 w-full bg-white/5 rounded-xl" />)}
+            {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-16 w-full bg-white/5 rounded-xl" />)}
           </div>
         ) : (
           <div className="space-y-6 text-slate-300">
@@ -396,8 +396,7 @@ export default function Dashboard() {
   const logsQuery = useMemoFirebase(() => (firestore && session?.user?.id ? query(collection(firestore, `users/${session.user.id}/logs`), orderBy('timestamp', 'desc'), limit(3)) : null), [firestore, session]);
   const { data: logsData } = useCollection<Log>(logsQuery);
 
-  const anyError = userError || titlesError || processesError || hearingsError || deadlinesError;
-
+  // CRITICAL: Hooks like useMemo must be called before early returns
   const stats = React.useMemo(() => {
     const s = { 
       totalRevenue: 0, pendingReceivables: 0, totalOverdue: 0, activeProcessesCount: 0, 
@@ -450,6 +449,8 @@ export default function Dashboard() {
     });
     return months;
   }, [processesData]);
+
+  const anyError = userError || titlesError || processesError || hearingsError || deadlinesError;
 
   if (anyError) {
     const isAuthError = (anyError as any)?.code === 'auth/invalid-custom-token';
