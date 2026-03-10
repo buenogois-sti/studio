@@ -18,7 +18,8 @@ import {
   Video,
   X,
   PlusCircle,
-  AlertCircle
+  AlertCircle,
+  FolderKanban
 } from 'lucide-react';
 import { format, isSameDay, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -45,7 +46,7 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { QuickDiligenceDialog } from '@/components/process/QuickDiligenceDialog';
+import Link from 'next/link';
 
 const statusConfig = {
   PENDENTE: { label: 'Pendente', icon: Clock, color: 'text-blue-500 bg-blue-500/10' },
@@ -61,7 +62,6 @@ export default function DiligenciasPage() {
   const [isProcessing, setIsProcessing] = React.useState<string | null>(null);
   const [refreshKey, setRefreshKey] = React.useState(0);
   const [selectedLawyerFilter, setSelectedLawyerFilter] = React.useState<string>('all');
-  const [isNewDiligenceOpen, setIsNewDiligenceOpen] = React.useState(false);
 
   const userProfileRef = useMemoFirebase(
     () => (firestore && user?.uid ? doc(firestore, 'users', user.uid) : null),
@@ -133,10 +133,13 @@ export default function DiligenciasPage() {
             />
           </div>
           <Button 
-            onClick={() => setIsNewDiligenceOpen(true)}
-            className="h-10 bg-primary text-primary-foreground font-bold shadow-lg shadow-primary/20"
+            variant="outline"
+            asChild
+            className="h-10 border-primary/20 text-primary hover:bg-primary/5 font-bold"
           >
-            <PlusCircle className="mr-2 h-4 w-4" /> Agendar Diligência
+            <Link href="/dashboard/processos">
+              <FolderKanban className="mr-2 h-4 w-4" /> Acessar Processos
+            </Link>
           </Button>
         </div>
       </div>
@@ -213,13 +216,6 @@ export default function DiligenciasPage() {
           />
         </TabsContent>
       </Tabs>
-
-      <QuickDiligenceDialog 
-        process={null}
-        open={isNewDiligenceOpen} 
-        onOpenChange={setIsNewDiligenceOpen} 
-        onSuccess={() => setRefreshKey(prev => prev + 1)}
-      />
     </div>
   );
 }
@@ -238,6 +234,7 @@ function DiligenceList({ data, isLoading, onUpdateStatus, isProcessing, processe
       <div className="text-center py-20 bg-white/5 rounded-3xl border-2 border-dashed border-white/10 opacity-40">
         <Briefcase className="h-12 w-12 mx-auto mb-4" />
         <p className="font-bold text-white uppercase tracking-widest text-[10px]">Nenhuma diligência encontrada</p>
+        <p className="text-[9px] text-slate-500 uppercase mt-2">Agende uma nova diligência diretamente no menu do processo</p>
       </div>
     );
   }
@@ -295,8 +292,10 @@ function DiligenceList({ data, isLoading, onUpdateStatus, isProcessing, processe
                       <DropdownMenuItem onClick={() => onUpdateStatus(d.id, 'REALIZADA')} className="font-bold gap-2 text-emerald-400">
                         <CheckCircle2 className="h-4 w-4" /> Marcar Concluída
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => {}} className="font-bold gap-2 text-white">
-                        <ExternalLink className="h-4 w-4 text-primary" /> Ver Processo
+                      <DropdownMenuItem asChild className="font-bold gap-2 text-white">
+                        <Link href={`/dashboard/processos?clientId=${process?.clientId}`}>
+                          <ExternalLink className="h-4 w-4 text-primary" /> Ver Processo
+                        </Link>
                       </DropdownMenuItem>
                       <DropdownMenuSeparator className="bg-white/5" />
                       <DropdownMenuItem className="text-rose-500 font-bold gap-2">
