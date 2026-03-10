@@ -24,10 +24,7 @@ if (!admin.apps.length) {
         console.error(`[Firebase Admin] Token is being signed for project '${serviceProjectId}' but browser config expects '${configProjectId}'.`);
         console.error(`[Firebase Admin] SOLUTION: Update FIREBASE_SERVICE_ACCOUNT_JSON with credentials for '${configProjectId}'.`);
         
-        // Em desenvolvimento local, lançamos erro explícito para não deixar passar
-        if (process.env.NODE_ENV === 'development') {
-          throw new Error(`Project ID Mismatch: Server="${serviceProjectId}", Client="${configProjectId}"`);
-        }
+        throw new Error(`Project ID Mismatch: Server="${serviceProjectId}", Client="${configProjectId}". Atualize FIREBASE_SERVICE_ACCOUNT_JSON na Vercel.`);
       }
 
       admin.initializeApp({
@@ -37,9 +34,8 @@ if (!admin.apps.length) {
       console.log(`[Firebase Admin] ✅ Inicializado com sucesso para: ${serviceProjectId}`);
       initialized = true;
     } else {
-      console.warn('[Firebase Admin] ⚠️ FIREBASE_SERVICE_ACCOUNT_JSON não configurado no ambiente');
-      admin.initializeApp();
-      initialized = true;
+      console.error('[Firebase Admin] ❌ FIREBASE_SERVICE_ACCOUNT_JSON não configurado no ambiente. Custom tokens não serão gerados.');
+      firebaseAdminInitializationError = 'FIREBASE_SERVICE_ACCOUNT_JSON não configurado.';
     }
   } catch (error: any) {
     firebaseAdminInitializationError = error.message;

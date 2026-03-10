@@ -70,12 +70,27 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
         console.log('[Firebase Auth] ✅ Sessão Firebase vinculada:', userCredential.user.email);
         lastTokenRef.current = session.customToken!;
         setUserAuthState(prev => ({ ...prev, isUserLoading: false, userError: null }));
-      }).catch((error: any) => {
+      }).catch(async (error: any) => {
         const errorCode = error?.code || 'UNKNOWN_ERROR';
         console.error('[Firebase Auth] ❌ Falha na autenticação do token:', errorCode);
         
         if (errorCode === 'auth/invalid-custom-token') {
-          console.error('[Firebase Auth] Erro de integridade de projeto detectado. O token foi gerado para um Project ID diferente do cliente.');
+          console.warn('[Firebase Auth] Token expirado ou inválido. Forçando refresh da sessão NextAuth...');
+          // Força NextAuth a renovar o JWT (e gerar novo customToken)
+          const { getSession } = await import('next-auth/react');
+          const freshSession = await getSession();
+          if (freshSession?.customToken && freshSession.customToken !== session.customToken) {
+            console.log('[Firebase Auth] 🔄 Nova sessão obtida, tentando novamente...');
+            try {
+              const cred = await signInWithCustomToken(auth, freshSession.customToken);
+              console.log('[Firebase Auth] ✅ Retry bem-sucedido:', cred.user.email);
+              lastTokenRef.current = freshSession.customToken;
+              setUserAuthState(prev => ({ ...prev, isUserLoading: false, userError: null }));
+              return;
+            } catch (retryError) {
+              console.error('[Firebase Auth] ❌ Retry também falhou:', retryError);
+            }
+          }
         }
         
         setUserAuthState((state) => ({ ...state, userError: error, isUserLoading: false }));

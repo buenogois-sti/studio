@@ -205,9 +205,10 @@ export const authOptions: NextAuthOptions = {
 
             console.log('[NextAuth JWT] No account or user, checking token validity...');
             if (Date.now() < (token.accessTokenExpires ?? 0)) {
-                if (!token.customToken && token.id && authAdmin) {
+                // Custom tokens expiram em 1h — sempre recriar para garantir validade
+                if (token.id && authAdmin) {
                     try {
-                        console.log('[NextAuth JWT] Recreating custom token for user:', token.id);
+                        console.log('[NextAuth JWT] Refreshing custom token for user:', token.id);
                         token.customToken = await authAdmin.createCustomToken(token.id, { role: token.role });
                         console.log('[NextAuth JWT] ✅ Custom token recreated successfully.');
                     } catch (tokenError: any) {
