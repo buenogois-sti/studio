@@ -37,7 +37,8 @@ import {
   Video,
   FileText,
   FolderKanban,
-  Edit
+  Edit,
+  Briefcase
 } from 'lucide-react';
 import { 
   format, 
@@ -110,6 +111,7 @@ const statusConfig: Record<HearingStatus, { label: string; icon: any; color: str
 const getTypeIcon = (type: string) => {
   if (type === 'ATENDIMENTO') return <Users className="h-3.5 w-3.5" />;
   if (type === 'PERICIA') return <Activity className="h-3.5 w-3.5" />;
+  if (type === 'DILIGENCIA') return <Briefcase className="h-3.5 w-3.5" />;
   return <Gavel className="h-3.5 w-3.5" />;
 };
 
@@ -161,7 +163,7 @@ function HearingDetailsDialog({
               <p className="text-[9px] font-black uppercase text-slate-500 mb-1">Responsável</p>
               <div className="flex items-center gap-2 text-sm font-bold text-slate-200">
                 <User className="h-4 w-4 text-emerald-400" />
-                Dr(a). {hearing.lawyerName}
+                {hearing.lawyerName}
               </div>
             </div>
           </div>
@@ -455,34 +457,39 @@ export default function AudienciasPage() {
                                               const StatusIcon = statusConfig[h.status || 'PENDENTE'].icon;
                                               const isUpdating = isProcessing === h.id;
                                               const isMeeting = h.type === 'ATENDIMENTO';
+                                              const isDiligence = h.type === 'DILIGENCIA';
                                               
                                               return (
                                                   <div key={h.id} className={cn(
                                                     "flex flex-col md:flex-row md:items-center gap-6 p-5 rounded-2xl border transition-all duration-300 group",
-                                                    isMeeting ? "bg-emerald-500/[0.02] border-emerald-500/10 hover:border-emerald-500/30" : "bg-black/20 border-white/5 hover:border-primary/20"
+                                                    isMeeting ? "bg-emerald-500/[0.02] border-emerald-500/10 hover:border-emerald-500/30" : 
+                                                    isDiligence ? "bg-blue-500/[0.02] border-blue-500/10 hover:border-blue-500/30" :
+                                                    "bg-black/20 border-white/5 hover:border-primary/20"
                                                   )}>
                                                       <div className="flex items-center gap-3 min-w-[100px] border-r border-white/5 pr-4">
-                                                          <Clock className={cn("h-4 w-4", isMeeting ? "text-emerald-400" : "text-primary")} />
+                                                          <Clock className={cn("h-4 w-4", isMeeting ? "text-emerald-400" : isDiligence ? "text-blue-400" : "text-primary")} />
                                                           <span className="text-base font-black text-white tabular-nums">{format(h.date.toDate(), 'HH:mm')}</span>
                                                       </div>
                                                       <div className="flex-1 min-w-0">
                                                           <div className="flex flex-wrap items-center gap-2 mb-2">
                                                               <Badge variant="outline" className={cn(
                                                                 "text-[8px] font-black uppercase px-2 gap-1.5 h-5",
-                                                                isMeeting ? "border-emerald-500/30 text-emerald-400" : "border-primary/30 text-primary"
+                                                                isMeeting ? "border-emerald-500/30 text-emerald-400" : 
+                                                                isDiligence ? "border-blue-500/30 text-blue-400" :
+                                                                "border-primary/30 text-primary"
                                                               )}>
                                                                 {getTypeIcon(h.type)}
                                                                 {h.type}
                                                               </Badge>
                                                               <Badge variant="outline" className="text-[9px] font-black uppercase border-white/10 text-slate-400 flex items-center gap-1">
-                                                                  <User className="h-2.5 w-2.5" /> Dr(a). {h.lawyerName || 'Pendente'}
+                                                                  <User className="h-2.5 w-2.5" /> {h.lawyerName || 'Pendente'}
                                                               </Badge>
                                                           </div>
                                                           <h4 className="font-black text-lg text-white truncate group-hover:text-primary transition-colors cursor-pointer" onClick={() => setDetailsHearing(h)}>
                                                             {p?.name || h.processName}
                                                           </h4>
                                                           <p className="text-[10px] text-slate-500 font-mono mt-1 flex items-center gap-1.5">
-                                                            {isMeeting ? <Video className="h-3 w-3 text-emerald-500 shrink-0" /> : <MapPin className="h-3 w-3 text-primary shrink-0" />} 
+                                                            {isMeeting ? <Video className="h-3 w-3 text-emerald-500 shrink-0" /> : isDiligence ? <MapPin className="h-3 w-3 text-blue-500 shrink-0" /> : <MapPin className="h-3 w-3 text-primary shrink-0" />} 
                                                             {h.location}
                                                           </p>
                                                       </div>
@@ -507,7 +514,7 @@ export default function AudienciasPage() {
                                                                       <CheckCircle2 className="h-4 w-4 text-emerald-500" /> Marcar Concluído
                                                                   </DropdownMenuItem>
                                                                   <DropdownMenuItem onClick={() => handleUpdateStatus(h, 'ADIADA')} className="font-bold gap-2 text-white">
-                                                                      <Clock3 className="h-4 w-4 text-amber-500" /> Adiar Atendimento
+                                                                      <Clock3 className="h-4 w-4 text-amber-500" /> Adiar Compromisso
                                                                   </DropdownMenuItem>
                                                                   <DropdownMenuItem className="text-rose-500 font-bold gap-2" onClick={() => handleUpdateStatus(h, 'CANCELADA')}>
                                                                       <XCircle className="h-4 w-4" /> Cancelar
@@ -581,7 +588,8 @@ export default function AudienciasPage() {
                                 "w-1.5 h-1.5 rounded-full",
                                 h.status === 'REALIZADA' ? "bg-emerald-500" : 
                                 h.status === 'CANCELADA' ? "bg-rose-500" : 
-                                h.type === 'ATENDIMENTO' ? "bg-emerald-400" : "bg-primary"
+                                h.type === 'ATENDIMENTO' ? "bg-emerald-400" : 
+                                h.type === 'DILIGENCIA' ? "bg-blue-400" : "bg-primary"
                               )} />
                             ))}
                           </div>
@@ -606,15 +614,18 @@ export default function AudienciasPage() {
                               const config = statusConfig[h.status || 'PENDENTE'];
                               const StatusIcon = config.icon;
                               const isUpdating = isProcessing === h.id;
+                              const isDiligence = h.type === 'DILIGENCIA';
 
                               return (
                                 <div key={h.id} className={cn(
                                   "p-5 rounded-2xl border space-y-4 transition-all group",
-                                  h.type === 'ATENDIMENTO' ? "bg-emerald-500/[0.03] border-emerald-500/20" : "bg-black/30 border-white/5 hover:border-primary/20"
+                                  h.type === 'ATENDIMENTO' ? "bg-emerald-500/[0.03] border-emerald-500/20" : 
+                                  isDiligence ? "bg-blue-500/[0.03] border-blue-500/20" :
+                                  "bg-black/30 border-white/5 hover:border-primary/20"
                                 )}>
                                   <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
-                                      <Clock className={cn("h-3.5 w-3.5", h.type === 'ATENDIMENTO' ? "text-emerald-400" : "text-primary")} />
+                                      <Clock className={cn("h-3.5 w-3.5", h.type === 'ATENDIMENTO' ? "text-emerald-400" : isDiligence ? "text-blue-400" : "text-primary")} />
                                       <span className="text-xs font-black text-white tabular-nums">{format(h.date.toDate(), 'HH:mm')}</span>
                                     </div>
                                     <div className="flex items-center gap-2">

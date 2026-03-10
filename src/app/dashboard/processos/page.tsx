@@ -35,7 +35,8 @@ import {
   FolderOpen,
   ArchiveX,
   CalendarDays,
-  Filter
+  Filter,
+  Briefcase
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
@@ -62,6 +63,7 @@ import { DocumentDraftingDialog } from '@/components/process/DocumentDraftingDia
 import { QuickHearingDialog } from '@/components/process/QuickHearingDialog';
 import { QuickMeetingDialog } from '@/components/process/QuickMeetingDialog';
 import { LegalDeadlineDialog } from '@/components/process/LegalDeadlineDialog';
+import { QuickDiligenceDialog } from '@/components/process/QuickDiligenceDialog';
 import { syncProcessToDrive } from '@/lib/drive';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -90,6 +92,7 @@ const ProcessCard = React.memo(({
   onMeeting, 
   onDeadline, 
   onHearing, 
+  onDiligence,
   onDrafting, 
   onEdit, 
   onArchive, 
@@ -108,6 +111,7 @@ const ProcessCard = React.memo(({
   onMeeting: (p: Process) => void;
   onDeadline: (p: Process) => void;
   onHearing: (p: Process) => void;
+  onDiligence: (p: Process) => void;
   onDrafting: (p: Process) => void;
   onEdit: (p: Process) => void;
   onArchive: (p: Process) => void;
@@ -210,6 +214,9 @@ const ProcessCard = React.memo(({
                     <DropdownMenuItem onClick={() => onHearing(p)} className="gap-2 focus:bg-white/5">
                       <Gavel className="h-4 w-4 text-amber-400" /> <span className="font-bold">Agendar Audiência</span>
                     </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onDiligence(p)} className="gap-2 focus:bg-white/5">
+                      <Briefcase className="h-4 w-4 text-blue-400" /> <span className="font-bold text-blue-400">Agendar Diligência</span>
+                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => onDrafting(p)} className="gap-2 focus:bg-white/5">
                       <FilePlus2 className="h-4 w-4 text-emerald-400" /> <span className="font-bold">Gerar Documento (IA)</span>
                     </DropdownMenuItem>
@@ -311,6 +318,7 @@ export default function ProcessosPage() {
   const [isHearingOpen, setIsHearingOpen] = React.useState(false);
   const [isMeetingOpen, setIsMeetingOpen] = React.useState(false);
   const [isDeadlineOpen, setIsDeadlineOpen] = React.useState(false);
+  const [isDiligenceOpen, setIsDiligenceOpen] = React.useState(false);
   const [editingProcess, setEditingProcess] = React.useState<Process | null>(null);
   const [selectedProcess, setSelectedProcess] = React.useState<Process | null>(null);
   const [isSyncing, setIsSyncing] = React.useState<string | null>(null);
@@ -484,6 +492,11 @@ export default function ProcessosPage() {
     setIsHearingOpen(true);
   }, []);
 
+  const handleDiligence = React.useCallback((p: Process) => {
+    setSelectedProcess(p);
+    setIsDiligenceOpen(true);
+  }, []);
+
   const handleDrafting = React.useCallback((p: Process) => {
     setSelectedProcess(p);
     setIsDraftingOpen(true);
@@ -604,6 +617,7 @@ export default function ProcessosPage() {
                 onMeeting={handleMeeting}
                 onDeadline={handleDeadline}
                 onHearing={handleHearing}
+                onDiligence={handleDiligence}
                 onDrafting={handleDrafting}
                 onEdit={handleEdit}
                 onArchive={handleArchiveRequest}
@@ -674,6 +688,7 @@ export default function ProcessosPage() {
       <DocumentDraftingDialog process={selectedProcess} open={isDraftingOpen} onOpenChange={setIsDraftingOpen} />
       <QuickHearingDialog process={selectedProcess} open={isHearingOpen} onOpenChange={setIsHearingOpen} />
       <QuickMeetingDialog process={selectedProcess} open={isMeetingOpen} onOpenChange={setIsMeetingOpen} />
+      <QuickDiligenceDialog process={selectedProcess} open={isDiligenceOpen} onOpenChange={setIsDiligenceOpen} />
       <LegalDeadlineDialog process={selectedProcess} open={isDeadlineOpen} onOpenChange={setIsDeadlineOpen} />
       <FinancialEventDialog process={eventProcess} open={!!eventProcess} onOpenChange={o => !o && setEventProcess(null)} onEventCreated={() => {}} />
 

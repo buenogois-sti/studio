@@ -76,7 +76,7 @@ export type Client = {
 
 export type TimelineEvent = {
   id: string;
-  type: 'note' | 'decision' | 'petition' | 'hearing' | 'system' | 'deadline' | 'pericia' | 'meeting';
+  type: 'note' | 'decision' | 'petition' | 'hearing' | 'system' | 'deadline' | 'pericia' | 'meeting' | 'diligence';
   description: string;
   date: Timestamp;
   authorName: string;
@@ -160,7 +160,7 @@ export type Process = {
 };
 
 export type HearingStatus = 'PENDENTE' | 'REALIZADA' | 'CANCELADA' | 'ADIADA';
-export type HearingType = 'CONCILIACAO' | 'INSTRUCAO' | 'UNA' | 'JULGAMENTO' | 'PERICIA' | 'ATENDIMENTO' | 'OUTRA';
+export type HearingType = 'CONCILIACAO' | 'INSTRUCAO' | 'UNA' | 'JULGAMENTO' | 'PERICIA' | 'ATENDIMENTO' | 'DILIGENCIA' | 'OUTRA';
 export type NotificationMethod = 'whatsapp' | 'email' | 'phone' | 'personal' | 'court' | 'other';
 
 export type Hearing = {
