@@ -363,8 +363,12 @@ export default function Dashboard() {
   
   const role = userProfile?.role || 'assistant';
 
-  // Resolução de Staff ID para filtros do advogado
-  const staffQuery = useMemoFirebase(() => firestore ? collection(firestore, 'staff') : null, [firestore]);
+  // Resolução de Staff ID para filtros do advogado — só carrega staff se for role que precisa
+  const needsStaffLookup = role === 'lawyer';
+  const staffQuery = useMemoFirebase(
+    () => (firestore && needsStaffLookup ? collection(firestore, 'staff') : null),
+    [firestore, needsStaffLookup]
+  );
   const { data: staffData } = useCollection<Staff>(staffQuery);
   
   const currentStaffMember = React.useMemo(() => {
@@ -372,33 +376,35 @@ export default function Dashboard() {
     return staffData.find(s => s.email.toLowerCase() === session.user.email?.toLowerCase());
   }, [staffData, session?.user?.email]);
 
-  // QUERIES DINÂMICAS POR ROLE
+  // Flag: dados de base prontos para disparar queries?
+  const isRoleReady = !!userProfile && (role !== 'lawyer' || !!currentStaffMember);
+
+  // QUERIES DINÂMICAS POR ROLE — só disparam quando isRoleReady
   const titlesQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return query(collection(firestore, 'financial_titles'), where('dueDate', '>=', stableStartOfMonth), limit(role === 'admin' ? 10 : 5));
-  }, [firestore, role, stableStartOfMonth]);
+    if (!firestore || !isRoleReady) return null;
+    if (role !== 'admin' && role !== 'financial') return null;
+    return query(collection(firestore, 'financial_titles'), where('dueDate', '>=', stableStartOfMonth), limit(10));
+  }, [firestore, isRoleReady, role, stableStartOfMonth]);
   const { data: titlesData, isLoading: isLoadingTitles, error: titlesError } = useCollection<FinancialTitle>(titlesQuery);
 
   const processesQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
+    if (!firestore || !isRoleReady) return null;
     const base = collection(firestore, 'processes');
-    // Se for advogado, filtra pelo ID do STAFF correspondente
     if (role === 'lawyer' && currentStaffMember) {
       return query(base, where('leadLawyerId', '==', currentStaffMember.id), orderBy('updatedAt', 'desc'), limit(15));
     }
     return query(base, orderBy('createdAt', 'desc'), limit(15));
-  }, [firestore, role, currentStaffMember]);
+  }, [firestore, isRoleReady, role, currentStaffMember]);
   const { data: processesData, isLoading: isLoadingProcesses, error: processesError } = useCollection<Process>(processesQuery);
 
   const hearingsQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
+    if (!firestore || !isRoleReady) return null;
     const base = collection(firestore, 'hearings');
-    // Filtro inteligente para advogado logado
     if (role === 'lawyer' && currentStaffMember) {
       return query(base, where('lawyerId', '==', currentStaffMember.id), where('date', '>=', stableNow), orderBy('date', 'asc'), limit(5));
     }
     return query(base, where('date', '>=', stableNow), orderBy('date', 'asc'), limit(5));
-  }, [firestore, role, currentStaffMember, stableNow]);
+  }, [firestore, isRoleReady, role, currentStaffMember, stableNow]);
   const { data: hearingsData, isLoading: isLoadingHearings, error: hearingsError } = useCollection<Hearing>(hearingsQuery);
 
   const deadlinesQuery = useMemoFirebase(() => {
@@ -413,7 +419,12 @@ export default function Dashboard() {
   }, [firestore, role, currentStaffMember]);
   const { data: creditsData } = useCollection<StaffCredit>(personalCreditsQuery);
 
-  const logsQuery = useMemoFirebase(() => (firestore && session?.user?.id ? query(collection(firestore, `users/${session.user.id}/logs`), orderBy('timestamp', 'desc'), limit(3)) : null), [firestore, session]);
+  const logsQuery = useMemoFirebase(
+    () => (firestore && isRoleReady && role === 'admin' && session?.user?.id
+      ? query(collection(firestore, `users/${session.user.id}/logs`), orderBy('timestamp', 'desc'), limit(3))
+      : null),
+    [firestore, isRoleReady, role, session?.user?.id]
+  );
   const { data: logsData } = useCollection<Log>(logsQuery);
 
   const stats = React.useMemo(() => {
