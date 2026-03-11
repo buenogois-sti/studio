@@ -17,11 +17,36 @@
       ]
     },
     {
+      "collectionGroup": "hearings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "type", "order": "ASCENDING" },
+        { "fieldPath": "date", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "hearings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "lawyerId", "order": "ASCENDING" },
+        { "fieldPath": "type", "order": "ASCENDING" },
+        { "fieldPath": "date", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "deadlines",
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "authorId", "order": "ASCENDING" },
         { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "endDate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "deadlines",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "authorId", "order": "ASCENDING" },
         { "fieldPath": "endDate", "order": "ASCENDING" }
       ]
     },
@@ -39,6 +64,23 @@
       "fields": [
         { "fieldPath": "origin", "order": "DESCENDING" },
         { "fieldPath": "paymentDate", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "financial_titles",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "clientId", "order": "ASCENDING" },
+        { "fieldPath": "dueDate", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "financial_titles",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "type", "order": "ASCENDING" },
+        { "fieldPath": "dueDate", "order": "DESCENDING" }
       ]
     },
     {
@@ -63,6 +105,22 @@
       "fields": [
         { "fieldPath": "userId", "order": "ASCENDING" },
         { "fieldPath": "requestDate", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "checklist_templates",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "category", "order": "ASCENDING" },
+        { "fieldPath": "legalArea", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "leads",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "DESCENDING" }
       ]
     }
   ],
