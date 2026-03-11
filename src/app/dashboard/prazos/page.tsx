@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -151,18 +150,35 @@ export default function PrazosPage() {
   const isLoading = isUserLoading || isProfileLoading || isLoadingDeadlines;
 
   if (deadlinesError) {
+    const errorMsg = deadlinesError?.message || '';
+    const autoIndexLink = errorMsg.match(/https:\/\/console\.firebase\.google\.com[^\s]*/)?.[0];
+
     return (
       <div className="p-6">
         <Alert variant="destructive" className="bg-rose-500/10 border-rose-500/20 text-rose-400">
           <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Índice Composto Necessário</AlertTitle>
+          <AlertTitle>Configuração de Banco de Dados Necessária</AlertTitle>
           <AlertDescription className="text-xs mt-2 space-y-4">
-            <p>Para visualizar sua agenda de prazos filtrada, o Firebase exige a criação de um índice manual devido ao filtro de autor e data.</p>
+            <p>Para visualizar sua agenda filtrada, o Firebase exige a criação de um índice manual.</p>
             
             <div className="bg-black/20 p-4 rounded-lg space-y-4 border border-white/10">
-              <div className="space-y-1">
-                <p className="font-black text-white uppercase tracking-tighter text-[10px]">Configuração do Índice:</p>
-                <code className="block bg-black/40 p-2 rounded text-[10px] text-primary">Coleção: deadlines | Campos: authorId (ASC), endDate (ASC)</code>
+              <p className="font-bold text-white uppercase text-[10px]">Ação Necessária:</p>
+              
+              <div className="space-y-3">
+                {autoIndexLink ? (
+                  <Button className="w-full bg-primary text-primary-foreground font-black uppercase text-[10px] h-10 shadow-lg shadow-primary/20" asChild>
+                    <a href={autoIndexLink} target="_blank">
+                      <RefreshCw className="h-3 w-3 mr-2" /> CRIAR ÍNDICE AUTOMATICAMENTE
+                    </a>
+                  </Button>
+                ) : (
+                  <p className="text-slate-400">O link de criação rápida está disponível no console do seu navegador (F12).</p>
+                )}
+
+                <div className="space-y-1">
+                  <p className="font-black text-white uppercase tracking-tighter text-[9px]">Estrutura Manual do Índice:</p>
+                  <code className="block bg-black/40 p-2 rounded text-[10px] text-primary">Coleção: deadlines | Campos: authorId (ASC), endDate (ASC)</code>
+                </div>
               </div>
             </div>
 

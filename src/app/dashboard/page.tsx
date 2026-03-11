@@ -1,4 +1,3 @@
-
 'use client';
 import * as React from 'react';
 import {
@@ -484,29 +483,39 @@ export default function Dashboard() {
   const isLoading = status === 'loading' || isLoadingTitles || isLoadingProcesses || isLoadingHearings;
 
   if (anyError) {
+    const errorMsg = (anyError as any)?.message || '';
+    const autoIndexLink = errorMsg.match(/https:\/\/console\.firebase\.google\.com[^\s]*/)?.[0];
     const isAuthError = (anyError as any)?.code === 'auth/invalid-custom-token';
+
     return (
       <div className="p-6">
         <Alert variant="destructive" className="bg-rose-500/10 border-rose-500/20 text-rose-400 shadow-lg">
           <AlertTriangle className="h-5 w-5" />
           <AlertTitle className="text-lg font-black uppercase tracking-tighter">
-            {isAuthError ? 'Erro de Sincronização de Projeto' : 'Configuração Pendente no Firestore'}
+            {isAuthError ? 'Erro de Sincronização de Projeto' : 'Configuração Pendente no Banco de Dados'}
           </AlertTitle>
           <AlertDescription className="text-xs mt-2 space-y-4">
             {isAuthError ? (
               <p>O token de acesso foi gerado para um projeto diferente deste cliente. Isso ocorre quando a variável <code>FIREBASE_SERVICE_ACCOUNT_JSON</code> no servidor não corresponde ao projeto configurado no navegador.</p>
             ) : (
-              <p>O Dashboard não pode carregar as informações estratégicas porque falta um índice composto no banco de dados.</p>
+              <p>O Dashboard não pode carregar as informações estratégicas porque faltam índices compostos para organizar os dados.</p>
             )}
             
             <div className="bg-black/40 p-4 rounded-xl border border-white/10 font-mono text-[10px] leading-relaxed">
               <p className="text-white font-bold mb-2">Instruções para Resolução:</p>
-              {isAuthError ? (
+              {autoIndexLink ? (
+                <Button className="w-full bg-primary text-primary-foreground font-black uppercase text-[10px] h-10 mb-4 shadow-lg shadow-primary/20" asChild>
+                  <a href={autoIndexLink} target="_blank">
+                    <RefreshCw className="h-3 w-3 mr-2" /> CRIAR ÍNDICE AUTOMATICAMENTE
+                  </a>
+                </Button>
+              ) : isAuthError ? (
                 <>1. Verifique se o <code>project_id</code> no JSON de credenciais é o mesmo do <code>src/firebase/config.ts</code>.<br />2. Atualize as variáveis de ambiente no seu servidor (Vercel/Docker).<br />3. Consulte o arquivo <code>docs/firebase-auth-flow.md</code> para o guia completo.</>
               ) : (
-                <>Abra o console do navegador (F12) e clique no link gerado pelo erro do Firebase para criar o índice automaticamente. Geralmente envolve campos como 'leadLawyerId' e 'updatedAt'.</>
+                <p>Abra o console do seu navegador (F12) e procure pelo link gerado pelo Firebase para criar o índice rapidamente.</p>
               )}
             </div>
+            
             <div className="flex gap-3">
               <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="mt-2 border-rose-500/30">
                 <RefreshCw className="h-3 w-3 mr-2" /> Recarregar Página
