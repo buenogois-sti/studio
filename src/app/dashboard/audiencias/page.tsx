@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -801,7 +800,8 @@ export default function AudienciasPage() {
                                   </TableCell>
                               </TableRow>
                             );
-                        }) : (
+                        })
+                        ) : (
                           <TableRow>
                             <TableCell colSpan={5} className="h-40 text-center py-20 opacity-30 italic text-slate-500">
                               Nenhum ato finalizado encontrado no histórico recente.
