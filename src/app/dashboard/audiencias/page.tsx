@@ -730,7 +730,8 @@ export default function AudienciasPage() {
                           Array.from({ length: 5 }).map((_, i) => (
                             <TableRow key={i}><TableCell colSpan={5} className="p-6"><Skeleton className="h-10 w-full" /></TableCell></TableRow>
                           ))
-                        ) : historyHearings.map(h => {
+                        ) : historyHearings.length > 0 ? (
+                          historyHearings.map(h => {
                             const config = statusConfig[h.status];
                             const isPendingReturn = h.status === 'REALIZADA' && !h.hasFollowUp;
                             const process = processesMap.get(h.processId);
@@ -800,7 +801,13 @@ export default function AudienciasPage() {
                                   </TableCell>
                               </TableRow>
                             );
-                        })}
+                        }) : (
+                          <TableRow>
+                            <TableCell colSpan={5} className="h-40 text-center py-20 opacity-30 italic text-slate-500">
+                              Nenhum ato finalizado encontrado no histórico recente.
+                            </TableCell>
+                          </TableRow>
+                        )}
                       </TableBody>
                     </Table>
                 </Card>

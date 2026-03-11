@@ -76,7 +76,7 @@ export default function DiligenciasPage() {
     () => (firestore && user?.uid ? doc(firestore, 'users', user.uid) : null),
     [firestore, user?.uid]
   );
-  const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
 
   const staffQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'staff'), limit(50)) : null, [firestore]);
   const { data: staffData } = useCollection<Staff>(staffQuery);
@@ -127,7 +127,7 @@ export default function DiligenciasPage() {
     }
   };
 
-  const isLoading = isUserLoading || isLoadingDiligencias;
+  const isLoading = isUserLoading || isProfileLoading || isLoadingDiligencias;
 
   if (diligenciasError) {
     return (
@@ -258,6 +258,7 @@ export default function DiligenciasPage() {
             onReturn={(d: any) => setReturnDiligence(d)}
             isProcessing={isProcessing}
             processesMap={processesMap}
+            isHistoryTab={true}
           />
         </TabsContent>
       </Tabs>
@@ -272,7 +273,7 @@ export default function DiligenciasPage() {
   );
 }
 
-function DiligenceList({ data, isLoading, onReturn, isProcessing, processesMap }: any) {
+function DiligenceList({ data, isLoading, onReturn, isProcessing, processesMap, isHistoryTab }: any) {
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -285,7 +286,9 @@ function DiligenceList({ data, isLoading, onReturn, isProcessing, processesMap }
     return (
       <div className="text-center py-20 bg-white/5 rounded-3xl border-2 border-dashed border-white/10 opacity-40">
         <Briefcase className="h-12 w-12 mx-auto mb-4" />
-        <p className="font-bold text-white uppercase tracking-widest text-[10px]">Nenhuma diligência encontrada</p>
+        <p className="font-bold text-white uppercase tracking-widest text-[10px]">
+          {isHistoryTab ? 'Nenhum histórico de diligências' : 'Nenhuma diligência pendente'}
+        </p>
       </div>
     );
   }
@@ -294,7 +297,7 @@ function DiligenceList({ data, isLoading, onReturn, isProcessing, processesMap }
     <div className="grid gap-4">
       {data.map((d: Hearing) => {
         const process = processesMap.get(d.processId);
-        const config = (statusConfig as any)[d.status];
+        const config = (statusConfig as any)[d.status] || statusConfig.PENDENTE;
         const StatusIcon = config.icon;
 
         return (

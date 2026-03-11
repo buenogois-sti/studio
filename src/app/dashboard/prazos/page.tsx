@@ -265,21 +265,22 @@ export default function PrazosPage() {
         </TabsContent>
 
         <TabsContent value="cumpridos" className="space-y-4">
-          {cumpridos.map(d => (
-            <DeadlineCard 
-              key={d.id} 
-              deadline={d} 
-              process={processesMap.get(d.processId)} 
-              onStatusUpdate={handleUpdateStatus}
-              onDelete={handleDelete}
-              onViewDetails={handleViewDetails}
-              onEdit={handleEdit}
-              onGoToProcess={handleGoToProcess}
-              isProcessing={isProcessing === d.id}
-            />
-          ))}
-          {cumpridos.length === 0 && (
-            <div className="text-center py-20 text-muted-foreground italic">Nenhum prazo cumprido no histórico recente.</div>
+          {cumpridos.length > 0 ? (
+            cumpridos.map(d => (
+              <DeadlineCard 
+                key={d.id} 
+                deadline={d} 
+                process={processesMap.get(d.processId)} 
+                onStatusUpdate={handleUpdateStatus}
+                onDelete={handleDelete}
+                onViewDetails={handleViewDetails}
+                onEdit={handleEdit}
+                onGoToProcess={handleGoToProcess}
+                isProcessing={isProcessing === d.id}
+              />
+            ))
+          ) : (
+            <div className="text-center py-20 text-muted-foreground italic opacity-40">Nenhum prazo cumprido no histórico recente.</div>
           )}
         </TabsContent>
 
@@ -298,63 +299,71 @@ export default function PrazosPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/20">
-                    {filteredDeadlines.map(d => (
-                      <tr key={d.id} className="hover:bg-white/5 transition-colors group">
-                        <td className="px-6 py-4 font-bold text-white">
-                          <div className="max-w-[250px] truncate">{processesMap.get(d.processId)?.name}</div>
-                        </td>
-                        <td className="px-6 py-4 text-slate-300 font-mono text-xs">{format(d.endDate.toDate(), 'dd/MM/yyyy')}</td>
-                        <td className="px-6 py-4">
-                          <Badge variant="outline" className="text-[10px] font-bold bg-white/5 border-primary/20 text-primary">{d.type}</Badge>
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          <Badge variant="outline" className={cn(
-                            "text-[9px] font-black uppercase",
-                            d.status === 'PENDENTE' ? "text-amber-400 border-amber-500/30 bg-amber-500/5" : "text-emerald-400 border-emerald-500/30 bg-emerald-500/5"
-                          )}>
-                            {isProcessing === d.id ? <Loader2 className="h-3 w-3 animate-spin" /> : d.status}
-                          </Badge>
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground group-hover:text-white" disabled={isProcessing === d.id}>
-                                {isProcessing === d.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreVertical className="h-4 w-4" />}
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="bg-card border-border w-56">
-                              <DropdownMenuLabel className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Opções do Prazo</DropdownMenuLabel>
-                              <DropdownMenuItem onClick={() => handleViewDetails(d)} className="gap-2 cursor-pointer focus:bg-primary/10">
-                                <Eye className="h-4 w-4 text-blue-400" /> <span className="font-bold">Ver Detalhes</span>
-                              </DropdownMenuItem>
-                              
-                              {d.status === 'CUMPRIDO' ? (
-                                <DropdownMenuItem onClick={() => handleUpdateStatus(d.id, 'PENDENTE')} className="gap-2 cursor-pointer text-amber-400">
-                                  <RotateCcw className="h-4 w-4" /> <span className="font-bold">Reativar Prazo</span>
+                    {filteredDeadlines.length > 0 ? (
+                      filteredDeadlines.map(d => (
+                        <tr key={d.id} className="hover:bg-white/5 transition-colors group">
+                          <td className="px-6 py-4 font-bold text-white">
+                            <div className="max-w-[250px] truncate">{processesMap.get(d.processId)?.name}</div>
+                          </td>
+                          <td className="px-6 py-4 text-slate-300 font-mono text-xs">{format(d.endDate.toDate(), 'dd/MM/yyyy')}</td>
+                          <td className="px-6 py-4">
+                            <Badge variant="outline" className="text-[10px] font-bold bg-white/5 border-primary/20 text-primary">{d.type}</Badge>
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <Badge variant="outline" className={cn(
+                              "text-[9px] font-black uppercase",
+                              d.status === 'PENDENTE' ? "text-amber-400 border-amber-500/30 bg-amber-500/5" : "text-emerald-400 border-emerald-500/30 bg-emerald-500/5"
+                            )}>
+                              {isProcessing === d.id ? <Loader2 className="h-3 w-3 animate-spin" /> : d.status}
+                            </Badge>
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground group-hover:text-white" disabled={isProcessing === d.id}>
+                                  {isProcessing === d.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreVertical className="h-4 w-4" />}
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="bg-card border-border w-56 p-1 shadow-2xl">
+                                <DropdownMenuLabel className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Opções do Prazo</DropdownMenuLabel>
+                                <DropdownMenuItem onClick={() => handleViewDetails(d)} className="gap-2 cursor-pointer focus:bg-primary/10">
+                                  <Eye className="h-4 w-4 text-blue-400" /> <span className="font-bold">Ver Detalhes</span>
                                 </DropdownMenuItem>
-                              ) : (
-                                <DropdownMenuItem onClick={() => handleUpdateStatus(d.id, 'CUMPRIDO')} className="gap-2 cursor-pointer text-emerald-400">
-                                  <Check className="h-4 w-4" /> <span className="font-bold">Marcar Cumprido</span>
+                                
+                                {d.status === 'CUMPRIDO' ? (
+                                  <DropdownMenuItem onClick={() => handleUpdateStatus(d.id, 'PENDENTE')} className="gap-2 cursor-pointer text-amber-400">
+                                    <RotateCcw className="h-4 w-4" /> <span className="font-bold">Reativar Prazo</span>
+                                  </DropdownMenuItem>
+                                ) : (
+                                  <DropdownMenuItem onClick={() => handleUpdateStatus(d.id, 'CUMPRIDO')} className="gap-2 cursor-pointer text-emerald-400">
+                                    <Check className="h-4 w-4" /> <span className="font-bold">Marcar Cumprido</span>
+                                  </DropdownMenuItem>
+                                )}
+
+                                <DropdownMenuItem onClick={() => handleEdit(d)} className="gap-2 cursor-pointer">
+                                  <Edit className="h-4 w-4 text-primary" /> <span className="font-bold">Editar</span>
                                 </DropdownMenuItem>
-                              )}
+                                
+                                <DropdownMenuItem onClick={() => handleGoToProcess(d.processId)} className="gap-2 cursor-pointer">
+                                  <ArrowRight className="h-4 w-4 text-slate-400" /> <span className="font-bold">Ver Processo</span>
+                                </DropdownMenuItem>
 
-                              <DropdownMenuItem onClick={() => handleEdit(d)} className="gap-2 cursor-pointer">
-                                <Edit className="h-4 w-4 text-primary" /> <span className="font-bold">Editar</span>
-                              </DropdownMenuItem>
-                              
-                              <DropdownMenuItem onClick={() => handleGoToProcess(d.processId)} className="gap-2 cursor-pointer">
-                                <ArrowRight className="h-4 w-4 text-slate-400" /> <span className="font-bold">Ver Processo</span>
-                              </DropdownMenuItem>
-
-                              <DropdownMenuSeparator className="bg-white/10" />
-                              <DropdownMenuItem className="text-rose-500 gap-2 cursor-pointer focus:bg-rose-500/10" onClick={() => handleDelete(d.id)}>
-                                <X className="h-4 w-4" /> <span className="font-bold">Excluir Prazo</span>
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                                <DropdownMenuSeparator className="bg-white/10" />
+                                <DropdownMenuItem className="text-rose-500 gap-2 cursor-pointer focus:bg-rose-500/10" onClick={() => handleDelete(d.id)}>
+                                  <X className="h-4 w-4" /> <span className="font-bold">Excluir Prazo</span>
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={5} className="h-40 text-center py-20 opacity-30 italic text-slate-500">
+                          Nenhum prazo encontrado no histórico.
                         </td>
                       </tr>
-                    ))}
+                    )}
                   </tbody>
                 </table>
               </div>
