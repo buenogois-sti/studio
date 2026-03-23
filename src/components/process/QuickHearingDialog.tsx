@@ -50,7 +50,7 @@ const hearingSchema = z.object({
   time: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Hora inválida.'),
   location: z.string().min(3, 'O local é obrigatório.'),
   courtBranch: z.string().optional().or(z.literal('')),
-  type: z.enum(['CONCILIACAO', 'INSTRUCAO', 'UNA', 'JULGAMENTO', 'PERICIA', 'ATENDIMENTO', 'OUTRA']),
+  type: z.enum(['CONCILIACAO', 'INSTRUCAO', 'UNA', 'JULGAMENTO', 'PERICIA', 'ATENDIMENTO', 'DILIGENCIA', 'OUTRA']),
   responsibleParty: z.string().min(3, 'O responsável é obrigatório.'),
   notes: z.string().optional(),
   meetingLink: z.string().optional().or(z.literal('')),
