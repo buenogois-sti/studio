@@ -30,6 +30,7 @@ export async function createLead(data: {
   isUrgent: boolean;
   prescriptionDate?: string;
   description?: string;
+  interviewerId?: string;
 }) {
   if (!firestoreAdmin) throw new Error('Servidor indisponível.');
   const session = await getServerSession(authOptions);
@@ -69,6 +70,7 @@ export async function createLead(data: {
       referralType: data.referralType || '',
       isUrgent: data.isUrgent,
       description: data.description || '',
+      interviewerId: data.interviewerId || '',
       status: 'NOVO' as LeadStatus,
       opposingParties: [],
       completedTasks: [], 
@@ -138,6 +140,19 @@ export async function updateLeadDetails(id: string, data: Partial<Lead>) {
         id: uuidv4(),
         type: 'system',
         description: `ÁREA ATUALIZADA: Área jurídica alterada de "${currentData.legalArea}" para "${data.legalArea}".`,
+        date: now as any,
+        authorName: session?.user?.name || 'Sistema'
+      });
+    }
+
+    // Rastrear mudança de entrevistador
+    if (data.interviewerId && data.interviewerId !== currentData.interviewerId) {
+      const staffDoc = await firestoreAdmin.collection('staff').doc(data.interviewerId).get();
+      const staffName = staffDoc.exists ? staffDoc.data()?.firstName : 'Novo Entrevistador';
+      timelineEvents.push({
+        id: uuidv4(),
+        type: 'system',
+        description: `TRIAGEM: Entrevistador alterado para ${staffName} por ${session?.user?.name || 'Sistema'}.`,
         date: now as any,
         authorName: session?.user?.name || 'Sistema'
       });
@@ -399,5 +414,31 @@ export async function scheduleLeadInterview(leadId: string, data: {
   } catch (error: any) {
     console.error('[scheduleLeadInterview] Error:', error);
     throw new Error(error.message || 'Falha ao agendar compromisso na agenda do advogado.');
+  }
+}
+
+/**
+ * Atualiza a análise de IA de um lead.
+ */
+export async function updateLeadAiAnalysis(leadId: string, analysis: Lead['aiAnalysis']) {
+  if (!firestoreAdmin) throw new Error('Servidor indisponível.');
+  const session = await getServerSession(authOptions);
+  if (!session) throw new Error('Não autenticado.');
+
+  try {
+    const leadRef = firestoreAdmin.collection('leads').doc(leadId);
+    
+    await leadRef.update({
+      aiAnalysis: {
+        ...analysis,
+        analyzedAt: FieldValue.serverTimestamp(),
+      },
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+
+    revalidatePath('/dashboard/leads');
+    return { success: true };
+  } catch (error: any) {
+    throw new Error(error.message);
   }
 }

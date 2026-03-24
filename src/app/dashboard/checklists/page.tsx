@@ -31,7 +31,8 @@ import {
   Zap,
   Eye,
   EyeOff,
-  Power
+  Power,
+  LayoutList
 } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy, limit, Timestamp } from 'firebase/firestore';
@@ -65,7 +66,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { upsertChecklistTemplate, deleteChecklistTemplate, saveChecklistExecution, toggleChecklistStatus } from '@/lib/checklist-actions';
+import { upsertChecklistTemplate, deleteChecklistTemplate, saveChecklistExecution, toggleChecklistStatus, injectLibrary } from '@/lib/checklist-actions';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -88,102 +89,17 @@ import { Separator } from '@/components/ui/separator';
 import { searchProcesses } from '@/lib/process-actions';
 import { searchLeads } from '@/lib/lead-actions';
 
-// Componente de Card memoizado para performance
-const ChecklistCard = React.memo(({ 
-  template, 
-  isAdmin, 
-  onEdit, 
-  onExecute, 
-  onDelete,
-  onView,
-  onToggleStatus
-}: { 
-  template: ChecklistTemplate; 
-  isAdmin: boolean; 
-  onEdit: (t: ChecklistTemplate) => void;
-  onExecute: (t: ChecklistTemplate) => void;
-  onDelete: (id: string) => void;
-  onView: (t: ChecklistTemplate) => void;
-  onToggleStatus: (id: string, current: boolean) => void;
-}) => (
-  <Card className={cn(
-    "bg-[#0f172a] border-white/5 border-2 hover:border-primary/20 transition-all group overflow-hidden flex flex-col",
-    !template.isActive && "opacity-60 grayscale-[0.5]"
-  )}>
-    <CardHeader className="pb-2">
-      <div className="flex items-start justify-between">
-        <div className="flex flex-wrap gap-1.5">
-          <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 text-[9px] font-black uppercase tracking-widest">{template.category}</Badge>
-          {template.legalArea && (
-            <Badge variant="secondary" className="bg-blue-500/10 text-blue-400 border-none text-[9px] font-black uppercase tracking-widest">
-              {template.legalArea}
-            </Badge>
-          )}
-          {!template.isActive && (
-            <Badge className="bg-rose-500/20 text-rose-400 border-none text-[9px] font-black uppercase tracking-widest">Inativo</Badge>
-          )}
-        </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-white/20 hover:text-white"><MoreVertical className="h-4 w-4" /></Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="bg-[#0f172a] border-white/10 text-white shadow-2xl p-1">
-            <DropdownMenuLabel className="text-[10px] font-black uppercase text-slate-500 px-2 py-1.5 tracking-widest">Opções</DropdownMenuLabel>
-            <DropdownMenuItem onClick={() => onView(template)} className="gap-2 focus:bg-white/5">
-              <Eye className="h-4 w-4 text-blue-400" /> Visualizar Estrutura
-            </DropdownMenuItem>
-            
-            {isAdmin && (
-              <>
-                <DropdownMenuItem onClick={() => onEdit(template)} className="gap-2 focus:bg-white/5">
-                  <Edit className="h-4 w-4 text-primary" /> Editar Modelo
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onToggleStatus(template.id, template.isActive)} className="gap-2 focus:bg-white/5">
-                  {template.isActive ? (
-                    <><EyeOff className="h-4 w-4 text-amber-400" /> Desativar Modelo</>
-                  ) : (
-                    <><Power className="h-4 w-4 text-emerald-400" /> Ativar Modelo</>
-                  )}
-                </DropdownMenuItem>
-                <DropdownMenuSeparator className="bg-white/5" />
-                <DropdownMenuItem onClick={() => onDelete(template.id)} className="text-rose-500 gap-2 focus:bg-rose-500/10">
-                  <Trash2 className="h-4 w-4" /> Excluir Permanentemente
-                </DropdownMenuItem>
-              </>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-      <CardTitle className="text-lg font-black text-white mt-2 leading-tight group-hover:text-primary transition-colors">{template.title}</CardTitle>
-      <CardDescription className="text-xs text-slate-400 line-clamp-2 mt-1 min-h-[32px]">{template.description}</CardDescription>
-    </CardHeader>
-    <CardContent className="pb-4 flex-1">
-      <div className="flex items-center gap-2 text-[10px] text-slate-500 font-bold uppercase">
-        <Target className="h-3 w-3 text-primary" /> {template.items.length} Passos de Verificação
-      </div>
-    </CardContent>
-    <CardFooter className="bg-white/5 border-t border-white/5 p-4">
-      <Button 
-        disabled={!template.isActive}
-        className="w-full bg-primary/10 hover:bg-primary text-primary hover:text-primary-foreground font-black uppercase tracking-widest text-[10px] h-10 gap-2 transition-all border border-primary/20"
-        onClick={() => onExecute(template)}
-      >
-        <Play className="h-3 w-3" /> {template.isActive ? 'Executar Checklist' : 'Modelo Desativado'}
-      </Button>
-    </CardFooter>
-  </Card>
-));
-ChecklistCard.displayName = 'ChecklistCard';
-
-export default function ChecklistsPage() {
+export default function LaboratorioMatrizesPage() {
   const { firestore } = useFirebase();
   const { data: session } = useSession();
-  const [activeTab, setActiveTab] = React.useState('templates');
+  const { toast } = useToast();
+  const [activeTab, setActiveTab] = React.useState('dna-triagem');
   const [searchTerm, setSearchTerm] = React.useState('');
   const [isEditorOpen, setIsEditorOpen] = React.useState(false);
   const [isExecutorOpen, setIsExecutorOpen] = React.useState(false);
   const [isDetailsOpen, setIsDetailsOpen] = React.useState(false);
   const [isViewOpen, setIsViewOpen] = React.useState(false);
+  const [isInjecting, setIsInjecting] = React.useState(false);
   const [selectedTemplate, setSelectedTemplate] = React.useState<ChecklistTemplate | null>(null);
   const [selectedExecution, setSelectedExecution] = React.useState<ChecklistExecution | null>(null);
   
@@ -206,7 +122,7 @@ export default function ChecklistsPage() {
     let list = [...templates];
     if (searchTerm.trim()) {
       const q = searchTerm.toLowerCase();
-      list = list.filter(t => t.title.toLowerCase().includes(q) || t.category.toLowerCase().includes(q));
+      list = list.filter(t => t.title.toLowerCase().includes(q) || (t.legalArea || '').toLowerCase().includes(q));
     }
     return list;
   }, [templates, searchTerm]);
@@ -229,104 +145,215 @@ export default function ChecklistsPage() {
   const handleToggleStatus = React.useCallback(async (id: string, current: boolean) => {
     try {
       await toggleChecklistStatus(id, current);
+      toast({ title: 'Status Atualizado', description: 'O modelo foi atualizado com sucesso.' });
     } catch (e: any) {
-      console.error(e);
+      toast({ variant: 'destructive', title: 'Erro', description: e.message });
     }
-  }, []);
+  }, [toast]);
+
+  const handleInjectLibrary = async () => {
+    setIsInjecting(true);
+    try {
+      await injectLibrary();
+      toast({ title: 'Biblioteca Injetada!', description: 'Os modelos padrão foram adicionados ao seu laboratório.' });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Erro ao injetar', description: e.message });
+    } finally {
+      setIsInjecting(false);
+    }
+  };
 
   return (
-    <div className="flex flex-col gap-8 pb-10">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-black tracking-tight font-headline flex items-center gap-3 text-white">
-            <CheckSquare className="h-8 w-8 text-primary" />
-            Checklists Operacionais
+    <div className="flex flex-col gap-10 pb-20 max-w-[1600px] mx-auto">
+      {/* Header Premium: Laboratório de Matrizes */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 px-1">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-500 tracking-tighter mb-2">
+            <span className="hover:text-primary cursor-pointer transition-colors">Início</span>
+            <ChevronRight className="h-3 w-3" />
+            <span className="text-white/80">Arquitetura Jurídica</span>
+          </div>
+          <h1 className="text-5xl font-black tracking-tight font-headline text-white leading-none uppercase">
+            Laboratório <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-primary/50">de Matrizes</span>
           </h1>
-          <p className="text-sm text-muted-foreground">Padronização de processos e garantia de qualidade da banca.</p>
+          <p className="text-sm text-slate-400 font-bold uppercase tracking-widest opacity-80">Gestão de roteiros de triagem e inteligência de dados.</p>
         </div>
-        <div className="flex items-center gap-3">
+
+        <div className="flex items-center gap-4">
+          <div className="relative w-72 group">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 group-focus-within:text-primary transition-colors" />
+            <Input 
+              placeholder="Filtrar modelos..." 
+              className="h-12 pl-10 bg-white/[0.03] border-white/10 hover:border-white/20 focus:border-primary text-white rounded-xl transition-all" 
+              value={searchTerm} 
+              onChange={e => setSearchTerm(e.target.value)} 
+            />
+          </div>
           {isAdmin && (
-            <Button onClick={() => { setSelectedTemplate(null); setIsEditorOpen(true); }} className="bg-primary text-primary-foreground font-black h-10 px-6 shadow-lg shadow-primary/20">
-              <Plus className="mr-2 h-4 w-4" /> Novo Modelo
-            </Button>
+            <>
+              <Button 
+                variant="ghost" 
+                disabled={isInjecting}
+                onClick={handleInjectLibrary}
+                className="h-12 px-6 text-slate-400 hover:text-white hover:bg-white/5 font-black uppercase text-[10px] tracking-widest gap-2 border border-white/5 rounded-xl transition-all"
+              >
+                {isInjecting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4 text-primary" />}
+                Injetar Biblioteca
+              </Button>
+              <Button 
+                onClick={() => { setSelectedTemplate(null); setIsEditorOpen(true); }} 
+                className="h-12 w-12 rounded-xl bg-primary text-primary-foreground shadow-2xl shadow-primary/20 hover:scale-[1.05] transition-all flex items-center justify-center p-0"
+              >
+                <Plus className="h-6 w-6 stroke-[3]" />
+              </Button>
+            </>
           )}
         </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-          <TabsList className="bg-[#0f172a] p-1 border border-white/5 h-12">
-            <TabsTrigger value="templates" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground px-6 h-10 font-bold">
-              <ListChecks className="h-4 w-4" /> Modelos Disponíveis
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+          <TabsList className="bg-white/5 p-1 border border-white/10 h-14 rounded-2xl w-fit">
+            <TabsTrigger value="dna-triagem" className="gap-2 data-[state=active]:bg-primary/10 data-[state=active]:text-primary px-8 h-12 font-black uppercase text-[10px] tracking-widest rounded-xl transition-all">
+              <Zap className="h-4 w-4" /> Matrizes de DNA (Triagem)
             </TabsTrigger>
-            <TabsTrigger value="history" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground px-6 h-10 font-bold">
-              <History className="h-4 w-4" /> Histórico de Execuções
+            <TabsTrigger value="modelos-peticao" className="gap-2 data-[state=active]:bg-primary/10 data-[state=active]:text-primary px-8 h-12 font-black uppercase text-[10px] tracking-widest rounded-xl transition-all">
+              <FileText className="h-4 w-4" /> Modelos de Petição
+            </TabsTrigger>
+            <TabsTrigger value="history" className="gap-2 data-[state=active]:bg-primary/10 data-[state=active]:text-primary px-8 h-12 font-black uppercase text-[10px] tracking-widest rounded-xl transition-all">
+              <History className="h-4 w-4" /> Histórico de Utilização
             </TabsTrigger>
           </TabsList>
           
-          <div className="relative w-full max-sm:w-full max-w-sm">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input 
-              placeholder="Pesquisar..." 
-              className="pl-8 bg-[#0f172a] border-white/10 text-white" 
-              value={searchTerm} 
-              onChange={e => setSearchTerm(e.target.value)} 
-            />
+          <div className="flex items-center gap-2 bg-white/5 p-1 rounded-xl border border-white/10">
+            <Button variant="ghost" size="icon" className="h-10 w-10 text-primary bg-primary/10 rounded-lg"><LayoutList className="h-4 w-4" /></Button>
+            <Button variant="ghost" size="icon" className="h-10 w-10 text-slate-500"><History className="h-4 w-4" /></Button>
           </div>
         </div>
 
-        <TabsContent value="templates" className="animate-in fade-in duration-300">
-          {isLoadingTemplates ? (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-48 w-full bg-white/5 rounded-2xl" />)}
-            </div>
-          ) : filteredTemplates.length > 0 ? (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredTemplates.map(template => (
-                <ChecklistCard 
-                  key={template.id} 
-                  template={template} 
-                  isAdmin={isAdmin}
-                  onEdit={handleEditTemplate}
-                  onExecute={handleExecuteTemplate}
-                  onDelete={deleteChecklistTemplate}
-                  onView={handleViewTemplate}
-                  onToggleStatus={handleToggleStatus}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-20 bg-white/5 rounded-3xl border-2 border-dashed border-white/10 opacity-40">
-              <CheckSquare className="h-12 w-12 mx-auto mb-4" />
-              <p className="font-bold text-white uppercase tracking-widest text-[10px]">Nenhum modelo disponível</p>
-            </div>
-          )}
+        <TabsContent value="dna-triagem" className="animate-in fade-in duration-500 slide-in-from-bottom-4">
+          <div className="rounded-[32px] bg-[#0f172a]/50 border-2 border-white/5 overflow-hidden backdrop-blur-sm">
+            <Table>
+              <TableHeader className="bg-white/[0.02] border-b border-white/10 h-16">
+                <TableRow className="hover:bg-transparent border-none">
+                  <TableHead className="text-slate-500 text-[10px] font-black uppercase px-10 tracking-widest">DNA Triagem</TableHead>
+                  <TableHead className="text-slate-500 text-[10px] font-black uppercase tracking-widest">Categoria</TableHead>
+                  <TableHead className="text-slate-500 text-[10px] font-black uppercase tracking-widest">Área</TableHead>
+                  <TableHead className="text-slate-500 text-[10px] font-black uppercase tracking-widest text-center">Campos</TableHead>
+                  <TableHead className="text-slate-500 text-[10px] font-black uppercase tracking-widest text-right px-10">Comandos</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoadingTemplates ? (
+                  [...Array(5)].map((_, i) => (
+                    <TableRow key={i} className="border-white/5">
+                      <TableCell colSpan={5} className="p-4 px-10"><Skeleton className="h-12 w-full bg-white/5 rounded-xl" /></TableCell>
+                    </TableRow>
+                  ))
+                ) : filteredTemplates.length > 0 ? (
+                  filteredTemplates.map(template => (
+                    <TableRow key={template.id} className={cn(
+                      "border-white/5 group transition-colors h-16",
+                      !template.isActive && "opacity-40 grayscale"
+                    )}>
+                      <TableCell className="px-10">
+                        <div className="flex items-center gap-3">
+                          <div className={cn("h-2 w-2 rounded-full", template.isActive ? "bg-primary animate-pulse" : "bg-slate-700")} />
+                          <span className="font-black text-white group-hover:text-primary transition-colors text-sm uppercase tracking-tight">{template.title}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="bg-white/5 text-[9px] font-black uppercase text-slate-400 border-white/10 rounded-lg px-2 py-1">
+                          {template.category}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{template.legalArea || 'Geral'}</span>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <div className="inline-flex items-center gap-1.5 text-xs text-slate-300 font-black">
+                          <ListChecks className="h-3.5 w-3.5 text-primary" /> {template.items.length}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right px-10">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => handleViewTemplate(template)}
+                            className="h-9 w-9 text-slate-500 hover:text-white hover:bg-white/5 rounded-xl transition-all"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => handleEditTemplate(template)}
+                            className="h-9 w-9 text-slate-500 hover:text-primary hover:bg-primary/5 rounded-xl transition-all"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          {isAdmin && (
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              onClick={() => deleteChecklistTemplate(template.id)}
+                              className="h-9 w-9 text-slate-500 hover:text-rose-500 hover:bg-rose-500/5 rounded-xl transition-all"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={5} className="py-24 text-center">
+                      <div className="flex flex-col items-center gap-4 opacity-40">
+                        <Zap className="h-12 w-12" />
+                        <p className="font-black uppercase tracking-widest text-[10px]">Nenhuma matriz de DNA encontrada.</p>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="modelos-peticao" className="animate-in fade-in duration-500 slide-in-from-bottom-4">
+          <div className="text-center py-40 bg-white/[0.01] border-2 border-dashed border-white/5 rounded-[40px] opacity-40">
+            <FileText className="h-16 w-16 mx-auto mb-6" />
+            <h2 className="text-2xl font-black uppercase font-headline">Acervo de Petições</h2>
+            <p className="font-bold text-xs uppercase tracking-widest text-slate-400 mt-2">Módulo em integração com o Laboratório de Matrizes.</p>
+          </div>
         </TabsContent>
 
         <TabsContent value="history" className="animate-in fade-in duration-300">
-          <Card className="bg-[#0f172a] border-white/5 overflow-hidden">
+          <Card className="bg-[#0f172a]/80 border-white/5 overflow-hidden backdrop-blur-xl rounded-[32px]">
             <Table>
-              <TableHeader className="bg-white/5 border-b border-white/10">
+              <TableHeader className="bg-white/[0.02] border-b border-white/10 h-16">
                 <TableRow className="hover:bg-transparent">
-                  <TableHead className="text-muted-foreground text-[10px] font-black uppercase px-6">Checklist / Vínculo</TableHead>
-                  <TableHead className="text-muted-foreground text-[10px] font-black uppercase">Responsável</TableHead>
-                  <TableHead className="text-muted-foreground text-[10px] font-black uppercase">Data/Hora</TableHead>
-                  <TableHead className="text-center text-muted-foreground text-[10px] font-black uppercase">Status</TableHead>
-                  <TableHead className="text-right text-muted-foreground text-[10px] font-black uppercase px-6">Ação</TableHead>
+                  <TableHead className="text-slate-500 text-[10px] font-black uppercase px-10">Matriz / Vínculo</TableHead>
+                  <TableHead className="text-slate-500 text-[10px] font-black uppercase">Responsável</TableHead>
+                  <TableHead className="text-slate-500 text-[10px] font-black uppercase">Data/Hora</TableHead>
+                  <TableHead className="text-center text-slate-500 text-[10px] font-black uppercase">Resultado</TableHead>
+                  <TableHead className="text-right text-slate-500 text-[10px] font-black uppercase px-10">Ficha</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoadingExecutions ? (
-                  [...Array(3)].map((_, i) => <TableRow key={i}><TableCell colSpan={5} className="p-6"><Skeleton className="h-10 w-full bg-white/5" /></TableCell></TableRow>)
+                  [...Array(3)].map((_, i) => <TableRow key={i}><TableCell colSpan={5} className="p-6 px-10"><Skeleton className="h-10 w-full bg-white/5" /></TableCell></TableRow>)
                 ) : executions?.map(exec => (
-                  <TableRow key={exec.id} className="border-white/5 hover:bg-white/5 transition-colors group">
-                    <TableCell className="px-6">
+                  <TableRow key={exec.id} className="border-white/5 hover:bg-white/[0.02] transition-colors group">
+                    <TableCell className="px-10">
                       <div className="flex flex-col">
-                        <span className="font-bold text-white text-sm">{exec.templateTitle}</span>
+                        <span className="font-black text-white text-sm uppercase tracking-tight">{exec.templateTitle}</span>
                         {(exec.processName || exec.leadTitle) && (
                           <div className="flex items-center gap-1.5 mt-1 text-primary">
                             {exec.processName ? <FolderKanban className="h-3 w-3" /> : <Zap className="h-3 w-3" />}
-                            <span className="text-[10px] font-black uppercase tracking-tighter truncate max-w-[200px]">
+                            <span className="text-[9px] font-black uppercase tracking-widest truncate max-w-[250px]">
                               {exec.processName || exec.leadTitle}
                             </span>
                           </div>
@@ -335,23 +362,23 @@ export default function ChecklistsPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-primary text-[8px] font-black border border-primary/20">
+                        <div className="h-7 w-7 rounded-full bg-primary/20 flex items-center justify-center text-primary text-[10px] font-black border border-primary/20">
                           {exec.userName.charAt(0)}
                         </div>
-                        <span className="text-xs text-slate-300 font-medium">{exec.userName}</span>
+                        <span className="text-xs text-slate-300 font-bold">{exec.userName}</span>
                       </div>
                     </TableCell>
                     <TableCell className="text-[10px] text-slate-400 font-mono">
-                      {exec.executedAt && format(exec.executedAt.toDate(), 'dd/MM/yy HH:mm')}
+                      {exec.executedAt && format(exec.executedAt.toDate(), 'dd/MM/yyyy HH:mm', { locale: ptBR })}
                     </TableCell>
                     <TableCell className="text-center">
-                      <Badge className="bg-emerald-500/20 text-emerald-400 border-none text-[9px] font-black tracking-widest px-2 h-6">CONCLUÍDO</Badge>
+                      <Badge className="bg-emerald-500/10 text-emerald-400 border-none text-[8px] font-black tracking-widest px-2 h-6 uppercase">CONCLUÍDO</Badge>
                     </TableCell>
-                    <TableCell className="text-right px-6">
+                    <TableCell className="text-right px-10">
                       <Button 
                         variant="ghost" 
                         size="icon" 
-                        className="text-white/30 hover:text-primary hover:bg-primary/10 rounded-full h-8 w-8 transition-colors"
+                        className="text-white/30 hover:text-primary hover:bg-primary/10 rounded-xl h-9 w-9 transition-all"
                         onClick={() => {
                           setSelectedExecution(exec);
                           setIsDetailsOpen(true);
@@ -362,9 +389,6 @@ export default function ChecklistsPage() {
                     </TableCell>
                   </TableRow>
                 ))}
-                {executions?.length === 0 && !isLoadingExecutions && (
-                  <TableRow><TableCell colSpan={5} className="text-center py-20 text-slate-500 italic opacity-40">Nenhuma execução registrada.</TableCell></TableRow>
-                )}
               </TableBody>
             </Table>
           </Card>

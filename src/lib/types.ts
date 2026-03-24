@@ -124,6 +124,14 @@ export type Lead = {
   completedTasks?: string[]; 
   stageEntryDates?: Record<string, Timestamp>;
   interviewAnswers?: Record<string, string>;
+  interviewerId?: string;
+  aiAnalysis?: {
+    summary?: string;
+    legalAdvice?: string;
+    score?: number;
+    suggestedSteps?: string[];
+    analyzedAt?: any;
+  };
   timeline?: TimelineEvent[];
   createdAt: Timestamp;
   updatedAt: Timestamp;

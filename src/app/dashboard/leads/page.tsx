@@ -42,8 +42,10 @@ import {
   Thermometer,
   Timer,
   Gavel,
+  Scale,
   ShieldAlert,
   LayoutList,
+  Sparkles,
   Edit,
   Save,
   UserCheck,
@@ -85,10 +87,18 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Textarea } from '@/components/ui/textarea';
-import { createLead, updateLeadStatus, convertLeadToProcess, scheduleLeadInterview, updateLeadDetails } from '@/lib/lead-actions';
+import { 
+  createLead, 
+  updateLeadStatus, 
+  convertLeadToProcess, 
+  scheduleLeadInterview, 
+  updateLeadDetails,
+  updateLeadAiAnalysis
+} from '@/lib/lead-actions';
+import { analyzeLead } from '@/ai/flows/analyze-lead-flow';
 import { ClientSearchInput } from '@/components/process/ClientSearchInput';
 import { ClientCreationModal } from '@/components/process/ClientCreationModal';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet';
 import { Separator } from '@/components/ui/separator';
 import { v4 as uuidv4 } from 'uuid';
@@ -100,6 +110,19 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { DocumentDraftingDialog } from '@/components/process/DocumentDraftingDialog';
 import { extractProtocolData } from '@/ai/flows/extract-protocol-data-flow';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip as RechartsTooltip, 
+  ResponsiveContainer, 
+  PieChart, 
+  Pie, 
+  Cell,
+  Legend
+} from 'recharts';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Tooltip,
@@ -193,6 +216,7 @@ const leadFormSchema = z.object({
   isUrgent: z.boolean().default(false),
   prescriptionDate: z.string().optional().or(z.literal('')),
   description: z.string().optional(),
+  interviewerId: z.string().optional(),
 });
 
 const conversionSchema = z.object({
@@ -443,6 +467,7 @@ function LeadDetailsSheet({
   onProtocolClick,
   onEditClient,
   lawyers,
+  interviewers,
   initialTab = 'ficha'
 }: { 
   lead: Lead | null; 
@@ -452,6 +477,7 @@ function LeadDetailsSheet({
   onProtocolClick: (l: Lead) => void;
   onEditClient: (c: Client) => void;
   lawyers: Staff[];
+  interviewers: Staff[];
   initialTab?: 'ficha' | 'timeline';
 }) {
   const { firestore } = useFirebase();
@@ -459,6 +485,7 @@ function LeadDetailsSheet({
   const { toast } = useToast();
   const [isSaving, setIsSaving] = React.useState(false);
   const [isAdvancing, setIsAdvancing] = React.useState(false);
+  const [isAiAnalyzing, setIsAiAnalyzing] = React.useState(false);
   const [newNote, setNewNote] = React.useState('');
   const [isDraftingOpen, setIsDraftingOpen] = React.useState(false);
   const [isSchedulingOpen, setIsSchedulingOpen] = React.useState(false);
@@ -468,6 +495,30 @@ function LeadDetailsSheet({
   React.useEffect(() => {
     if (open) setActiveTab(initialTab);
   }, [open, initialTab]);
+
+  const handleAiAnalyze = async () => {
+    if (!lead) return;
+    setIsAiAnalyzing(true);
+    try {
+      const result = await analyzeLead({
+        leadTitle: lead.title,
+        leadDescription: lead.description || '',
+        legalArea: lead.legalArea,
+        interviewAnswers: lead.interviewAnswers
+      });
+      
+      await updateLeadAiAnalysis(lead.id, {
+        ...result,
+        analyzedAt: new Date()
+      });
+      
+      toast({ title: 'Análise Concluída!', description: 'A IA revisou os dados e gerou recomendações.' });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Erro de IA', description: e.message });
+    } finally {
+      setIsAiAnalyzing(false);
+    }
+  };
 
   const clientIntegrity = React.useMemo(() => {
     if (!client) return 0;
@@ -621,6 +672,9 @@ function LeadDetailsSheet({
             <TabsTrigger value="timeline" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent text-slate-400 data-[state=active]:text-white font-bold h-full px-0 gap-2">
               <History className="h-4 w-4" /> Rastreabilidade (Timeline)
             </TabsTrigger>
+            <TabsTrigger value="ai-analysis" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent text-slate-400 data-[state=active]:text-white font-bold h-full px-0 gap-2">
+              <Sparkles className="h-4 w-4 text-primary" /> Análise Inteligente (IA)
+            </TabsTrigger>
           </TabsList>
 
           <ScrollArea className="flex-1">
@@ -706,6 +760,19 @@ function LeadDetailsSheet({
                           {lawyers.map(l => (
                             <SelectItem key={l.id} value={l.id}>Dr(a). {l.firstName}</SelectItem>
                           ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-black uppercase text-slate-500">Interrevistador (Triagem)</Label>
+                      <Select defaultValue={lead.interviewerId} onValueChange={(val) => updateLeadDetails(lead.id, { interviewerId: val })}>
+                        <SelectTrigger className="bg-black/40 border-white/10 h-11"><SelectValue /></SelectTrigger>
+                        <SelectContent className="bg-[#0f172a] text-white">
+                          {interviewers.map(l => (
+                            <SelectItem key={l.id} value={l.id}>{l.firstName}</SelectItem>
+                          ))}
+                          <Separator className="bg-white/5 my-1" />
+                          <SelectItem value="Outros" className="italic text-slate-400 font-bold">🔘 Outros</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -841,6 +908,101 @@ function LeadDetailsSheet({
                 </div>
               </TabsContent>
 
+              <TabsContent value="ai-analysis" className="m-0 space-y-8 animate-in fade-in zoom-in duration-300 px-1">
+                <div className="flex flex-col gap-8">
+                  <div className="p-8 rounded-[32px] bg-gradient-to-br from-primary/10 via-transparent to-transparent border-2 border-white/5 relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 p-10 opacity-5 group-hover:scale-110 transition-transform">
+                      <Bot className="h-40 w-40" />
+                    </div>
+                    
+                    <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
+                      <div className="space-y-2 text-center md:text-left">
+                        <h3 className="text-3xl font-black text-white uppercase tracking-tight leading-none">Parecer de <span className="text-primary">Inteligência Artificial</span></h3>
+                        <p className="text-xs text-slate-400 font-bold uppercase tracking-widest max-w-md">Análise técnica avançada de fundamentos jurídicos, viabilidade e sugestão de estratégia.</p>
+                      </div>
+                      <Button 
+                        disabled={isAiAnalyzing} 
+                        onClick={handleAiAnalyze}
+                        className="h-14 px-10 rounded-2xl bg-primary text-primary-foreground font-black uppercase text-[11px] tracking-widest gap-3 shadow-xl shadow-primary/20 hover:scale-105 transition-all shrink-0"
+                      >
+                        {isAiAnalyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                        {lead.aiAnalysis ? 'Refazer Análise Técnica' : 'Gerar Análise Jurídica'}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {lead.aiAnalysis ? (
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start pb-20">
+                      {/* Pontuação de Viabilidade */}
+                      <div className="lg:col-span-4 space-y-4">
+                        <div className="p-6 rounded-3xl bg-white/[0.03] border border-white/5 flex flex-col items-center justify-center text-center">
+                          <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-4">Score de Viabilidade</Label>
+                          <div className="relative h-32 w-32 flex items-center justify-center">
+                            <svg className="h-full w-full -rotate-90">
+                              <circle cx="64" cy="64" r="58" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-white/5" />
+                              <circle 
+                                cx="64" cy="64" r="58" stroke="currentColor" strokeWidth="8" fill="transparent" 
+                                strokeDasharray={364} 
+                                strokeDashoffset={364 - (364 * (lead.aiAnalysis.score || 0)) / 100}
+                                className={cn(
+                                  "transition-all duration-1000 ease-out",
+                                  (lead.aiAnalysis.score || 0) > 70 ? "text-emerald-500" : (lead.aiAnalysis.score || 0) > 40 ? "text-amber-500" : "text-rose-500"
+                                )} 
+                              />
+                            </svg>
+                            <span className="absolute text-3xl font-black text-white">{lead.aiAnalysis.score}%</span>
+                          </div>
+                          <p className="mt-4 text-[10px] font-black uppercase tracking-tight text-slate-400">Força da Tese Jurídica</p>
+                        </div>
+
+                        <div className="p-6 rounded-3xl bg-white/[0.03] border border-white/5 space-y-4">
+                          <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
+                            <ArrowRight className="h-3 w-3 text-primary" /> Sugestão de Estratégia
+                          </Label>
+                          <div className="space-y-2">
+                            {lead.aiAnalysis.suggestedSteps?.map((step, i) => (
+                              <div key={i} className="flex items-start gap-2 p-3 rounded-xl bg-white/5 border border-white/5 text-[10px] font-bold text-slate-300 uppercase leading-relaxed">
+                                <span className="text-primary mt-0.5">•</span>
+                                {step}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Conteúdo da Análise */}
+                      <div className="lg:col-span-8 space-y-8">
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-2 text-[10px] font-black uppercase text-primary tracking-widest">
+                            <Activity className="h-3.5 w-3.5" /> Sumário do Caso (Interpretação)
+                          </div>
+                          <div className="p-6 rounded-3xl bg-white/[0.02] border border-white/5 text-sm leading-relaxed text-slate-300 font-medium italic">
+                            "{lead.aiAnalysis.summary}"
+                          </div>
+                        </div>
+
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-2 text-[10px] font-black uppercase text-emerald-400 tracking-widest">
+                            <Scale className="h-3.5 w-3.5" /> Análise Técnica e Possibilidade Jurídica
+                          </div>
+                          <div className="p-6 rounded-3xl bg-white/[0.02] border border-white/5 text-sm leading-relaxed text-slate-300">
+                            {lead.aiAnalysis.legalAdvice?.split('\n').map((para, i) => (
+                              <p key={i} className={i > 0 ? "mt-4" : ""}>{para}</p>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="py-24 flex flex-col items-center justify-center opacity-30 border-2 border-dashed border-white/5 rounded-[40px] text-center px-10">
+                      <Sparkles className="h-16 w-16 mb-6 text-primary" />
+                      <h4 className="text-xl font-black uppercase font-headline">Aguardando Processamento</h4>
+                      <p className="text-xs font-bold uppercase tracking-widest mt-2 max-w-sm">Use o botão acima para permitir que nossa IA processe os dados da triagem e gere um parecer técnico inicial para este caso.</p>
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+
             </div>
           </ScrollArea>
 
@@ -875,7 +1037,7 @@ function LeadDetailsSheet({
   );
 }
 
-function NewLeadSheet({ open, onOpenChange, lawyers, onCreated }: { open: boolean; onOpenChange: (o: boolean) => void; lawyers: Staff[]; onCreated: () => void }) {
+function NewLeadSheet({ open, onOpenChange, lawyers, interviewers, onCreated }: { open: boolean; onOpenChange: (o: boolean) => void; lawyers: Staff[]; interviewers: Staff[]; onCreated: () => void }) {
   const [isSaving, setIsSaving] = React.useState(false);
   const [showClientModal, setShowClientModal] = React.useState(false);
   const { toast } = useToast();
@@ -885,7 +1047,7 @@ function NewLeadSheet({ open, onOpenChange, lawyers, onCreated }: { open: boolea
     defaultValues: { 
       clientId: '', lawyerId: '', title: '', legalArea: 'Trabalhista', 
       priority: 'MEDIA', captureSource: 'Indicação', isUrgent: false, 
-      prescriptionDate: '', description: '', 
+      prescriptionDate: '', description: '', interviewerId: '',
     }
   });
 
@@ -939,6 +1101,19 @@ function NewLeadSheet({ open, onOpenChange, lawyers, onCreated }: { open: boolea
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl><SelectTrigger className="bg-black/40 border-white/10 h-11"><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
                         <SelectContent className="bg-[#0f172a] border-white/10 text-white">{lawyers.map(l => <SelectItem key={l.id} value={l.id} className="font-bold">Dr(a). {l.firstName}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="interviewerId" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-1">Interrevistador (Triagem)</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl><SelectTrigger className="bg-black/40 border-white/10 h-11"><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
+                        <SelectContent className="bg-[#0f172a] border-white/10 text-white">
+                          {interviewers.map(l => <SelectItem key={l.id} value={l.id} className="font-bold">{l.firstName}</SelectItem>)}
+                          <Separator className="bg-white/5 my-1" />
+                          <SelectItem value="Outros" className="font-bold text-slate-400 italic">Outros</SelectItem>
+                        </SelectContent>
                       </Select>
                     </FormItem>
                   )} />
@@ -1131,6 +1306,8 @@ export default function LeadsPage() {
   const [isProcessing, setIsProcessing] = React.useState<string | null>(null);
   const [editingClient, setEditingClient] = React.useState<Client | null>(null);
   const [isClientSheetOpen, setIsClientSheetOpen] = React.useState(false);
+  const [showAnalytics, setShowAnalytics] = React.useState(false);
+
   
   // Filtros Avançados
   const [sourceFilter, setSourceFilter] = React.useState<string>('all');
@@ -1161,8 +1338,66 @@ export default function LeadsPage() {
     [firestore]
   );
   const { data: staffData } = useCollection<Staff>(staffQuery);
-  const lawyers = staffData?.filter(s => s.role === 'lawyer' || s.role === 'partner') || [];
+  const lawyers = React.useMemo(() => staffData?.filter(s => s.role === 'lawyer' || s.role === 'partner') || [], [staffData]);
+  const interviewers = React.useMemo(() => staffData?.filter(s => s.role === 'lawyer' || s.role === 'partner' || s.role === 'intern') || [], [staffData]);
   const staffMap = React.useMemo(() => new Map(staffData?.map(s => [s.id, s])), [staffData]);
+
+  // Analytics Calculations
+  const analyticsData = React.useMemo(() => {
+    if (!leadsData) return null;
+
+    const totalLeads = leadsData.length;
+    const convertedLeads = leadsData.filter(l => l.status === 'CONVERTIDO').length;
+    const conversionRate = totalLeads > 0 ? (convertedLeads / totalLeads) * 100 : 0;
+
+    // Source Efficiency
+    const sourceStats = leadsData.reduce((acc: any, lead) => {
+      const source = lead.captureSource || 'Outros';
+      if (!acc[source]) acc[source] = { name: source, total: 0, converted: 0 };
+      acc[source].total++;
+      if (lead.status === 'CONVERTIDO') acc[source].converted++;
+      return acc;
+    }, {});
+
+    const sourceEfficiencyData = Object.values(sourceStats).map((s: any) => ({
+      ...s,
+      efficiency: (s.converted / s.total) * 100
+    })).sort((a, b) => b.efficiency - a.efficiency);
+
+    // Lawyer Selection
+    const lawyerStats = leadsData.reduce((acc: any, lead) => {
+      const lawyer = staffMap.get(lead.lawyerId)?.firstName || 'Pendente';
+      if (!acc[lawyer]) acc[lawyer] = { name: lawyer, count: 0 };
+      acc[lawyer].count++;
+      return acc;
+    }, {});
+    const lawyerDistributionData = Object.values(lawyerStats).sort((a: any, b: any) => b.count - a.count);
+
+    // Interviewer Performance
+    const interviewerStats = leadsData.reduce((acc: any, lead) => {
+      const interviewerId = lead.interviewerId || lead.lawyerId; 
+      const interviewer = interviewerId === 'Outros' ? 'Outros' : (staffMap.get(interviewerId)?.firstName || 'N/A');
+      if (!acc[interviewer]) acc[interviewer] = { name: interviewer, total: 0, converted: 0 };
+      acc[interviewer].total++;
+      if (lead.status === 'CONVERTIDO') acc[interviewer].converted++;
+      return acc;
+    }, {});
+    const interviewerPerformanceData = Object.values(interviewerStats).map((s: any) => ({
+      ...s,
+      rate: s.total > 0 ? (s.converted / s.total) * 100 : 0
+    })).sort((a, b) => b.rate - a.rate);
+
+    return {
+      totalLeads,
+      convertedLeads,
+      conversionRate,
+      sourceEfficiencyData,
+      lawyerDistributionData,
+      interviewerPerformanceData
+    };
+  }, [leadsData, staffMap]);
+
+  const COLORS = ['#D4AF37', '#4F46E5', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
 
   // Busca Híbrida: Leads e Processos
   const [hybridResults, setHybridResults] = React.useState<Array<{ type: 'lead' | 'process', data: any }>>([]);
@@ -1289,321 +1524,217 @@ export default function LeadsPage() {
   return (
     <TooltipProvider>
       <div className="flex flex-col gap-8 pb-10">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div>
-            <h1 className="text-3xl font-black tracking-tight font-headline text-white flex items-center gap-3">
-              <Zap className="h-8 w-8 text-primary" />
-              Cockpit de Leads
-            </h1>
-            <p className="text-sm text-muted-foreground">Triagem e conversão estratégica Bueno Gois.</p>
+        <div className="flex flex-col gap-1 mb-2">
+          <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-500">
+            <span className="hover:text-primary cursor-pointer transition-colors">Início</span>
+            <ChevronRight className="h-3 w-3" />
+            <span className="text-slate-300">Funil de Leads</span>
           </div>
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-            <div className="relative flex-1 sm:w-96">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-              <Input 
-                placeholder="Busque Lead ou Processo por CPF/Nome..." 
-                className="pl-9 pr-20 bg-[#0f172a] border-white/10 h-11 text-sm rounded-xl text-white" 
-                value={searchTerm} 
-                onChange={e => setSearchTerm(e.target.value)} 
-              />
-              {isSearchingHybrid && <Loader2 className="absolute right-14 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-primary" />}
-              
-              {hybridResults.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-2 bg-[#0f172a] border border-white/10 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-[60] overflow-hidden animate-in fade-in slide-in-from-top-2">
-                  <ScrollArea className="max-h-[350px]">
-                    <div className="p-2 space-y-1">
-                      {hybridResults.map((item, idx) => (
-                        <button
-                          key={`${item.type}-${idx}`}
-                          className="w-full text-left p-4 hover:bg-white/5 transition-all rounded-xl border border-transparent hover:border-white/5 group flex items-start gap-3"
-                          onClick={() => {
-                            if (item.type === 'lead') {
-                              openLeadDetails(item.data.id, 'ficha');
-                            } else {
-                              toast({ title: 'Processo Selecionado', description: `Iniciando checklist autônomo para ${item.data.name}.` });
-                            }
-                            setSearchTerm('');
-                          }}
-                        >
-                          {item.type === 'process' ? <FolderKanban className="h-4 w-4 text-primary shrink-0 mt-1" /> : <Zap className="h-4 w-4 text-amber-500 shrink-0 mt-1" />}
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-bold text-white group-hover:text-primary transition-colors truncate">
-                              {item.type === 'process' ? item.data.name : item.data.title}
-                            </p>
-                            <p className="text-[10px] text-slate-500 font-mono uppercase mt-0.5">
-                              {item.type === 'process' 
-                                ? `PROCESSO: ${item.data.processNumber || 'Sem Nº'} - Cliente: ${item.data.clientName || 'N/A'}` 
-                                : `LEAD: ${item.data.clientName || 'Sem nome'} (${item.data.clientDocument || 'Sem CPF'})`}
-                            </p>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </ScrollArea>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div>
+              <h1 className="text-3xl font-black tracking-tighter font-headline text-white uppercase">
+                Triagem de Oportunidades
+              </h1>
+            </div>
+            <div className="flex items-center gap-3">
+              <Button 
+                variant="outline"
+                onClick={() => setShowAnalytics(!showAnalytics)} 
+                className={cn(
+                  "border-white/10 text-[10px] font-black uppercase tracking-widest h-11 px-6 rounded-xl transition-all",
+                  showAnalytics ? "bg-primary/20 text-primary border-primary/30" : "bg-[#0f172a] text-slate-400"
+                )}
+              >
+                <TrendingUp className="mr-2 h-4 w-4" /> 
+                {showAnalytics ? 'Fechar Analytics' : 'Ver Analytics'}
+              </Button>
+              <Button 
+                onClick={() => setIsNewLeadOpen(true)} 
+                className="bg-gradient-to-r from-[#D4AF37] to-[#F9D71C] text-black font-black uppercase text-[11px] tracking-widest h-12 px-8 rounded-xl shadow-xl shadow-yellow-900/20 hover:scale-105 transition-transform"
+              >
+                <Plus className="mr-2 h-5 w-5 fill-current" /> Novo Atendimento
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {showAnalytics && analyticsData && (
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 animate-in fade-in zoom-in-95 duration-500">
+            <Card className="bg-[#0f172a] border-white/5 p-6 rounded-3xl lg:col-span-1 flex flex-col justify-center items-center text-center">
+              <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-4">Taxa de Conversão Global</p>
+              <div className="relative h-32 w-32">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={[
+                        { name: 'Convertidos', value: analyticsData.convertedLeads },
+                        { name: 'Restante', value: analyticsData.totalLeads - analyticsData.convertedLeads }
+                      ]}
+                      innerRadius={45}
+                      outerRadius={60}
+                      paddingAngle={5}
+                      dataKey="value"
+                    >
+                      <Cell fill="#D4AF37" />
+                      <Cell fill="rgba(255,255,255,0.05)" />
+                    </Pie>
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-2xl font-black text-white">{analyticsData.conversionRate.toFixed(1)}%</span>
                 </div>
-              )}
-            </div>
-            <Button onClick={() => setIsNewLeadOpen(true)} className="bg-primary text-primary-foreground font-black uppercase text-[10px] tracking-widest h-11 px-8 rounded-xl shadow-lg shadow-primary/20">
-              <PlusCircle className="mr-2 h-4 w-4" /> Novo Lead
-            </Button>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="bg-[#0f172a] border border-white/5 p-4 rounded-2xl">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Leads Ativos</p>
-              <Zap className="h-4 w-4 text-primary" />
-            </div>
-            <p className="text-2xl font-black text-white">{leadsData?.length || 0}</p>
-          </div>
-          <div className="bg-[#0f172a] border border-white/5 p-4 rounded-2xl">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Urgência Crítica</p>
-              <Flame className="h-4 w-4 text-rose-500" />
-            </div>
-            <p className="text-2xl font-black text-white">{leadsData?.filter(l => l.isUrgent).length || 0}</p>
-          </div>
-          <div className="bg-[#0f172a] border border-white/5 p-4 rounded-2xl">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Na fase Distribuição</p>
-              <TrendingUp className="h-4 w-4 text-emerald-500" />
-            </div>
-            <p className="text-2xl font-black text-white">{leadsData?.filter(l => l.status === 'DISTRIBUICAO').length || 0}</p>
-          </div>
-          <div className="bg-[#0f172a] border border-white/5 p-4 rounded-2xl">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Aging Médio</p>
-              <Timer className="h-4 w-4 text-blue-400" />
-            </div>
-            <p className="text-2xl font-black text-white">4.2 <span className="text-[10px] font-normal text-slate-500">dias</span></p>
-          </div>
-        </div>
-
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as LeadStatus)} className="w-full">
-          <div className="flex flex-col lg:flex-row items-end justify-between gap-4 mb-8">
-            <TabsList className="bg-[#0f172a] p-1 border border-white/5 h-12 flex overflow-x-auto no-scrollbar justify-start gap-1 w-full lg:w-auto">
-              {STAGES.map(stage => {
-                const config = stageConfig[stage];
-                const count = filteredLeads.filter(l => l.status === stage).length || 0;
-                return (
-                  <Tooltip key={stage} delayDuration={300}>
-                    <TooltipTrigger asChild>
-                      <TabsTrigger 
-                        value={stage} 
-                        className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold px-6 h-10 shrink-0 rounded-lg transition-all"
-                      >
-                        <config.icon className="h-3.5 w-3.5" />
-                        {config.label}
-                        <Badge variant="secondary" className="ml-1.5 px-1.5 h-4 text-[9px] bg-white/10 border-none text-inherit">{count}</Badge>
-                      </TabsTrigger>
-                    </TooltipTrigger>
-                    <TooltipContent className="bg-[#0f172a] border-white/10 text-white p-4 max-w-xs shadow-2xl">
-                      <div className="space-y-2">
-                        <p className="text-[10px] font-black uppercase text-primary tracking-widest mb-1">Expectativa da Etapa</p>
-                        <p className="text-xs font-medium leading-relaxed">{config.description}</p>
-                        <div className="pt-2">
-                          <p className="text-[9px] font-black uppercase text-slate-500 tracking-widest mb-1">O que fazer agora:</p>
-                          <ul className="space-y-1">
-                            {config.tasks.map(t => (
-                              <li key={t} className="text-[10px] flex items-center gap-1.5 text-slate-300">
-                                <div className="h-1 w-1 rounded-full bg-primary" /> {t}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      </div>
-                    </TooltipContent>
-                  </Tooltip>
-                );
-              })}
-            </TabsList>
-
-            <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
-              <Select value={sourceFilter} onValueChange={setSourceFilter}>
-                <SelectTrigger className="h-9 bg-[#0f172a] border-white/10 text-[10px] font-black uppercase w-[140px] rounded-lg">
-                  <SelectValue placeholder="Fonte" />
-                </SelectTrigger>
-                <SelectContent className="bg-[#0f172a] border-white/10">
-                  <SelectItem value="all">Todas as Fontes</SelectItem>
-                  <SelectItem value="Indicação">Indicação</SelectItem>
-                  <SelectItem value="Google Search">Google</SelectItem>
-                  <SelectItem value="Instagram">Instagram</SelectItem>
-                  <SelectItem value="Antigo Cliente">Antigo Cliente</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                <SelectTrigger className="h-9 bg-[#0f172a] border-white/10 text-[10px] font-black uppercase w-[140px] rounded-lg">
-                  <SelectValue placeholder="Prioridade" />
-                </SelectTrigger>
-                <SelectContent className="bg-[#0f172a] border-white/10">
-                  <SelectItem value="all">Qualquer Nível</SelectItem>
-                  <SelectItem value="BAIXA">Baixa</SelectItem>
-                  <SelectItem value="MEDIA">Média</SelectItem>
-                  <SelectItem value="ALTA">Alta</SelectItem>
-                  <SelectItem value="CRITICA">Crítica</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <TabsContent value={activeTab} className="animate-in fade-in duration-500">
-            <Card className="bg-[#0f172a] border-white/5 overflow-hidden shadow-2xl">
-              <Table>
-                <TableHeader className="bg-white/5">
-                  <TableRow className="border-white/10 hover:bg-transparent">
-                    <TableHead className="text-[10px] font-black uppercase text-slate-500 px-6 py-4">Status / Saúde</TableHead>
-                    <TableHead className="text-[10px] font-black uppercase text-slate-500">Lead / Atendimento</TableHead>
-                    <TableHead className="text-[10px] font-black uppercase text-slate-500">Origem / Canal</TableHead>
-                    <TableHead className="text-[10px] font-black uppercase text-slate-500">Prescrição</TableHead>
-                    <TableHead className="text-[10px] font-black uppercase text-slate-500 text-center">Fase Aging</TableHead>
-                    <TableHead className="text-[10px] font-black uppercase text-slate-500 text-right px-6">Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {isLoading ? (
-                    [...Array(5)].map((_, i) => (
-                      <TableRow key={i} className="border-white/5">
-                        <TableCell colSpan={6} className="p-6"><Skeleton className="h-10 w-full bg-white/5" /></TableCell>
-                      </TableRow>
-                    ))
-                  ) : filteredLeads.filter(l => l.status === activeTab).length > 0 ? (
-                    filteredLeads.filter(l => l.status === activeTab).map(lead => {
-                      const client = clientsMap.get(lead.clientId);
-                      const lawyer = staffMap.get(lead.lawyerId);
-                      const stage = stageConfig[lead.status];
-                      
-                      // Lógica de Aging (há quanto tempo nesta fase)
-                      const entryDate = lead.stageEntryDates?.[lead.status];
-                      const agingDays = entryDate ? differenceInDays(new Date(), entryDate.toDate()) : 0;
-                      
-                      // Alerta de inatividade Bueno Gois para fase Contratual
-                      const isInactivityAlert = lead.status === 'CONTRATUAL' && agingDays >= 3;
-
-                      // Lógica de Prescrição
-                      const prescriptionDate = lead.prescriptionDate?.toDate();
-                      const isPrescriptionClose = prescriptionDate && differenceInDays(prescriptionDate, new Date()) < 30;
-
-                      const completedTasks = lead.completedTasks || [];
-                      const currentStageTasks = stage.tasks;
-                      const completedInStage = completedTasks.filter(t => currentStageTasks.includes(t)).length;
-                      const progress = currentStageTasks.length > 0 ? (completedInStage / currentStageTasks.length) * 100 : 0;
-
-                      return (
-                        <TableRow 
-                          key={lead.id} 
-                          className={cn(
-                            "border-white/5 hover:bg-white/5 transition-colors group cursor-pointer",
-                            lead.priority === 'CRITICA' && "bg-rose-500/[0.02]",
-                            isInactivityAlert && "bg-amber-500/[0.02]"
-                          )}
-                          onClick={() => openLeadDetails(lead.id, 'ficha')}
-                        >
-                          <TableCell className="px-6 py-5">
-                            <div className="flex items-center gap-3">
-                              <Thermometer className={cn("h-5 w-5", getHeatColor(lead))} />
-                              <div className="flex flex-col">
-                                <span className={cn("text-[9px] font-black uppercase tracking-widest", getHeatColor(lead))}>{lead.priority}</span>
-                                <span className="text-[10px] font-mono text-slate-500">#{lead.id.substring(0, 6)}</span>
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-3">
-                              <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20 text-primary font-black text-xs">
-                                {client?.firstName.charAt(0)}
-                              </div>
-                              <div className="flex flex-col max-w-[220px]">
-                                <span className="font-bold text-white truncate text-sm">{lead.title}</span>
-                                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">Cliente: {lead.clientName || `${client?.firstName} ${client?.lastName}`}</span>
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex flex-col">
-                              <span className="text-[10px] font-black uppercase text-primary/80">{lead.captureSource}</span>
-                              <span className="text-[10px] text-slate-500 font-bold">{lawyer?.firstName || 'Pendente'}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            {prescriptionDate ? (
-                              <div className={cn(
-                                "flex flex-col",
-                                isPrescriptionClose ? "text-rose-500 animate-pulse" : "text-slate-400"
-                              )}>
-                                <span className="font-bold text-[11px]">{format(prescriptionDate, 'dd/MM/yyyy')}</span>
-                                <span className="text-[9px] font-black uppercase tracking-tighter">
-                                  {isPrescriptionClose ? '⚠️ RISCO ALTO' : `${differenceInDays(prescriptionDate, new Date())} dias p/ fim`}
-                                </span>
-                              </div>
-                            ) : (
-                              <span className="text-slate-700 italic text-[10px]">Não definida</span>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-center w-[180px]">
-                            <div className="flex flex-col gap-1.5 items-center">
-                              <div className="flex items-center justify-between w-full text-[9px] font-black uppercase text-slate-500">
-                                <span className={cn(isInactivityAlert && "text-amber-400 flex items-center gap-1 font-black")}>
-                                  {isInactivityAlert && <ShieldAlert className="h-3 w-3" />}
-                                  {agingDays}d na fase
-                                </span>
-                                <span className={cn(progress === 100 ? "text-emerald-500" : "text-white")}>{Math.round(progress)}%</span>
-                              </div>
-                              <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
-                                <div 
-                                  className={cn("h-full transition-all duration-500", progress === 100 ? "bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]" : "bg-primary")}
-                                  style={{ width: `${progress}%` }}
-                                />
-                              </div>
-                              {isInactivityAlert && (
-                                <p className="text-[8px] font-black text-amber-500 uppercase mt-1 animate-pulse">Cobrar Assinaturas / Documentos</p>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right px-6">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                                <Button variant="ghost" size="icon" className="text-white/20 hover:text-white">
-                                  <MoreVertical className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="bg-[#0f172a] border-white/10 w-56 p-1">
-                                <DropdownMenuItem className="font-bold gap-2 focus:bg-primary/10" onClick={() => openLeadDetails(lead.id, 'ficha')}>
-                                  <Info className="h-4 w-4 text-primary" /> Ficha de Triagem
-                                </DropdownMenuItem>
-                                <DropdownMenuItem className="font-bold gap-2" onClick={() => openLeadDetails(lead.id, 'timeline')}>
-                                  <History className="h-4 w-4" /> Timeline
-                                </DropdownMenuItem>
-                                {isAdmin && (
-                                  <>
-                                    <DropdownMenuSeparator className="bg-white/5" />
-                                    <DropdownMenuItem className="text-rose-500 font-bold gap-2" onClick={(e) => { e.stopPropagation(); handleDeleteLead(lead.id); }}>
-                                      <Trash2 className="h-4 w-4" /> Excluir Atendimento
-                                    </DropdownMenuItem>
-                                  </>
-                                )}
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })
-                  ) : (
-                    <TableRow>
-                      <TableCell colSpan={6} className="h-60 text-center opacity-30 italic text-slate-500">
-                        <div className="flex flex-col items-center gap-3">
-                          <Activity className="h-12 w-12" />
-                          <p className="font-black uppercase tracking-widest text-[10px]">Nenhum pedido nesta fase</p>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
+              </div>
+              <p className="mt-4 text-[10px] font-bold text-slate-400">{analyticsData.convertedLeads} de {analyticsData.totalLeads} leads convertidos</p>
             </Card>
-          </TabsContent>
-        </Tabs>
+
+            <Card className="bg-[#0f172a] border-white/5 p-6 rounded-3xl lg:col-span-1">
+              <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-4">Eficiência por Fonte</p>
+              <div className="h-[180px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={analyticsData.sourceEfficiencyData.slice(0, 5)} layout="vertical">
+                    <XAxis type="number" hide />
+                    <YAxis dataKey="name" type="category" stroke="#94a3b8" fontSize={10} width={80} axisLine={false} tickLine={false} />
+                    <RechartsTooltip 
+                      contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', fontSize: '10px' }}
+                      itemStyle={{ color: '#fff' }}
+                    />
+                    <Bar dataKey="efficiency" fill="#D4AF37" radius={[0, 4, 4, 0]} barSize={12} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </Card>
+
+            <Card className="bg-[#0f172a] border-white/5 p-6 rounded-3xl lg:col-span-1">
+              <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-4">Interrevistador (Conversão)</p>
+              <div className="h-[180px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={analyticsData.interviewerPerformanceData.slice(0, 5)}>
+                    <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} axisLine={false} tickLine={false} />
+                    <YAxis hide />
+                    <RechartsTooltip 
+                      contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', fontSize: '10px' }}
+                      itemStyle={{ color: '#fff' }}
+                    />
+                    <Bar dataKey="rate" fill="#4F46E5" radius={[4, 4, 0, 0]} barSize={20} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </Card>
+
+            <Card className="bg-[#0f172a] border-white/5 p-6 rounded-3xl lg:col-span-1">
+              <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-4">Distribuição Advogados</p>
+              <div className="h-[180px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={analyticsData.lawyerDistributionData.slice(0, 5)}
+                      innerRadius={40}
+                      outerRadius={55}
+                      paddingAngle={5}
+                      dataKey="count"
+                    >
+                      {analyticsData.lawyerDistributionData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Legend iconType="circle" wrapperStyle={{ fontSize: '9px', paddingTop: '10px' }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </Card>
+          </div>
+        )}
+
+        <div className="relative mb-6">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+          <Input 
+            placeholder="Busque por nome, CPF ou título da demanda..." 
+            className="pl-9 pr-20 bg-[#0f172a] border-white/5 h-11 text-sm rounded-xl text-white w-full md:w-[400px]" 
+            value={searchTerm} 
+            onChange={e => setSearchTerm(e.target.value)} 
+          />
+          {isSearchingHybrid && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-primary" />}
+        </div>
+
+        <ScrollArea className="w-full whitespace-nowrap">
+          <div className="flex gap-6 pb-6">
+            {STAGES.filter(s => s !== 'CONVERTIDO' && s !== 'ABANDONADO').map(stage => {
+              const config = stageConfig[stage];
+              const leads = filteredLeads.filter(l => l.status === stage);
+              
+              return (
+                <div key={stage} className="inline-block w-[320px] align-top">
+                  <div className="mb-4 bg-[#0f172a]/40 backdrop-blur-md border border-white/5 rounded-2xl p-4 flex items-center justify-between group">
+                    <div className="flex items-center gap-3">
+                      <div className={cn("h-2.5 w-2.5 rounded-full shadow-[0_0_10px_rgba(var(--color))]", 
+                        stage === 'NOVO' ? "bg-blue-400" :
+                        stage === 'ATENDIMENTO' ? "bg-indigo-400" :
+                        stage === 'CONTRATUAL' ? "bg-emerald-400" :
+                        stage === 'BUROCRACIA' ? "bg-amber-400" : "bg-purple-400"
+                      )} />
+                      <h3 className="text-[11px] font-black uppercase tracking-widest text-slate-200">{config.label}</h3>
+                    </div>
+                    <Badge variant="outline" className="text-[10px] font-black border-white/10 bg-white/5 text-slate-400 h-6 px-2 rounded-full">
+                      {leads.length}
+                    </Badge>
+                  </div>
+                  
+                  <div className="space-y-4 min-h-[calc(100vh-350px)] rounded-3xl bg-black/10 p-2 border border-white/[0.01]">
+                    {leads.length > 0 ? (
+                      leads.map(lead => {
+                        const client = clientsMap.get(lead.clientId);
+                        const isHighPriority = lead.priority === 'ALTA' || lead.priority === 'CRITICA';
+                        
+                        return (
+                          <Card 
+                            key={lead.id} 
+                            className="bg-[#0f172a] border border-white/5 hover:border-primary/30 transition-all cursor-pointer group shadow-2xl hover:shadow-primary/5 hover:-translate-y-1 duration-300"
+                            onClick={() => openLeadDetails(lead.id, 'ficha')}
+                          >
+                            <CardContent className="p-4 space-y-4">
+                              <div className="space-y-2">
+                                <div className="flex items-start justify-between gap-2">
+                                  <h4 className="text-sm font-black text-white leading-tight uppercase tracking-tight group-hover:text-primary transition-colors line-clamp-2">
+                                    {lead.title}
+                                  </h4>
+                                  {isHighPriority && <Flame className="h-4 w-4 text-rose-500 shrink-0 animate-pulse" />}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <div className="h-5 w-5 rounded-full bg-primary/20 flex items-center justify-center text-[9px] font-black text-primary border border-primary/20">
+                                    {client?.firstName.charAt(0) || 'C'}
+                                  </div>
+                                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight truncate">
+                                    {lead.clientName || `${client?.firstName} ${client?.lastName}`}
+                                  </p>
+                                </div>
+                              </div>
+                              
+                              <div className="flex items-center justify-between pt-2 border-t border-white/[0.03]">
+                                <Badge className="bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-[8px] font-black h-5 px-2 rounded-md">
+                                  CPF OK
+                                </Badge>
+                                <div className="flex items-center gap-1.5 text-[9px] font-bold text-slate-500">
+                                  <Timer className="h-3 w-3" />
+                                  {differenceInDays(new Date(), lead.updatedAt.toDate())}d
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        );
+                      })
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-20 opacity-10 border-2 border-dashed border-white/5 rounded-3xl">
+                        <Activity className="h-10 w-10 mb-2" />
+                        <p className="text-[10px] font-black uppercase tracking-widest text-center">Nenhum lead<br/>disponível</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <ScrollBar orientation="horizontal" className="bg-white/5" />
+        </ScrollArea>
 
         <LeadDetailsSheet 
           lead={activeLead} 
@@ -1613,10 +1744,11 @@ export default function LeadsPage() {
           onProtocolClick={(l) => { setSelectedLeadId(l.id); setIsConversionOpen(true); }} 
           onEditClient={handleEditClient}
           lawyers={lawyers}
+          interviewers={interviewers}
           initialTab={initialDetailTab}
         />
         
-        <NewLeadSheet open={isNewLeadOpen} onOpenChange={setIsNewLeadOpen} lawyers={lawyers} onCreated={() => {}} />
+        <NewLeadSheet open={isNewLeadOpen} onOpenChange={setIsNewLeadOpen} lawyers={lawyers} interviewers={interviewers} onCreated={() => {}} />
         
         <LeadConversionDialog lead={activeLead} open={isConversionOpen} onOpenChange={setIsConversionOpen} onConfirm={handleConfirmProtocol} lawyers={lawyers} />
 

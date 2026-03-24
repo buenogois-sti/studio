@@ -69,7 +69,7 @@ const sidebarSections = [
     items: [
       { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'lawyer', 'financial', 'assistant'] },
       { href: '/dashboard/relatorios', label: 'Relatórios BI', icon: BarChart, roles: ['admin', 'financial', 'lawyer'] },
-      { href: '/dashboard/checklists', label: 'Checklists', icon: CheckSquare, roles: ['admin', 'lawyer', 'assistant', 'financial'] },
+      { href: '/dashboard/checklists', label: 'Lab. de Matrizes', icon: CheckSquare, roles: ['admin', 'lawyer', 'assistant', 'financial'] },
     ]
   },
   {
@@ -123,7 +123,7 @@ const BreadcrumbMap: { [key: string]: string } = {
   '/dashboard/arquivo': 'Arquivo Digital',
   '/dashboard/staff': 'Equipe',
   '/dashboard/configuracoes': 'Configurações',
-  '/dashboard/checklists': 'Checklists Operacionais',
+  '/dashboard/checklists': 'Laboratório de Matrizes',
 };
 
 function InnerLayout({ children }: { children: React.ReactNode }) {
