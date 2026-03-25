@@ -26,7 +26,7 @@ import { H2 } from '@/components/ui/typography';
 import { Loader2, Search, DollarSign, Percent, Briefcase, MapPin, Globe, Heart } from 'lucide-react';
 
 import { useFirebase } from '@/firebase';
-import { collection, serverTimestamp, doc, addDoc, updateDoc } from 'firebase/firestore';
+import { collection, serverTimestamp, doc, addDoc, updateDoc, Timestamp } from 'firebase/firestore';
 import type { Staff } from '@/lib/types';
 import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
@@ -38,9 +38,19 @@ const staffSchema = z.object({
   email: z.string().email({ message: 'E-mail inválido.' }),
   phone: z.string().optional().or(z.literal('')),
   whatsapp: z.string().optional().or(z.literal('')),
+  documentCPF: z.string().optional().or(z.literal('')),
+  documentRG: z.string().optional().or(z.literal('')),
   nationality: z.string().optional().or(z.literal('')),
   civilStatus: z.string().optional().or(z.literal('')),
   
+  // HR Fields
+  ctps: z.string().optional().or(z.literal('')),
+  pis: z.string().optional().or(z.literal('')),
+  admissionDate: z.string().optional().or(z.literal('')),
+  birthDate: z.string().optional().or(z.literal('')),
+  gender: z.string().optional().or(z.literal('')),
+  education: z.string().optional().or(z.literal('')),
+
   address_street: z.string().optional().or(z.literal('')),
   address_number: z.string().optional().or(z.literal('')),
   address_complement: z.string().optional().or(z.literal('')),
@@ -64,6 +74,7 @@ const staffSchema = z.object({
   remuneration_valuePerHearing: z.coerce.number().min(0).optional().or(z.literal(0)),
   remuneration_priceDrafting: z.coerce.number().min(0).optional().or(z.literal(0)),
   remuneration_priceDiligence: z.coerce.number().min(0).optional().or(z.literal(0)),
+  remuneration_salary: z.coerce.number().min(0).optional().or(z.literal(0)),
 }).refine((data) => {
     if (data.role === 'lawyer' || data.role === 'intern') {
         return !!data.oabNumber && data.oabNumber.length > 0;
@@ -131,8 +142,16 @@ export function StaffForm({
         email: staff.email,
         phone: staff.phone || '',
         whatsapp: staff.whatsapp || '',
+        documentCPF: staff.documentCPF || '',
+        documentRG: staff.documentRG || '',
         nationality: staff.nationality || 'brasileiro(a)',
         civilStatus: staff.civilStatus || 'solteiro(a)',
+        ctps: staff.ctps || '',
+        pis: staff.pis || '',
+        admissionDate: staff.admissionDate ? (typeof staff.admissionDate === 'string' ? staff.admissionDate : (staff.admissionDate as any).toDate().toISOString().split('T')[0]) : '',
+        birthDate: staff.birthDate ? (typeof staff.birthDate === 'string' ? staff.birthDate : (staff.birthDate as any).toDate().toISOString().split('T')[0]) : '',
+        gender: staff.gender || '',
+        education: staff.education || '',
         address_street: staff.address?.street ?? '',
         address_number: staff.address?.number ?? '',
         address_complement: staff.address?.complement ?? '',
@@ -153,6 +172,7 @@ export function StaffForm({
         remuneration_valuePerHearing: staff.remuneration?.valuePerHearing ?? 0,
         remuneration_priceDrafting: staff.remuneration?.activityPrices?.drafting ?? 0,
         remuneration_priceDiligence: staff.remuneration?.activityPrices?.diligence ?? 0,
+        remuneration_salary: staff.remuneration?.salary ?? 0,
     } : {
         role: 'lawyer',
         firstName: '',
@@ -160,6 +180,14 @@ export function StaffForm({
         email: '',
         phone: '',
         whatsapp: '',
+        documentCPF: '',
+        documentRG: '',
+        ctps: '',
+        pis: '',
+        admissionDate: '',
+        birthDate: '',
+        gender: 'Prefiro não informar',
+        education: '',
         nationality: 'brasileiro(a)',
         civilStatus: 'solteiro(a)',
         address_street: '',
@@ -182,6 +210,7 @@ export function StaffForm({
         remuneration_valuePerHearing: 0,
         remuneration_priceDrafting: 0,
         remuneration_priceDiligence: 0,
+        remuneration_salary: 0,
     },
   });
   
@@ -238,7 +267,8 @@ export function StaffForm({
         bankName, agency, account, pixKey,
         remuneration_type, remuneration_officePercentage, remuneration_lawyerPercentage,
         remuneration_fixedMonthlyValue, remuneration_valuePerHearing,
-        remuneration_priceDrafting, remuneration_priceDiligence,
+        remuneration_priceDrafting, remuneration_priceDiligence, remuneration_salary,
+        admissionDate, birthDate,
         ...restOfValues
       } = values;
 
@@ -249,6 +279,9 @@ export function StaffForm({
         oabNumber: values.oabNumber || "",
         oabStatus: values.oabStatus || "Ativa"
       };
+
+      if (admissionDate) staffData.admissionDate = Timestamp.fromDate(new Date(admissionDate + 'T12:00:00'));
+      if (birthDate) staffData.birthDate = Timestamp.fromDate(new Date(birthDate + 'T12:00:00'));
 
       staffData.address = {
         street: address_street || "",
@@ -268,7 +301,7 @@ export function StaffForm({
       };
 
       if (remuneration_type) {
-        const rem: any = { type: remuneration_type };
+        const rem: any = { type: remuneration_type, salary: remuneration_salary || 0 };
         if (remuneration_type === 'SUCUMBENCIA') {
             rem.officePercentage = remuneration_officePercentage ?? 0;
             rem.lawyerPercentage = remuneration_lawyerPercentage ?? 0;
@@ -310,7 +343,7 @@ export function StaffForm({
           
           <section className="space-y-4">
             <H2 className="text-white border-primary/20">Identificação & Acesso</H2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white/5 p-6 rounded-2xl border border-white/10">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 bg-white/5 p-6 rounded-2xl border border-white/10">
               <FormField
                 control={form.control}
                 name="role"
@@ -324,17 +357,6 @@ export function StaffForm({
                     <FormMessage />
                   </FormItem>
                 )}
-              />
-              <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">Email Corporativo *</FormLabel>
-                        <FormControl><Input className="h-11 bg-background" placeholder="adv@buenogois.com.br" {...field} /></FormControl>
-                        <FormMessage />
-                      </FormItem>
-                  )}
               />
               <FormField
                 control={form.control}
@@ -359,13 +381,42 @@ export function StaffForm({
                 )}
               />
               <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">Email Corporativo *</FormLabel>
+                        <FormControl><Input className="h-11 bg-background" placeholder="adv@buenogois.com.br" {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                  )}
+              />
+              <FormField
+                control={form.control}
+                name="birthDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">Data de Nascimento</FormLabel>
+                    <FormControl><Input type="date" className="h-11 bg-background" {...field} /></FormControl>
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="education"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">Escolaridade / Formação</FormLabel>
+                    <FormControl><Input className="h-11 bg-background" placeholder="Ex: Pós-graduação" {...field} /></FormControl>
+                  </FormItem>
+                )}
+              />
+              <FormField
                 control={form.control}
                 name="nationality"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2">
-                      <Globe className="h-3.5 w-3.5" /> Nacionalidade
-                    </FormLabel>
+                    <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">Nacionalidade</FormLabel>
                     <FormControl><Input className="h-11 bg-background" placeholder="brasileiro(a)" {...field} /></FormControl>
                   </FormItem>
                 )}
@@ -375,12 +426,86 @@ export function StaffForm({
                 name="civilStatus"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2">
-                      <Heart className="h-3.5 w-3.5" /> Estado Civil
-                    </FormLabel>
+                    <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">Estado Civil</FormLabel>
                     <FormControl><Input className="h-11 bg-background" placeholder="solteiro(a)" {...field} /></FormControl>
                   </FormItem>
                 )}
+              />
+            </div>
+          </section>
+
+          <section className="space-y-4">
+            <H2 className="text-white border-primary/20">Documentação & DP</H2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 bg-white/5 p-6 rounded-2xl border border-white/10">
+              <FormField
+                control={form.control}
+                name="documentCPF"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">CPF</FormLabel>
+                    <FormControl><Input className="h-11 bg-background" placeholder="000.000.000-00" {...field} /></FormControl>
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="documentRG"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">RG</FormLabel>
+                    <FormControl><Input className="h-11 bg-background" placeholder="00.000.000-0" {...field} /></FormControl>
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="ctps"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">CTPS (Carteira Trabalho)</FormLabel>
+                    <FormControl><Input className="h-11 bg-background" placeholder="Nº / Série" {...field} /></FormControl>
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="pis"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">PIS / PASEP</FormLabel>
+                    <FormControl><Input className="h-11 bg-background" placeholder="000.00000.00-0" {...field} /></FormControl>
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="admissionDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest text-primary">Data de Admissão</FormLabel>
+                    <FormControl><Input type="date" className="h-11 bg-background border-primary/20" {...field} /></FormControl>
+                  </FormItem>
+                )}
+              />
+               <FormField
+                  control={form.control}
+                  name="remuneration_salary"
+                  render={({ field }) => (
+                      <FormItem>
+                          <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">Salário Base CLT (R$)</FormLabel>
+                          <FormControl>
+                              <div className="relative">
+                                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-bold">R$</span>
+                                  <Input 
+                                    type="text" 
+                                    className="h-11 pl-9 bg-background" 
+                                    value={formatCurrencyValue(field.value)} 
+                                    onChange={(e) => handleCurrencyValueChange(e, field.onChange)}
+                                  />
+                              </div>
+                          </FormControl>
+                      </FormItem>
+                  )}
               />
             </div>
           </section>

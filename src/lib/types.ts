@@ -235,8 +235,11 @@ export type FinancialTitle = {
   processId?: string;
   clientId?: string;
   costCenter?: string;
+  bankAccountId?: string;
   description: string;
   type: 'RECEITA' | 'DESPESA';
+  category?: string;
+  subcategory?: string;
   origin:
     | 'ACORDO'
     | 'SENTENCA'
@@ -254,12 +257,34 @@ export type FinancialTitle = {
     | 'OUTRAS_DESPESAS'
     | 'PERICIA'
     | 'DESLOCAMENTO'
-    | 'ADICIONAL';
+    | 'ADICIONAL'
+    | 'CONTAS_CONSUMO'
+    | 'ALVARA'
+    | 'TRANSFERENCIAS_JUDICIAIS'
+    | 'OUTRAS_RECEITAS';
   value: number;
   dueDate: any;
   paymentDate?: any;
-  status: 'PENDENTE' | 'PAGO' | 'ATRASADO';
+  competenceDate?: any;
+  status: 'PENDENTE' | 'PAGO' | 'ATRASADO' | 'CANCELADO';
+  paymentMethod?: 'PIX' | 'BOLETO' | 'CARTAO' | 'TRANSFERENCIA' | 'DINHEIRO';
+  beneficiaryName?: string;
+  beneficiaryDocument?: string;
+  receiptUrl?: string;
+  notes?: string;
   paidToStaffId?: string;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+};
+
+export type BankAccount = {
+  id: string;
+  name: string;
+  bankName: string;
+  type: 'CORRENTE' | 'POUPANCA' | 'INVESTIMENTO';
+  balance: number;
+  color?: string;
+  isActive: boolean;
 };
 
 export type ReimbursementStatus = 'SOLICITADO' | 'APROVADO' | 'REEMBOLSADO' | 'NEGADO';
@@ -319,6 +344,8 @@ export type Staff = {
   email: string;
   phone?: string;
   whatsapp?: string;
+  documentCPF?: string;
+  documentRG?: string;
   nationality?: string;
   civilStatus?: string;
   address?: {
@@ -332,6 +359,16 @@ export type Staff = {
   };
   oabNumber?: string;
   oabStatus?: OABStatus;
+  
+  // HR / DP Fields
+  ctps?: string;
+  pis?: string;
+  admissionDate?: Timestamp;
+  resignationDate?: Timestamp;
+  birthDate?: Timestamp;
+  gender?: string;
+  education?: string;
+  
   bankInfo?: {
     bankName?: string;
     agency?: string;
@@ -345,6 +382,13 @@ export type Staff = {
     lawyerPercentage?: number;
     fixedMonthlyValue?: number;
     valuePerHearing?: number;
+    salary?: number; // CLT Salary
+    benefits?: {
+      transportation?: number;
+      food?: number;
+      healthInsurance?: number;
+      others?: number;
+    };
     activityPrices?: {
       drafting?: number;
       diligence?: number;
@@ -353,6 +397,49 @@ export type Staff = {
   };
   createdAt: Timestamp;
   updatedAt?: Timestamp;
+};
+
+export type CorrespondentStatus = 'ATIVO' | 'INATIVO' | 'BLOQUEADO';
+
+export type Correspondent = {
+  id: string;
+  name: string;
+  document: string; // CNPJ or CPF
+  email: string;
+  phone?: string;
+  whatsapp?: string;
+  legalArea: string[]; // Areas they cover
+  locations: string[]; // Cities/States they cover
+  status: CorrespondentStatus;
+  rating?: number;
+  bankInfo?: {
+    bankName?: string;
+    agency?: string;
+    account?: string;
+    pixKey?: string;
+  };
+  notes?: string;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+};
+
+export type PayrollStatus = 'DRAFT' | 'APPROVED' | 'PAID' | 'CANCELLED';
+
+export type PayrollEntry = {
+  id: string;
+  staffId: string;
+  staffName: string;
+  monthKey: string; // "YYYY-MM"
+  baseSalary: number;
+  bonuses: { description: string; value: number }[];
+  discounts: { description: string; value: number }[];
+  netValue: number;
+  status: PayrollStatus;
+  paymentDate?: Timestamp;
+  financialTitleId?: string; // Link to financial module
+  notes?: string;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
 };
 
 export type ClientKitTemplate = {

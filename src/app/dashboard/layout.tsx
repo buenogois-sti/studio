@@ -51,7 +51,8 @@ import {
   LayoutDashboard,
   Users,
   MapPin,
-  Gavel
+  Gavel,
+  HeartHandshake
 } from 'lucide-react';
 import type { UserProfile } from '@/lib/types';
 import {
@@ -101,7 +102,7 @@ const sidebarSections = [
   {
     label: 'Tecnologia (Gestão)',
     items: [
-      { href: '/dashboard/staff', label: 'Equipe', icon: Briefcase, roles: ['admin'] },
+      { href: '/dashboard/rh', label: 'Recursos Humanos', icon: Users, roles: ['admin'] },
       { href: '/dashboard/configuracoes', label: 'Configurações', icon: Settings, roles: ['admin'] },
     ]
   }
@@ -122,6 +123,9 @@ const BreadcrumbMap: { [key: string]: string } = {
   '/dashboard/acervo': 'Acervo de Modelos',
   '/dashboard/arquivo': 'Arquivo Digital',
   '/dashboard/staff': 'Equipe',
+  '/dashboard/rh': 'Recursos Humanos',
+  '/dashboard/rh/payroll': 'Folha de Pagamento',
+  '/dashboard/rh/correspondents': 'Correspondentes',
   '/dashboard/configuracoes': 'Configurações',
   '/dashboard/checklists': 'Laboratório de Matrizes',
 };

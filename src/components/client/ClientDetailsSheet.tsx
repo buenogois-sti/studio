@@ -15,6 +15,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   Copy, 
   Printer, 
+  Pencil,
   User, 
   Phone, 
   MapPin, 
@@ -53,6 +54,7 @@ interface ClientDetailsSheetProps {
   client: Client | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onEdit?: (client: Client) => void;
 }
 
 const InfoRow = React.memo(({ 
@@ -129,7 +131,7 @@ const InfoRow = React.memo(({
 });
 InfoRow.displayName = 'InfoRow';
 
-export const ClientDetailsSheet = React.memo(function ClientDetailsSheet({ client, open, onOpenChange }: ClientDetailsSheetProps) {
+export const ClientDetailsSheet = React.memo(function ClientDetailsSheet({ client, open, onOpenChange, onEdit }: ClientDetailsSheetProps) {
   const { firestore } = useFirebase();
   const { toast } = useToast();
 
@@ -168,11 +170,10 @@ export const ClientDetailsSheet = React.memo(function ClientDetailsSheet({ clien
     });
   }, [toast]);
 
-  if (!client) return null;
-
-  const isPJ = client.clientType === 'Pessoa Jurídica';
+  const isPJ = client?.clientType === 'Pessoa Jurídica';
 
   const integrity = React.useMemo(() => {
+    if (!client) return 0;
     const commonFields = [
       client.firstName, client.document, client.email,
       client.mobile, client.address?.street, client.address?.zipCode,
@@ -187,6 +188,8 @@ export const ClientDetailsSheet = React.memo(function ClientDetailsSheet({ clien
     return Math.round((filled / fields.length) * 100);
   }, [client, isPJ]);
 
+  if (!client) return null;
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="sm:max-w-3xl w-full p-0 flex flex-col bg-[#020617] border-border overflow-hidden shadow-2xl">
@@ -200,6 +203,9 @@ export const ClientDetailsSheet = React.memo(function ClientDetailsSheet({ clien
                 </div>
             </div>
             <div className="flex gap-2">
+                <Button variant="outline" size="icon" onClick={() => client && onEdit?.(client)} title="Editar" className="h-10 w-10 text-primary border-primary/20 hover:bg-primary/5">
+                    <Pencil className="h-4 w-4" />
+                </Button>
                 <Button variant="outline" size="icon" onClick={() => window.print()} title="Imprimir" className="h-10 w-10">
                     <Printer className="h-4 w-4" />
                 </Button>

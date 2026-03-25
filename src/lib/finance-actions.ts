@@ -234,11 +234,27 @@ export async function createFinancialTitle(data: any) {
                 value: baseData.value || 0,
                 status: baseData.status || 'PENDENTE',
                 dueDate: Timestamp.fromDate(currentDueDate),
+                paymentMethod: baseData.paymentMethod || null,
+                beneficiaryName: baseData.beneficiaryName || null,
+                beneficiaryDocument: baseData.beneficiaryDocument || null,
+                notes: baseData.notes || null,
+                bankAccountId: baseData.bankAccountId || null,
+                category: baseData.category || null,
+                subcategory: baseData.subcategory || null,
+                createdAt: FieldValue.serverTimestamp(),
                 updatedAt: FieldValue.serverTimestamp()
             };
 
+            if (baseData.competenceDate) {
+              payload.competenceDate = Timestamp.fromDate(addMonths(new Date(baseData.competenceDate), i));
+            }
+
             if (baseData.processId) payload.processId = baseData.processId;
             if (resolvedClientId) payload.clientId = resolvedClientId;
+
+            if (baseData.status === 'PAGO') {
+              payload.paymentDate = FieldValue.serverTimestamp();
+            }
 
             batch.set(titleRef, payload);
         }

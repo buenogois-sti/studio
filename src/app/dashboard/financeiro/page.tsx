@@ -43,12 +43,17 @@ import {
   CalendarDays,
   ShieldCheck,
   Bot,
-  Edit
+  Edit,
+  PieChart,
+  Clock
 } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, Timestamp, query, orderBy, deleteDoc, doc, getDocs, where, limit } from 'firebase/firestore';
 import type { FinancialTitle, Staff, Client, Process } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
+import { searchProcesses } from '@/lib/process-actions';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { EXPENSE_CATEGORIES, REVENUE_CATEGORIES } from '@/lib/financial-constants';
 import { cn } from '@/lib/utils';
 import { H1 } from '@/components/ui/typography';
 import { useToast } from '@/components/ui/use-toast';
@@ -62,6 +67,19 @@ import {
   DialogDescription,
   DialogClose
 } from '@/components/ui/dialog';
+import { 
+  AreaChart, 
+  Area, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  Cell,
+  Legend
+} from 'recharts';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -83,8 +101,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import Link from 'next/link';
-import { searchProcesses } from '@/lib/process-actions';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 const titleFormSchema = z.object({
   description: z.string().min(3, 'Descrição obrigatória'),
@@ -106,13 +122,24 @@ const titleFormSchema = z.object({
     'OUTRAS_DESPESAS',
     'PERICIA',
     'DESLOCAMENTO',
-    'ADICIONAL'
+    'ADICIONAL',
+    'ALVARA',
+    'TRANSFERENCIAS_JUDICIAIS',
+    'CONTAS_CONSUMO',
+    'OUTRAS_RECEITAS'
   ]),
   value: z.coerce.number().positive('Valor deve ser positivo'),
   dueDate: z.string().min(1, 'Data de vencimento obrigatória'),
-  status: z.enum(['PENDENTE', 'PAGO', 'ATRASADO']).default('PENDENTE'),
+  competenceDate: z.string().optional(),
+  status: z.enum(['PENDENTE', 'PAGO', 'ATRASADO', 'CANCELADO']).default('PENDENTE'),
+  paymentMethod: z.enum(['PIX', 'BOLETO', 'CARTAO', 'TRANSFERENCIA', 'DINHEIRO']).optional(),
+  beneficiaryName: z.string().optional(),
+  beneficiaryDocument: z.string().optional(),
+  notes: z.string().optional(),
   processId: z.string().optional(),
   clientId: z.string().optional(),
+  category: z.string().optional(),
+  subcategory: z.string().optional(),
   recurring: z.boolean().default(false),
   months: z.coerce.number().min(1).max(24).default(1),
 });
@@ -372,8 +399,15 @@ function TitleFormDialog({
       status: 'PENDENTE',
       value: 0,
       dueDate: format(new Date(), 'yyyy-MM-dd'),
+      competenceDate: format(new Date(), 'yyyy-MM-dd'),
+      paymentMethod: 'PIX',
+      beneficiaryName: '',
+      beneficiaryDocument: '',
+      notes: '',
       processId: '',
       clientId: '',
+      category: '',
+      subcategory: '',
       recurring: false,
       months: 1,
     }
@@ -390,6 +424,8 @@ function TitleFormDialog({
         dateVal = new Date(title.dueDate as any);
       }
 
+      const competenceVal = title.competenceDate ? (title.competenceDate instanceof Timestamp ? title.competenceDate.toDate() : new Date(title.competenceDate)) : null;
+
       form.reset({
         description: title.description || '',
         type: title.type || 'RECEITA',
@@ -397,8 +433,15 @@ function TitleFormDialog({
         status: title.status || 'PENDENTE',
         value: title.value || 0,
         dueDate: format(dateVal, 'yyyy-MM-dd'),
+        competenceDate: competenceVal ? format(competenceVal, 'yyyy-MM-dd') : format(dateVal, 'yyyy-MM-dd'),
+        paymentMethod: title.paymentMethod || 'PIX',
+        beneficiaryName: title.beneficiaryName || '',
+        beneficiaryDocument: title.beneficiaryDocument || '',
+        notes: title.notes || '',
         processId: title.processId || '',
         clientId: title.clientId || '',
+        category: title.category || '',
+        subcategory: title.subcategory || '',
         recurring: false,
         months: 1
       });
@@ -417,8 +460,15 @@ function TitleFormDialog({
         status: 'PENDENTE',
         value: 0,
         dueDate: format(new Date(), 'yyyy-MM-dd'),
+        competenceDate: format(new Date(), 'yyyy-MM-dd'),
+        paymentMethod: 'PIX',
+        beneficiaryName: '',
+        beneficiaryDocument: '',
+        notes: '',
         processId: '',
         clientId: '',
+        category: '',
+        subcategory: '',
         recurring: false,
         months: 1
       });
@@ -465,6 +515,7 @@ function TitleFormDialog({
       const payload: any = {
         ...values,
         dueDate: new Date(values.dueDate + 'T12:00:00'),
+        competenceDate: values.competenceDate ? new Date(values.competenceDate + 'T12:00:00') : null,
         processId: selectedProcess?.id || '',
         clientId: selectedProcess?.clientId || '',
       };
@@ -488,7 +539,7 @@ function TitleFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-xl bg-[#020617] border-white/10 h-[90vh] flex flex-col p-0 overflow-hidden shadow-2xl">
+      <DialogContent className="sm:max-w-2xl bg-[#020617] border-white/10 h-[95vh] flex flex-col p-0 overflow-hidden shadow-2xl">
         <DialogHeader className="p-6 border-b border-white/5 bg-white/5 shrink-0">
           <DialogTitle className="text-xl font-black font-headline text-white uppercase tracking-tight">
             {isEdit ? 'Editar Título Financeiro' : 'Novo Título Financeiro'}
@@ -535,11 +586,13 @@ function TitleFormDialog({
                               <SelectValue placeholder="Selecione..." />
                             </SelectTrigger>
                           </FormControl>
-                          <SelectContent className="bg-[#0f172a] border-white/10 text-white">
+                          <SelectContent className="bg-[#0f172a] border-white/10 text-white max-h-[400px]">
                             <DropdownMenuLabel className="text-[10px] uppercase text-muted-foreground p-2">Escritório (Fixos)</DropdownMenuLabel>
                             <SelectItem value="ALUGUEL_CONTAS">🏢 Aluguel / Contas de Consumo</SelectItem>
                             <SelectItem value="SALARIOS_PROLABORE">👨‍⚖️ Salários / Pró-Labore</SelectItem>
                             <SelectItem value="INFRAESTRUTURA_TI">💻 TI / Software / Cloud</SelectItem>
+                            <SelectItem value="MATERIAL_ESCRITORIO">📦 Material de Escritório</SelectItem>
+                            <SelectItem value="IMPOSTOS_TAXAS">🏛️ Impostos e Taxas</SelectItem>
                             
                             <DropdownMenuSeparator className="bg-white/5" />
                             <DropdownMenuLabel className="text-[10px] uppercase text-muted-foreground p-2">Jurídico (Variáveis)</DropdownMenuLabel>
@@ -549,16 +602,116 @@ function TitleFormDialog({
                             <SelectItem value="CUSTAS_PROCESSUAIS">📄 Custas Judiciais</SelectItem>
                             <SelectItem value="PERICIA">🔍 Perícia Técnica</SelectItem>
                             <SelectItem value="DESLOCAMENTO">🚗 Deslocamento/Diligência</SelectItem>
+                            <SelectItem value="SERVICOS_TERCEIROS">🤝 Serviços de Terceiros</SelectItem>
                             
                             <DropdownMenuSeparator className="bg-white/5" />
                             <SelectItem value="OUTRAS_DESPESAS">📦 Outras Operações</SelectItem>
                             <SelectItem value="ADICIONAL">➕ Adicional / Extra</SelectItem>
+                            <SelectItem value="ALVARA">📜 Alvará Judicial</SelectItem>
+                            <SelectItem value="TRANSFERENCIAS_JUDICIAIS">🏦 Transf. Judiciais</SelectItem>
                           </SelectContent>
                         </Select>
                       </FormItem>
                     )}
                   />
                 </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FormField
+                    control={form.control}
+                    name="category"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Grupo de Contas</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger className="bg-black/40 border-white/10 h-11 focus:border-primary transition-all rounded-xl">
+                              <SelectValue placeholder="Selecione Categoria..." />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent className="bg-[#0f172a] border-white/10 text-white">
+                            {Object.entries(form.watch('type') === 'RECEITA' ? REVENUE_CATEGORIES : EXPENSE_CATEGORIES).map(([key, cat]) => (
+                                <SelectItem key={key} value={key}>{cat.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="subcategory"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Subcategoria Legal</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value} disabled={!form.watch('category')}>
+                          <FormControl>
+                            <SelectTrigger className="bg-black/40 border-white/10 h-11 focus:border-primary transition-all rounded-xl">
+                              <SelectValue placeholder="Selecione Subcategoria..." />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent className="bg-[#0f172a] border-white/10 text-white">
+                            {(form.watch('type') === 'RECEITA' ? REVENUE_CATEGORIES : EXPENSE_CATEGORIES)[form.watch('category') as keyof typeof EXPENSE_CATEGORIES]?.subcategories.map(sub => (
+                                <SelectItem key={sub} value={sub}>{sub}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FormField
+                    control={form.control}
+                    name="beneficiaryName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Favorecido / Beneficiário</FormLabel>
+                        <FormControl>
+                          <Input className="h-11 bg-black/40 border-white/10 rounded-xl" placeholder="Nome do favorecido..." {...field} />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="paymentMethod"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Meio de Pagamento</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger className="bg-black/40 border-white/10 h-11 rounded-xl">
+                              <SelectValue placeholder="Selecione..." />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent className="bg-[#0f172a] border-white/10 text-white">
+                            <SelectItem value="PIX">PIX (Instantâneo)</SelectItem>
+                            <SelectItem value="BOLETO">Boleto Bancário</SelectItem>
+                            <SelectItem value="TRANSFERENCIA">Transferência / TED</SelectItem>
+                            <SelectItem value="CARTAO">Cartão de Crédito</SelectItem>
+                            <SelectItem value="DINHEIRO">Espécie (Dinheiro)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Descrição detalhada do Título *</FormLabel>
+                      <FormControl>
+                        <Input className="h-12 bg-black/40 border-white/10 rounded-xl font-bold" placeholder="Ex: Honorários Contratuais - Processo X" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
                 <div className="space-y-3">
                   <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
@@ -614,21 +767,44 @@ function TitleFormDialog({
                   )}
                 </div>
 
-                <FormField
-                  control={form.control}
-                  name="description"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Descrição do Lançamento *</FormLabel>
-                      <FormControl>
-                        <Input className="h-12 bg-black/40 border-white/10 rounded-xl font-bold" placeholder="Ex: Honorários Contratuais 1ª Instância" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-5 rounded-2xl bg-white/5 border border-white/10">
+                   <FormField
+                    control={form.control}
+                    name="competenceDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Mês de Competência</FormLabel>
+                        <FormControl>
+                          <Input type="date" className="bg-transparent border-white/10 h-10 text-white rounded-xl" {...field} />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="status"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Status Inicial</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger className="bg-transparent border-white/10 h-10 rounded-xl">
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent className="bg-[#0f172a] border-white/10">
+                            <SelectItem value="PENDENTE">⏳ Aguardando</SelectItem>
+                            <SelectItem value="PAGO">✅ Liquidado</SelectItem>
+                            <SelectItem value="ATRASADO">🔴 Vencido</SelectItem>
+                            <SelectItem value="CANCELADO">🚫 Cancelado</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 rounded-3xl bg-primary/5 border-2 border-primary/20">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 rounded-3xl bg-primary/5 border-2 border-primary/20 shadow-lg shadow-primary/5">
                   <FormField
                     control={form.control}
                     name="value"
@@ -639,7 +815,7 @@ function TitleFormDialog({
                           <div className="relative">
                             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-primary font-black text-sm">R$</span>
                             <Input 
-                              className="bg-black/40 border-primary/20 pl-10 h-12 text-lg font-black text-white rounded-xl focus:border-primary" 
+                              className="bg-black/40 border-primary/20 pl-10 h-12 text-lg font-black text-white rounded-xl focus:border-primary shadow-inner" 
                               type="text"
                               value={formatCurrencyValue(field.value)}
                               onChange={(e) => handleValueChange(e, field.onChange)}
@@ -667,6 +843,19 @@ function TitleFormDialog({
                     )}
                   />
                 </div>
+
+                <FormField
+                  control={form.control}
+                  name="notes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Observações Internas (Opcional)</FormLabel>
+                      <FormControl>
+                        <Input className="h-20 bg-black/40 border-white/10 rounded-xl text-xs py-2" placeholder="Notas sobre este lançamento..." {...field} />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
 
                 {!isEdit && (
                   <div className="space-y-4 pt-2">
@@ -714,7 +903,7 @@ function TitleFormDialog({
                             <div className="flex items-start gap-2 mt-3 p-3 bg-primary/10 rounded-lg border border-primary/20">
                               <Bot className="h-4 w-4 text-primary shrink-0 mt-0.5" />
                               <p className="text-[10px] text-slate-300 leading-relaxed uppercase font-bold">
-                                A inteligência financeira da Bueno Gois criará {field.value} lançamentos automáticos com vencimentos escalonados.
+                                A inteligência financeira criará lançamentos automáticos com vencimentos escalonados.
                               </p>
                             </div>
                             <FormMessage />
@@ -777,6 +966,12 @@ export default function FinanceiroPage() {
   const { data: processesData } = useCollection<Process>(processesQuery);
   const processesMap = React.useMemo(() => new Map(processesData?.map(p => [p.id, p])), [processesData]);
   
+  const [bankAccounts, setBankAccounts] = React.useState<BankAccount[]>([
+    { id: '1', name: 'Conta Principal', bankName: 'Itaú Personalité', type: 'CORRENTE', balance: 45280.50, color: '#ec4899', isActive: true },
+    { id: '2', name: 'Reserva de Lucros', bankName: 'XP Investimentos', type: 'INVESTIMENTO', balance: 128400.00, color: '#f5d030', isActive: true },
+    { id: '3', name: 'Caixa Pequeno', bankName: 'Caixa Interno', type: 'CORRENTE', balance: 1200.00, color: '#10b981', isActive: true },
+  ]);
+
   const stats = React.useMemo(() => {
     if (!titlesData) return { totalReceitas: 0, totalDespesas: 0, pendenteReceita: 0, pendenteDespesa: 0, officeRevenue: 0 };
     return titlesData.reduce((acc, t) => {
@@ -794,6 +989,24 @@ export default function FinanceiroPage() {
       }
       return acc;
     }, { totalReceitas: 0, totalDespesas: 0, pendenteReceita: 0, pendenteDespesa: 0, officeRevenue: 0 });
+  }, [titlesData]);
+
+  const chartData = React.useMemo(() => {
+    if (!titlesData) return [];
+    const months: Record<string, { month: string, receita: number, despesa: number }> = {};
+    
+    titlesData.forEach(t => {
+      const date = t.dueDate instanceof Timestamp ? t.dueDate.toDate() : new Date(t.dueDate);
+      const monthKey = format(date, 'MMM/yy', { locale: ptBR });
+      if (!months[monthKey]) months[monthKey] = { month: monthKey, receita: 0, despesa: 0 };
+      
+      if (t.status === 'PAGO') {
+        if (t.type === 'RECEITA') months[monthKey].receita += t.value;
+        else months[monthKey].despesa += t.value;
+      }
+    });
+
+    return Object.values(months).slice(-6);
   }, [titlesData]);
 
   const groupedReceitas = React.useMemo(() => {
@@ -926,26 +1139,134 @@ export default function FinanceiroPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="bg-primary/5 border-primary/20 border-2 shadow-[0_0_20px_rgba(245,208,48,0.05)]">
-          <CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-primary tracking-widest">Receita Real (Honorários 30%)</CardTitle></CardHeader>
-          <CardContent className="p-4 pt-0"><p className="text-2xl font-black text-primary tabular-nums">{formatCurrency(stats.officeRevenue)}</p></CardContent>
-        </Card>
-        <Card className="bg-emerald-500/5 border-emerald-500/10">
-          <CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-emerald-400 tracking-widest">Total Bruto Recebido</CardTitle></CardHeader>
-          <CardContent className="p-4 pt-0"><p className="text-2xl font-black text-emerald-400 tabular-nums">{formatCurrency(stats.totalReceitas)}</p></CardContent>
-        </Card>
-        <Card className="bg-amber-500/5 border-amber-500/10"><CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-amber-400 tracking-widest">Receitas Pendentes</CardTitle></CardHeader><CardContent className="p-4 pt-0"><p className="text-2xl font-black text-amber-400 tabular-nums">{formatCurrency(stats.pendenteReceita)}</p></CardContent></Card>
-        <Card className="bg-rose-500/5 border-rose-500/10"><CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-rose-400 tracking-widest">Total de Custos (Saídas)</CardTitle></CardHeader><CardContent className="p-4 pt-0"><p className="text-2xl font-black text-rose-400 tabular-nums">{formatCurrency(stats.totalDespesas)}</p></CardContent></Card>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="lg:col-span-8 space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card className="bg-primary/5 border-primary/20 border-2 overflow-hidden relative">
+              <div className="absolute top-0 right-0 p-3 opacity-10"><Scale className="h-12 w-12" /></div>
+              <CardHeader className="p-4 pb-1"><CardTitle className="text-[10px] font-black uppercase text-primary tracking-widest">Lucro Operacional (30%)</CardTitle></CardHeader>
+              <CardContent className="p-4 pt-0"><p className="text-2xl font-black text-primary tabular-nums">{formatCurrency(stats.officeRevenue)}</p></CardContent>
+            </Card>
+            <Card className="bg-emerald-500/5 border-emerald-500/10 overflow-hidden relative">
+              <div className="absolute top-0 right-0 p-3 opacity-10"><ArrowUpRight className="h-12 w-12" /></div>
+              <CardHeader className="p-4 pb-1"><CardTitle className="text-[10px] font-black uppercase text-emerald-400 tracking-widest">Realizado (Receitas)</CardTitle></CardHeader>
+              <CardContent className="p-4 pt-0"><p className="text-2xl font-black text-emerald-400 tabular-nums">{formatCurrency(stats.totalReceitas)}</p></CardContent>
+            </Card>
+            <Card className="bg-rose-500/5 border-rose-500/10 overflow-hidden relative">
+              <div className="absolute top-0 right-0 p-3 opacity-10"><ArrowDownRight className="h-12 w-12" /></div>
+              <CardHeader className="p-4 pb-1"><CardTitle className="text-[10px] font-black uppercase text-rose-400 tracking-widest">Realizado (Saídas)</CardTitle></CardHeader>
+              <CardContent className="p-4 pt-0"><p className="text-2xl font-black text-rose-400 tabular-nums">{formatCurrency(stats.totalDespesas)}</p></CardContent>
+            </Card>
+            <Card className="bg-amber-500/5 border-amber-500/10 overflow-hidden relative">
+              <div className="absolute top-0 right-0 p-3 opacity-10"><Clock className="h-12 w-12" /></div>
+              <CardHeader className="p-4 pb-1"><CardTitle className="text-[10px] font-black uppercase text-amber-400 tracking-widest">Provisionado (Entrada)</CardTitle></CardHeader>
+              <CardContent className="p-4 pt-0"><p className="text-2xl font-black text-amber-400 tabular-nums">{formatCurrency(stats.pendenteReceita)}</p></CardContent>
+            </Card>
+          </div>
+
+          <Card className="bg-[#0f172a] border-white/5 p-6 overflow-hidden">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-xs font-black uppercase tracking-widest text-white">Fluxo de Caixa Realizado</h3>
+                <p className="text-[10px] text-slate-500 font-bold mt-1 uppercase">Demonstrativo dos últimos 6 meses de operação</p>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-1.5"><div className="h-2 w-2 rounded-full bg-primary" /><span className="text-[9px] font-black uppercase text-slate-400">Receitas</span></div>
+                <div className="flex items-center gap-1.5"><div className="h-2 w-2 rounded-full bg-rose-500" /><span className="text-[9px] font-black uppercase text-slate-400">Despesas</span></div>
+              </div>
+            </div>
+            <div className="h-[240px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={chartData}>
+                  <defs>
+                    <linearGradient id="colorReceita" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="var(--primary)" stopOpacity={0}/>
+                    </linearGradient>
+                    <linearGradient id="colorDespesa" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#f43f5e" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
+                  <XAxis dataKey="month" stroke="#475569" fontSize={9} tickLine={false} axisLine={false} />
+                  <YAxis stroke="#475569" fontSize={9} tickLine={false} axisLine={false} tickFormatter={(v) => `R$${v/1000}k`} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#020617', border: '1px solid #ffffff10', borderRadius: '12px' }}
+                    itemStyle={{ fontSize: '10px', fontWeight: 'bold' }}
+                  />
+                  <Area type="monotone" dataKey="receita" stroke="var(--primary)" strokeWidth={3} fillOpacity={1} fill="url(#colorReceita)" />
+                  <Area type="monotone" dataKey="despesa" stroke="#f43f5e" strokeWidth={3} fillOpacity={1} fill="url(#colorDespesa)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+        </div>
+
+        <div className="lg:col-span-4 space-y-6">
+          <Card className="bg-[#0f172a] border-white/5 overflow-hidden">
+            <CardHeader className="p-5 border-b border-white/5 bg-white/5">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-xs font-black uppercase tracking-widest text-white flex items-center gap-2">
+                  <Wallet className="h-4 w-4 text-primary" /> Disponibilidade Bancária
+                </CardTitle>
+                <Badge className="bg-emerald-500/20 text-emerald-400 text-[8px] font-black uppercase h-5">Tempo Real</Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="divide-y divide-white/5">
+                {bankAccounts.map(account => (
+                  <div key={account.id} className="p-5 flex items-center justify-between group hover:bg-white/5 transition-all">
+                    <div className="flex items-center gap-4">
+                      <div className="h-10 w-10 rounded-xl flex items-center justify-center border border-white/10 shrink-0" style={{ backgroundColor: `${account.color}10`, color: account.color }}>
+                        <DollarSign className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-black text-white">{account.name}</p>
+                        <p className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">{account.bankName}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-black text-white tabular-nums">{formatCurrency(account.balance)}</p>
+                      <p className="text-[8px] font-bold text-slate-500 uppercase">{account.type}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="p-5 bg-black/20">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Patrimônio Líquido</span>
+                  <span className="text-lg font-black text-primary">
+                    {formatCurrency(bankAccounts.reduce((acc, a) => acc + a.balance, 0))}
+                  </span>
+                </div>
+                <Button variant="ghost" className="w-full text-primary hover:text-primary/80 text-[10px] font-bold uppercase h-9 group">
+                  Gerenciar Contas <ArrowUpRight className="ml-2 h-3 w-3 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="bg-primary/5 border-primary/20 border-2 p-5 text-center space-y-4">
+              <PieChart className="h-8 w-8 text-primary mx-auto" />
+              <div className="space-y-1">
+                <p className="text-xs font-black text-white uppercase tracking-tighter">Meta Mensal Bueno Gois</p>
+                <p className="text-[10px] text-slate-400 font-bold uppercase">Atingimos 65% da faturamento planejado para Março.</p>
+              </div>
+              <div className="w-full bg-black/40 rounded-full h-1.5 overflow-hidden">
+                <div className="bg-primary h-full w-[65%] rounded-full shadow-[0_0_10px_rgba(245,208,48,0.5)]" />
+              </div>
+          </Card>
+        </div>
       </div>
 
       <Tabs defaultValue="receitas" className="flex-1 flex flex-col">
         <TabsList className="grid w-full grid-cols-3 bg-[#0f172a] border border-white/5 rounded-lg p-1 gap-1 h-12">
             <TabsTrigger value="receitas" className="rounded-md data-[state=active]:bg-emerald-500/20 data-[state=active]:text-emerald-400 font-bold h-10">
-              <ArrowUpRight className="h-4 w-4 mr-2" /> Receitas
+              <ArrowUpRight className="h-4 w-4 mr-2" /> Contas a Receber
             </TabsTrigger>
             <TabsTrigger value="despesas" className="rounded-md data-[state=active]:bg-rose-500/20 data-[state=active]:text-rose-400 font-bold h-10">
-              <ArrowDownRight className="h-4 w-4 mr-2" /> Despesas
+              <ArrowDownRight className="h-4 w-4 mr-2" /> Contas a Pagar
             </TabsTrigger>
             <TabsTrigger value="relatorios" className="rounded-md data-[state=active]:bg-purple-500/20 data-[state=active]:text-purple-400 font-bold h-10">
               <BarChart3 className="h-4 w-4 mr-2" /> Painel BI
@@ -1013,7 +1334,8 @@ export default function FinanceiroPage() {
                   <Table>
                     <TableHeader className="bg-white/5">
                       <TableRow className="border-none hover:bg-transparent">
-                        <TableHead className="text-[9px] font-black uppercase text-slate-500 px-6">Descrição da Parcela</TableHead>
+                        <TableHead className="text-[9px] font-black uppercase text-slate-500 px-6">Descrição / Subcategoria</TableHead>
+                        <TableHead className="text-[9px] font-black uppercase text-slate-500">Agrupamento</TableHead>
                         <TableHead className="text-[9px] font-black uppercase text-slate-500">Vencimento</TableHead>
                         <TableHead className="text-[9px] font-black uppercase text-slate-500 text-center">Status</TableHead>
                         <TableHead className="text-[9px] font-black uppercase text-slate-500 text-right">Valor Bruto</TableHead>
@@ -1030,7 +1352,15 @@ export default function FinanceiroPage() {
                             isOverdue && "bg-rose-500/[0.03]"
                           )}>
                             <TableCell className="px-6">
-                              <span className={cn("font-bold text-xs", isOverdue ? "text-rose-400" : "text-slate-200")}>{t.description}</span>
+                              <div>
+                                <span className={cn("font-bold text-xs block", isOverdue ? "text-rose-400" : "text-slate-200")}>{t.description}</span>
+                                {t.subcategory && <span className="text-[9px] font-black text-slate-500 uppercase tracking-tighter block mt-0.5">{t.subcategory}</span>}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="text-[8px] font-black uppercase border-white/5 bg-white/5 text-slate-400">
+                                {t.category ? (REVENUE_CATEGORIES[t.category as keyof typeof REVENUE_CATEGORIES]?.label || t.category) : 'Geral'}
+                              </Badge>
                             </TableCell>
                             <TableCell className={cn("text-[10px] font-mono", isOverdue ? "text-rose-500 font-black" : "text-slate-400")}>
                               {format(dueDate, 'dd/MM/yyyy')}
@@ -1137,7 +1467,8 @@ export default function FinanceiroPage() {
             <Table>
               <TableHeader className="bg-white/5">
                 <TableRow className="border-white/5 hover:bg-transparent">
-                  <TableHead className="text-muted-foreground font-black uppercase text-[10px] px-6">Descrição da Saída</TableHead>
+                  <TableHead className="text-muted-foreground font-black uppercase text-[10px] px-6">Descrição / Subcategoria</TableHead>
+                  <TableHead className="text-muted-foreground font-black uppercase text-[10px]">Agrupamento</TableHead>
                   <TableHead className="text-muted-foreground font-black uppercase text-[10px]">Vencimento</TableHead>
                   <TableHead className="text-center text-muted-foreground font-black uppercase text-[10px]">Status</TableHead>
                   <TableHead className="text-right text-muted-foreground font-black uppercase text-[10px]">Valor</TableHead>
@@ -1154,12 +1485,29 @@ export default function FinanceiroPage() {
                   const isOverdue = t.status !== 'PAGO' && isBefore(dueDate, now);
                   return (
                     <TableRow key={t.id} className="border-white/5 hover:bg-white/5 transition-colors">
-                      <TableCell className="px-6 font-bold text-white text-sm">{t.description}</TableCell>
+                      <TableCell className="px-6">
+                        <div>
+                          <p className="font-bold text-white text-sm">{t.description}</p>
+                          <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter mt-1 flex items-center gap-2">
+                            {t.subcategory && <span className="text-primary/70">{t.subcategory}</span>}
+                            <span>• {t.beneficiaryName || 'Sem favorecido'}</span>
+                          </p>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-[8px] font-black uppercase border-white/5 bg-white/5 text-slate-400">
+                          {t.category ? (EXPENSE_CATEGORIES[t.category as keyof typeof EXPENSE_CATEGORIES]?.label || t.category) : 'Outros'}
+                        </Badge>
+                      </TableCell>
                       <TableCell className="text-xs text-slate-400 font-mono">
                         {format(dueDate, 'dd/MM/yyyy')}
                       </TableCell>
                       <TableCell className="text-center">
-                        <Badge variant="outline" className={cn("text-[9px] font-black uppercase px-2 h-6 border-none", t.status === 'PAGO' ? 'bg-rose-500/20 text-rose-400' : 'bg-amber-500/20 text-amber-400')}>
+                        <Badge variant="outline" className={cn(
+                          "text-[9px] font-black uppercase px-2 h-6 border-none", 
+                          t.status === 'PAGO' ? 'bg-emerald-500/20 text-emerald-400' : 
+                          isOverdue ? 'bg-rose-500/20 text-rose-500' : 'bg-amber-500/20 text-amber-400'
+                        )}>
                           {isOverdue ? 'VENCIDO' : t.status}
                         </Badge>
                       </TableCell>
@@ -1196,6 +1544,7 @@ export default function FinanceiroPage() {
                     </TableRow>
                   )
                 }))}
+
               </TableBody>
             </Table>
           </Card>

@@ -223,6 +223,24 @@ export default function ClientsPage() {
           <p className="text-sm text-muted-foreground">Gestão estratégica de contatos Bueno Gois.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center bg-[#0f172a] border border-border/50 rounded-xl p-1 mr-2 shadow-inner">
+            <Button 
+              variant={viewMode === 'grid' ? 'secondary' : 'ghost'} 
+              size="sm" 
+              onClick={() => setViewMode('grid')}
+              className={cn("h-8 w-10 px-0 rounded-lg", viewMode === 'grid' ? "bg-primary text-primary-foreground shadow-lg" : "text-slate-500 hover:text-white")}
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
+            <Button 
+              variant={viewMode === 'table' ? 'secondary' : 'ghost'} 
+              size="sm" 
+              onClick={() => setViewMode('table')}
+              className={cn("h-8 w-10 px-0 rounded-lg", viewMode === 'table' ? "bg-primary text-primary-foreground shadow-lg" : "text-slate-500 hover:text-white")}
+            >
+              <List className="h-4 w-4" />
+            </Button>
+          </div>
           <div className="relative w-full max-w-sm">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input placeholder="Pesquisar..." className="pl-8 bg-[#0f172a] border-border/50 text-white" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
@@ -235,23 +253,110 @@ export default function ClientsPage() {
       {isLoading && !paginatedClients.length ? (
         <div className="flex flex-col items-center justify-center py-32 space-y-4"><Loader2 className="h-12 w-12 animate-spin text-primary" /><p className="text-sm font-black uppercase text-muted-foreground">Otimizando Dados...</p></div>
       ) : paginatedClients.length > 0 ? (
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {paginatedClients.map((client) => (
-            <ClientCard 
-              key={client.id}
-              client={client}
-              processesCount={processesByClientMap.get(client.id) || 0}
-              integrity={clientIntegrityMap.get(client.id) || 0}
-              statusInfo={STATUS_CONFIG[client.status || 'active']}
-              isSyncing={isSyncing === client.id}
-              onSync={handleSyncClient}
-              onDetails={(c) => { setSelectedClientForDetails(c); setIsDetailsOpen(true); }}
-              onEdit={(c) => { setEditingClient(c); setIsSheetOpen(true); }}
-              onDelete={setClientToDelete}
-              onDeactivate={setClientToDeactivate}
-            />
-          ))}
-        </div>
+        viewMode === 'grid' ? (
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {paginatedClients.map((client) => (
+              <ClientCard 
+                key={client.id}
+                client={client}
+                processesCount={processesByClientMap.get(client.id) || 0}
+                integrity={clientIntegrityMap.get(client.id) || 0}
+                statusInfo={STATUS_CONFIG[client.status || 'active']}
+                isSyncing={isSyncing === client.id}
+                onSync={handleSyncClient}
+                onDetails={(c) => { setSelectedClientForDetails(c); setIsDetailsOpen(true); }}
+                onEdit={(c) => { setEditingClient(c); setIsSheetOpen(true); }}
+                onDelete={setClientToDelete}
+                onDeactivate={setClientToDeactivate}
+              />
+            ))}
+          </div>
+        ) : (
+          <Card className="bg-[#0f172a] border-white/5 overflow-hidden shadow-2xl">
+            <Table>
+              <TableHeader className="bg-black/40">
+                <TableRow className="border-white/5 hover:bg-transparent">
+                  <TableHead className="text-[10px] font-black uppercase text-slate-500 tracking-widest px-6 h-12">Cliente</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase text-slate-500 tracking-widest h-12">Status / Tipo</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase text-slate-500 tracking-widest h-12">Documento</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase text-slate-500 tracking-widest h-12">Contatos</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase text-slate-500 tracking-widest h-12">Processos</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase text-slate-500 tracking-widest h-12">Integridade</TableHead>
+                  <TableHead className="text-right h-12 px-6"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {paginatedClients.map((client) => {
+                  const statusInfo = STATUS_CONFIG[client.status || 'active'];
+                  const integrity = clientIntegrityMap.get(client.id) || 0;
+                  return (
+                    <TableRow key={client.id} className="border-white/5 hover:bg-white/5 group transition-colors">
+                      <TableCell className="px-6 py-4">
+                        <div className="flex flex-col">
+                          <span className="font-bold text-white group-hover:text-primary transition-colors cursor-pointer" onClick={() => { setSelectedClientForDetails(client); setIsDetailsOpen(true); }}>
+                            {`${client.firstName} ${client.lastName}`}
+                          </span>
+                          <span className="text-[10px] text-slate-500 uppercase font-black tracking-tighter mt-0.5">Ref: {client.id.substring(0, 8)}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className={cn("text-[8px] font-black uppercase px-2 h-5 border-none", statusInfo.color)}>{statusInfo.label}</Badge>
+                          <span className="text-[9px] text-slate-500 font-bold uppercase">{client.clientType || 'PF'}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-mono text-[10px] text-slate-400">
+                        {client.document || '---'}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1.5">
+                           {client.mobile && (
+                             <a href={`https://wa.me/${client.mobile.replace(/\D/g, '')}`} target="_blank" title={client.mobile} className="h-7 w-7 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400 hover:bg-emerald-500/20 transition-all">
+                               <MessageSquare className="h-3.5 w-3.5" />
+                             </a>
+                           )}
+                           {client.email && (
+                             <a href={`mailto:${client.email}`} title={client.email} className="h-7 w-7 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-400 hover:bg-blue-500/20 transition-all">
+                               <Mail className="h-3.5 w-3.5" />
+                             </a>
+                           )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-black text-white text-sm">
+                        {processesByClientMap.get(client.id) || 0}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-1.5 w-24">
+                          <div className="flex justify-between items-center bg-black/40 px-1.5 py-0.5 rounded text-[8px] font-black text-slate-500 uppercase">
+                            <span>Ficha</span>
+                            <span className={cn(integrity < 50 ? "text-rose-400" : integrity < 80 ? "text-amber-400" : "text-emerald-400")}>{integrity}%</span>
+                          </div>
+                          <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
+                            <div className={cn("h-full transition-all duration-1000", integrity < 50 ? "bg-rose-500" : integrity < 80 ? "bg-amber-500" : "bg-emerald-500")} style={{ width: `${integrity}%` }} />
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right px-6">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button size="icon" variant="ghost" className="h-8 w-8 text-white/20 hover:text-white rounded-full"><MoreVertical className="h-4 w-4" /></Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="bg-[#0f172a] border-white/10 shadow-2xl">
+                              <DropdownMenuItem onClick={() => { setSelectedClientForDetails(client); setIsDetailsOpen(true); }} className="font-bold"><UserCheck className="mr-2 h-4 w-4" /> Ver Ficha</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => { setEditingClient(client); setIsSheetOpen(true); }}><Edit className="mr-2 h-4 w-4" /> Editar</DropdownMenuItem>
+                              <DropdownMenuSeparator className="bg-white/5" />
+                              <DropdownMenuItem onClick={() => setClientToDeactivate(client)} className="text-amber-400"><UserMinus className="mr-2 h-4 w-4" /> Arquivar</DropdownMenuItem>
+                              <DropdownMenuItem className="text-rose-500 font-bold" onClick={() => setClientToDelete(client)}><Trash2 className="mr-2 h-4 w-4" /> Excluir</DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </Card>
+        )
       ) : (
         <div className="flex flex-1 items-center justify-center rounded-3xl border-2 border-dashed border-white/5 bg-black/20 py-20 text-center text-slate-500 italic">Nenhum cliente localizado.</div>
       )}
@@ -282,7 +387,16 @@ export default function ClientsPage() {
         </SheetContent>
       </Sheet>
 
-      <ClientDetailsSheet client={selectedClientForDetails} open={isDetailsOpen} onOpenChange={setIsDetailsOpen} />
+      <ClientDetailsSheet 
+        client={selectedClientForDetails} 
+        open={isDetailsOpen} 
+        onOpenChange={setIsDetailsOpen} 
+        onEdit={(c) => {
+          setIsDetailsOpen(false);
+          setEditingClient(c);
+          setIsSheetOpen(true);
+        }}
+      />
     </div>
   );
 }
