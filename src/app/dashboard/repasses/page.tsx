@@ -51,7 +51,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
 import { H1 } from '@/components/ui/typography';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { processRepasse, launchPayroll, deleteStaffCredit, updateStaffCredit, addManualStaffCredit, updateCreditForecast, requestCreditUnlock } from '@/lib/finance-actions';
+import { processRepasse, launchPayroll, deleteStaffCredit, updateStaffCredit, addManualStaffCredit, updateCreditForecast, requestCreditUnlock, updateFinancialTitleStatus } from '@/lib/finance-actions';
 import {
   Dialog,
   DialogContent,
@@ -90,7 +90,7 @@ const roleLabels: Record<string, string> = {
   lawyer: 'Advogado',
   intern: 'Estagiário',
   employee: 'Administrativo',
-  provider: 'Prestador / Fornecedor',
+  provider: 'Correspondente',
   partner: 'Sócio',
 };
 
@@ -114,7 +114,6 @@ function RepasseValue({ staffId }: { staffId: string }) {
     {val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
   </span>;
 }
-
 function OfficeWalletView() {
   const { firestore } = useFirebase();
   
@@ -126,119 +125,121 @@ function OfficeWalletView() {
     limit(100)
   ) : null), [firestore]);
 
-  const payoutsQuery = useMemoFirebase(() => (firestore ? query(
+  const allExitsQuery = useMemoFirebase(() => (firestore ? query(
     collection(firestore, 'financial_titles'),
-    where('origin', '==', 'HONORARIOS_PAGOS'),
-    where('status', '==', 'PAGO'),
-    limit(100)
+    where('origin', 'in', ['HONORARIOS_PAGOS', 'REPASSE_CLIENTE']),
+    orderBy('paymentDate', 'desc'),
+    limit(200)
   ) : null), [firestore]);
 
   const { data: titles, isLoading: isLoadingTitles } = useCollection<FinancialTitle>(titlesQuery);
-  const { data: payouts, isLoading: isLoadingPayouts } = useCollection<FinancialTitle>(payoutsQuery);
+  const { data: exits, isLoading: isLoadingExits } = useCollection<FinancialTitle>(allExitsQuery);
 
   const stats = React.useMemo(() => {
-    if (!titles) return { grossHonorarios: 0, totalPayouts: 0, netBalance: 0 };
-    
-    const grossHonorarios = titles.reduce((acc, t) => acc + (t.value * 0.3), 0);
-    const totalPayouts = payouts?.reduce((acc, p) => acc + p.value, 0) || 0;
+    const grossEntry = titles?.reduce((acc, t) => acc + t.value, 0) || 0;
+    const clientExits = exits?.filter(e => e.origin === 'REPASSE_CLIENTE').reduce((acc, e) => acc + e.value, 0) || 0;
+    const staffExits = exits?.filter(e => e.origin === 'HONORARIOS_PAGOS').reduce((acc, e) => acc + e.value, 0) || 0;
     
     return {
-      grossHonorarios,
-      totalPayouts,
-      netBalance: grossHonorarios - totalPayouts
+      grossEntry,
+      clientExits,
+      staffExits,
+      netOffice: grossEntry - clientExits - staffExits
     };
-  }, [titles, payouts]);
+  }, [titles, exits]);
 
-  if (isLoadingTitles || isLoadingPayouts) {
+  if (isLoadingTitles || isLoadingExits) {
     return <div className="flex flex-col items-center justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
   }
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card className="bg-emerald-500/5 border-emerald-500/20">
-          <CardHeader className="p-4 pb-2">
-            <CardTitle className="text-[10px] font-black uppercase text-emerald-400 tracking-widest flex items-center gap-2">
-              <ArrowUpRight className="h-3 w-3" /> Honorários Retidos (Banca)
-            </CardTitle>
-          </CardHeader>
+          <CardHeader className="p-4 pb-1"><CardTitle className="text-[9px] font-black uppercase text-emerald-400 tracking-widest">Total Recebido Bruto</CardTitle></CardHeader>
           <CardContent className="p-4 pt-0">
-            <p className="text-3xl font-black text-white tabular-nums">
-              {stats.grossHonorarios.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-            </p>
-            <p className="text-[9px] text-emerald-500/60 font-bold uppercase mt-1">30% sobre receitas liquidadas</p>
+            <p className="text-2xl font-black text-white">{stats.grossEntry.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+            <p className="text-[8px] text-emerald-500/60 font-bold uppercase mt-1">Entradas processadas 100%</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-rose-500/5 border-rose-500/20">
-          <CardHeader className="p-4 pb-2">
-            <CardTitle className="text-[10px] font-black uppercase text-rose-400 tracking-widest flex items-center gap-2">
-              <ArrowDownRight className="h-3 w-3" /> Comissões & Repasses Pagos
-            </CardTitle>
-          </CardHeader>
+        <Card className="bg-blue-500/5 border-blue-500/20">
+          <CardHeader className="p-4 pb-1"><CardTitle className="text-[9px] font-black uppercase text-blue-400 tracking-widest">Repasses a Clientes</CardTitle></CardHeader>
           <CardContent className="p-4 pt-0">
-            <p className="text-3xl font-black text-white tabular-nums">
-              {stats.totalPayouts.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-            </p>
-            <p className="text-[9px] text-rose-500/60 font-bold uppercase mt-1">Saídas para equipe/sócios</p>
+            <p className="text-2xl font-black text-white">{stats.clientExits.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+            <p className="text-[8px] text-blue-500/60 font-bold uppercase mt-1">Saídas liquidadas (70%)</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-primary/5 border-primary/20 border-2 shadow-[0_0_30px_rgba(245,208,48,0.05)]">
-          <CardHeader className="p-4 pb-2">
-            <CardTitle className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-2">
-              <Scale className="h-3 w-3" /> Lucro Líquido em Caixa
-            </CardTitle>
-          </CardHeader>
+        <Card className="bg-purple-500/5 border-purple-500/20">
+          <CardHeader className="p-4 pb-1"><CardTitle className="text-[9px] font-black uppercase text-purple-400 tracking-widest">Repasses à Equipe</CardTitle></CardHeader>
           <CardContent className="p-4 pt-0">
-            <p className="text-3xl font-black text-primary tabular-nums">
-              {stats.netBalance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-            </p>
-            <p className="text-[9px] text-primary/60 font-bold uppercase mt-1">Disponibilidade real da banca</p>
+            <p className="text-2xl font-black text-white">{stats.staffExits.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+            <p className="text-[8px] text-purple-500/60 font-bold uppercase mt-1">Comissões e Pró-labore</p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-primary/5 border-primary/20 border-2">
+          <CardHeader className="p-4 pb-1"><CardTitle className="text-[9px] font-black uppercase text-primary tracking-widest">Saldo Líquido Banca</CardTitle></CardHeader>
+          <CardContent className="p-4 pt-0">
+            <p className="text-2xl font-black text-primary">{stats.netOffice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+            <p className="text-[8px] text-primary/60 font-bold uppercase mt-1">Lucratividade real retida</p>
           </CardContent>
         </Card>
       </div>
 
-      <Card className="bg-[#0f172a] border-white/5 overflow-hidden">
-        <CardHeader className="bg-white/5 border-b border-white/5 flex flex-row items-center justify-between">
-          <div>
-            <CardTitle className="text-lg font-headline text-white">Extrato de Ganhos Institucionais</CardTitle>
-            <CardDescription className="text-slate-400">Detalhamento dos 30% retidos pela banca em cada operação.</CardDescription>
+      <Card className="bg-[#0f172a] border-white/5 overflow-hidden shadow-2xl">
+        <CardHeader className="bg-white/5 border-b border-white/5 flex flex-row items-center justify-between py-4 px-6 text-sm">
+          <div className="flex items-center gap-3">
+             <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center"><Building className="h-4 w-4 text-primary" /></div>
+             <div>
+                <CardTitle className="text-base font-black text-white uppercase tracking-tight">Extrato Consolidado da Banca</CardTitle>
+                <CardDescription className="text-[10px] text-slate-500 uppercase font-bold">Fluxo completo de entradas e saídas operacionais</CardDescription>
+             </div>
           </div>
-          <Button variant="outline" size="sm" className="h-8 border-white/10 text-white" onClick={() => window.print()}><Printer className="h-3.5 w-3.5 mr-2" /> Imprimir</Button>
+          <Button variant="outline" size="sm" className="h-8 border-white/10 text-[10px] uppercase font-black" onClick={() => window.print()}><Printer className="h-3.5 w-3.5 mr-2" /> Exportar</Button>
         </CardHeader>
         <Table>
           <TableHeader className="bg-black/20">
-            <TableRow className="border-white/5">
-              <TableHead className="text-[10px] font-black uppercase text-slate-500 px-6">Data</TableHead>
-              <TableHead className="text-[10px] font-black uppercase text-slate-500">Origem / Cliente</TableHead>
-              <TableHead className="text-[10px] font-black uppercase text-slate-500 text-right">Valor Bruto</TableHead>
-              <TableHead className="text-[10px] font-black uppercase text-primary text-right px-6">Cota Bueno Gois (30%)</TableHead>
+            <TableRow className="border-white/5 uppercase">
+              <TableHead className="text-[9px] font-black text-slate-500 px-6 py-4">Data</TableHead>
+              <TableHead className="text-[9px] font-black text-slate-500 py-4">Operação / Referência</TableHead>
+              <TableHead className="text-[9px] font-black text-slate-500 text-right py-4">Fluxo Wallet</TableHead>
+              <TableHead className="text-[9px] font-black text-slate-500 text-right px-6 py-4">Valor (R$)</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {titles?.map(t => (
-              <TableRow key={t.id} className="border-white/5 hover:bg-white/5 transition-colors">
-                <TableCell className="px-6 text-xs text-slate-400">
-                  {t.paymentDate ? format(t.paymentDate.toDate(), 'dd/MM/yy') : '---'}
+            {[...(titles || []), ...(exits || [])].sort((a, b) => {
+                const dateA = a.paymentDate || a.dueDate;
+                const dateB = b.paymentDate || b.dueDate;
+                return (dateB?.toDate()?.getTime() || 0) - (dateA?.toDate()?.getTime() || 0);
+            }).slice(0, 50).map(t => (
+              <TableRow key={t.id} className="border-white/5 hover:bg-white/5 transition-colors group">
+                <TableCell className="px-6 text-[10px] text-slate-500 font-mono">
+                  {t.paymentDate ? format(t.paymentDate.toDate(), 'dd/MM/yyyy HH:mm') : t.dueDate ? format(t.dueDate.toDate(), 'dd/MM/yyyy') : '---'}
                 </TableCell>
                 <TableCell>
                   <div className="flex flex-col">
-                    <span className="text-sm font-bold text-slate-200">{t.description}</span>
-                    <span className="text-[9px] text-slate-500 uppercase font-black">{t.origin}</span>
+                    <span className="text-xs font-bold text-slate-200">{t.description}</span>
+                    <span className="text-[8px] text-slate-500 uppercase font-black mt-0.5 tracking-tighter">{t.origin}</span>
                   </div>
                 </TableCell>
-                <TableCell className="text-right font-mono text-xs text-slate-400">
-                  {t.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                <TableCell className="text-right">
+                    <Badge className={cn(
+                        "text-[8px] font-black uppercase border-none",
+                        t.type === 'RECEITA' ? "bg-emerald-500/20 text-emerald-400" : "bg-rose-500/20 text-rose-400"
+                    )}>
+                        {t.type === 'RECEITA' ? '+ ENTRADA' : '- SAÍDA'}
+                    </Badge>
                 </TableCell>
-                <TableCell className="text-right px-6 font-black text-primary text-sm tabular-nums">
-                  {(t.value * 0.3).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                <TableCell className={cn(
+                    "text-right px-6 font-black text-sm tabular-nums",
+                    t.type === 'RECEITA' ? "text-emerald-400" : "text-rose-400"
+                )}>
+                  {t.type === 'RECEITA' ? '+' : '-'} {t.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                 </TableCell>
               </TableRow>
             ))}
-            {titles?.length === 0 && (
-              <TableRow><TableCell colSpan={4} className="h-40 text-center text-slate-500 italic">Sem receitas liquidadas no período.</TableCell></TableRow>
-            )}
           </TableBody>
         </Table>
       </Card>
@@ -620,22 +621,22 @@ function ManageCreditsDialog({ staff, open, onOpenChange, onUpdate, isAdmin }: {
   );
 }
 
-function LawyerWalletView({ staffId, staffName }: { staffId: string; staffName: string }) {
+function StaffWalletView({ staffId, staffName }: { staffId: string; staffName: string }) {
   const { firestore } = useFirebase();
   const { toast } = useToast();
-  const [filter, setFilter] = React.useState<'ALL' | 'DISPONIVEL' | 'RETIDO'>('ALL');
+  const [filter, setFilter] = React.useState<'ALL' | 'DISPONIVEL' | 'RETIDO' | 'PAGO'>('ALL');
   const [isRequesting, setIsRequesting] = React.useState<string | null>(null);
 
   const creditsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
-    return query(collection(firestore, `staff/${staffId}/credits`), orderBy('date', 'desc'), limit(100));
+    return query(collection(firestore, `staff/${staffId}/credits`), orderBy('date', 'desc'), limit(150));
   }, [firestore, staffId]);
 
   const { data: credits, isLoading } = useCollection<StaffCredit>(creditsQuery);
 
   const filteredCredits = React.useMemo(() => {
     if (!credits) return [];
-    if (filter === 'ALL') return credits.filter(c => c.status !== 'PAGO');
+    if (filter === 'ALL') return credits;
     return credits.filter(c => c.status === filter);
   }, [credits, filter]);
 
@@ -655,47 +656,68 @@ function LawyerWalletView({ staffId, staffName }: { staffId: string; staffName: 
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
-          <Button variant={filter === 'ALL' ? 'default' : 'ghost'} size="sm" onClick={() => setFilter('ALL')} className="text-[10px] uppercase font-black h-8">Carteira Pendente</Button>
-          <Button variant={filter === 'DISPONIVEL' ? 'default' : 'ghost'} size="sm" onClick={() => setFilter('DISPONIVEL')} className="text-[10px] uppercase font-black h-8 text-emerald-400">Liberados</Button>
-          <Button variant={filter === 'RETIDO' ? 'default' : 'ghost'} size="sm" onClick={() => setFilter('RETIDO')} className="text-[10px] uppercase font-black h-8 text-blue-400">Aguardando Cliente</Button>
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-2">
+          <Button variant={filter === 'ALL' ? 'default' : 'ghost'} size="sm" onClick={() => setFilter('ALL')} className="text-[10px] uppercase font-black h-8 shrink-0">Extrato Completo</Button>
+          <Button variant={filter === 'DISPONIVEL' ? 'default' : 'ghost'} size="sm" onClick={() => setFilter('DISPONIVEL')} className="text-[10px] uppercase font-black h-8 text-emerald-400 shrink-0">Saldos Liberados</Button>
+          <Button variant={filter === 'RETIDO' ? 'default' : 'ghost'} size="sm" onClick={() => setFilter('RETIDO')} className="text-[10px] uppercase font-black h-8 text-blue-400 shrink-0">Aguardando Cliente</Button>
+          <Button variant={filter === 'PAGO' ? 'default' : 'ghost'} size="sm" onClick={() => setFilter('PAGO')} className="text-[10px] uppercase font-black h-8 text-slate-400 shrink-0">Histórico de Resgates</Button>
         </div>
       </div>
 
-      <Card className="bg-[#0f172a] border-white/5 overflow-hidden">
-        <ScrollArea className="h-[60vh]">
+      <Card className="bg-[#0f172a] border-white/5 overflow-hidden shadow-2xl">
+        <ScrollArea className="h-[65vh]">
           <div className="p-6">
             {isLoading ? (
               <div className="space-y-4">
-                {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-20 w-full bg-white/5 rounded-xl" />)}
+                {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-24 w-full bg-white/5 rounded-2xl" />)}
               </div>
             ) : filteredCredits.length > 0 ? (
               <div className="space-y-3">
                 {filteredCredits.map(c => (
-                  <div key={c.id} className="flex items-center justify-between p-5 rounded-2xl bg-white/5 border border-white/5 hover:border-primary/20 transition-all group">
+                  <div key={c.id} className={cn(
+                    "flex flex-col md:flex-row md:items-center justify-between p-5 rounded-2xl border transition-all group gap-4",
+                    c.status === 'PAGO' ? "bg-white/[0.02] border-white/5 opacity-60" : "bg-white/5 border-white/5 hover:border-primary/20"
+                  )}>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1.5">
+                      <div className="flex flex-wrap items-center gap-2 mb-1.5">
                         <Badge variant="outline" className={cn(
                           "text-[8px] font-black uppercase px-2 h-5 border-none",
-                          c.status === 'DISPONIVEL' ? "bg-emerald-500/20 text-emerald-400" : "bg-blue-500/20 text-blue-400"
-                        )}>{c.status}</Badge>
+                          c.status === 'DISPONIVEL' ? "bg-emerald-500/20 text-emerald-400" : 
+                          c.status === 'RETIDO' ? "bg-blue-500/20 text-blue-400" : 
+                          "bg-slate-500/20 text-slate-400"
+                        )}>{c.status === 'PAGO' ? 'LIQUIDADO' : c.status}</Badge>
                         <span className="text-[10px] text-muted-foreground font-bold tracking-widest">{c.date ? format(c.date.toDate(), 'dd/MM/yyyy') : 'N/A'}</span>
-                        {(c as any).unlockRequested && (
+                        
+                        {(c as any).unlockRequested && c.status === 'RETIDO' && (
                           <Badge variant="outline" className="text-[8px] font-black uppercase bg-amber-500/10 text-amber-400 border-amber-500/20 h-5">
                             🔒 Desbloqueio Solicitado
                           </Badge>
                         )}
-                        {c.paymentForecast && (
+                        
+                        {c.status === 'DISPONIVEL' && c.paymentForecast && (
                           <Badge variant="secondary" className="text-[8px] font-black uppercase bg-primary/10 text-primary border-primary/20 gap-1 h-5">
                             <Clock className="h-2.5 w-2.5" /> Pagamento Previsto: {format(c.paymentForecast.toDate(), 'dd/MM/yyyy')}
                           </Badge>
                         )}
+
+                        {c.status === 'PAGO' && c.paymentDate && (
+                          <Badge variant="outline" className="text-[8px] font-black uppercase bg-emerald-500/10 text-emerald-400 border-emerald-500/20 h-5">
+                            ✅ Pago em: {format(c.paymentDate.toDate(), 'dd/MM/yy')}
+                          </Badge>
+                        )}
                       </div>
                       <p className="text-sm font-bold text-white truncate">{c.description}</p>
-                      <p className="text-[9px] text-slate-500 uppercase font-black tracking-widest mt-1">{c.type}</p>
+                      <div className="flex items-center gap-3 mt-1">
+                        <p className="text-[9px] text-slate-500 uppercase font-black tracking-widest">{c.type}</p>
+                        {c.processId && <span className="text-[8px] text-slate-600 font-mono uppercase tracking-tighter">REF PROC: {c.processId.substring(0, 8)}</span>}
+                      </div>
                     </div>
-                    <div className="text-right ml-6 flex flex-col items-end gap-2">
-                      <span className="text-lg font-black text-white tabular-nums">{c.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                    <div className="text-right flex flex-col items-end gap-2">
+                      <span className={cn(
+                        "text-lg font-black tabular-nums",
+                        c.status === 'PAGO' ? "text-slate-500" : "text-white"
+                      )}>{c.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                      
                       {c.status === 'RETIDO' && !(c as any).unlockRequested && (
                         <Button 
                           variant="ghost" 
@@ -713,9 +735,12 @@ function LawyerWalletView({ staffId, staffName }: { staffId: string; staffName: 
                 ))}
               </div>
             ) : (
-              <div className="text-center py-20 opacity-30 flex flex-col items-center">
-                <FileText className="h-12 w-12 mb-4" />
-                <p className="text-sm font-black uppercase tracking-widest">Nenhum lançamento pendente encontrado</p>
+              <div className="text-center py-24 opacity-30 flex flex-col items-center">
+                <div className="h-16 w-16 rounded-full bg-white/5 flex items-center justify-center mb-4">
+                    <FileText className="h-8 w-8" />
+                </div>
+                <p className="text-sm font-black uppercase tracking-[0.2em]">Nenhum lançamento no extrato</p>
+                <p className="text-[10px] font-bold text-slate-500 mt-2 uppercase">Sua carteira está aguardando novos lançamentos automáticos.</p>
               </div>
             )}
           </div>
@@ -725,13 +750,84 @@ function LawyerWalletView({ staffId, staffName }: { staffId: string; staffName: 
   );
 }
 
+function ClientPayoutList() {
+  const { firestore } = useFirebase();
+  const { toast } = useToast();
+  const [isProcessing, setIsProcessing] = React.useState<string | null>(null);
+
+  const q = useMemoFirebase(() => (firestore ? query(
+    collection(firestore, 'financial_titles'),
+    where('origin', '==', 'REPASSE_CLIENTE'),
+    where('status', '==', 'PENDENTE'),
+    orderBy('dueDate', 'asc')
+  ) : null), [firestore]);
+
+  const { data: titles, isLoading } = useCollection<FinancialTitle>(q);
+
+  const handlePay = async (id: string) => {
+    setIsProcessing(id);
+    try {
+      await updateFinancialTitleStatus(id, 'PAGO');
+      toast({ title: 'Repasse ao Cliente Realizado!' });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Erro', description: e.message });
+    } finally {
+      setIsProcessing(null);
+    }
+  };
+
+  if (isLoading) return <div className="p-20 flex justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
+
+  return (
+    <Card className="bg-[#0f172a] border-white/5 overflow-hidden shadow-2xl">
+      <Table>
+        <TableHeader className="bg-white/5"><TableRow className="border-white/5 shadow-none"><TableHead className="text-muted-foreground px-6 py-4 uppercase text-[10px] font-black tracking-widest">Vencimento</TableHead><TableHead className="text-muted-foreground py-4 uppercase text-[10px] font-black tracking-widest">Descrição / Caso</TableHead><TableHead className="text-right text-muted-foreground py-4 uppercase text-[10px] font-black tracking-widest">Valor a Pagar (70%)</TableHead><TableHead className="text-right text-muted-foreground px-6 py-4 uppercase text-[10px] font-black tracking-widest">Ações</TableHead></TableRow></TableHeader>
+        <TableBody>
+          {titles?.map(t => (
+            <TableRow key={t.id} className="border-white/5 hover:bg-white/5 transition-all">
+              <TableCell className="text-xs text-slate-400 px-6 font-mono">{t.dueDate ? format(t.dueDate.toDate(), 'dd/MM/yyyy') : '---'}</TableCell>
+              <TableCell>
+                <div className="flex flex-col py-2">
+                  <span className="font-bold text-white text-sm">{t.description}</span>
+                  <span className="text-[9px] text-muted-foreground uppercase font-black mt-1">Ref ID: {t.id}</span>
+                </div>
+              </TableCell>
+              <TableCell className="text-right font-black text-blue-400 text-lg tabular-nums">
+                {t.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+              </TableCell>
+              <TableCell className="text-right px-6">
+                <Button 
+                    className="bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[10px] uppercase h-9 px-6 rounded-full shadow-lg shadow-emerald-900/20"
+                    onClick={() => handlePay(t.id)}
+                    disabled={isProcessing === t.id}
+                >
+                    {isProcessing === t.id ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Check className="h-3 w-3 mr-1" />}
+                    Confirmar Saída
+                </Button>
+              </TableCell>
+            </TableRow>
+          ))}
+          {titles?.length === 0 && (
+            <TableRow><TableCell colSpan={4} className="h-60 text-center text-slate-500 italic">
+                <div className="flex flex-col items-center justify-center gap-4 py-10 opacity-40">
+                    <ShieldCheck className="h-12 w-12" />
+                    <p className="text-sm font-black uppercase tracking-tighter">Nenhum repasse de cliente pendente no sistema.</p>
+                </div>
+            </TableCell></TableRow>
+          )}
+        </TableBody>
+      </Table>
+    </Card>
+  );
+}
+
 export default function RepassesPage() {
   const { firestore, user } = useFirebase();
   const { data: session } = useSession();
   const { toast } = useToast();
   
   const [isLaunching, setIsLaunching] = React.useState(false);
-  const [stats, setStats] = React.useState({ totalPending: 0, totalPaidMonth: 0, staffCount: 0, totalRetained: 0 });
+  const [stats, setStats] = React.useState({ totalPending: 0, totalPaidMonth: 0, staffCount: 0, totalRetained: 0, clientDebt: 0 });
   const [refreshKey, setRefreshKey] = React.useState(0);
   const [isVoucherOpen, setIsVoucherOpen] = React.useState(false);
   const [voucherData, setVoucherData] = React.useState<{ staff: Staff | null, credits: any[], total: number, date?: Date }>({ staff: null, credits: [], total: 0 });
@@ -762,7 +858,11 @@ export default function RepassesPage() {
         const startOfCurrentMonth = startOfMonth(new Date());
         const paidSnap = await getDocs(query(collection(firestore, 'financial_titles'), where('origin', '==', 'HONORARIOS_PAGOS'), where('paymentDate', '>=', Timestamp.fromDate(startOfCurrentMonth))));
         const paid = paidSnap.docs.reduce((sum, d) => sum + (d.data().value || 0), 0);
-        setStats({ totalPending: pending, totalPaidMonth: paid, staffCount: staffSnap.size, totalRetained: retained });
+
+        const clientSnap = await getDocs(query(collection(firestore, 'financial_titles'), where('origin', '==', 'REPASSE_CLIENTE'), where('status', '==', 'PENDENTE')));
+        const clientDebt = clientSnap.docs.reduce((sum, d) => sum + (d.data().value || 0), 0);
+
+        setStats({ totalPending: pending, totalPaidMonth: paid, staffCount: staffSnap.size, totalRetained: retained, clientDebt });
       } else if (isLawyer) {
         const credSnap = await getDocs(collection(firestore, `staff/${userProfile.id}/credits`));
         let pending = 0; let retained = 0; let paid = 0;
@@ -778,7 +878,7 @@ export default function RepassesPage() {
             if (pDate && pDate >= startOfCurrentMonth) paid += val;
           }
         });
-        setStats({ totalPending: pending, totalPaidMonth: paid, staffCount: 1, totalRetained: retained });
+        setStats({ totalPending: pending, totalPaidMonth: paid, staffCount: 1, totalRetained: retained, clientDebt: 0 });
       }
     } catch (e) { console.warn('[RepassesStats] Failed to load full stats.'); }
   }, [firestore, isAdmin, isLawyer, userProfile]);
@@ -814,8 +914,8 @@ export default function RepassesPage() {
     <div className="flex flex-col gap-8 pb-10">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <H1 className="text-white">{isAdmin ? 'Gestão de Carteiras & Repasses' : 'Minha Carteira Profissional'}</H1>
-          <p className="text-sm text-muted-foreground">{isAdmin ? 'Auditoria de saldos vinculados e controle de honorários da banca.' : 'Consulte seus honorários liberados, reembolsos e histórico de liquidações.'}</p>
+          <H1 className="text-white">{isAdmin ? 'Hub de Wallets & Liquidações' : 'Minha Wallet Digital'}</H1>
+          <p className="text-sm text-slate-400 font-medium">{isAdmin ? 'Gestão centralizada de carteiras profissionais, repasses institucionais e fluxo de caixa.' : 'Consulte seu extrato de honorários, saldos liberados e histórico de liquidações.'}</p>
         </div>
         <div className="flex items-center gap-2">
           {isAdmin && (
@@ -827,22 +927,24 @@ export default function RepassesPage() {
       
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="bg-emerald-500/5 border-emerald-500/20"><CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-emerald-400 tracking-widest">{isAdmin ? 'Total Liquidado (Mês)' : 'Seu Recebido (Mês)'}</CardTitle></CardHeader><CardContent className="p-4 pt-0"><p className="text-2xl font-black text-white">{stats.totalPaidMonth.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p></CardContent></Card>
-        <Card className="bg-amber-500/5 border-amber-500/20"><CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-amber-400 tracking-widest">{isAdmin ? 'Saldos Liberados (Banca)' : 'Seu Saldo Liberado'}</CardTitle></CardHeader><CardContent className="p-4 pt-0"><p className="text-2xl font-black text-white">{stats.totalPending.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p></CardContent></Card>
-        <Card className="bg-blue-500/5 border-blue-500/20"><CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-blue-400 tracking-widest">{isAdmin ? 'Honorários Retidos (Futuro)' : 'Honorários Retidos'}</CardTitle></CardHeader><CardContent className="p-4 pt-0"><p className="text-2xl font-black text-white">{stats.totalRetained.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p></CardContent></Card>
-        <Card className="bg-white/5 border-white/10"><CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Ativos p/ Liquidação</CardTitle></CardHeader><CardContent className="p-4 pt-0"><p className="text-2xl font-black text-white">{isAdmin ? stats.staffCount : '1'}</p></CardContent></Card>
+        <Card className="bg-amber-500/5 border-amber-500/20"><CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-amber-400 tracking-widest">{isAdmin ? 'Saldos Liberados (Equipe)' : 'Seu Saldo Liberado'}</CardTitle></CardHeader><CardContent className="p-4 pt-0"><p className="text-2xl font-black text-white">{stats.totalPending.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p></CardContent></Card>
+        <Card className="bg-blue-500/5 border-blue-500/20"><CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-blue-400 tracking-widest">{isAdmin ? 'A Repassar (Clientes)' : 'Honorários Retidos'}</CardTitle></CardHeader><CardContent className="p-4 pt-0"><p className="text-2xl font-black text-white">{(isAdmin ? stats.clientDebt : stats.totalRetained).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p></CardContent></Card>
+        <Card className="bg-white/5 border-white/10"><CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{isAdmin ? 'Ativos p/ Liquidação' : 'Créditos Bloqueados'}</CardTitle></CardHeader><CardContent className="p-4 pt-0"><p className="text-2xl font-black text-white">{isAdmin ? stats.staffCount : stats.totalRetained.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p></CardContent></Card>
       </div>
 
       {isAdmin ? (
         <Tabs defaultValue="lawyers" className="w-full">
           <TabsList className="bg-[#0f172a] p-1 border border-white/5 mb-8 h-12 flex overflow-x-auto no-scrollbar justify-start gap-1">
-            <TabsTrigger value="lawyers" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold px-6 h-10 shrink-0"><Briefcase className="h-4 w-4" /> Advogados</TabsTrigger>
-            <TabsTrigger value="staff" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold px-6 h-10 shrink-0"><Users className="h-4 w-4" /> Colaboradores</TabsTrigger>
-            <TabsTrigger value="providers" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold px-6 h-10 shrink-0"><ShieldCheck className="h-4 w-4" /> Provedores</TabsTrigger>
-            <TabsTrigger value="banca" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold px-6 h-10 shrink-0 border-l border-white/10 ml-2"><Building className="h-4 w-4 text-emerald-400" /> Banca (Bueno Gois)</TabsTrigger>
-            <TabsTrigger value="history" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold px-6 h-10 shrink-0"><History className="h-4 w-4" /> Histórico Geral</TabsTrigger>
+            <TabsTrigger value="lawyers" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-black uppercase text-[10px] px-6 h-10 shrink-0"><Briefcase className="h-4 w-4" /> Advogados</TabsTrigger>
+            <TabsTrigger value="staff" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-black uppercase text-[10px] px-6 h-10 shrink-0"><Users className="h-4 w-4" /> Colaboradores</TabsTrigger>
+            <TabsTrigger value="clients" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-black uppercase text-[10px] px-6 h-10 shrink-0"><Users className="h-4 w-4 text-blue-400" /> Clientes</TabsTrigger>
+            <TabsTrigger value="providers" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-black uppercase text-[10px] px-6 h-10 shrink-0"><ShieldCheck className="h-4 w-4" /> Correspondentes</TabsTrigger>
+            <TabsTrigger value="banca" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-black uppercase text-[10px] px-6 h-10 shrink-0 border-l border-white/10 ml-2"><Building className="h-4 w-4 text-emerald-400" /> Banca (Wallet Institucional)</TabsTrigger>
+            <TabsTrigger value="history" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-black uppercase text-[10px] px-6 h-10 shrink-0"><History className="h-4 w-4" /> Log de Transações</TabsTrigger>
           </TabsList>
           <TabsContent value="lawyers" className="mt-0 animate-in fade-in duration-300"><PayoutList filterRole="lawyer" onRefresh={() => setRefreshKey(k => k + 1)} onPaid={handleRepassePaid} isAdmin={isAdmin} /></TabsContent>
           <TabsContent value="staff" className="mt-0 animate-in fade-in duration-300"><PayoutList filterRole="employee" onRefresh={() => setRefreshKey(k => k + 1)} onPaid={handleRepassePaid} isAdmin={isAdmin} /></TabsContent>
+          <TabsContent value="clients" className="mt-0 animate-in fade-in duration-300"><ClientPayoutList /></TabsContent>
           <TabsContent value="providers" className="mt-0 animate-in fade-in duration-300"><PayoutList filterRole="provider" onRefresh={() => setRefreshKey(k => k + 1)} onPaid={handleRepassePaid} isAdmin={isAdmin} /></TabsContent>
           <TabsContent value="banca" className="mt-0 animate-in fade-in duration-300"><OfficeWalletView /></TabsContent>
           <TabsContent value="history" className="mt-0 animate-in fade-in duration-300"><PaymentHistory onShowVoucher={handleShowVoucherFromHistory} /></TabsContent>
@@ -850,11 +952,11 @@ export default function RepassesPage() {
       ) : isLawyer ? (
         <Tabs defaultValue="wallet" className="w-full">
           <TabsList className="grid w-full grid-cols-2 bg-[#0f172a] border border-white/5 p-1 h-12">
-            <TabsTrigger value="wallet" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold h-10"><Wallet className="h-4 w-4" /> Meus Créditos Pendentes</TabsTrigger>
-            <TabsTrigger value="history" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold h-10"><History className="h-4 w-4" /> Meu Histórico de Recebimento</TabsTrigger>
+            <TabsTrigger value="wallet" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-black uppercase text-[10px] h-10 tracking-widest"><Wallet className="h-4 w-4" /> Minha Wallet Profissional</TabsTrigger>
+            <TabsTrigger value="history" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-black uppercase text-[10px] h-10 tracking-widest"><History className="h-4 w-4" /> Histórico de Recebimentos</TabsTrigger>
           </TabsList>
           <TabsContent value="wallet" className="mt-6">
-            <LawyerWalletView staffId={userProfile.id} staffName={`${userProfile.firstName} ${userProfile.lastName}`} />
+            <StaffWalletView staffId={userProfile.id} staffName={`${userProfile.firstName} ${userProfile.lastName}`} />
           </TabsContent>
           <TabsContent value="history" className="mt-6">
             <PaymentHistory onShowVoucher={handleShowVoucherFromHistory} />

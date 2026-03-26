@@ -42,7 +42,21 @@ export async function createFinancialEventAndTitles(data: CreateEventData) {
 
   const batch = firestoreAdmin.batch();
   const eventRef = firestoreAdmin.collection('financial_events').doc();
-  batch.set(eventRef, { processId, type, eventDate: new Date(eventDate), description, totalValue });
+  
+  let lawyerPercentage = 30; // Default commission for the firm
+  let clientPercentage = 70; // Default payout for client
+
+  if (processData.leadLawyerId) {
+    const staffDoc = await firestoreAdmin.collection('staff').doc(processData.leadLawyerId).get();
+    const rem = (staffDoc.data() as Staff | undefined)?.remuneration;
+    if (rem?.lawyerPercentage) {
+      // If the lawyer gets X%, the firm gets 30% and the client gets 100 - X - 30?
+      // No, usually firm takes 30%, lawyer takes e.g. 5% of TOTAL or 15% of firm's cut.
+      // Let's assume lawyer's cut is distinct from the 30% firm takes if it's participation.
+    }
+  }
+
+  batch.set(eventRef, { processId, type, eventDate: new Date(eventDate), description, totalValue, lawyerPercentage, clientPercentage });
 
   const instVal = totalValue / (installments || 1);
   const origin = eventTypeToOriginMap[type];
@@ -59,6 +73,9 @@ export async function createFinancialEventAndTitles(data: CreateEventData) {
       value: instVal,
       dueDate: Timestamp.fromDate(addMonths(new Date(firstDueDate), i)),
       status: 'PENDENTE',
+      installmentIndex: i + 1,
+      totalInstallments: installments,
+      recurrenceId: eventRef.id
     });
   }
 
@@ -91,7 +108,7 @@ export async function createFinancialEventAndTitles(data: CreateEventData) {
   }
 }
 
-export async function updateFinancialTitleStatus(titleId: string, status: 'PAGO' | 'PENDENTE' | 'ATRASADO') {
+export async function updateFinancialTitleStatus(titleId: string, status: 'PAGO' | 'PENDENTE' | 'ATRASADO' | 'CANCELADO') {
     if (!firestoreAdmin) throw new Error("Servidor inacessível.");
     try {
         const titleRef = firestoreAdmin.collection('financial_titles').doc(titleId);
@@ -100,22 +117,63 @@ export async function updateFinancialTitleStatus(titleId: string, status: 'PAGO'
         if (!titleDoc.exists || !titleData) throw new Error('Título não encontrado.');
 
         const batch = firestoreAdmin.batch();
+        const now = FieldValue.serverTimestamp();
+
         batch.update(titleRef, { 
             status, 
-            paymentDate: status === 'PAGO' ? FieldValue.serverTimestamp() : FieldValue.delete(),
-            updatedAt: FieldValue.serverTimestamp()
+            paymentDate: status === 'PAGO' ? now : FieldValue.delete(),
+            updatedAt: now
         });
 
-        if (titleData.financialEventId) {
-            const staffSnap = await firestoreAdmin.collection('staff').get();
-            for (const s of staffSnap.docs) {
-                const creds = await s.ref.collection('credits')
-                    .where('financialEventId', '==', titleData.financialEventId)
-                    .get();
-                creds.docs.forEach(c => batch.update(c.ref, { 
-                    status: status === 'PAGO' ? 'DISPONIVEL' : 'RETIDO',
-                    unlockedAt: status === 'PAGO' ? FieldValue.serverTimestamp() : FieldValue.delete()
-                }));
+        // Integração Complexa: Acordos e Recebimentos
+        if (status === 'PAGO' && titleData.type === 'RECEITA' && ['ACORDO', 'SENTENCA', 'ALVARA', 'TRANSFERENCIAS_JUDICIAIS'].includes(titleData.origin)) {
+            
+            // 1. Desbloqueio de Créditos do Advogado (Carteira do Colaborador)
+            if (titleData.financialEventId) {
+                const staffSnap = await firestoreAdmin.collection('staff').get();
+                for (const s of staffSnap.docs) {
+                    const creds = await s.ref.collection('credits')
+                        .where('financialEventId', '==', titleData.financialEventId)
+                        .get();
+                    
+                    creds.docs.forEach(c => {
+                        const cData = c.data();
+                        // Se houver parcelas, talvez desbloquear apenas o proporcional? 
+                        // Por simplicidade, se o título da parcela X/Y for pago, desbloqueamos o crédito vinculado
+                        batch.update(c.ref, { 
+                            status: 'DISPONIVEL',
+                            unlockedAt: now,
+                            notes: `Desbloqueado pelo recebimento de "${titleData.description}"`
+                        });
+                    });
+                }
+
+                // 2. Lançamento Automático de Repasse ao Cliente (Fluxo de Saída)
+                // Se o recebimento foi de um acordo/sentença, o cliente ganha a parte dele (ex: 70%)
+                const eventDoc = await firestoreAdmin.collection('financial_events').doc(titleData.financialEventId).get();
+                if (eventDoc.exists) {
+                    const eventData = eventDoc.data() as FinancialEvent;
+                    const clientPercentage = eventData.clientPercentage || 70;
+                    const clientPayoutValue = (titleData.value * clientPercentage) / 100;
+
+                    if (clientPayoutValue > 0) {
+                        const payoutTitleRef = firestoreAdmin.collection('financial_titles').doc();
+                        batch.set(payoutTitleRef, {
+                            description: `Repasse p/ Cliente: ${titleData.description.replace('(Receita)', '(Saída)')}`,
+                            type: 'DESPESA',
+                            origin: 'REPASSE_CLIENTE',
+                            value: clientPayoutValue,
+                            dueDate: now, // Agendado para agora pois já recebemos o bruto
+                            status: 'PENDENTE',
+                            financialEventId: titleData.financialEventId,
+                            processId: titleData.processId || null,
+                            clientId: titleData.clientId || null,
+                            notes: `Provisionado automaticamente pelo recebimento da Parcela ID: ${titleId}`,
+                            createdAt: now,
+                            updatedAt: now
+                        });
+                    }
+                }
             }
         }
 
@@ -132,17 +190,102 @@ export async function updateFinancialTitle(id: string, data: any) {
   if (!firestoreAdmin) throw new Error("Servidor inacessível.");
   try {
     const titleRef = firestoreAdmin.collection('financial_titles').doc(id);
+    const { recurring, months = 1, ...baseData } = data;
     
-    const payload = { ...data };
-    if (data.dueDate) {
-      payload.dueDate = Timestamp.fromDate(new Date(data.dueDate));
+    const payload = { ...baseData };
+    if (baseData.dueDate) {
+      payload.dueDate = Timestamp.fromDate(new Date(baseData.dueDate));
+    }
+    if (baseData.competenceDate) {
+      payload.competenceDate = Timestamp.fromDate(new Date(baseData.competenceDate));
     }
 
-    await titleRef.update({
-      ...payload,
-      updatedAt: FieldValue.serverTimestamp()
+    // Se ligou recorrência agora e não tinha antes
+    if (recurring && months > 1 && !baseData.recurrenceId) {
+      const batch = firestoreAdmin.batch();
+      const recurrenceId = uuidv4();
+      
+      // Update the current one
+      batch.update(titleRef, {
+        ...payload,
+        recurrenceId,
+        installmentIndex: 1,
+        totalInstallments: months,
+        description: `${payload.description} (1/${months})`,
+        updatedAt: FieldValue.serverTimestamp()
+      });
+
+      // Create the rest
+      const initialDueDate = new Date(baseData.dueDate);
+      const initialCompetenceDate = baseData.competenceDate ? new Date(baseData.competenceDate) : null;
+
+      for (let i = 1; i < months; i++) {
+        const nextRef = firestoreAdmin.collection('financial_titles').doc();
+        const nextDueDate = addMonths(initialDueDate, i);
+        const nextPayload = {
+          ...payload,
+          description: `${payload.description} (${i + 1}/${months})`,
+          dueDate: Timestamp.fromDate(nextDueDate),
+          installmentIndex: i + 1,
+          totalInstallments: months,
+          recurrenceId,
+          createdAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp()
+        };
+        if (initialCompetenceDate) {
+          nextPayload.competenceDate = Timestamp.fromDate(addMonths(initialCompetenceDate, i));
+        }
+        batch.set(nextRef, nextPayload);
+      }
+      await batch.commit();
+    } else {
+      await titleRef.update({
+        ...payload,
+        updatedAt: FieldValue.serverTimestamp()
+      });
+    }
+
+    revalidatePath('/dashboard/financeiro');
+    return { success: true };
+  } catch (error: any) {
+    throw new Error(error.message);
+  }
+}
+
+export async function updateFinancialTitleSeries(recurrenceId: string, data: any) {
+  if (!firestoreAdmin) throw new Error("Servidor inacessível.");
+  try {
+    const batch = firestoreAdmin.batch();
+    const titles = await firestoreAdmin.collection('financial_titles')
+      .where('recurrenceId', '==', recurrenceId)
+      .get();
+    
+    const { value, description, origin, type, category, subcategory } = data;
+    const payload: any = {};
+    if (value !== undefined) payload.value = value;
+    if (description !== undefined) payload.description = description;
+    if (origin !== undefined) payload.origin = origin;
+    if (type !== undefined) payload.type = type;
+    if (category !== undefined) payload.category = category;
+    if (subcategory !== undefined) payload.subcategory = subcategory;
+    
+    payload.updatedAt = FieldValue.serverTimestamp();
+
+    titles.docs.forEach(doc => {
+      // For description, we keep the index if present
+      const currentData = doc.data();
+      let finalDescription = description;
+      if (description && currentData.installmentIndex && currentData.totalInstallments) {
+        finalDescription = `${description} (${currentData.installmentIndex}/${currentData.totalInstallments})`;
+      }
+      
+      batch.update(doc.ref, {
+        ...payload,
+        description: finalDescription || currentData.description
+      });
     });
 
+    await batch.commit();
     revalidatePath('/dashboard/financeiro');
     return { success: true };
   } catch (error: any) {
@@ -154,6 +297,36 @@ export async function deleteFinancialTitle(id: string) {
   if (!firestoreAdmin) throw new Error("Servidor inacessível.");
   try {
     await firestoreAdmin.collection('financial_titles').doc(id).delete();
+    revalidatePath('/dashboard/financeiro');
+    return { success: true };
+  } catch (error: any) {
+    throw new Error(error.message);
+  }
+}
+
+export async function deleteFinancialTitleSeries(groupId: string) {
+  if (!firestoreAdmin) throw new Error("Servidor inacessível.");
+  try {
+    const batch = firestoreAdmin.batch();
+    
+    // Check both potential grouping fields
+    const titlesByRecurrence = await firestoreAdmin.collection('financial_titles')
+      .where('recurrenceId', '==', groupId)
+      .get();
+    
+    const titlesByEvent = await firestoreAdmin.collection('financial_titles')
+      .where('financialEventId', '==', groupId)
+      .get();
+    
+    titlesByRecurrence.docs.forEach(doc => batch.delete(doc.ref));
+    titlesByEvent.docs.forEach(doc => {
+      // Avoid double delete if both fields point to same ID
+      if (!titlesByRecurrence.docs.find(d => d.id === doc.id)) {
+        batch.delete(doc.ref);
+      }
+    });
+
+    await batch.commit();
     revalidatePath('/dashboard/financeiro');
     return { success: true };
   } catch (error: any) {
@@ -218,6 +391,7 @@ export async function createFinancialTitle(data: any) {
 
         const initialDueDate = new Date(baseData.dueDate);
         const count = recurring ? Math.min(Math.max(months, 1), 24) : 1;
+        const recurrenceId = recurring ? uuidv4() : null;
 
         for (let i = 0; i < count; i++) {
             const titleRef = firestoreAdmin.collection('financial_titles').doc();
@@ -242,7 +416,10 @@ export async function createFinancialTitle(data: any) {
                 category: baseData.category || null,
                 subcategory: baseData.subcategory || null,
                 createdAt: FieldValue.serverTimestamp(),
-                updatedAt: FieldValue.serverTimestamp()
+                updatedAt: FieldValue.serverTimestamp(),
+                installmentIndex: i + 1,
+                totalInstallments: count,
+                recurrenceId: recurrenceId
             };
 
             if (baseData.competenceDate) {

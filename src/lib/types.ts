@@ -229,6 +229,8 @@ export type FinancialEvent = {
   eventDate: Date | Timestamp;
   description: string;
   totalValue: number;
+  lawyerPercentage?: number;
+  clientPercentage?: number;
 };
 
 export type FinancialTitle = {
@@ -263,6 +265,7 @@ export type FinancialTitle = {
     | 'CONTAS_CONSUMO'
     | 'ALVARA'
     | 'TRANSFERENCIAS_JUDICIAIS'
+    | 'REPASSE_CLIENTE'
     | 'OUTRAS_RECEITAS';
   value: number;
   dueDate: any;
@@ -277,6 +280,9 @@ export type FinancialTitle = {
   paidToStaffId?: string;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
+  recurrenceId?: string;
+  installmentIndex?: number;
+  totalInstallments?: number;
 };
 
 export type BankAccount = {

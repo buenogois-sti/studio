@@ -88,7 +88,7 @@ import { Input } from '@/components/ui/input';
 import { format, isBefore, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { createFinancialTitle, updateFinancialTitleStatus, processLatePaymentRoutine, updateFinancialTitle, deleteFinancialTitle } from '@/lib/finance-actions';
+import { createFinancialTitle, updateFinancialTitleStatus, processLatePaymentRoutine, updateFinancialTitle, deleteFinancialTitle, deleteFinancialTitleSeries } from '@/lib/finance-actions';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -859,8 +859,7 @@ function TitleFormDialog({
                   )}
                 />
 
-                {!isEdit && (
-                  <div className="space-y-4 pt-2">
+                <div className="space-y-4 pt-2">
                     <div className="flex items-center justify-between p-5 rounded-2xl bg-white/5 border border-white/10">
                       <div className="space-y-0.5">
                         <FormLabel className="text-white font-black text-sm">Habilitar Recorrência?</FormLabel>
@@ -914,7 +913,6 @@ function TitleFormDialog({
                       />
                     )}
                   </div>
-                )}
               </form>
             </Form>
           </div>
@@ -975,22 +973,28 @@ export default function FinanceiroPage() {
   ]);
 
   const stats = React.useMemo(() => {
-    if (!titlesData) return { totalReceitas: 0, totalDespesas: 0, pendenteReceita: 0, pendenteDespesa: 0, officeRevenue: 0 };
+    if (!titlesData) return { totalReceitas: 0, totalDespesas: 0, pendenteReceita: 0, pendenteDespesa: 0, officeRevenue: 0, pendingClientPayouts: 0 };
     return titlesData.reduce((acc, t) => {
       const val = t.value || 0;
       if (t.type === 'RECEITA') {
         if (t.status === 'PAGO') {
           acc.totalReceitas += val;
-          acc.officeRevenue += (val * 0.3); 
+          acc.officeRevenue += (val * 0.3); // 30% retention rule
         } else {
           acc.pendenteReceita += val;
         }
       } else {
-        if (t.status === 'PAGO') acc.totalDespesas += val;
-        else acc.pendenteDespesa += val;
+        if (t.status === 'PAGO') {
+          acc.totalDespesas += val;
+        } else {
+          acc.pendenteDespesa += val;
+          if (t.origin === 'REPASSE_CLIENTE') {
+            acc.pendingClientPayouts += val;
+          }
+        }
       }
       return acc;
-    }, { totalReceitas: 0, totalDespesas: 0, pendenteReceita: 0, pendenteDespesa: 0, officeRevenue: 0 });
+    }, { totalReceitas: 0, totalDespesas: 0, pendenteReceita: 0, pendenteDespesa: 0, officeRevenue: 0, pendingClientPayouts: 0 });
   }, [titlesData]);
 
   const chartData = React.useMemo(() => {
@@ -1083,12 +1087,17 @@ export default function FinanceiroPage() {
     }
   };
 
-  const handleDeleteTitle = async () => {
+  const handleDeleteTitle = async (deleteSeries = false) => {
     if (!titleToDelete) return;
     setIsDeleting(true);
     try {
-      await deleteFinancialTitle(titleToDelete.id);
-      toast({ title: 'Lançamento excluído com sucesso!' });
+      if (deleteSeries && (titleToDelete.recurrenceId || titleToDelete.financialEventId)) {
+        await deleteFinancialTitleSeries((titleToDelete.recurrenceId || titleToDelete.financialEventId)!);
+        toast({ title: 'Série de lançamentos excluída!' });
+      } else {
+        await deleteFinancialTitle(titleToDelete.id);
+        toast({ title: 'Lançamento excluído com sucesso!' });
+      }
       setRefreshKey(k => k + 1);
       setTitleToEditDelete(null);
     } catch (e: any) {
@@ -1141,9 +1150,9 @@ export default function FinanceiroPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <div className="lg:col-span-8 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
+        <div className="flex-1 space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
             <Card className="bg-primary/5 border-primary/20 border-2 overflow-hidden relative">
               <div className="absolute top-0 right-0 p-3 opacity-10"><Scale className="h-12 w-12" /></div>
               <CardHeader className="p-4 pb-1"><CardTitle className="text-[10px] font-black uppercase text-primary tracking-widest">Lucro Operacional (30%)</CardTitle></CardHeader>
@@ -1163,6 +1172,11 @@ export default function FinanceiroPage() {
               <div className="absolute top-0 right-0 p-3 opacity-10"><Clock className="h-12 w-12" /></div>
               <CardHeader className="p-4 pb-1"><CardTitle className="text-[10px] font-black uppercase text-amber-400 tracking-widest">Provisionado (Entrada)</CardTitle></CardHeader>
               <CardContent className="p-4 pt-0"><p className="text-2xl font-black text-amber-400 tabular-nums">{formatCurrency(stats.pendenteReceita)}</p></CardContent>
+            </Card>
+            <Card className="bg-blue-500/5 border-blue-500/10 overflow-hidden relative">
+              <div className="absolute top-0 right-0 p-3 opacity-10"><Users className="h-12 w-12" /></div>
+              <CardHeader className="p-4 pb-1"><CardTitle className="text-[10px] font-black uppercase text-blue-400 tracking-widest">A Repassar (Clientes)</CardTitle></CardHeader>
+              <CardContent className="p-4 pt-0"><p className="text-2xl font-black text-blue-400 tabular-nums">{formatCurrency(stats.pendingClientPayouts)}</p></CardContent>
             </Card>
           </div>
 
@@ -1516,6 +1530,19 @@ export default function FinanceiroPage() {
                         {formatCurrency(t.value)}
                       </TableCell>
                       <TableCell className="text-right px-6">
+                        <div className="flex justify-end gap-2">
+                        {t.status !== 'PAGO' && (
+                            <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="h-8 text-[9px] font-black uppercase text-emerald-400 hover:bg-emerald-500/10 border border-emerald-500/20"
+                                onClick={() => handleUpdateStatus(t.id, 'PAGO')}
+                                disabled={isProcessing === t.id}
+                            >
+                                {isProcessing === t.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3 mr-1" />}
+                                Pagar
+                            </Button>
+                        )}
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-white/30 hover:text-white rounded-full">
@@ -1541,6 +1568,7 @@ export default function FinanceiroPage() {
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
+                        </div>
                       </TableCell>
                     </TableRow>
                   )
@@ -1579,18 +1607,44 @@ export default function FinanceiroPage() {
       />
 
       <AlertDialog open={!!titleToDelete} onOpenChange={(o) => !o && setTitleToEditDelete(null)}>
-        <AlertDialogContent className="bg-[#0f172a] border-white/10 text-white">
+        <AlertDialogContent className="bg-[#0f172a] border-white/10 text-white sm:max-w-[500px]">
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Trash2 className="h-5 w-5 text-rose-500" /> Confirmar Exclusão
+            </AlertDialogTitle>
             <AlertDialogDescription className="text-slate-400">
-              Tem certeza que deseja remover este lançamento? Esta ação é irreversível e afetará os cálculos de faturamento do escritório.
+              {titleToDelete?.recurrenceId || titleToDelete?.financialEventId ? (
+                <span>
+                  Este item faz parte de uma <strong>série de lançamentos / parcelas</strong>. 
+                  Deseja excluir apenas esta parcela ou todos os lançamentos vinculados?
+                </span>
+              ) : (
+                "Tem certeza que deseja remover este lançamento? Esta ação é irreversível e afetará os cálculos de faturamento do escritório."
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting} className="bg-transparent border-white/10 text-slate-400">Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteTitle} disabled={isDeleting} className="bg-rose-600 text-white hover:bg-rose-700 border-none font-bold">
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel disabled={isDeleting} className="bg-transparent border-white/10 text-slate-400 mt-0">Cancelar</AlertDialogCancel>
+            
+            {(titleToDelete?.recurrenceId || titleToDelete?.financialEventId) && (
+              <Button 
+                onClick={() => handleDeleteTitle(true)} 
+                disabled={isDeleting} 
+                variant="outline"
+                className="bg-rose-500/10 border-rose-500/30 text-rose-500 hover:bg-rose-500/20 font-bold"
+              >
+                {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4 rotate-45" />}
+                Excluir Toda a Série
+              </Button>
+            )}
+
+            <AlertDialogAction 
+              onClick={() => handleDeleteTitle(false)} 
+              disabled={isDeleting} 
+              className="bg-rose-600 text-white hover:bg-rose-700 border-none font-bold"
+            >
               {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
-              Confirmar Exclusão
+              {titleToDelete?.recurrenceId || titleToDelete?.financialEventId ? 'Excluir apenas este' : 'Confirmar Exclusão'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
