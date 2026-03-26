@@ -24,7 +24,8 @@ import {
   RefreshCw,
   ExternalLink,
   ShieldAlert,
-  Terminal
+  Terminal,
+  Search
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import {
@@ -45,9 +46,9 @@ import Link from 'next/link';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { useFirebase, useCollection, useMemoFirebase, useDoc } from '@/firebase';
 import { collection, query, orderBy, limit, Timestamp, where, doc } from 'firebase/firestore';
-import type { Client, FinancialTitle, Process, Hearing, Log, UserProfile, StaffCredit, LegalDeadline, Staff } from '@/lib/types';
+import { Client, FinancialTitle, Process, Hearing, Log, UserProfile, StaffCredit, LegalDeadline, Staff, Lead } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import { format, isBefore, startOfMonth, startOfDay } from 'date-fns';
+import { format, isBefore, startOfMonth, startOfDay, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -139,6 +140,48 @@ const AIAdvisor = React.memo(({ stats, activities, isLoading, role }: { stats: a
         </Card>
     );
 });
+const WhatsNewBanner = React.memo(() => (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 animate-in slide-in-from-top duration-700">
+        {[
+            { 
+                title: "Perícias Judiciais", 
+                desc: "Novo módulo para agendamento e controle de peritos.", 
+                icon: Search, 
+                href: "/dashboard/pericias",
+                color: "text-blue-400 bg-blue-500/10 border-blue-500/20"
+            },
+            { 
+                title: "Gestão de RH", 
+                desc: "Sistema de remuneração e folha de elite integrado.", 
+                icon: Users, 
+                href: "/dashboard/rh",
+                color: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
+            },
+            { 
+                title: "Categorias Financeiras", 
+                desc: "Novo plano de contas com subcategorias detalhadas.", 
+                icon: DollarSign, 
+                href: "/dashboard/financeiro",
+                color: "text-amber-400 bg-amber-500/10 border-amber-500/20"
+            }
+        ].map((item, i) => (
+            <Link key={i} href={item.href} className={cn("flex items-start gap-3 p-4 rounded-2xl border hover:scale-[1.02] transition-all bg-black/40 shadow-xl", item.color)}>
+                <div className="p-2 rounded-xl bg-white/5 border border-white/10 shrink-0">
+                    <item.icon className="h-5 w-5" />
+                </div>
+                <div>
+                    <div className="flex items-center gap-2 mb-1">
+                        <h3 className="text-xs font-black uppercase text-white">{item.title}</h3>
+                        <Badge className="text-[8px] font-black h-4 px-1.5 bg-primary text-primary-foreground">NOVO</Badge>
+                    </div>
+                    <p className="text-[10px] font-bold text-slate-400 leading-tight">{item.desc}</p>
+                </div>
+            </Link>
+        ))}
+    </div>
+));
+WhatsNewBanner.displayName = 'WhatsNewBanner';
+
 AIAdvisor.displayName = 'AIAdvisor';
 
 const AdminDashboard = React.memo(({ stats, isLoading, logsData, hearingsData, chartData }: any) => (
@@ -162,7 +205,7 @@ const AdminDashboard = React.memo(({ stats, isLoading, logsData, hearingsData, c
 ));
 AdminDashboard.displayName = 'AdminDashboard';
 
-const LawyerDashboard = React.memo(({ stats, isLoading, hearingsData, deadlinesData }: any) => (
+const LawyerDashboard = React.memo(({ stats, isLoading, hearingsData, deadlinesData, logsData }: any) => (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard title="Minha Carteira" value={stats.activeProcessesCount} icon={Briefcase} />
@@ -172,7 +215,7 @@ const LawyerDashboard = React.memo(({ stats, isLoading, hearingsData, deadlinesD
       </div>
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">
-          <AIAdvisor stats={stats} activities={[]} isLoading={isLoading} role="lawyer" />
+          <AIAdvisor stats={stats} activities={logsData} isLoading={isLoading} role="lawyer" />
           <PersonalDeadlinesCard data={deadlinesData} isLoading={isLoading} />
         </div>
         <div className="space-y-6">
@@ -382,7 +425,8 @@ export default function Dashboard() {
   const titlesQuery = useMemoFirebase(() => {
     if (!firestore || !isRoleReady) return null;
     if (role !== 'admin' && role !== 'financial') return null;
-    return query(collection(firestore, 'financial_titles'), where('dueDate', '>=', stableStartOfMonth), limit(10));
+    // Buscamos um número maior de títulos para que o cálculo de totais seja real
+    return query(collection(firestore, 'financial_titles'), where('dueDate', '>=', stableStartOfMonth), limit(500));
   }, [firestore, isRoleReady, role, stableStartOfMonth]);
   const { data: titlesData, isLoading: isLoadingTitles, error: titlesError } = useCollection<FinancialTitle>(titlesQuery);
 
@@ -390,9 +434,9 @@ export default function Dashboard() {
     if (!firestore || !isRoleReady) return null;
     const base = collection(firestore, 'processes');
     if (role === 'lawyer' && currentStaffMember) {
-      return query(base, where('leadLawyerId', '==', currentStaffMember.id), orderBy('updatedAt', 'desc'), limit(15));
+      return query(base, where('leadLawyerId', '==', currentStaffMember.id), orderBy('updatedAt', 'desc'), limit(100));
     }
-    return query(base, orderBy('createdAt', 'desc'), limit(15));
+    return query(base, orderBy('createdAt', 'desc'), limit(300));
   }, [firestore, isRoleReady, role, currentStaffMember]);
   const { data: processesData, isLoading: isLoadingProcesses, error: processesError } = useCollection<Process>(processesQuery);
 
@@ -407,9 +451,14 @@ export default function Dashboard() {
   const { data: hearingsData, isLoading: isLoadingHearings, error: hearingsError } = useCollection<Hearing>(hearingsQuery);
 
   const deadlinesQuery = useMemoFirebase(() => {
-    if (!firestore || role !== 'lawyer' || !currentStaffMember) return null;
-    return query(collection(firestore, 'deadlines'), where('authorId', '==', currentStaffMember.id), where('status', '==', 'PENDENTE'), orderBy('endDate', 'asc'), limit(3));
-  }, [firestore, role, currentStaffMember]);
+    if (!firestore || !isRoleReady) return null;
+    const base = collection(firestore, 'deadlines');
+    if (role === 'lawyer' && currentStaffMember) {
+      return query(base, where('authorId', '==', currentStaffMember.id), where('status', '==', 'PENDENTE'), orderBy('endDate', 'asc'), limit(3));
+    }
+    // Para admin/assistant, pegar todos os pendentes para hoje/geral
+    return query(base, where('status', '==', 'PENDENTE'), orderBy('endDate', 'asc'), limit(5));
+  }, [firestore, isRoleReady, role, currentStaffMember]);
   const { data: deadlinesData, error: deadlinesError } = useCollection<LegalDeadline>(deadlinesQuery);
 
   const personalCreditsQuery = useMemoFirebase(() => {
@@ -418,18 +467,25 @@ export default function Dashboard() {
   }, [firestore, role, currentStaffMember]);
   const { data: creditsData } = useCollection<StaffCredit>(personalCreditsQuery);
 
-  const logsQuery = useMemoFirebase(
-    () => (firestore && isRoleReady && role === 'admin' && session?.user?.id
+  const logsData = useMemoFirebase(
+    () => (firestore && isRoleReady && session?.user?.id
       ? query(collection(firestore, `users/${session.user.id}/logs`), orderBy('timestamp', 'desc'), limit(3))
       : null),
-    [firestore, isRoleReady, role, session?.user?.id]
+    [firestore, isRoleReady, session?.user?.id]
   );
-  const { data: logsData } = useCollection<Log>(logsQuery);
+  const { data: logsDataList } = useCollection<Log>(logsData);
+
+  const leadsQuery = useMemoFirebase(() => {
+    if (!firestore || !isRoleReady) return null;
+    if (role !== 'admin' && role !== 'assistant') return null;
+    return query(collection(firestore, 'leads'), orderBy('createdAt', 'desc'), limit(200));
+  }, [firestore, isRoleReady, role]);
+  const { data: leadsData } = useCollection<Lead>(leadsQuery);
 
   const stats = React.useMemo(() => {
     const s = { 
       totalRevenue: 0, pendingReceivables: 0, totalOverdue: 0, activeProcessesCount: 0, 
-      upcomingHearingsCount: 0, leadsConverted: 85, personalFees: 0, personalDeadlines: 0,
+      upcomingHearingsCount: 0, leadsConverted: 0, personalFees: 0, personalDeadlines: 0,
       totalExpenses: 0, hearingsToday: 0, newLeads: 0, deadlinesToday: 0, pendingDrive: 0
     };
     
@@ -439,11 +495,18 @@ export default function Dashboard() {
     if (role === 'admin' || role === 'financial') {
       titlesData?.forEach(t => {
         const dueDate = t.dueDate instanceof Timestamp ? t.dueDate.toDate() : (t.dueDate ? new Date(t.dueDate as any) : null);
+        const paymentDate = t.paymentDate instanceof Timestamp ? t.paymentDate.toDate() : (t.paymentDate ? new Date(t.paymentDate as any) : null);
         
         if (t.type === 'RECEITA') {
-          if (t.status === 'PAGO') s.totalRevenue += t.value;
-          else if (dueDate && isBefore(dueDate, now)) s.totalOverdue += t.value;
-          else s.pendingReceivables += t.value;
+          // Receita do mês: título pago com data de pagamento dentro do mês atual
+          if (t.status === 'PAGO' && paymentDate && paymentDate >= startOfMonth(new Date())) {
+            s.totalRevenue += t.value;
+          } 
+          
+          if (t.status === 'PENDENTE') {
+            if (dueDate && isBefore(dueDate, now)) s.totalOverdue += t.value;
+            else s.pendingReceivables += t.value;
+          }
         } else if (t.type === 'DESPESA' && t.status === 'PENDENTE') {
           s.totalExpenses += t.value;
         }
@@ -455,11 +518,27 @@ export default function Dashboard() {
       s.personalDeadlines = deadlinesData?.length || 0;
     }
 
+    if (leadsData) {
+      const totalLeads = leadsData.length;
+      const convertedLeads = leadsData.filter(l => l.status === 'CONVERTIDO').length;
+      s.leadsConverted = totalLeads > 0 ? Math.round((convertedLeads / totalLeads) * 100) : 0;
+      s.newLeads = leadsData.filter(l => l.status === 'NOVO').length;
+    }
+
+    if (hearingsData) {
+      s.upcomingHearingsCount = hearingsData.length;
+      s.hearingsToday = hearingsData.filter(h => isSameDay(h.date.toDate(), now)).length;
+    }
+    
+    if (deadlinesData) {
+      s.deadlinesToday = deadlinesData.filter(d => isSameDay(d.endDate.toDate(), now)).length;
+    }
+
     s.activeProcessesCount = processesData.filter(p => p.status === 'Ativo').length;
-    s.upcomingHearingsCount = hearingsData?.length || 0;
+    s.pendingDrive = processesData.filter(p => p.status === 'Ativo' && !p.driveFolderId).length;
 
     return s;
-  }, [role, titlesData, processesData, hearingsData, creditsData, deadlinesData]);
+  }, [role, titlesData, processesData, hearingsData, creditsData, deadlinesData, leadsData]);
 
   const chartData = React.useMemo(() => {
     const months: { month: string; key: string; newCases: number; }[] = [];
@@ -547,11 +626,13 @@ export default function Dashboard() {
             <CheckCircle2 className="h-3 w-3 mr-1.5" /> Acesso Seguro
         </Badge>
       </div>
-
-      {role === 'admin' && <AdminDashboard stats={stats} isLoading={isLoading} logsData={logsData?.map(l => l.description) || []} hearingsData={hearingsData} chartData={chartData} />}
-      {role === 'lawyer' && <LawyerDashboard stats={stats} isLoading={isLoading} hearingsData={hearingsData} deadlinesData={deadlinesData} />}
+      
+      <WhatsNewBanner />
+      
+      {role === 'admin' && <AdminDashboard stats={stats} isLoading={isLoading} logsData={logsDataList?.map((l: any) => l.description) || []} hearingsData={hearingsData} chartData={chartData} />}
+      {role === 'lawyer' && <LawyerDashboard stats={stats} isLoading={isLoading} hearingsData={hearingsData} deadlinesData={deadlinesData} logsData={logsDataList?.map((l: any) => l.description) || []} />}
       {role === 'financial' && <FinancialDashboard stats={stats} isLoading={isLoading} titlesData={titlesData} />}
-      {role === 'assistant' && <AssistantDashboard stats={stats} hearingsData={hearingsData} leadsData={[]} isLoading={isLoading} />}
+      {role === 'assistant' && <AssistantDashboard stats={stats} hearingsData={hearingsData} leadsData={leadsData || []} isLoading={isLoading} />}
     </div>
   );
 }

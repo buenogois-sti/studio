@@ -197,6 +197,8 @@ export type Hearing = {
   notificationDate?: Timestamp;
   rescheduledToId?: string;
   rescheduleReason?: string;
+  expertName?: string;
+  expertPhone?: string;
 };
 
 export type LegalDeadlineStatus = 'PENDENTE' | 'CUMPRIDO' | 'PERDIDO' | 'CANCELADO';
@@ -312,6 +314,8 @@ export type Log = {
     timestamp: Timestamp;
 };
 
+export type StaffStatus = 'ATIVO' | 'INATIVO' | 'BLOQUEADO' | 'PENDENTE_HOMOLOGACAO';
+export type LegalType = 'PF' | 'PJ';
 export type StaffRole = 'employee' | 'lawyer' | 'intern' | 'provider' | 'partner';
 export type OABStatus = 'Ativa' | 'Suspensa' | 'Inativa' | 'Pendente';
 export type RemunerationType = 'SUCUMBENCIA' | 'PRODUCAO' | 'QUOTA_LITIS' | 'FIXO_MENSAL' | 'AUDIENCISTA';
@@ -339,8 +343,13 @@ export type StaffCredit = {
 export type Staff = {
   id: string;
   role: StaffRole;
+  engagementType: 'fixed' | 'correspondent';
   firstName: string;
   lastName: string;
+  status: StaffStatus;
+  legalType: LegalType;
+  companyName?: string;
+  cnpj?: string;
   email: string;
   phone?: string;
   whatsapp?: string;
@@ -383,6 +392,7 @@ export type Staff = {
     fixedMonthlyValue?: number;
     valuePerHearing?: number;
     salary?: number; // CLT Salary
+    paymentDay?: number; // Day of the month for payment
     benefits?: {
       transportation?: number;
       food?: number;

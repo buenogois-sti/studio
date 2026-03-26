@@ -299,7 +299,13 @@ export default function StaffPage() {
                                     member.role === 'intern' ? "bg-purple-500/10 text-purple-400 border-purple-500/20" :
                                     "bg-slate-500/10 text-slate-400 border-slate-500/20"
                                 )}>
-                                    {roleLabels[member.role] || member.role}
+                                {roleLabels[member.role] || member.role}
+                                </Badge>
+                                <Badge variant="secondary" className={cn(
+                                    "w-fit text-[8px] font-black uppercase py-0 px-1 h-3.5 border-none",
+                                    member.engagementType === 'correspondent' ? "bg-emerald-500/10 text-emerald-500" : "bg-slate-500/10 text-slate-400"
+                                )}>
+                                    {member.engagementType === 'correspondent' ? 'Correspondente' : 'Prestador Fixo'}
                                 </Badge>
                                 <h3 className="font-bold text-xl leading-tight text-white group-hover:text-primary transition-colors">{`${member.firstName} ${member.lastName}`}</h3>
                                 <div className='flex items-center gap-2'>

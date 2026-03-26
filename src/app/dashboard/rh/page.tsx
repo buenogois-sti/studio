@@ -43,7 +43,14 @@ export default function RHPage() {
     const correspondents = correspondentsData?.length || 0;
     const payrollTotal = staffData?.reduce((acc, s) => acc + (s.remuneration?.salary || 0), 0) || 0;
     
-    return { total, active, correspondents, payrollTotal };
+    const profileIntegrity = staffData?.reduce((acc, s) => {
+        const fields = [s.firstName, s.lastName, s.email, s.documentCPF, s.oabNumber, s.birthDate, s.bankInfo?.pixKey];
+        const filled = fields.filter(f => !!f).length;
+        return acc + (filled / fields.length);
+    }, 0) || 0;
+    const avgIntegrity = total > 0 ? Math.round((profileIntegrity / total) * 100) : 100;
+    
+    return { total, active, correspondents, payrollTotal, avgIntegrity };
   }, [staffData, correspondentsData]);
 
   return (
@@ -97,8 +104,8 @@ export default function RHPage() {
           <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:scale-110 transition-transform"><Target className="h-12 w-12" /></div>
           <CardHeader className="pb-2"><CardDescription className="text-[10px] font-black uppercase text-primary tracking-widest">Performance Global</CardDescription></CardHeader>
           <CardContent>
-            <p className="text-3xl font-black text-primary">88%</p>
-            <p className="text-[10px] text-white/50 font-bold uppercase mt-1">Nível de Eficiência RH</p>
+            <p className="text-3xl font-black text-primary">{stats.avgIntegrity}%</p>
+            <p className="text-[10px] text-white/50 font-bold uppercase mt-1">Conformidade das Fichas de DP</p>
           </CardContent>
         </Card>
       </div>
@@ -141,10 +148,9 @@ export default function RHPage() {
             <CardContent className="p-0 flex-1">
                 <div className="divide-y divide-white/5">
                    {[
-                     { label: 'Salários Equipe', date: '05/Abr', status: 'PENDENTE', value: stats.payrollTotal },
-                     { label: 'FGTS / GPS', date: '07/Abr', status: 'AGUARDANDO', value: stats.payrollTotal * 0.28 },
-                     { label: 'Vale Refeição', date: '28/Mar', status: 'HOJE', value: 3450.00 },
-                     { label: 'Contribuições OAB', date: '31/Mar', status: 'VENCENDO', value: 1200.00 },
+                     { label: 'Projetado: Salários Equipe', date: 'Próx. 5º Útil', status: 'AGENDADO', value: stats.payrollTotal },
+                     { label: 'Projetado: Encargos (28%)', date: 'Próx. Diá 07', status: 'ESTIMADO', value: stats.payrollTotal * 0.28 },
+                     { label: 'Projetado: Benefícios', date: 'Fim do Mês', status: 'ESTIMADO', value: 3450.00 },
                    ].map((item, i) => (
                      <div key={i} className="p-5 flex items-center justify-between hover:bg-white/5 transition-all group">
                         <div className="space-y-1">

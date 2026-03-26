@@ -38,7 +38,8 @@ import {
   FolderKanban,
   Edit,
   Briefcase,
-  X
+  X,
+  Search
 } from 'lucide-react';
 import { 
   format, 

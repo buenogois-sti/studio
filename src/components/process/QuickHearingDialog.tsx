@@ -50,7 +50,7 @@ const hearingSchema = z.object({
   time: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Hora inválida.'),
   location: z.string().min(3, 'O local é obrigatório.'),
   courtBranch: z.string().optional().or(z.literal('')),
-  type: z.enum(['CONCILIACAO', 'INSTRUCAO', 'UNA', 'JULGAMENTO', 'PERICIA', 'ATENDIMENTO', 'DILIGENCIA', 'OUTRA']),
+  type: z.enum(['CONCILIACAO', 'INSTRUCAO', 'UNA', 'JULGAMENTO', 'ATENDIMENTO', 'DILIGENCIA', 'OUTRA']),
   responsibleParty: z.string().min(3, 'O responsável é obrigatório.'),
   notes: z.string().optional(),
   meetingLink: z.string().optional().or(z.literal('')),
@@ -106,7 +106,7 @@ export function QuickHearingDialog({ process, hearing, open, onOpenChange, onSuc
           lawyerId: hearing.lawyerId,
           date: format(hDate, 'yyyy-MM-dd'),
           time: format(hDate, 'HH:mm'),
-          type: hearing.type,
+          type: hearing.type as any,
           location: hearing.location,
           courtBranch: hearing.courtBranch || '',
           responsibleParty: hearing.responsibleParty || '',
@@ -328,7 +328,6 @@ export function QuickHearingDialog({ process, hearing, open, onOpenChange, onSuc
                             <SelectItem value="CONCILIACAO">Conciliação</SelectItem>
                             <SelectItem value="INSTRUCAO">Instrução</SelectItem>
                             <SelectItem value="JULGAMENTO">Sentença/Julgamento</SelectItem>
-                            <SelectItem value="PERICIA">Perícia</SelectItem>
                             <SelectItem value="ATENDIMENTO">Atendimento / Reunião</SelectItem>
                             <SelectItem value="OUTRA">Outra</SelectItem>
                           </SelectContent>

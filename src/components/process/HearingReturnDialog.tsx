@@ -299,7 +299,7 @@ export function HearingReturnDialog({ hearing, open, onOpenChange, onSuccess }: 
                                 {field.value && <CheckCircle2 className="h-3.5 w-3.5 text-primary-foreground stroke-[3]" />}
                               </div>
                             </FormControl>
-                            <Label className="text-xs font-bold text-slate-200 cursor-pointer" onClick={() => field.onChange(!field.value)}>Agendar Nova {isDiligencia ? 'Diligência' : 'Audiência'}</Label>
+                            <Label className="text-xs font-bold text-slate-200 cursor-pointer" onClick={() => field.onChange(!field.value)}>Agendar {isPericia ? 'Nova Perícia' : isDiligencia ? 'Nova Diligência' : 'Nova Audiência'}</Label>
                           </FormItem>
                         )}
                       />
@@ -334,8 +334,11 @@ export function HearingReturnDialog({ hearing, open, onOpenChange, onSuccess }: 
                               <SelectContent className="bg-[#0f172a] text-white">
                                 <SelectItem value="UNA">UNA</SelectItem>
                                 <SelectItem value="INSTRUCAO">Instrução</SelectItem>
+                                <SelectItem value="CONCILIACAO">Conciliação</SelectItem>
+                                <SelectItem value="PERICIA">Perícia</SelectItem>
                                 <SelectItem value="DILIGENCIA">Diligência</SelectItem>
                                 <SelectItem value="ATENDIMENTO">Atendimento</SelectItem>
+                                <SelectItem value="JULGAMENTO">Julgamento</SelectItem>
                               </SelectContent>
                             </Select>
                           </FormItem>

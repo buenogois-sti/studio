@@ -21,7 +21,8 @@ import {
   CalendarDays,
   RotateCcw,
   Info,
-  RefreshCw
+  RefreshCw,
+  Zap
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useFirebase, useCollection, useMemoFirebase, useDoc } from '@/firebase';
@@ -104,6 +105,25 @@ export default function PrazosPage() {
     const now = startOfDay(new Date());
     return filteredDeadlines.filter(d => d.status === 'PENDENTE' && isBefore(d.endDate.toDate(), now) && !isToday(d.endDate.toDate()));
   }, [filteredDeadlines]);
+
+  React.useEffect(() => {
+    if (atrasados.length > 0) {
+      toast({
+        variant: 'destructive',
+        title: '⚠️ Prazos Expirados',
+        description: `Você possui ${atrasados.length} compromissos com o prazo vencido. Verifique imediatamente.`
+      });
+    }
+
+    const urgentCount = pendentes.filter(d => !isBefore(d.endDate.toDate(), startOfDay(new Date())) && differenceInDays(d.endDate.toDate(), new Date()) <= 3).length;
+    if (urgentCount > 0) {
+      toast({
+        className: 'bg-amber-600 text-white border-none',
+        title: '⚡ Prazos Urgentes',
+        description: `Existem ${urgentCount} prazos que vencem nos próximos 3 dias.`
+      });
+    }
+  }, [atrasados.length, pendentes.length, toast]);
 
   const handleUpdateStatus = async (id: string, status: LegalDeadlineStatus) => {
     if (isProcessing) return;
@@ -230,6 +250,24 @@ export default function PrazosPage() {
               <div>
                 <CardTitle className="text-lg font-black uppercase tracking-tighter">Atenção Crítica</CardTitle>
                 <CardDescription className="text-rose-400/80 font-medium">Existem {atrasados.length} prazo(s) com vencimento expirado!</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+        </Card>
+      )}
+
+      {pendentes.filter(d => !isBefore(d.endDate.toDate(), startOfDay(new Date())) && differenceInDays(d.endDate.toDate(), new Date()) <= 3).length > 0 && (
+        <Card className="border-amber-500/20 bg-amber-500/5 border-2 animate-in fade-in duration-500">
+          <CardHeader className="py-4">
+            <div className="flex items-center gap-3 text-amber-500">
+              <div className="h-10 w-10 rounded-full bg-amber-500/10 flex items-center justify-center">
+                <Zap className="h-6 w-6" />
+              </div>
+              <div>
+                <CardTitle className="text-lg font-black uppercase tracking-tighter">Prioridade Máxima</CardTitle>
+                <CardDescription className="text-amber-400/80 font-medium">
+                  {pendentes.filter(d => !isBefore(d.endDate.toDate(), startOfDay(new Date())) && differenceInDays(d.endDate.toDate(), new Date()) <= 3).length} prazo(s) vencem nos próximos 3 dias!
+                </CardDescription>
               </div>
             </div>
           </CardHeader>
@@ -429,6 +467,7 @@ function DeadlineCard({
   const endDate = deadline.endDate.toDate();
   const startDate = deadline.startDate.toDate();
   const isExpired = isBefore(endDate, startOfDay(now)) && !isToday(endDate);
+  const isUrgent = !isExpired && differenceInDays(endDate, now) <= 3;
   const isFulfilled = deadline.status === 'CUMPRIDO';
   
   const daysDiff = differenceInDays(endDate, now);
@@ -438,12 +477,24 @@ function DeadlineCard({
   
   return (
     <Card className={cn(
-      "border-l-4 transition-all duration-300 bg-[#0f172a] hover:bg-[#1e293b] group relative overflow-hidden",
-      isFulfilled ? "border-l-emerald-500/50 opacity-80" : isExpired ? "border-l-rose-500 shadow-[0_0_20px_rgba(244,63,94,0.1)]" : "border-l-primary"
+      "border-l-4 transition-all duration-300 bg-[#0f172a] hover:bg-[#1e293b] group relative overflow-hidden mb-4",
+      isFulfilled ? "border-l-emerald-500/50 opacity-80" : 
+      isExpired ? "border-l-rose-500 shadow-[0_0_25px_rgba(244,63,94,0.15)] ring-1 ring-rose-500/50" : 
+      isUrgent ? "border-l-amber-500 shadow-[0_0_20px_rgba(245,158,11,0.1)] ring-1 ring-amber-500/30" :
+      "border-l-primary"
     )}>
-      <CardContent className="p-5">
+      {isExpired && !isFulfilled && (
+        <div className="absolute top-0 right-0 w-32 h-32 -mr-16 -mt-16 bg-rose-500/10 rounded-full blur-3xl animate-pulse pointer-events-none" />
+      )}
+      {isUrgent && !isFulfilled && (
+        <div className="absolute top-0 right-0 w-32 h-32 -mr-16 -mt-16 bg-amber-500/10 rounded-full blur-3xl animate-pulse pointer-events-none" />
+      )}
+      <CardContent className="p-1 sm:p-5">
         <div className="flex flex-col lg:flex-row gap-6">
-          <div className="flex gap-4 min-w-[280px]">
+          <div 
+            className="flex gap-4 min-w-[280px] cursor-pointer flex-1"
+            onClick={() => onViewDetails(deadline)}
+          >
             <div className={cn(
               "h-14 w-14 rounded-2xl flex flex-col items-center justify-center border-2 shrink-0 transition-transform group-hover:scale-105",
               isFulfilled ? "bg-emerald-500/10 border-emerald-500/20" : isExpired ? "bg-rose-500/10 border-rose-500/20 animate-pulse" : "bg-primary/10 border-primary/20"
@@ -457,13 +508,22 @@ function DeadlineCard({
             <div className="min-w-0 space-y-1.5 flex-1">
               <div className="flex items-center gap-2 flex-wrap">
                 <Badge variant="outline" className="bg-white/5 text-primary border-primary/30 text-[9px] font-black uppercase tracking-widest">{deadline.type}</Badge>
+                {isExpired && !isFulfilled && (
+                  <Badge className="bg-rose-500 text-white border-none animate-pulse text-[8px] h-4 font-black px-1.5 uppercase">🔥 EXPIRADO</Badge>
+                )}
+                {isUrgent && !isFulfilled && (
+                  <Badge className="bg-amber-500 text-black border-none text-[8px] h-4 font-black px-1.5 uppercase">⚡ URGENTE</Badge>
+                )}
                 <span className="text-[9px] text-muted-foreground uppercase font-black flex items-center gap-1">
                   <Scale className="h-3 w-3" /> {deadline.isBusinessDays ? 'Úteis (CPC)' : 'Corridos'}
                 </span>
               </div>
               <h3 
-                className="text-base font-black text-white truncate leading-tight hover:text-primary transition-colors cursor-pointer"
-                onClick={() => onGoToProcess(deadline.processId)}
+                className="text-base font-black text-white truncate leading-tight hover:text-primary transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onGoToProcess(deadline.processId);
+                }}
               >
                 {process?.name || 'Processo não encontrado'}
               </h3>
@@ -533,6 +593,9 @@ function DeadlineCard({
                 <DropdownMenuLabel className="text-[9px] font-black uppercase text-muted-foreground px-2 py-1.5 tracking-widest">Gerenciamento</DropdownMenuLabel>
                 <DropdownMenuItem onClick={() => onViewDetails(deadline)} className="gap-2 cursor-pointer focus:bg-primary/10">
                   <Eye className="h-4 w-4 text-blue-400" /> <span className="font-bold">Ver Detalhes</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onEdit(deadline)} className="gap-2 cursor-pointer focus:bg-primary/10">
+                  <RefreshCw className="h-4 w-4 text-amber-500" /> <span className="font-bold">Reagendar Prazo</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => onEdit(deadline)} className="gap-2 cursor-pointer focus:bg-primary/10">
                   <Edit className="h-4 w-4 text-primary" /> <span className="font-bold">Editar Prazo</span>

@@ -62,6 +62,8 @@ const statusConfig = {
   ADIADA: { label: 'Adiada', icon: AlertCircle, color: 'text-amber-500 bg-amber-500/10' },
 };
 
+import { LegalAppraisalDialog } from '@/components/process/LegalAppraisalDialog';
+
 export default function DiligenciasPage() {
   const { firestore, isUserLoading, user } = useFirebase();
   const { toast } = useToast();
@@ -70,6 +72,7 @@ export default function DiligenciasPage() {
   const [refreshKey, setRefreshKey] = React.useState(0);
   const [selectedLawyerFilter, setSelectedLawyerFilter] = React.useState<string>('all');
   const [returnDiligence, setReturnDiligence] = React.useState<Hearing | null>(null);
+  const [editingDiligence, setEditingDiligence] = React.useState<Hearing | null>(null);
 
   const userProfileRef = useMemoFirebase(
     () => (firestore && user?.uid ? doc(firestore, 'users', user.uid) : null),
@@ -83,7 +86,7 @@ export default function DiligenciasPage() {
   const diligenciasQuery = useMemoFirebase(() => {
     if (!firestore || !userProfile) return null;
     const base = collection(firestore, 'hearings');
-    const operationalTypes = ['DILIGENCIA', 'PERICIA'];
+    const operationalTypes = ['DILIGENCIA'];
     
     let q;
     if (selectedLawyerFilter !== 'all') {
@@ -124,6 +127,10 @@ export default function DiligenciasPage() {
     } finally {
       setIsProcessing(null);
     }
+  };
+  
+  const handleEdit = (d: Hearing) => {
+    setEditingDiligence(d);
   };
 
   const isLoading = isUserLoading || isProfileLoading || isLoadingDiligencias;
@@ -175,7 +182,7 @@ export default function DiligenciasPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <H1 className="text-white text-3xl font-black">Atos Operacionais</H1>
-          <p className="text-sm text-muted-foreground">Gestão de diligências externas, vistorias e perícias da banca.</p>
+          <p className="text-sm text-muted-foreground">Gestão de diligências externas e vistorias da banca.</p>
         </div>
         <div className="flex items-center gap-2">
           <div className="relative w-full max-w-xs">
@@ -257,6 +264,7 @@ export default function DiligenciasPage() {
             isLoading={isLoading} 
             onUpdateStatus={handleUpdateStatus}
             onReturn={(d: any) => setReturnDiligence(d)}
+            onEdit={handleEdit}
             isProcessing={isProcessing}
             processesMap={processesMap}
           />
@@ -268,6 +276,7 @@ export default function DiligenciasPage() {
             isLoading={isLoading} 
             onUpdateStatus={handleUpdateStatus}
             onReturn={(d: any) => setReturnDiligence(d)}
+            onEdit={handleEdit}
             isProcessing={isProcessing}
             processesMap={processesMap}
             isHistoryTab={true}
@@ -281,11 +290,18 @@ export default function DiligenciasPage() {
         onOpenChange={(o) => !o && setReturnDiligence(null)}
         onSuccess={() => setRefreshKey(k => k + 1)}
       />
+
+      <LegalAppraisalDialog 
+        appraisal={editingDiligence}
+        open={!!editingDiligence}
+        onOpenChange={(o) => !o && setEditingDiligence(null)}
+        onSuccess={() => setRefreshKey(k => k + 1)}
+      />
     </div>
   );
 }
 
-function DiligenceList({ data, isLoading, onReturn, isProcessing, processesMap, isHistoryTab }: any) {
+function DiligenceList({ data, isLoading, onReturn, onEdit, isProcessing, processesMap, isHistoryTab }: any) {
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -322,10 +338,7 @@ function DiligenceList({ data, isLoading, onReturn, isProcessing, processesMap, 
                 </div>
                 <div className="min-w-0 space-y-1">
                   <div className="flex items-center gap-2">
-                    <Badge variant="outline" className={cn(
-                      "text-[8px] font-black uppercase border-none px-1.5 h-4.5",
-                      d.type === 'PERICIA' ? "bg-purple-500/10 text-purple-400" : "bg-blue-500/10 text-blue-400"
-                    )}>{d.type}</Badge>
+                    <Badge variant="outline" className="text-[8px] font-black uppercase border-none px-1.5 h-4.5 bg-blue-500/10 text-blue-400">DILIGÊNCIA</Badge>
                     <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest flex items-center gap-1">
                       <Clock className="h-3 w-3" /> {format(d.date.toDate(), 'HH:mm')}
                     </span>
@@ -360,6 +373,9 @@ function DiligenceList({ data, isLoading, onReturn, isProcessing, processesMap, 
                     <DropdownMenuContent align="end" className="bg-[#0f172a] border-white/10 w-56">
                       <DropdownMenuItem onClick={() => onReturn(d)} className="font-bold gap-2 text-emerald-400 focus:bg-emerald-500/10">
                         <History className="h-4 w-4" /> Emitir Relatório
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => onEdit(d)} className="font-bold gap-2 text-primary focus:bg-primary/10">
+                        <Edit className="h-4 w-4" /> Editar / Converter
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild className="font-bold gap-2 text-white">
                         <Link href={`/dashboard/processos?clientId=${process?.clientId}`}>

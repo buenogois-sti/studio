@@ -49,7 +49,7 @@ import {
 } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, Timestamp, query, orderBy, deleteDoc, doc, getDocs, where, limit } from 'firebase/firestore';
-import type { FinancialTitle, Staff, Client, Process } from '@/lib/types';
+import type { FinancialTitle, Staff, Client, Process, BankAccount } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { searchProcesses } from '@/lib/process-actions';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -373,12 +373,14 @@ function TitleFormDialog({
   open, 
   onOpenChange, 
   title, 
-  onSuccess 
+  onSuccess,
+  defaultDate,
 }: { 
   open: boolean; 
   onOpenChange: (o: boolean) => void; 
   title?: FinancialTitle | null; 
-  onSuccess: () => void 
+  onSuccess: () => void;
+  defaultDate?: string;
 }) {
   const [isSaving, setIsSaving] = React.useState(false);
   const [processSearch, setProcessSearch] = React.useState('');
@@ -459,8 +461,8 @@ function TitleFormDialog({
         origin: 'OUTRAS_DESPESAS',
         status: 'PENDENTE',
         value: 0,
-        dueDate: format(new Date(), 'yyyy-MM-dd'),
-        competenceDate: format(new Date(), 'yyyy-MM-dd'),
+        dueDate: defaultDate || format(new Date(), 'yyyy-MM-dd'),
+        competenceDate: defaultDate || format(new Date(), 'yyyy-MM-dd'),
         paymentMethod: 'PIX',
         beneficiaryName: '',
         beneficiaryDocument: '',
@@ -474,7 +476,7 @@ function TitleFormDialog({
       });
       setSelectedProcess(null);
     }
-  }, [open, title, form, firestore]);
+  }, [open, title, form, firestore, defaultDate]);
 
   React.useEffect(() => {
     if (processSearch.length < 2) {
@@ -651,7 +653,7 @@ function TitleFormDialog({
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent className="bg-[#0f172a] border-white/10 text-white">
-                            {(form.watch('type') === 'RECEITA' ? REVENUE_CATEGORIES : EXPENSE_CATEGORIES)[form.watch('category') as keyof typeof EXPENSE_CATEGORIES]?.subcategories.map(sub => (
+                            {((form.watch('type') === 'RECEITA' ? REVENUE_CATEGORIES : EXPENSE_CATEGORIES) as any)[form.watch('category') as string]?.subcategories.map((sub: string) => (
                                 <SelectItem key={sub} value={sub}>{sub}</SelectItem>
                             ))}
                           </SelectContent>
@@ -947,10 +949,10 @@ export default function FinanceiroPage() {
   const [isReceiptOpen, setIsReceiptOpen] = React.useState(false);
   const [searchTerm, setSearchTerm] = React.useState('');
   const [expandedGroups, setExpandedGroups] = React.useState<Set<string>>(new Set());
+  const [isDeleting, setIsDeleting] = React.useState(false);
   const [isFormOpen, setIsFormOpen] = React.useState(false);
   const [titleToEdit, setTitleToEdit] = React.useState<FinancialTitle | null>(null);
   const [titleToDelete, setTitleToEditDelete] = React.useState<FinancialTitle | null>(null);
-  const [isDeleting, setIsDeleting] = React.useState(false);
   
   const { toast } = useToast();
   const now = React.useMemo(() => startOfDay(new Date()), []);
@@ -1272,7 +1274,6 @@ export default function FinanceiroPage() {
               <BarChart3 className="h-4 w-4 mr-2" /> Painel BI
             </TabsTrigger>
         </TabsList>
-
         <TabsContent value="receitas" className="flex-1 mt-4 space-y-4">
           {isLoading ? (
             Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-32 w-full bg-[#0f172a] rounded-2xl" />)

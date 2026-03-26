@@ -69,6 +69,13 @@ const remunerationLabels: Record<string, string> = {
   AUDIENCISTA: 'Advogado Audiencista',
 };
 
+const statusLabels: Record<string, { label: string, color: string }> = {
+    ATIVO: { label: 'Ativo / Homologado', color: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' },
+    PENDENTE_HOMOLOGACAO: { label: 'Pendente de Homologação', color: 'bg-amber-500/10 text-amber-500 border-amber-500/20' },
+    BLOQUEADO: { label: 'Bloqueado', color: 'bg-rose-500/10 text-rose-500 border-rose-500/20' },
+    INATIVO: { label: 'Inativo / Desligado', color: 'bg-slate-500/10 text-slate-500 border-slate-500/20' },
+};
+
 export function StaffDetailsSheet({ staff, processes, open, onOpenChange }: StaffDetailsSheetProps) {
   const { firestore } = useFirebase();
   const { toast } = useToast();
@@ -208,6 +215,9 @@ export function StaffDetailsSheet({ staff, processes, open, onOpenChange }: Staf
                     <Badge variant="outline" className="text-[10px] font-black uppercase bg-primary/10 text-primary border-primary/20">
                         {roleLabels[staff.role]}
                     </Badge>
+                    <Badge variant="outline" className={cn("text-[10px] font-black uppercase", statusLabels[staff.status || 'ATIVO']?.color)}>
+                        {statusLabels[staff.status || 'ATIVO']?.label}
+                    </Badge>
                 </div>
                 <SheetTitle className="text-2xl font-headline font-bold text-white">{staff.firstName} {staff.lastName}</SheetTitle>
             </div>
@@ -271,15 +281,36 @@ export function StaffDetailsSheet({ staff, processes, open, onOpenChange }: Staf
                                       </div>
                                   </>
                               )}
-                              {staff.remuneration.type === 'FIXO_MENSAL' && (
-                                  <div className="col-span-2">
-                                      <p className="text-[10px] uppercase font-black text-muted-foreground">Valor Mensal Fixo</p>
-                                      <p className="text-lg font-black text-white">{staff.remuneration.fixedMonthlyValue?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
-                                  </div>
+                               {staff.remuneration.type === 'FIXO_MENSAL' && (
+                                  <>
+                                      <div>
+                                          <p className="text-[10px] uppercase font-black text-muted-foreground">Valor Mensal Fixo</p>
+                                          <p className="text-lg font-black text-white">{staff.remuneration.fixedMonthlyValue?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                                      </div>
+                                      <div>
+                                          <p className="text-[10px] uppercase font-black text-muted-foreground">Dia de Pagamento</p>
+                                          <p className="text-lg font-black text-primary">Todo dia {staff.remuneration.paymentDay || '---'}</p>
+                                      </div>
+                                  </>
                               )}
                           </div>
                       </div>
                     </section>
+                )}
+
+                {staff.legalType === 'PJ' && (
+                  <section>
+                    <div className="flex items-center gap-2 mb-4">
+                        <div className="h-8 w-8 rounded-lg bg-indigo-500/10 flex items-center justify-center">
+                            <Briefcase className="h-4 w-4 text-indigo-500" />
+                        </div>
+                        <h3 className="font-black text-xs uppercase tracking-widest text-muted-foreground">Informações Jurídicas (PJ)</h3>
+                    </div>
+                    <div className="grid grid-cols-1 gap-y-2 bg-indigo-500/5 p-6 rounded-2xl border border-indigo-500/10">
+                        <InfoRow icon={Briefcase} label="Razão Social / Nome Fantasia" value={staff.companyName} actionType="copy" className="col-span-full" />
+                        <InfoRow icon={Hash} label="CNPJ" value={staff.cnpj} actionType="copy" />
+                    </div>
+                  </section>
                 )}
 
                 <section>
@@ -290,12 +321,15 @@ export function StaffDetailsSheet({ staff, processes, open, onOpenChange }: Staf
                       <h3 className="font-black text-xs uppercase tracking-widest text-muted-foreground">Habilitação & Contato</h3>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 bg-white/5 p-6 rounded-2xl border border-white/10">
-                      <InfoRow icon={Hash} label="Nº da OAB" value={staff.oabNumber} actionType="copy" />
+                      <InfoRow icon={Hash} label="Nº da OAB / Registro" value={staff.oabNumber} actionType="copy" />
                       <InfoRow icon={AlertCircle} label="Situação OAB" value={staff.oabStatus} />
                       <Separator className="col-span-full my-2 bg-white/5" />
                       <InfoRow icon={AtSign} label="E-mail" value={staff.email} actionType="email" className="col-span-full" />
                       <InfoRow icon={Smartphone} label="WhatsApp" value={staff.whatsapp} actionType="whatsapp" />
                       <InfoRow icon={Phone} label="Telefone" value={staff.phone} actionType="phone" />
+                      {staff.legalType === 'PF' && (
+                        <InfoRow icon={User} label="CPF" value={staff.documentCPF} actionType="copy" />
+                      )}
                   </div>
                 </section>
 

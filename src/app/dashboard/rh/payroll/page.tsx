@@ -21,11 +21,12 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { useFirebase, useCollection } from '@/firebase';
+import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, limit } from 'firebase/firestore';
-import type { Staff, PayrollEntry } from '@/lib/types';
+import type { Staff, PayrollEntry, Process } from '@/lib/types';
 import { useToast } from '@/components/ui/use-toast';
 import { processPayroll } from '@/lib/staff-actions';
+import { StaffDetailsSheet } from '@/components/staff/StaffDetailsSheet';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -34,27 +35,44 @@ export default function PayrollPage() {
   const { toast } = useToast();
   const [isProcessing, setIsProcessing] = React.useState(false);
   const [monthKey, setMonthKey] = React.useState(format(new Date(), 'yyyy-MM'));
+  const [selectedStaff, setSelectedStaff] = React.useState<Staff | null>(null);
+  const [isDetailsOpen, setIsDetailsOpen] = React.useState(false);
   
   const staffQuery = React.useMemo(() => firestore ? query(collection(firestore, 'staff'), limit(100)) : null, [firestore]);
   const { data: staffData, isLoading: isLoadingStaff } = useCollection<Staff>(staffQuery);
+
+  const processesQuery = useMemoFirebase(
+    () => (firestore ? collection(firestore, 'processes') : null),
+    [firestore]
+  );
+  const { data: processesData } = useCollection<Process>(processesQuery);
+  const processes = processesData || [];
 
   const [entries, setEntries] = React.useState<any[]>([]);
 
   React.useEffect(() => {
     if (staffData) {
-      const initialEntries = staffData.filter(s => !s.resignationDate).map(s => ({
-        staffId: s.id,
-        staffName: `${s.firstName} ${s.lastName}`,
-        baseSalary: s.remuneration?.salary || 0,
-        bonuses: [],
-        discounts: [],
-        netValue: s.remuneration?.salary || 0
-      }));
+      const initialEntries = staffData.filter(s => !s.resignationDate).map(s => {
+        const baseVal = s.remuneration?.type === 'FIXO_MENSAL' 
+          ? (s.remuneration.fixedMonthlyValue || 0) 
+          : (s.remuneration?.salary || 0);
+          
+        return {
+          staffId: s.id,
+          staffName: `${s.firstName} ${s.lastName}`,
+          baseSalary: baseVal,
+          bonuses: [],
+          discounts: [],
+          netValue: baseVal,
+          type: s.remuneration?.type,
+          paymentDay: s.remuneration?.paymentDay
+        };
+      });
       setEntries(initialEntries);
     }
   }, [staffData]);
 
-  const updateEntry = (index: number, field: string, value: number) => {
+  const updateEntry = (index: number, field: string, value: any) => {
     const newEntries = [...entries];
     newEntries[index] = { ...newEntries[index], [field]: value };
     
@@ -111,7 +129,8 @@ export default function PayrollPage() {
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         <div className="lg:col-span-3 space-y-6">
           <Card className="bg-[#0f172a] border-white/5 overflow-hidden">
-            <TableHeader className="bg-white/5 border-b border-white/10 uppercase">
+            <Table>
+              <TableHeader className="bg-white/5 border-b border-white/10 uppercase">
               <TableRow className="hover:bg-transparent">
                 <TableHead className="text-[10px] font-black tracking-widest px-6 h-12">Colaborador</TableHead>
                 <TableHead className="text-[10px] font-black tracking-widest h-12">Salário Base</TableHead>
@@ -131,17 +150,42 @@ export default function PayrollPage() {
                     <div className="flex items-center gap-3">
                         <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-black uppercase text-xs border border-primary/20">{entry.staffName[0]}</div>
                         <div className="flex flex-col">
-                            <span className="font-bold text-white group-hover:text-primary transition-colors">{entry.staffName}</span>
-                            <span className="text-[10px] text-slate-500 uppercase font-black tracking-tighter mt-0.5">Ref: {entry.staffId.substring(0, 8)}</span>
+                           <span 
+                            className="font-bold text-white group-hover:text-primary transition-colors cursor-pointer"
+                            onClick={() => {
+                                const fullStaff = staffData?.find(s => s.id === entry.staffId);
+                                if (fullStaff) {
+                                    setSelectedStaff(fullStaff);
+                                    setIsDetailsOpen(true);
+                                }
+                            }}
+                           >
+                            {entry.staffName}
+                           </span>
+                           <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Ref: {entry.staffId.substring(0,8).toUpperCase()}</span>
                         </div>
                     </div>
                   </TableCell>
-                  <TableCell>
-                    <div className="flex flex-col">
-                        <span className="text-xs font-black text-white">{entry.baseSalary.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-                        <div className="flex items-center gap-1 opacity-50"><CreditCard className="h-2 w-2" /><span className="text-[8px] font-black uppercase">Fixo Mensal</span></div>
-                    </div>
-                  </TableCell>
+                   <TableCell>
+                      <div className="flex flex-col">
+                          <p className="text-sm font-black text-white">{entry.baseSalary.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                          <div className="flex items-center gap-1.5 mt-0.5 opacity-50">
+                             {entry.type === 'FIXO_MENSAL' ? (
+                               <Badge variant="outline" className="text-[8px] h-4 uppercase border-white/10 text-slate-400 gap-1">
+                                 <Calendar className="h-2.5 w-2.5" /> Fixo Mensal (Dia {entry.paymentDay || 5})
+                               </Badge>
+                             ) : entry.type === 'AUDIENCISTA' ? (
+                               <Badge variant="outline" className="text-[8px] h-4 uppercase border-white/10 text-slate-400 gap-1">
+                                 <History className="h-2.5 w-2.5" /> Por Audiência
+                               </Badge>
+                             ) : (
+                               <Badge variant="outline" className="text-[8px] h-4 uppercase border-white/10 text-slate-400 gap-1">
+                                 <DollarSign className="h-2.5 w-2.5" /> Variável
+                               </Badge>
+                             )}
+                          </div>
+                      </div>
+                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
                          <span className="text-[10px] font-bold text-emerald-400">R$</span>
@@ -169,6 +213,7 @@ export default function PayrollPage() {
                 </TableRow>
               ))}
             </TableBody>
+            </Table>
           </Card>
 
           <div className="flex items-center justify-between p-6 rounded-2xl bg-primary/5 border border-primary/20 shadow-lg">
@@ -236,6 +281,13 @@ export default function PayrollPage() {
             </div>
         </div>
       </div>
+
+      <StaffDetailsSheet 
+        staff={selectedStaff}
+        processes={processes}
+        open={isDetailsOpen}
+        onOpenChange={setIsDetailsOpen}
+      />
     </div>
   );
 }

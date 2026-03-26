@@ -40,8 +40,11 @@ import {
   Settings,
   Briefcase,
   Loader2,
-  Library,
   BarChart,
+  Library,
+  History,
+  CalendarDays,
+  ShieldCheck,
   Archive,
   Receipt,
   Timer,
@@ -52,6 +55,7 @@ import {
   Users,
   MapPin,
   Gavel,
+  Search,
   HeartHandshake
 } from 'lucide-react';
 import type { UserProfile } from '@/lib/types';
@@ -86,7 +90,9 @@ const sidebarSections = [
       { href: '/dashboard/processos', label: 'Processos', icon: FolderKanban, roles: ['admin', 'lawyer', 'assistant', 'financial'] },
       { href: '/dashboard/prazos', label: 'Agenda de Prazos', icon: Timer, roles: ['admin', 'lawyer', 'assistant'] },
       { href: '/dashboard/audiencias', label: 'Pauta de Audiências', icon: Gavel, roles: ['admin', 'lawyer', 'assistant'] },
+      { href: '/dashboard/pericias', label: 'Perícias Judiciais', icon: Search, roles: ['admin', 'lawyer', 'assistant'], isNew: true },
       { href: '/dashboard/diligencias', label: 'Atos Operacionais', icon: MapPin, roles: ['admin', 'lawyer', 'assistant'] },
+      { href: '/dashboard/correspondentes', label: 'Correspondentes', icon: HeartHandshake, roles: ['admin', 'lawyer', 'assistant'] },
       { href: '/dashboard/acervo', label: 'Acervo de Modelos', icon: Library, roles: ['admin', 'lawyer', 'assistant'] },
       { href: '/dashboard/arquivo', label: 'Arquivo Digital', icon: Archive, roles: ['admin', 'lawyer', 'assistant'] },
     ]
@@ -94,7 +100,8 @@ const sidebarSections = [
   {
     label: 'Financeiro (Caixa)',
     items: [
-      { href: '/dashboard/financeiro', label: 'Faturamento', icon: DollarSign, roles: ['admin', 'financial'] },
+      { href: '/dashboard/financeiro', label: 'Faturamento', icon: DollarSign, roles: ['admin', 'financial'], isNew: true },
+      { href: '/dashboard/financeiro/calendario', label: 'Calendário Fluxo', icon: CalendarDays, roles: ['admin', 'financial'] },
       { href: '/dashboard/repasses', label: 'Carteira & Repasses', icon: Wallet, roles: ['admin', 'financial', 'lawyer'] },
       { href: '/dashboard/reembolsos', label: 'Reembolsos', icon: Receipt, roles: ['admin', 'lawyer', 'financial', 'assistant'] },
     ]
@@ -102,7 +109,7 @@ const sidebarSections = [
   {
     label: 'Tecnologia (Gestão)',
     items: [
-      { href: '/dashboard/rh', label: 'Recursos Humanos', icon: Users, roles: ['admin'] },
+      { href: '/dashboard/rh', label: 'Recursos Humanos', icon: Users, roles: ['admin'], isNew: true },
       { href: '/dashboard/configuracoes', label: 'Configurações', icon: Settings, roles: ['admin'] },
     ]
   }
@@ -115,9 +122,12 @@ const BreadcrumbMap: { [key: string]: string } = {
   '/dashboard/processos': 'Processos',
   '/dashboard/prazos': 'Prazos Judiciais',
   '/dashboard/audiencias': 'Audiências',
+  '/dashboard/pericias': 'Perícias Judiciais',
   '/dashboard/diligencias': 'Atos Operacionais',
+  '/dashboard/correspondentes': 'Correspondentes',
   '/dashboard/reembolsos': 'Reembolsos',
   '/dashboard/financeiro': 'Financeiro',
+  '/dashboard/financeiro/calendario': 'Calendário Financeiro',
   '/dashboard/repasses': 'Carteira & Repasses',
   '/dashboard/relatorios': 'Relatórios Gerenciais',
   '/dashboard/acervo': 'Acervo de Modelos',
@@ -225,7 +235,10 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
                               >
                                 <Link href={item.href}>
                                   <item.icon />
-                                  <span className="font-bold">{item.label}</span>
+                                  <span className="font-bold flex-1">{item.label}</span>
+                                  {(item as any).isNew && (
+                                    <span className="ml-auto text-[8px] font-black bg-primary text-primary-foreground px-1.5 py-0.5 rounded-full animate-pulse">NEW</span>
+                                  )}
                                 </Link>
                               </SidebarMenuButton>
                             </SidebarMenuItem>

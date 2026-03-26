@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/select"
 import { SheetFooter } from '@/components/ui/sheet';
 import { H2 } from '@/components/ui/typography';
-import { Loader2, Search, DollarSign, Percent, Briefcase, MapPin, Globe, Heart } from 'lucide-react';
+import { Loader2, Search, DollarSign, Percent, Briefcase, MapPin, Globe, Heart, Calendar } from 'lucide-react';
 
 import { useFirebase } from '@/firebase';
 import { collection, serverTimestamp, doc, addDoc, updateDoc, Timestamp } from 'firebase/firestore';
@@ -33,11 +33,16 @@ import { cn } from '@/lib/utils';
 
 const staffSchema = z.object({
   role: z.enum(['employee', 'lawyer', 'intern', 'provider', 'partner'], { required_error: 'O perfil é obrigatório.'}),
+  engagementType: z.enum(['fixed', 'correspondent'], { required_error: 'O tipo de vínculo é obrigatório.'}),
   firstName: z.string().min(2, { message: 'O nome é obrigatório.' }),
   lastName: z.string().min(2, { message: 'O sobrenome é obrigatório.' }),
   email: z.string().email({ message: 'E-mail inválido.' }),
   phone: z.string().optional().or(z.literal('')),
   whatsapp: z.string().optional().or(z.literal('')),
+  status: z.enum(['ATIVO', 'INATIVO', 'BLOQUEADO', 'PENDENTE_HOMOLOGACAO']).default('PENDENTE_HOMOLOGACAO'),
+  legalType: z.enum(['PF', 'PJ']).default('PF'),
+  companyName: z.string().optional().or(z.literal('')),
+  cnpj: z.string().optional().or(z.literal('')),
   documentCPF: z.string().optional().or(z.literal('')),
   documentRG: z.string().optional().or(z.literal('')),
   nationality: z.string().optional().or(z.literal('')),
@@ -75,6 +80,7 @@ const staffSchema = z.object({
   remuneration_priceDrafting: z.coerce.number().min(0).optional().or(z.literal(0)),
   remuneration_priceDiligence: z.coerce.number().min(0).optional().or(z.literal(0)),
   remuneration_salary: z.coerce.number().min(0).optional().or(z.literal(0)),
+  remuneration_paymentDay: z.coerce.number().min(1).max(31).optional().or(z.literal(0)),
 }).refine((data) => {
     if (data.role === 'lawyer' || data.role === 'intern') {
         return !!data.oabNumber && data.oabNumber.length > 0;
@@ -137,6 +143,7 @@ export function StaffForm({
     resolver: zodResolver(staffSchema),
     defaultValues: staff ? {
         role: staff.role,
+        engagementType: staff.engagementType || 'fixed',
         firstName: staff.firstName,
         lastName: staff.lastName,
         email: staff.email,
@@ -173,8 +180,18 @@ export function StaffForm({
         remuneration_priceDrafting: staff.remuneration?.activityPrices?.drafting ?? 0,
         remuneration_priceDiligence: staff.remuneration?.activityPrices?.diligence ?? 0,
         remuneration_salary: staff.remuneration?.salary ?? 0,
+        remuneration_paymentDay: staff.remuneration?.paymentDay ?? 0,
+        status: staff.status || 'PENDENTE_HOMOLOGACAO',
+        legalType: staff.legalType || 'PF',
+        companyName: staff.companyName || '',
+        cnpj: staff.cnpj || '',
     } : {
         role: 'lawyer',
+        engagementType: 'fixed',
+        status: 'PENDENTE_HOMOLOGACAO' as any,
+        legalType: 'PF' as any,
+        companyName: '',
+        cnpj: '',
         firstName: '',
         lastName: '',
         email: '',
@@ -211,11 +228,13 @@ export function StaffForm({
         remuneration_priceDrafting: 0,
         remuneration_priceDiligence: 0,
         remuneration_salary: 0,
+        remuneration_paymentDay: 5, // Default common payment day
     },
   });
   
   const watchedRole = form.watch('role');
   const watchedRemuneration = form.watch('remuneration_type');
+  const watchedLegalType = form.watch('legalType');
 
   const handleCurrencyValueChange = (e: React.ChangeEvent<HTMLInputElement>, onChange: (val: number) => void) => {
     const rawValue = e.target.value.replace(/\D/g, '');
@@ -268,17 +287,24 @@ export function StaffForm({
         remuneration_type, remuneration_officePercentage, remuneration_lawyerPercentage,
         remuneration_fixedMonthlyValue, remuneration_valuePerHearing,
         remuneration_priceDrafting, remuneration_priceDiligence, remuneration_salary,
+        remuneration_paymentDay,
         admissionDate, birthDate,
         ...restOfValues
       } = values;
 
-      const staffData: any = { 
+      const cleanData = {
         ...restOfValues,
+        status: values.status,
+        legalType: values.legalType,
+        companyName: values.legalType === 'PJ' ? values.companyName : '',
+        cnpj: values.legalType === 'PJ' ? values.cnpj : '',
         phone: values.phone || "",
         whatsapp: values.whatsapp || "",
         oabNumber: values.oabNumber || "",
         oabStatus: values.oabStatus || "Ativa"
       };
+
+      const staffData: any = cleanData;
 
       if (admissionDate) staffData.admissionDate = Timestamp.fromDate(new Date(admissionDate + 'T12:00:00'));
       if (birthDate) staffData.birthDate = Timestamp.fromDate(new Date(birthDate + 'T12:00:00'));
@@ -309,6 +335,7 @@ export function StaffForm({
             rem.lawyerPercentage = remuneration_lawyerPercentage ?? 0;
         } else if (remuneration_type === 'FIXO_MENSAL') {
             rem.fixedMonthlyValue = remuneration_fixedMonthlyValue ?? 0;
+            rem.paymentDay = remuneration_paymentDay ?? 0;
         } else if (remuneration_type === 'AUDIENCISTA') {
             rem.valuePerHearing = remuneration_valuePerHearing ?? 0;
         } else if (remuneration_type === 'PRODUCAO') {
@@ -358,28 +385,132 @@ export function StaffForm({
                   </FormItem>
                 )}
               />
-              <FormField
+               <FormField
                 control={form.control}
-                name="firstName"
+                name="status"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">Nome *</FormLabel>
-                    <FormControl><Input className="h-11 bg-background" placeholder="Primeiro nome" {...field} /></FormControl>
+                    <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">Status / Situação *</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl><SelectTrigger className="h-11 bg-background"><SelectValue placeholder="Selecionar..." /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        <SelectItem value="ATIVO">Ativo / Homologado</SelectItem>
+                        <SelectItem value="PENDENTE_HOMOLOGACAO">Pendente de Homologação</SelectItem>
+                        <SelectItem value="BLOQUEADO">Bloqueado / Suspender</SelectItem>
+                        <SelectItem value="INATIVO">Inativo / Desligado</SelectItem>
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
               />
               <FormField
                 control={form.control}
-                name="lastName"
+                name="engagementType"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">Sobrenome *</FormLabel>
-                    <FormControl><Input className="h-11 bg-background" placeholder="Sobrenome completo" {...field} /></FormControl>
+                    <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">Tipo de Vínculo *</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl><SelectTrigger className="h-11 bg-background"><SelectValue placeholder="Selecionar..." /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        <SelectItem value="fixed">Prestador Fixo / CLT</SelectItem>
+                        <SelectItem value="correspondent">Correspondente (Por Diligência)</SelectItem>
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+              <FormField
+                control={form.control}
+                name="legalType"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">Natureza Jurídica *</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl><SelectTrigger className="h-11 bg-background shrink-0"><SelectValue placeholder="Selecionar..." /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        <SelectItem value="PF">Pessoa Física / Autônomo</SelectItem>
+                        <SelectItem value="PJ">Pessoa Jurídica / Escritório Parceiro</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              {watchedLegalType === 'PJ' ? (
+                <>
+                  <FormField
+                    control={form.control}
+                    name="companyName"
+                    render={({ field }) => (
+                      <FormItem className="col-span-full md:col-span-2">
+                        <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">Razão Social / Nome do Escritório *</FormLabel>
+                        <FormControl><Input className="h-11 bg-background" placeholder="Ex: Bueno Gois Sociedade de Advogados" {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="cnpj"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">CNPJ *</FormLabel>
+                        <FormControl><Input className="h-11 bg-background" placeholder="00.000.000/0000-00" {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="firstName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">Nome do Contato Principal *</FormLabel>
+                        <FormControl><Input className="h-11 bg-background" placeholder="Primeiro nome" {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="lastName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">Sobrenome do Contato *</FormLabel>
+                        <FormControl><Input className="h-11 bg-background" placeholder="Sobrenome completo" {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </>
+              ) : (
+                <>
+                  <FormField
+                    control={form.control}
+                    name="firstName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">Nome *</FormLabel>
+                        <FormControl><Input className="h-11 bg-background" placeholder="Primeiro nome" {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="lastName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">Sobrenome *</FormLabel>
+                        <FormControl><Input className="h-11 bg-background" placeholder="Sobrenome completo" {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </>
+              )}
               <FormField
                   control={form.control}
                   name="email"
@@ -589,26 +720,43 @@ export function StaffForm({
                       )}
 
                       {watchedRemuneration === 'FIXO_MENSAL' && (
-                          <FormField
-                              control={form.control}
-                              name="remuneration_fixedMonthlyValue"
-                              render={({ field }) => (
-                                  <FormItem className="md:col-span-2">
-                                      <FormLabel className="text-xs font-bold uppercase">Valor Fixo Pro-Labore / Salário (R$)</FormLabel>
-                                      <FormControl>
-                                          <div className="relative">
-                                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-bold">R$</span>
-                                              <Input 
-                                                type="text" 
-                                                className="h-11 pl-9 bg-background" 
-                                                value={formatCurrencyValue(field.value)} 
-                                                onChange={(e) => handleCurrencyValueChange(e, field.onChange)}
-                                              />
-                                          </div>
-                                      </FormControl>
-                                  </FormItem>
-                              )}
-                          />
+                          <>
+                              <FormField
+                                  control={form.control}
+                                  name="remuneration_fixedMonthlyValue"
+                                  render={({ field }) => (
+                                      <FormItem>
+                                          <FormLabel className="text-xs font-bold uppercase">Valor Pro-Labore / Fixo (R$)</FormLabel>
+                                          <FormControl>
+                                              <div className="relative">
+                                                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-bold">R$</span>
+                                                  <Input 
+                                                    type="text" 
+                                                    className="h-11 pl-9 bg-background font-black" 
+                                                    value={formatCurrencyValue(field.value)} 
+                                                    onChange={(e) => handleCurrencyValueChange(e, field.onChange)}
+                                                  />
+                                              </div>
+                                          </FormControl>
+                                      </FormItem>
+                                  )}
+                              />
+                              <FormField
+                                  control={form.control}
+                                  name="remuneration_paymentDay"
+                                  render={({ field }) => (
+                                      <FormItem>
+                                          <FormLabel className="text-xs font-bold uppercase">Dia Preferencial p/ Pagamento</FormLabel>
+                                          <FormControl>
+                                              <div className="relative">
+                                                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                                  <Input type="number" min="1" max="31" className="h-11 pl-10 bg-background font-black" placeholder="Ex: 5" {...field} />
+                                              </div>
+                                          </FormControl>
+                                      </FormItem>
+                                  )}
+                              />
+                          </>
                       )}
 
                       {watchedRemuneration === 'AUDIENCISTA' && (

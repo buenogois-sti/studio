@@ -287,6 +287,8 @@ export async function createHearing(data: {
     }
     
     revalidatePath('/dashboard/audiencias');
+    revalidatePath('/dashboard/pericias');
+    revalidatePath('/dashboard/diligencias');
     return { success: true, id: hearingRef.id };
   } catch (error: any) {
     console.error('Error creating hearing/meeting:', error);
@@ -394,6 +396,8 @@ export async function updateHearing(hearingId: string, data: Partial<Hearing>) {
     }
 
     revalidatePath('/dashboard/audiencias');
+    revalidatePath('/dashboard/pericias');
+    revalidatePath('/dashboard/diligencias');
     return { success: true };
   } catch (error: any) {
     throw new Error(error.message);
@@ -440,6 +444,8 @@ export async function updateHearingStatus(hearingId: string, status: HearingStat
         }
 
         revalidatePath('/dashboard/audiencias');
+        revalidatePath('/dashboard/pericias');
+        revalidatePath('/dashboard/diligencias');
         return { success: true };
     } catch (e: any) {
         throw new Error(e.message || 'Falha ao atualizar status.');
@@ -567,6 +573,8 @@ export async function processHearingReturn(hearingId: string, data: {
 
     await batch.commit();
     revalidatePath('/dashboard/audiencias');
+    revalidatePath('/dashboard/pericias');
+    revalidatePath('/dashboard/diligencias');
     return { success: true };
   } catch (error: any) {
     throw new Error(error.message);

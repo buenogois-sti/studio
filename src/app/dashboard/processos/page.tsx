@@ -64,6 +64,7 @@ import { QuickHearingDialog } from '@/components/process/QuickHearingDialog';
 import { QuickMeetingDialog } from '@/components/process/QuickMeetingDialog';
 import { LegalDeadlineDialog } from '@/components/process/LegalDeadlineDialog';
 import { QuickDiligenceDialog } from '@/components/process/QuickDiligenceDialog';
+import { LegalAppraisalDialog } from '@/components/process/LegalAppraisalDialog';
 import { syncProcessToDrive } from '@/lib/drive';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -93,6 +94,7 @@ const ProcessCard = React.memo(({
   onDeadline, 
   onHearing, 
   onDiligence,
+  onAppraisal,
   onDrafting, 
   onEdit, 
   onArchive, 
@@ -112,6 +114,7 @@ const ProcessCard = React.memo(({
   onDeadline: (p: Process) => void;
   onHearing: (p: Process) => void;
   onDiligence: (p: Process) => void;
+  onAppraisal: (p: Process) => void;
   onDrafting: (p: Process) => void;
   onEdit: (p: Process) => void;
   onArchive: (p: Process) => void;
@@ -217,6 +220,9 @@ const ProcessCard = React.memo(({
                     <DropdownMenuItem onClick={() => onDiligence(p)} className="gap-2 focus:bg-white/5">
                       <Briefcase className="h-4 w-4 text-blue-400" /> <span className="font-bold text-blue-400">Agendar Diligência</span>
                     </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onAppraisal(p)} className="gap-2 focus:bg-white/5">
+                      <Search className="h-4 w-4 text-primary" /> <span className="font-bold text-primary">Agendar Perícia</span>
+                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => onDrafting(p)} className="gap-2 focus:bg-white/5">
                       <FilePlus2 className="h-4 w-4 text-emerald-400" /> <span className="font-bold">Gerar Documento (IA)</span>
                     </DropdownMenuItem>
@@ -319,6 +325,7 @@ export default function ProcessosPage() {
   const [isMeetingOpen, setIsMeetingOpen] = React.useState(false);
   const [isDeadlineOpen, setIsDeadlineOpen] = React.useState(false);
   const [isDiligenceOpen, setIsDiligenceOpen] = React.useState(false);
+  const [isAppraisalOpen, setIsAppraisalOpen] = React.useState(false);
   const [editingProcess, setEditingProcess] = React.useState<Process | null>(null);
   const [selectedProcess, setSelectedProcess] = React.useState<Process | null>(null);
   const [isSyncing, setIsSyncing] = React.useState<string | null>(null);
@@ -497,6 +504,11 @@ export default function ProcessosPage() {
     setIsDiligenceOpen(true);
   }, []);
 
+  const handleAppraisal = React.useCallback((p: Process) => {
+    setSelectedProcess(p);
+    setIsAppraisalOpen(true);
+  }, []);
+
   const handleDrafting = React.useCallback((p: Process) => {
     setSelectedProcess(p);
     setIsDraftingOpen(true);
@@ -618,6 +630,7 @@ export default function ProcessosPage() {
                 onDeadline={handleDeadline}
                 onHearing={handleHearing}
                 onDiligence={handleDiligence}
+                onAppraisal={handleAppraisal}
                 onDrafting={handleDrafting}
                 onEdit={handleEdit}
                 onArchive={handleArchiveRequest}
@@ -689,6 +702,7 @@ export default function ProcessosPage() {
       <QuickHearingDialog process={selectedProcess} open={isHearingOpen} onOpenChange={setIsHearingOpen} />
       <QuickMeetingDialog process={selectedProcess} open={isMeetingOpen} onOpenChange={setIsMeetingOpen} />
       <QuickDiligenceDialog process={selectedProcess} open={isDiligenceOpen} onOpenChange={setIsDiligenceOpen} />
+      <LegalAppraisalDialog process={selectedProcess} open={isAppraisalOpen} onOpenChange={setIsAppraisalOpen} />
       <LegalDeadlineDialog process={selectedProcess} open={isDeadlineOpen} onOpenChange={setIsDeadlineOpen} />
       <FinancialEventDialog process={eventProcess} open={!!eventProcess} onOpenChange={o => !o && setEventProcess(null)} onEventCreated={() => {}} />
 
