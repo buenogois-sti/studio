@@ -48,7 +48,7 @@ import {
   Clock
 } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, Timestamp, query, orderBy, deleteDoc, doc, getDocs, where, limit } from 'firebase/firestore';
+import { collection, Timestamp, query, orderBy, deleteDoc, doc, getDocs, where, limit, serverTimestamp } from 'firebase/firestore';
 import type { FinancialTitle, Staff, Client, Process, BankAccount } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { searchProcesses } from '@/lib/process-actions';
@@ -88,7 +88,7 @@ import { Input } from '@/components/ui/input';
 import { format, isBefore, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { createFinancialTitle, updateFinancialTitleStatus, processLatePaymentRoutine, updateFinancialTitle, deleteFinancialTitle, deleteFinancialTitleSeries } from '@/lib/finance-actions';
+import { createFinancialTitle, updateFinancialTitleStatus, processLatePaymentRoutine, updateFinancialTitle, deleteFinancialTitle, deleteFinancialTitleSeries, anticipateFinancialTitles } from '@/lib/finance-actions';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -126,7 +126,12 @@ const titleFormSchema = z.object({
     'ALVARA',
     'TRANSFERENCIAS_JUDICIAIS',
     'CONTAS_CONSUMO',
-    'OUTRAS_RECEITAS'
+    'OUTRAS_RECEITAS',
+    'INFRAESTRUTURA_IMOBILIARIA',
+    'RECURSOS_HUMANOS',
+    'LOGISTICA_VIAGENS',
+    'DESPESAS_BANCARIAS',
+    'RENDIMENTOS_INVESTIMENTOS'
   ]),
   value: z.coerce.number().positive('Valor deve ser positivo'),
   dueDate: z.string().min(1, 'Data de vencimento obrigatória'),
@@ -374,19 +379,24 @@ function TitleFormDialog({
   onOpenChange, 
   title, 
   onSuccess,
+  onDelete,
   defaultDate,
 }: { 
   open: boolean; 
   onOpenChange: (o: boolean) => void; 
   title?: FinancialTitle | null; 
   onSuccess: () => void;
+  onDelete?: (title: FinancialTitle, series: boolean) => void;
   defaultDate?: string;
 }) {
   const [isSaving, setIsSaving] = React.useState(false);
+  const [isDeleting, setIsDeleting] = React.useState(false);
   const [processSearch, setProcessSearch] = React.useState('');
   const [processResults, setProcessResults] = React.useState<Process[]>([]);
   const [isSearchingProcess, setIsSearchingProcess] = React.useState(false);
   const [selectedProcess, setSelectedProcess] = React.useState<Process | null>(null);
+  const [recurrenceHistory, setRecurrenceHistory] = React.useState<FinancialTitle[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = React.useState(false);
   const { toast } = useToast();
   const { firestore } = useFirebase();
 
@@ -476,6 +486,17 @@ function TitleFormDialog({
       });
       setSelectedProcess(null);
     }
+
+    if (open && title?.recurrenceId && firestore) {
+      setIsLoadingHistory(true);
+      getDocs(query(collection(firestore, 'financial_titles'), where('recurrenceId', '==', title.recurrenceId), orderBy('dueDate', 'asc')))
+        .then(snap => {
+          setRecurrenceHistory(snap.docs.map(d => ({ id: d.id, ...d.data() } as FinancialTitle)));
+        })
+        .finally(() => setIsLoadingHistory(false));
+    } else {
+      setRecurrenceHistory([]);
+    }
   }, [open, title, form, firestore, defaultDate]);
 
   React.useEffect(() => {
@@ -511,6 +532,50 @@ function TitleFormDialog({
     }).format(value);
   };
 
+  const handleUpdateStatusQuick = async (id: string, status: 'PAGO' | 'PENDENTE') => {
+    setIsSaving(true);
+    try {
+      await updateFinancialTitleStatus(id, status);
+      toast({ title: `Título marcado como ${status.toLowerCase()}!` });
+      onSuccess();
+      onOpenChange(false);
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Erro', description: e.message });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDelete = async (series: boolean) => {
+      if (!title || !onDelete) return;
+      if (!confirm(series ? 'Excluir toda a série de recorrência?' : 'Excluir este lançamento específico?')) return;
+      
+      setIsDeleting(true);
+      try {
+          onDelete(title, series);
+          onOpenChange(false);
+      } finally {
+          setIsDeleting(false);
+      }
+  };
+
+  const handleAnticipate = async () => {
+    if (!title?.recurrenceId) return;
+    if (!confirm('Deseja liquidar todas as parcelas pendentes desta série?')) return;
+    
+    setIsSaving(true);
+    try {
+      const res = await anticipateFinancialTitles(title.recurrenceId);
+      toast({ title: 'Série Antecipada!', description: `${res.count} títulos liquidados.` });
+      onSuccess();
+      onOpenChange(false);
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Erro', description: e.message });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const onSubmit = async (values: z.infer<typeof titleFormSchema>) => {
     setIsSaving(true);
     try {
@@ -520,6 +585,7 @@ function TitleFormDialog({
         competenceDate: values.competenceDate ? new Date(values.competenceDate + 'T12:00:00') : null,
         processId: selectedProcess?.id || '',
         clientId: selectedProcess?.clientId || '',
+        updatedAt: serverTimestamp() as any
       };
 
       if (isEdit && title) {
@@ -541,20 +607,36 @@ function TitleFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl bg-[#020617] border-white/10 h-[95vh] flex flex-col p-0 overflow-hidden shadow-2xl">
-        <DialogHeader className="p-6 border-b border-white/5 bg-white/5 shrink-0">
-          <DialogTitle className="text-xl font-black font-headline text-white uppercase tracking-tight">
-            {isEdit ? 'Editar Título Financeiro' : 'Novo Título Financeiro'}
-          </DialogTitle>
-          <DialogDescription className="text-slate-400">
-            {isEdit ? 'Ajuste os dados do lançamento selecionado.' : 'Lançamento manual de entrada ou saída para controle de caixa.'}
-          </DialogDescription>
+      <DialogContent className={cn(
+          "bg-[#020617] border-white/10 h-[95vh] flex flex-col p-0 overflow-hidden shadow-2xl transition-all duration-500",
+          title?.recurrenceId ? "sm:max-w-5xl" : "sm:max-w-2xl"
+      )}>
+        <DialogHeader className="p-6 border-b border-white/5 bg-white/5 shrink-0 flex flex-row items-center justify-between space-y-0">
+          <div>
+            <DialogTitle className="text-xl font-black font-headline text-white uppercase tracking-tight">
+              {isEdit ? 'Editar Título Financeiro' : 'Novo Título Financeiro'}
+            </DialogTitle>
+            <DialogDescription className="text-slate-400">
+              {isEdit ? 'Ajuste os dados do lançamento selecionado.' : 'Lançamento manual de entrada ou saída para controle de caixa.'}
+            </DialogDescription>
+          </div>
+          {isEdit && title?.status !== 'PAGO' && (
+              <Button 
+                onClick={() => handleUpdateStatusQuick(title.id, 'PAGO')}
+                disabled={isSaving}
+                className="bg-emerald-500 hover:bg-emerald-600 text-white font-black uppercase text-[10px] tracking-widest h-10 px-6 rounded-xl shadow-lg shadow-emerald-500/20"
+              >
+                <CheckCircle2 className="h-4 w-4 mr-2" /> Liquidar Título
+              </Button>
+          )}
         </DialogHeader>
         
-        <ScrollArea className="flex-1">
-          <div className="p-6">
-            <Form {...form}>
+        <div className="flex-1 flex overflow-hidden">
+          <ScrollArea className="flex-1 border-r border-white/5">
+            <div className="p-6">
+              <Form {...form}>
               <form id="title-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+                {/* 1. Categorização e Operação */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <FormField
                     control={form.control}
@@ -564,74 +646,35 @@ function TitleFormDialog({
                         <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Tipo de Operação *</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
-                            <SelectTrigger className="bg-black/40 border-white/10 h-11 focus:border-primary transition-all">
-                              <SelectValue />
+                            <SelectTrigger className="bg-black/40 border-white/10 h-11 focus:border-primary transition-all rounded-xl">
+                              <SelectValue placeholder="Selecione tipo..." />
                             </SelectTrigger>
                           </FormControl>
-                          <SelectContent className="bg-[#0f172a] border-white/10 text-white">
-                            <SelectItem value="RECEITA">💰 Entrada (Receita)</SelectItem>
-                            <SelectItem value="DESPESA">💸 Saída (Despesa)</SelectItem>
+                          <SelectContent className="bg-[#0f172a] border-white/10 text-white shadow-2xl">
+                            <SelectItem value="RECEITA" className="focus:bg-emerald-500/10 focus:text-emerald-400">💰 Entrada (Receita)</SelectItem>
+                            <SelectItem value="DESPESA" className="focus:bg-rose-500/10 focus:text-rose-400">💸 Saída (Despesa)</SelectItem>
                           </SelectContent>
                         </Select>
                       </FormItem>
                     )}
                   />
-                  <FormField
-                    control={form.control}
-                    name="origin"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Categoria / Origem *</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger className="bg-black/40 border-white/10 h-11 focus:border-primary transition-all">
-                              <SelectValue placeholder="Selecione..." />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent className="bg-[#0f172a] border-white/10 text-white max-h-[400px]">
-                            <DropdownMenuLabel className="text-[10px] uppercase text-muted-foreground p-2">Escritório (Fixos)</DropdownMenuLabel>
-                            <SelectItem value="ALUGUEL_CONTAS">🏢 Aluguel / Contas de Consumo</SelectItem>
-                            <SelectItem value="SALARIOS_PROLABORE">👨‍⚖️ Salários / Pró-Labore</SelectItem>
-                            <SelectItem value="INFRAESTRUTURA_TI">💻 TI / Software / Cloud</SelectItem>
-                            <SelectItem value="MATERIAL_ESCRITORIO">📦 Material de Escritório</SelectItem>
-                            <SelectItem value="IMPOSTOS_TAXAS">🏛️ Impostos e Taxas</SelectItem>
-                            
-                            <DropdownMenuSeparator className="bg-white/5" />
-                            <DropdownMenuLabel className="text-[10px] uppercase text-muted-foreground p-2">Jurídico (Variáveis)</DropdownMenuLabel>
-                            <SelectItem value="HONORARIOS_CONTRATUAIS">⚖️ Honorários Contratuais</SelectItem>
-                            <SelectItem value="SUCUMBENCIA">🏆 Honorários de Sucumbência</SelectItem>
-                            <SelectItem value="ACORDO">🤝 Acordo / Liquidação</SelectItem>
-                            <SelectItem value="CUSTAS_PROCESSUAIS">📄 Custas Judiciais</SelectItem>
-                            <SelectItem value="PERICIA">🔍 Perícia Técnica</SelectItem>
-                            <SelectItem value="DESLOCAMENTO">🚗 Deslocamento/Diligência</SelectItem>
-                            <SelectItem value="SERVICOS_TERCEIROS">🤝 Serviços de Terceiros</SelectItem>
-                            
-                            <DropdownMenuSeparator className="bg-white/5" />
-                            <SelectItem value="OUTRAS_DESPESAS">📦 Outras Operações</SelectItem>
-                            <SelectItem value="ADICIONAL">➕ Adicional / Extra</SelectItem>
-                            <SelectItem value="ALVARA">📜 Alvará Judicial</SelectItem>
-                            <SelectItem value="TRANSFERENCIAS_JUDICIAIS">🏦 Transf. Judiciais</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <FormField
                     control={form.control}
                     name="category"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Grupo de Contas</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
+                        <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Grupo de Contas / Gestão *</FormLabel>
+                        <Select onValueChange={(val) => {
+                           field.onChange(val);
+                           form.setValue('origin', val as any);
+                           form.setValue('subcategory', ''); // Reset subcategory
+                        }} value={field.value}>
                           <FormControl>
                             <SelectTrigger className="bg-black/40 border-white/10 h-11 focus:border-primary transition-all rounded-xl">
                               <SelectValue placeholder="Selecione Categoria..." />
                             </SelectTrigger>
                           </FormControl>
-                          <SelectContent className="bg-[#0f172a] border-white/10 text-white">
+                          <SelectContent className="bg-[#0f172a] border-white/10 text-white max-h-[400px]">
                             {Object.entries(form.watch('type') === 'RECEITA' ? REVENUE_CATEGORIES : EXPENSE_CATEGORIES).map(([key, cat]) => (
                                 <SelectItem key={key} value={key}>{cat.label}</SelectItem>
                             ))}
@@ -640,19 +683,25 @@ function TitleFormDialog({
                       </FormItem>
                     )}
                   />
+                </div>
+
+                {/* 2. Detalhamento e Valor */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <FormField
                     control={form.control}
                     name="subcategory"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Subcategoria Legal</FormLabel>
+                        <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
+                            Subcategoria Detalhada <Badge variant="outline" className="text-[7px] h-4 bg-primary/10 text-primary border-primary/20">Dinâmico</Badge>
+                        </FormLabel>
                         <Select onValueChange={field.onChange} value={field.value} disabled={!form.watch('category')}>
                           <FormControl>
                             <SelectTrigger className="bg-black/40 border-white/10 h-11 focus:border-primary transition-all rounded-xl">
-                              <SelectValue placeholder="Selecione Subcategoria..." />
+                              <SelectValue placeholder="Selecione detalhe..." />
                             </SelectTrigger>
                           </FormControl>
-                          <SelectContent className="bg-[#0f172a] border-white/10 text-white">
+                          <SelectContent className="bg-[#0f172a] border-white/10 text-white max-h-[350px]">
                             {((form.watch('type') === 'RECEITA' ? REVENUE_CATEGORIES : EXPENSE_CATEGORIES) as any)[form.watch('category') as string]?.subcategories.map((sub: string) => (
                                 <SelectItem key={sub} value={sub}>{sub}</SelectItem>
                             ))}
@@ -661,8 +710,65 @@ function TitleFormDialog({
                       </FormItem>
                     )}
                   />
+                  <FormField
+                   control={form.control}
+                   name="value"
+                   render={({ field }) => (
+                     <FormItem>
+                       <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Valor do Título (R$) *</FormLabel>
+                       <FormControl>
+                         <div className="relative">
+                           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-primary font-black text-sm">R$</span>
+                           <Input 
+                             className="bg-black/40 border-white/10 pl-10 h-11 text-base font-black text-white rounded-xl focus:border-primary shadow-inner" 
+                             placeholder="0,00"
+                             value={formatCurrencyValue(field.value)}
+                             onChange={(e) => handleValueChange(e, field.onChange)}
+                           />
+                         </div>
+                       </FormControl>
+                       <FormMessage />
+                     </FormItem>
+                   )}
+                 />
                 </div>
 
+                {/* 3. Datas */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-5 rounded-2xl bg-white/5 border border-white/10">
+                   <FormField
+                    control={form.control}
+                    name="dueDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Data de Vencimento *</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary" />
+                            <Input type="date" className="bg-[#020617] border-white/10 h-11 pl-10 text-white rounded-xl" {...field} />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="competenceDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Mês de Competência</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <Clock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                            <Input type="date" className="bg-[#020617] border-white/10 h-11 pl-10 text-white rounded-xl" {...field} />
+                          </div>
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                {/* 4. Favorecido e Pagamento */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <FormField
                     control={form.control}
@@ -671,7 +777,10 @@ function TitleFormDialog({
                       <FormItem>
                         <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Favorecido / Beneficiário</FormLabel>
                         <FormControl>
-                          <Input className="h-11 bg-black/40 border-white/10 rounded-xl" placeholder="Nome do favorecido..." {...field} />
+                          <div className="relative">
+                            <Users className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                            <Input className="h-11 bg-black/40 border-white/10 rounded-xl pl-10" placeholder="Nome do favorecido..." {...field} />
+                          </div>
                         </FormControl>
                       </FormItem>
                     )}
@@ -701,6 +810,7 @@ function TitleFormDialog({
                   />
                 </div>
 
+                {/* 5. Descrição */}
                 <FormField
                   control={form.control}
                   name="description"
@@ -708,89 +818,79 @@ function TitleFormDialog({
                     <FormItem>
                       <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Descrição detalhada do Título *</FormLabel>
                       <FormControl>
-                        <Input className="h-12 bg-black/40 border-white/10 rounded-xl font-bold" placeholder="Ex: Honorários Contratuais - Processo X" {...field} />
+                        <Input className="h-12 bg-black/40 border-white/10 rounded-xl font-bold" placeholder="Ex: Pagamento Aluguel Março/2026" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
 
+                {/* 6. Vínculo Processual */}
                 <div className="space-y-3">
-                  <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
-                    <FolderKanban className="h-3.5 w-3.5 text-primary" /> Vínculo Processual (Opcional)
-                  </FormLabel>
-                  {selectedProcess ? (
-                    <div className="flex items-center justify-between p-4 rounded-2xl border-2 border-primary/30 bg-primary/5 animate-in zoom-in-95">
-                      <div className="flex items-center gap-3 overflow-hidden">
-                        <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20 shrink-0">
-                          <Scale className="h-5 w-5 text-primary" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-bold text-white truncate">{selectedProcess.name}</p>
-                          <p className="text-[10px] text-primary/60 font-mono tracking-widest">{selectedProcess.processNumber || 'Sem Nº CNJ'}</p>
-                        </div>
-                      </div>
-                      <Button variant="ghost" size="icon" className="h-10 w-10 text-slate-500 hover:text-white rounded-xl" onClick={() => setSelectedProcess(null)}>
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-                      <Input 
-                        className="bg-black/40 border-white/10 pl-10 h-12 rounded-xl focus:border-primary transition-all text-sm" 
-                        placeholder="Pesquisar processo para vincular..." 
-                        value={processSearch}
-                        onChange={(e) => setProcessSearch(e.target.value)}
-                      />
-                      {isSearchingProcess && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-primary" />}
-                      {processResults.length > 0 && (
-                        <div className="absolute top-full left-0 right-0 mt-2 bg-[#0f172a] border border-white/10 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-50 overflow-hidden animate-in fade-in slide-in-from-top-2">
-                          <ScrollArea className="max-h-[250px]">
-                            {processResults.map(p => (
-                              <button
-                                key={p.id}
-                                type="button"
-                                className="w-full text-left p-4 hover:bg-white/5 transition-all border-b border-white/5 last:border-0 group"
-                                onClick={() => {
-                                  setSelectedProcess(p);
-                                  setProcessResults([]);
-                                  setProcessSearch('');
-                                }}
-                              >
-                                <p className="text-sm font-bold text-white group-hover:text-primary transition-colors truncate">{p.name}</p>
-                                <p className="text-[10px] text-slate-500 font-mono uppercase mt-0.5">{p.processNumber || 'Nº não informado'}</p>
-                              </button>
-                            ))}
-                          </ScrollArea>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
+                   <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
+                     <FolderKanban className="h-3.5 w-3.5 text-primary" /> Vínculo Processual (Opcional)
+                   </FormLabel>
+                   {selectedProcess ? (
+                     <div className="flex items-center justify-between p-4 rounded-2xl border-2 border-primary/30 bg-primary/5 animate-in zoom-in-95">
+                       <div className="flex items-center gap-3 overflow-hidden">
+                         <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20 shrink-0">
+                           <Scale className="h-5 w-5 text-primary" />
+                         </div>
+                         <div className="min-w-0 flex-1">
+                           <p className="text-sm font-bold text-white truncate">{selectedProcess.name}</p>
+                           <p className="text-[10px] text-primary/60 font-mono tracking-widest">{selectedProcess.processNumber || 'Sem Nº CNJ'}</p>
+                         </div>
+                       </div>
+                       <Button variant="ghost" size="icon" className="h-10 w-10 text-slate-500 hover:text-white rounded-xl" onClick={() => setSelectedProcess(null)}>
+                         <X className="h-4 w-4" />
+                       </Button>
+                     </div>
+                   ) : (
+                     <div className="relative">
+                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                       <Input 
+                         className="bg-black/40 border-white/10 pl-10 h-12 rounded-xl focus:border-primary transition-all text-sm" 
+                         placeholder="Pesquisar processo para vincular..." 
+                         value={processSearch}
+                         onChange={(e) => setProcessSearch(e.target.value)}
+                       />
+                       {isSearchingProcess && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-primary" />}
+                       {processResults.length > 0 && (
+                         <div className="absolute top-full left-0 right-0 mt-2 bg-[#0f172a] border border-white/10 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-50 overflow-hidden animate-in fade-in slide-in-from-top-2">
+                           <ScrollArea className="max-h-[250px]">
+                             {processResults.map(p => (
+                               <button
+                                 key={p.id}
+                                 type="button"
+                                 className="w-full text-left p-4 hover:bg-white/5 transition-all border-b border-white/5 last:border-0 group"
+                                 onClick={() => {
+                                   setSelectedProcess(p);
+                                   setProcessResults([]);
+                                   setProcessSearch('');
+                                 }}
+                               >
+                                 <p className="text-sm font-bold text-white group-hover:text-primary transition-colors truncate">{p.name}</p>
+                                 <p className="text-[10px] text-slate-500 font-mono uppercase mt-0.5">{p.processNumber || 'Nº não informado'}</p>
+                               </button>
+                             ))}
+                           </ScrollArea>
+                         </div>
+                       )}
+                     </div>
+                   )}
+                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-5 rounded-2xl bg-white/5 border border-white/10">
-                   <FormField
-                    control={form.control}
-                    name="competenceDate"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Mês de Competência</FormLabel>
-                        <FormControl>
-                          <Input type="date" className="bg-transparent border-white/10 h-10 text-white rounded-xl" {...field} />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
+                {/* 7. Status e Observações */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <FormField
                     control={form.control}
                     name="status"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Status Inicial</FormLabel>
+                        <FormLabel className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Status do Título</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
-                            <SelectTrigger className="bg-transparent border-white/10 h-10 rounded-xl">
+                            <SelectTrigger className="bg-black/40 border-white/10 h-11 rounded-xl">
                               <SelectValue />
                             </SelectTrigger>
                           </FormControl>
@@ -804,62 +904,22 @@ function TitleFormDialog({
                       </FormItem>
                     )}
                   />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 rounded-3xl bg-primary/5 border-2 border-primary/20 shadow-lg shadow-primary/5">
                   <FormField
                     control={form.control}
-                    name="value"
+                    name="notes"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-[10px] font-black uppercase text-primary tracking-widest">Valor do Título (R$) *</FormLabel>
+                        <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Observações (Opcional)</FormLabel>
                         <FormControl>
-                          <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-primary font-black text-sm">R$</span>
-                            <Input 
-                              className="bg-black/40 border-primary/20 pl-10 h-12 text-lg font-black text-white rounded-xl focus:border-primary shadow-inner" 
-                              type="text"
-                              value={formatCurrencyValue(field.value)}
-                              onChange={(e) => handleValueChange(e, field.onChange)}
-                            />
-                          </div>
+                          <Input className="h-11 bg-black/40 border-white/10 rounded-xl" placeholder="Notas sobre este lançamento..." {...field} />
                         </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="dueDate"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Vencimento da Parcela *</FormLabel>
-                        <FormControl>
-                          <div className="relative">
-                            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-                            <Input type="date" className="bg-black/40 border-white/10 h-12 pl-10 text-white rounded-xl" {...field} />
-                          </div>
-                        </FormControl>
-                        <FormMessage />
                       </FormItem>
                     )}
                   />
                 </div>
 
-                <FormField
-                  control={form.control}
-                  name="notes"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Observações Internas (Opcional)</FormLabel>
-                      <FormControl>
-                        <Input className="h-20 bg-black/40 border-white/10 rounded-xl text-xs py-2" placeholder="Notas sobre este lançamento..." {...field} />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-
-                <div className="space-y-4 pt-2">
+                {/* 8. Recorrência */}
+                <div className="space-y-4 pt-2 pb-10">
                     <div className="flex items-center justify-between p-5 rounded-2xl bg-white/5 border border-white/10">
                       <div className="space-y-0.5">
                         <FormLabel className="text-white font-black text-sm">Habilitar Recorrência?</FormLabel>
@@ -874,6 +934,7 @@ function TitleFormDialog({
                               checked={field.value} 
                               onCheckedChange={field.onChange} 
                               className="data-[state=checked]:bg-primary"
+                              disabled={isEdit}
                             />
                           </FormControl>
                         )}
@@ -912,13 +973,120 @@ function TitleFormDialog({
                         )}
                       />
                     )}
-                  </div>
+                </div>
               </form>
             </Form>
           </div>
         </ScrollArea>
 
+        {title?.recurrenceId && (
+            <div className="w-80 bg-black/20 overflow-hidden flex flex-col shrink-0 animate-in slide-in-from-right duration-500">
+                <div className="p-6 border-b border-white/5 bg-white/5">
+                    <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500 flex items-center gap-2">
+                        <History className="h-3.5 w-3.5" /> Histórico de Recorrência
+                    </h4>
+                    <p className="text-[9px] text-slate-600 font-bold uppercase mt-1">Ciclagem de parcelas vinculadas</p>
+                </div>
+                {recurrenceHistory.some(h => h.status === 'PENDENTE') && (
+                    <div className="px-4 py-2 border-b border-white/5 bg-primary/5">
+                        <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            disabled={isSaving}
+                            className="w-full text-primary hover:bg-primary/10 font-black uppercase text-[9px] tracking-widest gap-2 h-8"
+                            onClick={handleAnticipate}
+                        >
+                            <Flame className="h-3 w-3" /> Antecipar Pendentes
+                        </Button>
+                    </div>
+                )}
+                <ScrollArea className="flex-1">
+                    <div className="p-4 space-y-2">
+                        {isLoadingHistory ? (
+                            <div className="flex flex-col items-center justify-center p-12 gap-3">
+                                <Loader2 className="h-5 w-5 animate-spin text-slate-700" />
+                                <span className="text-[9px] font-black text-slate-700 uppercase">Carregando série...</span>
+                            </div>
+                        ) : recurrenceHistory.map((h, i) => (
+                            <button 
+                                key={h.id}
+                                disabled={h.id === title.id}
+                                onClick={() => {
+                                    // In a real app we'd navigate to this title in the parent or reload the dialog
+                                    // For now, let's just show it's clickable
+                                }}
+                                className={cn(
+                                    "w-full text-left p-3 rounded-xl border transition-all group flex items-center justify-between",
+                                    h.id === title.id 
+                                        ? "bg-primary/10 border-primary/30 ring-1 ring-primary/20" 
+                                        : "bg-white/5 border-white/5 hover:border-white/20 hover:bg-white/10"
+                                )}
+                            >
+                                <div className="min-w-0 pr-2">
+                                    <div className="flex items-center gap-2 mb-0.5">
+                                        <span className={cn(
+                                            "text-[7px] font-black px-1 rounded uppercase",
+                                            h.status === 'PAGO' ? "bg-emerald-500/20 text-emerald-500" : "bg-amber-500/20 text-amber-500"
+                                        )}>
+                                            {h.installmentIndex}/{h.totalInstallments}
+                                        </span>
+                                        <span className="text-[9px] font-bold text-slate-500 uppercase">
+                                            {format(h.dueDate instanceof Timestamp ? h.dueDate.toDate() : new Date(h.dueDate), 'MMM/yyyy', { locale: ptBR })}
+                                        </span>
+                                    </div>
+                                    <p className={cn(
+                                        "text-[10px] font-black truncate",
+                                        h.id === title.id ? "text-primary" : "text-white"
+                                    )}>
+                                        R$ {h.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                    </p>
+                                </div>
+                                {h.status === 'PAGO' && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />}
+                            </button>
+                        ))}
+                    </div>
+                </ScrollArea>
+                <div className="p-4 border-t border-white/5 bg-black/40">
+                    <div className="flex justify-between items-center text-[10px] font-black uppercase text-slate-500 mb-2">
+                        <span>Progresso da Série</span>
+                        <span className="text-white">{Math.round((recurrenceHistory.filter(h => h.status === 'PAGO').length / recurrenceHistory.length) * 100)}%</span>
+                    </div>
+                    <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                        <div 
+                            className="h-full bg-primary transition-all duration-1000" 
+                            style={{ width: `${(recurrenceHistory.filter(h => h.status === 'PAGO').length / recurrenceHistory.length) * 100}%` }}
+                        />
+                    </div>
+                </div>
+            </div>
+        )}
+        </div>
+
         <DialogFooter className="p-6 border-t border-white/5 bg-white/5 shrink-0 gap-3">
+          {isEdit && title && (
+              <div className="mr-auto flex items-center gap-2">
+                  <Button 
+                    variant="ghost" 
+                    type="button" 
+                    onClick={() => handleDelete(false)}
+                    disabled={isSaving || isDeleting}
+                    className="text-rose-500 hover:text-rose-400 hover:bg-rose-500/10 font-bold uppercase text-[10px] h-12 px-4 rounded-xl"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" /> Excluir
+                  </Button>
+                  {title.recurrenceId && (
+                      <Button 
+                        variant="ghost" 
+                        type="button" 
+                        onClick={() => handleDelete(true)}
+                        disabled={isSaving || isDeleting}
+                        className="text-rose-600 hover:text-rose-500 hover:bg-rose-500/10 font-bold uppercase text-[10px] h-12 px-4 rounded-xl"
+                      >
+                         Excluir Série
+                      </Button>
+                  )}
+              </div>
+          )}
           <DialogClose asChild>
             <Button variant="ghost" type="button" className="text-slate-400 font-bold uppercase text-[10px] tracking-widest h-12">
               Cancelar
@@ -927,7 +1095,7 @@ function TitleFormDialog({
           <Button 
             type="submit" 
             form="title-form" 
-            disabled={isSaving} 
+            disabled={isSaving || isDeleting} 
             className="flex-1 bg-primary text-primary-foreground font-black uppercase tracking-widest text-[11px] h-12 shadow-xl shadow-primary/20 hover:scale-[1.02] transition-all"
           >
             {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
@@ -966,11 +1134,8 @@ export default function FinanceiroPage() {
   const { data: processesData } = useCollection<Process>(processesQuery);
   const processesMap = React.useMemo(() => new Map(processesData?.map(p => [p.id, p])), [processesData]);
   
-  const [bankAccounts, setBankAccounts] = React.useState<BankAccount[]>([
-    { id: '1', name: 'Conta Principal', bankName: 'Itaú Personalité', type: 'CORRENTE', balance: 45280.50, color: '#ec4899', isActive: true },
-    { id: '2', name: 'Reserva de Lucros', bankName: 'XP Investimentos', type: 'INVESTIMENTO', balance: 128400.00, color: '#f5d030', isActive: true },
-    { id: '3', name: 'Caixa Pequeno', bankName: 'Caixa Interno', type: 'CORRENTE', balance: 1200.00, color: '#10b981', isActive: true },
-  ]);
+  const accountsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'bank_accounts'), orderBy('name', 'asc')) : null), [firestore]);
+  const { data: bankAccounts, isLoading: isLoadingAccounts } = useCollection<BankAccount>(accountsQuery);
 
   const stats = React.useMemo(() => {
     if (!titlesData) return { totalReceitas: 0, totalDespesas: 0, pendenteReceita: 0, pendenteDespesa: 0, officeRevenue: 0, pendingClientPayouts: 0 };
@@ -1231,29 +1396,38 @@ export default function FinanceiroPage() {
             </CardHeader>
             <CardContent className="p-0">
               <div className="divide-y divide-white/5">
-                {bankAccounts.map(account => (
-                  <div key={account.id} className="p-5 flex items-center justify-between group hover:bg-white/5 transition-all">
-                    <div className="flex items-center gap-4">
-                      <div className="h-10 w-10 rounded-xl flex items-center justify-center border border-white/10 shrink-0" style={{ backgroundColor: `${account.color}10`, color: account.color }}>
-                        <DollarSign className="h-5 w-5" />
+                {isLoadingAccounts ? (
+                  <div className="p-8 text-center"><Loader2 className="h-4 w-4 animate-spin mx-auto text-primary" /></div>
+                ) : (bankAccounts || []).length > 0 ? (
+                  bankAccounts?.map(account => (
+                    <div key={account.id} className="p-5 flex items-center justify-between group hover:bg-white/5 transition-all">
+                      <div className="flex items-center gap-4">
+                        <div className="h-10 w-10 rounded-xl flex items-center justify-center border border-white/10 shrink-0" style={{ backgroundColor: `${account.color || '#F5D030'}10`, color: account.color || '#F5D030' }}>
+                          <DollarSign className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-black text-white">{account.name}</p>
+                          <p className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">{account.bankName}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-xs font-black text-white">{account.name}</p>
-                        <p className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">{account.bankName}</p>
+                      <div className="text-right">
+                        <p className="text-sm font-black text-white tabular-nums">{formatCurrency(account.balance)}</p>
+                        <p className="text-[8px] font-bold text-slate-500 uppercase">{account.type}</p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm font-black text-white tabular-nums">{formatCurrency(account.balance)}</p>
-                      <p className="text-[8px] font-bold text-slate-500 uppercase">{account.type}</p>
-                    </div>
+                  ))
+                ) : (
+                  <div className="p-10 text-center opacity-30">
+                    <AlertTriangle className="h-8 w-8 mx-auto mb-2" />
+                    <p className="text-[10px] font-black uppercase tracking-widest leading-none">Nenhuma conta cadastrada</p>
                   </div>
-                ))}
+                )}
               </div>
               <div className="p-5 bg-black/20">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Patrimônio Líquido</span>
                   <span className="text-lg font-black text-primary">
-                    {formatCurrency(bankAccounts.reduce((acc, a) => acc + a.balance, 0))}
+                    {formatCurrency((bankAccounts || []).reduce((acc, a) => acc + (a.balance || 0), 0))}
                   </span>
                 </div>
                 <Button variant="ghost" className="w-full text-primary hover:text-primary/80 text-[10px] font-bold uppercase h-9 group">
@@ -1595,7 +1769,11 @@ export default function FinanceiroPage() {
         open={isFormOpen} 
         onOpenChange={setIsFormOpen} 
         title={titleToEdit}
-        onSuccess={() => setRefreshKey(k => k + 1)} 
+        onSuccess={() => setRefreshKey(k => k + 1)}
+        onDelete={(title, series) => {
+            setTitleToEditDelete(title);
+            handleDeleteTitle(series);
+        }}
       />
 
       <ClientReceiptDialog 

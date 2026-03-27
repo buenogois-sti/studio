@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import * as React from 'react';
 import { useSession } from 'next-auth/react';
 import { useToast } from '@/components/ui/use-toast';
+import { cn } from '@/lib/utils';
 
 import {
   SidebarProvider,
@@ -70,7 +71,7 @@ import { LGPDGuard } from '@/components/LGPDGuard';
 
 const sidebarSections = [
   {
-    label: 'Iniciativa (Estratégico)',
+    label: 'Hub de Comando',
     items: [
       { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'lawyer', 'financial', 'assistant'] },
       { href: '/dashboard/relatorios', label: 'Relatórios BI', icon: BarChart, roles: ['admin', 'financial', 'lawyer'] },
@@ -78,38 +79,44 @@ const sidebarSections = [
     ]
   },
   {
-    label: 'Comercial (CRM)',
+    label: 'Pessoal',
+    items: [
+      { href: '/dashboard/repasses?view=personal', label: 'Minha Wallet Digital', icon: Wallet, roles: ['lawyer', 'assistant'] },
+    ]
+  },
+  {
+    label: 'Relacionamento (CRM)',
     items: [
       { href: '/dashboard/leads', label: 'Leads (Triagem)', icon: Zap, roles: ['admin', 'lawyer', 'assistant'] },
       { href: '/dashboard/clientes', label: 'Clientes', icon: Users, roles: ['admin', 'lawyer', 'assistant', 'financial'] },
     ]
   },
   {
-    label: 'Secretaria (Operacional)',
+    label: 'Jurídico (Operação)',
     items: [
       { href: '/dashboard/processos', label: 'Processos', icon: FolderKanban, roles: ['admin', 'lawyer', 'assistant', 'financial'] },
-      { href: '/dashboard/prazos', label: 'Agenda de Prazos', icon: Timer, roles: ['admin', 'lawyer', 'assistant'] },
+      { href: '/dashboard/prazos', label: 'Prazos Judiciais', icon: Timer, roles: ['admin', 'lawyer', 'assistant'] },
       { href: '/dashboard/audiencias', label: 'Pauta de Audiências', icon: Gavel, roles: ['admin', 'lawyer', 'assistant'] },
       { href: '/dashboard/pericias', label: 'Perícias Judiciais', icon: Search, roles: ['admin', 'lawyer', 'assistant'], isNew: true },
-      { href: '/dashboard/diligencias', label: 'Atos Operacionais', icon: MapPin, roles: ['admin', 'lawyer', 'assistant'] },
-      { href: '/dashboard/correspondentes', label: 'Correspondentes', icon: HeartHandshake, roles: ['admin', 'lawyer', 'assistant'] },
-      { href: '/dashboard/acervo', label: 'Acervo de Modelos', icon: Library, roles: ['admin', 'lawyer', 'assistant'] },
-      { href: '/dashboard/arquivo', label: 'Arquivo Digital', icon: Archive, roles: ['admin', 'lawyer', 'assistant'] },
+      { href: '/dashboard/diligencias', label: 'Atos & Diligências', icon: MapPin, roles: ['admin', 'lawyer', 'assistant'] },
     ]
   },
   {
-    label: 'Financeiro (Caixa)',
+    label: 'Financeiro (Carteira)',
     items: [
-      { href: '/dashboard/financeiro', label: 'Faturamento', icon: DollarSign, roles: ['admin', 'financial'], isNew: true },
+      { href: '/dashboard/repasses', label: 'Wallets & Liquidações', icon: Wallet, roles: ['admin', 'financial'], isNew: true },
+      { href: '/dashboard/financeiro', label: 'Faturamento', icon: DollarSign, roles: ['admin', 'financial'] },
       { href: '/dashboard/financeiro/calendario', label: 'Calendário Fluxo', icon: CalendarDays, roles: ['admin', 'financial'] },
-      { href: '/dashboard/repasses', label: 'Carteira & Repasses', icon: Wallet, roles: ['admin', 'financial', 'lawyer'] },
       { href: '/dashboard/reembolsos', label: 'Reembolsos', icon: Receipt, roles: ['admin', 'lawyer', 'financial', 'assistant'] },
     ]
   },
   {
-    label: 'Tecnologia (Gestão)',
+    label: 'Administrativo',
     items: [
-      { href: '/dashboard/rh', label: 'Recursos Humanos', icon: Users, roles: ['admin'], isNew: true },
+      { href: '/dashboard/rh', label: 'RH & Folha de Elite', icon: ShieldCheck, roles: ['admin'], isNew: true },
+      { href: '/dashboard/correspondentes', label: 'Correspondentes', icon: HeartHandshake, roles: ['admin', 'lawyer', 'assistant'] },
+      { href: '/dashboard/acervo', label: 'Acervo de Modelos', icon: Library, roles: ['admin', 'lawyer', 'assistant'] },
+      { href: '/dashboard/arquivo', label: 'Arquivo Digital', icon: Archive, roles: ['admin', 'lawyer', 'assistant'] },
       { href: '/dashboard/configuracoes', label: 'Configurações', icon: Settings, roles: ['admin'] },
     ]
   }
@@ -231,13 +238,16 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
                                 asChild
                                 isActive={pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href))}
                                 tooltip={item.label}
-                                className="data-[active=true]:bg-primary/10 data-[active=true]:text-primary text-slate-400 hover:text-white transition-all h-10"
+                                className={cn(
+                                    "data-[active=true]:bg-primary/10 data-[active=true]:text-primary text-slate-400 hover:text-white transition-all h-10",
+                                    (item as any).isNew && "border-l-2 border-amber-500/50 bg-amber-500/5"
+                                )}
                               >
                                 <Link href={item.href}>
-                                  <item.icon />
-                                  <span className="font-bold flex-1">{item.label}</span>
+                                  <item.icon className={cn((item as any).isNew && "text-amber-400")} />
+                                  <span className={cn("font-bold flex-1", (item as any).isNew && "text-amber-400")}>{item.label}</span>
                                   {(item as any).isNew && (
-                                    <span className="ml-auto text-[8px] font-black bg-primary text-primary-foreground px-1.5 py-0.5 rounded-full animate-pulse">NEW</span>
+                                    <span className="ml-auto text-[8px] font-bold bg-amber-400 text-black px-1.5 py-0.5 rounded-sm shadow-[0_0_10px_rgba(251,191,36,0.4)] animate-pulse">NEW</span>
                                   )}
                                 </Link>
                               </SidebarMenuButton>

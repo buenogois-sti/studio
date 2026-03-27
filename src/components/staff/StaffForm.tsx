@@ -72,7 +72,8 @@ const staffSchema = z.object({
   account: z.string().optional().or(z.literal('')),
   pixKey: z.string().optional().or(z.literal('')),
 
-  remuneration_type: z.enum(['SUCUMBENCIA', 'PRODUCAO', 'QUOTA_LITIS', 'FIXO_MENSAL', 'AUDIENCISTA']).optional(),
+  remuneration_type: z.enum(['SUCUMBENCIA', 'PRODUCAO', 'QUOTA_LITIS', 'FIXO_MENSAL', 'AUDIENCISTA', 'SOCIO']).optional(),
+  remuneration_profitPercentage: z.coerce.number().min(0).max(100).optional().or(z.literal(0)),
   remuneration_officePercentage: z.coerce.number().min(0).optional().or(z.literal(0)),
   remuneration_lawyerPercentage: z.coerce.number().min(0).optional().or(z.literal(0)),
   remuneration_fixedMonthlyValue: z.coerce.number().min(0).optional().or(z.literal(0)),
@@ -123,6 +124,7 @@ const remunerationOptions = [
     { value: 'QUOTA_LITIS', label: 'Participação sobre o Êxito (Quota Litis)' },
     { value: 'FIXO_MENSAL', label: 'Valor Fixo Mensal' },
     { value: 'AUDIENCISTA', label: 'Advogado Audiencista (Por Audiência)' },
+    { value: 'SOCIO', label: 'Distribuição de Lucros (Sócio)' },
 ];
 
 const oabStatusOptions = ['Ativa', 'Suspensa', 'Inativa', 'Pendente'];
@@ -180,6 +182,7 @@ export function StaffForm({
         remuneration_priceDrafting: staff.remuneration?.activityPrices?.drafting ?? 0,
         remuneration_priceDiligence: staff.remuneration?.activityPrices?.diligence ?? 0,
         remuneration_salary: staff.remuneration?.salary ?? 0,
+        remuneration_profitPercentage: staff.remuneration?.profitPercentage ?? 0,
         remuneration_paymentDay: staff.remuneration?.paymentDay ?? 0,
         status: staff.status || 'PENDENTE_HOMOLOGACAO',
         legalType: staff.legalType || 'PF',
@@ -228,6 +231,7 @@ export function StaffForm({
         remuneration_priceDrafting: 0,
         remuneration_priceDiligence: 0,
         remuneration_salary: 0,
+        remuneration_profitPercentage: 0,
         remuneration_paymentDay: 5, // Default common payment day
     },
   });
@@ -287,6 +291,7 @@ export function StaffForm({
         remuneration_type, remuneration_officePercentage, remuneration_lawyerPercentage,
         remuneration_fixedMonthlyValue, remuneration_valuePerHearing,
         remuneration_priceDrafting, remuneration_priceDiligence, remuneration_salary,
+        remuneration_profitPercentage,
         remuneration_paymentDay,
         admissionDate, birthDate,
         ...restOfValues
@@ -343,6 +348,10 @@ export function StaffForm({
                 drafting: remuneration_priceDrafting ?? 0,
                 diligence: remuneration_priceDiligence ?? 0,
             };
+        } else if (remuneration_type === 'SOCIO') {
+            rem.fixedMonthlyValue = remuneration_fixedMonthlyValue ?? 0;
+            rem.paymentDay = remuneration_paymentDay ?? 0;
+            rem.profitPercentage = remuneration_profitPercentage ?? 0;
         }
         staffData.remuneration = rem;
       }
@@ -747,6 +756,61 @@ export function StaffForm({
                                   render={({ field }) => (
                                       <FormItem>
                                           <FormLabel className="text-xs font-bold uppercase">Dia Preferencial p/ Pagamento</FormLabel>
+                                          <FormControl>
+                                              <div className="relative">
+                                                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                                  <Input type="number" min="1" max="31" className="h-11 pl-10 bg-background font-black" placeholder="Ex: 5" {...field} />
+                                              </div>
+                                          </FormControl>
+                                      </FormItem>
+                                  )}
+                              />
+                          </>
+                      )}
+
+                      {watchedRemuneration === 'SOCIO' && (
+                          <>
+                              <FormField
+                                  control={form.control}
+                                  name="remuneration_fixedMonthlyValue"
+                                  render={({ field }) => (
+                                      <FormItem>
+                                          <FormLabel className="text-xs font-bold uppercase text-primary">Pró-Labore Fixo (R$)</FormLabel>
+                                          <FormControl>
+                                              <div className="relative">
+                                                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-bold">R$</span>
+                                                  <Input 
+                                                    type="text" 
+                                                    className="h-11 pl-9 bg-background font-black border-primary/20" 
+                                                    value={formatCurrencyValue(field.value)} 
+                                                    onChange={(e) => handleCurrencyValueChange(e, field.onChange)}
+                                                  />
+                                              </div>
+                                          </FormControl>
+                                      </FormItem>
+                                  )}
+                              />
+                              <FormField
+                                  control={form.control}
+                                  name="remuneration_profitPercentage"
+                                  render={({ field }) => (
+                                      <FormItem>
+                                          <FormLabel className="text-xs font-bold uppercase text-primary">Cota de Lucros / Dividendos (%)</FormLabel>
+                                          <FormControl>
+                                              <div className="relative">
+                                                  <Percent className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                                  <Input type="number" className="h-11 pl-10 bg-background font-black border-primary/20" placeholder="Ex: 50" {...field} />
+                                              </div>
+                                          </FormControl>
+                                      </FormItem>
+                                  )}
+                              />
+                              <FormField
+                                  control={form.control}
+                                  name="remuneration_paymentDay"
+                                  render={({ field }) => (
+                                      <FormItem className="col-span-full">
+                                          <FormLabel className="text-xs font-bold uppercase">Dia Preferencial p/ Retirada do Pró-labore</FormLabel>
                                           <FormControl>
                                               <div className="relative">
                                                   <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />

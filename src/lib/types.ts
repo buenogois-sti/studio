@@ -249,6 +249,7 @@ export type FinancialTitle = {
     | 'SENTENCA'
     | 'HONORARIOS_CONTRATUAIS'
     | 'SUCUMBENCIA'
+    | 'HONORARIOS_EXITO'
     | 'CUSTAS_PROCESSUAIS'
     | 'HONORARIOS_PAGOS'
     | 'SALARIOS_PROLABORE'
@@ -266,7 +267,12 @@ export type FinancialTitle = {
     | 'ALVARA'
     | 'TRANSFERENCIAS_JUDICIAIS'
     | 'REPASSE_CLIENTE'
-    | 'OUTRAS_RECEITAS';
+    | 'OUTRAS_RECEITAS'
+    | 'INFRAESTRUTURA_IMOBILIARIA'
+    | 'RECURSOS_HUMANOS'
+    | 'LOGISTICA_VIAGENS'
+    | 'DESPESAS_BANCARIAS'
+    | 'RENDIMENTOS_INVESTIMENTOS';
   value: number;
   dueDate: any;
   paymentDate?: any;
@@ -324,10 +330,10 @@ export type StaffStatus = 'ATIVO' | 'INATIVO' | 'BLOQUEADO' | 'PENDENTE_HOMOLOGA
 export type LegalType = 'PF' | 'PJ';
 export type StaffRole = 'employee' | 'lawyer' | 'intern' | 'provider' | 'partner';
 export type OABStatus = 'Ativa' | 'Suspensa' | 'Inativa' | 'Pendente';
-export type RemunerationType = 'SUCUMBENCIA' | 'PRODUCAO' | 'QUOTA_LITIS' | 'FIXO_MENSAL' | 'AUDIENCISTA';
+export type RemunerationType = 'SUCUMBENCIA' | 'PRODUCAO' | 'QUOTA_LITIS' | 'FIXO_MENSAL' | 'AUDIENCISTA' | 'SOCIO';
 
 export type StaffCreditStatus = 'RETIDO' | 'DISPONIVEL' | 'PAGO';
-export type StaffCreditType = 'HONORARIOS' | 'REEMBOLSO' | 'SALARIO' | 'PRODUCAO' | 'BONUS' | 'DEBITO';
+export type StaffCreditType = 'HONORARIOS' | 'REEMBOLSO' | 'SALARIO' | 'PRODUCAO' | 'BONUS' | 'DEBITO' | 'DIVIDENDOS';
 
 export type StaffCredit = {
   id: string;
@@ -398,6 +404,7 @@ export type Staff = {
     fixedMonthlyValue?: number;
     valuePerHearing?: number;
     salary?: number; // CLT Salary
+    profitPercentage?: number;
     paymentDay?: number; // Day of the month for payment
     benefits?: {
       transportation?: number;

@@ -304,6 +304,35 @@ export async function deleteFinancialTitle(id: string) {
   }
 }
 
+export async function anticipateFinancialTitles(recurrenceId: string) {
+    if (!firestoreAdmin) throw new Error("Servidor inacessível.");
+    try {
+        const batch = firestoreAdmin.batch();
+        const titles = await firestoreAdmin.collection('financial_titles')
+            .where('recurrenceId', '==', recurrenceId)
+            .where('status', '==', 'PENDENTE')
+            .get();
+        
+        const now = FieldValue.serverTimestamp();
+
+        titles.docs.forEach(doc => {
+            batch.update(doc.ref, { 
+                status: 'PAGO', 
+                paymentDate: now,
+                updatedAt: now,
+                notes: FieldValue.arrayUnion(`Antecipação em ${format(new Date(), 'dd/MM/yyyy HH:mm')}`)
+            });
+        });
+
+        await batch.commit();
+        revalidatePath('/dashboard/financeiro');
+        revalidatePath('/dashboard/repasses');
+        return { success: true, count: titles.size };
+    } catch (error: any) {
+        throw new Error(error.message);
+    }
+}
+
 export async function deleteFinancialTitleSeries(groupId: string) {
   if (!firestoreAdmin) throw new Error("Servidor inacessível.");
   try {
@@ -562,16 +591,63 @@ export async function processLatePaymentRoutine(titleId: string) {
   }
 }
 
-export async function launchPayroll() {
+export async function checkPendingPayrollForToday() {
   if (!firestoreAdmin) throw new Error("Servidor inacessível.");
   const staffSnap = await firestoreAdmin.collection('staff').get();
-  let count = 0;
+  const today = new Date();
+  const currentDay = today.getDate();
+  const currentMonthKey = format(today, 'MMMM/yyyy', { locale: ptBR });
 
-  const currentMonth = format(new Date(), 'MMMM/yyyy', { locale: ptBR });
+  const pending: { id: string, name: string, value: number, type: string }[] = [];
 
   for (const s of staffSnap.docs) {
     const data = s.data() as Staff;
-    if (data.remuneration?.type === 'FIXO_MENSAL' && data.remuneration.fixedMonthlyValue) {
+    const paymentDay = data.remuneration?.paymentDay || 5; // Default to 5th if not set
+    
+    // Check if it's the professional's day
+    if (paymentDay === currentDay) {
+      // Check if already launched for this month
+      const creditsSnap = await s.ref.collection('credits')
+        .where('type', '==', 'SALARIO')
+        .where('description', '>=', `Pro-labore Mensal - ${currentMonthKey}`)
+        .limit(1)
+        .get();
+
+      if (creditsSnap.empty && data.remuneration?.fixedMonthlyValue) {
+        pending.push({
+          id: s.id,
+          name: `${data.firstName} ${data.lastName}`,
+          value: data.remuneration.fixedMonthlyValue,
+          type: 'SALARIO'
+        });
+      }
+    }
+  }
+
+  return pending;
+}
+
+export async function launchPayroll(staffIds?: string[]) {
+  if (!firestoreAdmin) throw new Error("Servidor inacessível.");
+  const staffSnap = staffIds 
+    ? await Promise.all(staffIds.map(id => firestoreAdmin!.collection('staff').doc(id).get()))
+    : (await firestoreAdmin.collection('staff').get()).docs;
+
+  let count = 0;
+  const currentMonth = format(new Date(), 'MMMM/yyyy', { locale: ptBR });
+
+  for (const s of staffSnap) {
+    if (!s.exists) continue;
+    const data = s.data() as Staff;
+    
+    // Verification to avoid double launch even in targeted launch
+    const alreadyExists = await s.ref.collection('credits')
+        .where('type', '==', 'SALARIO')
+        .where('description', '==', `Pro-labore Mensal - ${currentMonth}`)
+        .limit(1)
+        .get();
+
+    if (alreadyExists.empty && data.remuneration?.fixedMonthlyValue) {
       await s.ref.collection('credits').add({
         type: 'SALARIO',
         description: `Pro-labore Mensal - ${currentMonth}`,

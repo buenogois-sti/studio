@@ -104,7 +104,7 @@
       "collectionGroup": "financial_titles",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "origin", "order": "DESCENDING" },
+        { "fieldPath": "origin", "order": "ASCENDING" },
         { "fieldPath": "paymentDate", "order": "DESCENDING" }
       ]
     },
@@ -189,6 +189,22 @@
         { "fieldPath": "status", "order": "ASCENDING" },
         { "fieldPath": "priority", "order": "ASCENDING" },
         { "fieldPath": "updatedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "deadlines",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "endDate", "order": "DESCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "hearings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "date", "order": "DESCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
       ]
     }
   ],

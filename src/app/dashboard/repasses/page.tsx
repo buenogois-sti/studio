@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { useSearchParams } from 'next/navigation';
 import { 
   Wallet, 
   Users, 
@@ -36,8 +37,12 @@ import {
   Building,
   ArrowUpRight,
   ArrowDownRight,
-  Scale
+  Scale,
+  ChevronLeft,
+  ChevronRight,
+  Sparkles
 } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useFirebase, useCollection, useMemoFirebase, useDoc } from '@/firebase';
 import { collection, query, where, getDocs, getDoc, FieldValue, Timestamp, doc, deleteDoc, orderBy, limit } from 'firebase/firestore';
 import type { Staff, FinancialTitle, StaffCredit, UserProfile } from '@/lib/types';
@@ -51,7 +56,8 @@ import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
 import { H1 } from '@/components/ui/typography';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { processRepasse, launchPayroll, deleteStaffCredit, updateStaffCredit, addManualStaffCredit, updateCreditForecast, requestCreditUnlock, updateFinancialTitleStatus } from '@/lib/finance-actions';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { processRepasse, launchPayroll, deleteStaffCredit, updateStaffCredit, addManualStaffCredit, updateCreditForecast, requestCreditUnlock, updateFinancialTitleStatus, checkPendingPayrollForToday } from '@/lib/finance-actions';
 import {
   Dialog,
   DialogContent,
@@ -77,7 +83,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { format, startOfMonth } from 'date-fns';
+import { format, startOfMonth, endOfMonth, addMonths, subMonths, isWithinInterval } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -114,23 +120,27 @@ function RepasseValue({ staffId }: { staffId: string }) {
     {val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
   </span>;
 }
-function OfficeWalletView() {
+function OfficeWalletView({ selectedDate }: { selectedDate: Date }) {
   const { firestore } = useFirebase();
+  const start = startOfMonth(selectedDate);
+  const end = endOfMonth(selectedDate);
   
   const titlesQuery = useMemoFirebase(() => (firestore ? query(
     collection(firestore, 'financial_titles'),
     where('status', '==', 'PAGO'),
     where('type', '==', 'RECEITA'),
-    orderBy('dueDate', 'desc'),
-    limit(100)
-  ) : null), [firestore]);
+    where('paymentDate', '>=', Timestamp.fromDate(start)),
+    where('paymentDate', '<=', Timestamp.fromDate(end)),
+    orderBy('paymentDate', 'desc')
+  ) : null), [firestore, selectedDate]);
 
   const allExitsQuery = useMemoFirebase(() => (firestore ? query(
     collection(firestore, 'financial_titles'),
     where('origin', 'in', ['HONORARIOS_PAGOS', 'REPASSE_CLIENTE']),
-    orderBy('paymentDate', 'desc'),
-    limit(200)
-  ) : null), [firestore]);
+    where('paymentDate', '>=', Timestamp.fromDate(start)),
+    where('paymentDate', '<=', Timestamp.fromDate(end)),
+    orderBy('paymentDate', 'desc')
+  ) : null), [firestore, selectedDate]);
 
   const { data: titles, isLoading: isLoadingTitles } = useCollection<FinancialTitle>(titlesQuery);
   const { data: exits, isLoading: isLoadingExits } = useCollection<FinancialTitle>(allExitsQuery);
@@ -153,59 +163,44 @@ function OfficeWalletView() {
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card className="bg-emerald-500/5 border-emerald-500/20">
-          <CardHeader className="p-4 pb-1"><CardTitle className="text-[9px] font-black uppercase text-emerald-400 tracking-widest">Total Recebido Bruto</CardTitle></CardHeader>
-          <CardContent className="p-4 pt-0">
-            <p className="text-2xl font-black text-white">{stats.grossEntry.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
-            <p className="text-[8px] text-emerald-500/60 font-bold uppercase mt-1">Entradas processadas 100%</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-blue-500/5 border-blue-500/20">
-          <CardHeader className="p-4 pb-1"><CardTitle className="text-[9px] font-black uppercase text-blue-400 tracking-widest">Repasses a Clientes</CardTitle></CardHeader>
-          <CardContent className="p-4 pt-0">
-            <p className="text-2xl font-black text-white">{stats.clientExits.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
-            <p className="text-[8px] text-blue-500/60 font-bold uppercase mt-1">Saídas liquidadas (70%)</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-purple-500/5 border-purple-500/20">
-          <CardHeader className="p-4 pb-1"><CardTitle className="text-[9px] font-black uppercase text-purple-400 tracking-widest">Repasses à Equipe</CardTitle></CardHeader>
-          <CardContent className="p-4 pt-0">
-            <p className="text-2xl font-black text-white">{stats.staffExits.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
-            <p className="text-[8px] text-purple-500/60 font-bold uppercase mt-1">Comissões e Pró-labore</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-primary/5 border-primary/20 border-2">
-          <CardHeader className="p-4 pb-1"><CardTitle className="text-[9px] font-black uppercase text-primary tracking-widest">Saldo Líquido Banca</CardTitle></CardHeader>
-          <CardContent className="p-4 pt-0">
-            <p className="text-2xl font-black text-primary">{stats.netOffice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
-            <p className="text-[8px] text-primary/60 font-bold uppercase mt-1">Lucratividade real retida</p>
-          </CardContent>
-        </Card>
+    <div className="space-y-6 animate-in fade-in duration-500">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="p-4 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/[0.08] transition-all">
+            <span className="text-[9px] font-black uppercase text-slate-500 tracking-widest block mb-2">Receita Bruta</span>
+            <span className="text-xl font-black text-white">{stats.grossEntry.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+        </div>
+        <div className="p-4 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/[0.08] transition-all">
+            <span className="text-[9px] font-black uppercase text-slate-500 tracking-widest block mb-2">Saídas p/ Clientes</span>
+            <span className="text-xl font-black text-rose-400">({stats.clientExits.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })})</span>
+        </div>
+        <div className="p-4 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/[0.08] transition-all">
+            <span className="text-[9px] font-black uppercase text-slate-500 tracking-widest block mb-2">Saídas p/ Equipe</span>
+            <span className="text-xl font-black text-rose-400">({stats.staffExits.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })})</span>
+        </div>
+        <div className="p-4 rounded-2xl bg-primary/10 border border-primary/20 hover:bg-primary/20 transition-all">
+            <span className="text-[9px] font-black uppercase text-primary tracking-widest block mb-2">Lucro Retido Banca</span>
+            <span className="text-xl font-black text-white">{stats.netOffice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+        </div>
       </div>
 
       <Card className="bg-[#0f172a] border-white/5 overflow-hidden shadow-2xl">
-        <CardHeader className="bg-white/5 border-b border-white/5 flex flex-row items-center justify-between py-4 px-6 text-sm">
+        <CardHeader className="bg-white/5 border-b border-white/5 flex flex-row items-center justify-between py-4 px-6">
           <div className="flex items-center gap-3">
-             <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center"><Building className="h-4 w-4 text-primary" /></div>
+             <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center"><History className="h-4 w-4 text-primary" /></div>
              <div>
-                <CardTitle className="text-base font-black text-white uppercase tracking-tight">Extrato Consolidado da Banca</CardTitle>
-                <CardDescription className="text-[10px] text-slate-500 uppercase font-bold">Fluxo completo de entradas e saídas operacionais</CardDescription>
+                <CardTitle className="text-sm font-black text-white uppercase tracking-tight">Fluxo de Caixa Consolidado</CardTitle>
+                <CardDescription className="text-[9px] text-slate-500 uppercase font-black">Histórico de liquidações institucionais do mês</CardDescription>
              </div>
           </div>
-          <Button variant="outline" size="sm" className="h-8 border-white/10 text-[10px] uppercase font-black" onClick={() => window.print()}><Printer className="h-3.5 w-3.5 mr-2" /> Exportar</Button>
+          <Button variant="outline" size="sm" className="h-8 border-white/10 text-[9px] uppercase font-black" onClick={() => window.print()}><Printer className="h-3.5 w-3.5 mr-2" /> Gerar Relatório</Button>
         </CardHeader>
         <Table>
           <TableHeader className="bg-black/20">
             <TableRow className="border-white/5 uppercase">
-              <TableHead className="text-[9px] font-black text-slate-500 px-6 py-4">Data</TableHead>
-              <TableHead className="text-[9px] font-black text-slate-500 py-4">Operação / Referência</TableHead>
-              <TableHead className="text-[9px] font-black text-slate-500 text-right py-4">Fluxo Wallet</TableHead>
-              <TableHead className="text-[9px] font-black text-slate-500 text-right px-6 py-4">Valor (R$)</TableHead>
+              <TableHead className="text-[9px] font-black text-slate-500 px-6 py-3">Data</TableHead>
+              <TableHead className="text-[9px] font-black text-slate-500 py-3">Operação / Referência</TableHead>
+              <TableHead className="text-[9px] font-black text-slate-500 text-center py-3">Tipo</TableHead>
+              <TableHead className="text-[9px] font-black text-slate-500 text-right px-6 py-3">Valor (R$)</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -216,7 +211,7 @@ function OfficeWalletView() {
             }).slice(0, 50).map(t => (
               <TableRow key={t.id} className="border-white/5 hover:bg-white/5 transition-colors group">
                 <TableCell className="px-6 text-[10px] text-slate-500 font-mono">
-                  {t.paymentDate ? format(t.paymentDate.toDate(), 'dd/MM/yyyy HH:mm') : t.dueDate ? format(t.dueDate.toDate(), 'dd/MM/yyyy') : '---'}
+                  {t.paymentDate ? format(t.paymentDate.toDate(), 'dd/MM/yy HH:mm') : t.dueDate ? format(t.dueDate.toDate(), 'dd/MM/yy') : '---'}
                 </TableCell>
                 <TableCell>
                   <div className="flex flex-col">
@@ -224,19 +219,19 @@ function OfficeWalletView() {
                     <span className="text-[8px] text-slate-500 uppercase font-black mt-0.5 tracking-tighter">{t.origin}</span>
                   </div>
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell className="text-center">
                     <Badge className={cn(
-                        "text-[8px] font-black uppercase border-none",
+                        "text-[8px] font-black uppercase border-none h-5 px-2",
                         t.type === 'RECEITA' ? "bg-emerald-500/20 text-emerald-400" : "bg-rose-500/20 text-rose-400"
                     )}>
-                        {t.type === 'RECEITA' ? '+ ENTRADA' : '- SAÍDA'}
+                        {t.type === 'RECEITA' ? '+ ENTRADA' : '- REPASSE'}
                     </Badge>
                 </TableCell>
                 <TableCell className={cn(
                     "text-right px-6 font-black text-sm tabular-nums",
                     t.type === 'RECEITA' ? "text-emerald-400" : "text-rose-400"
                 )}>
-                  {t.type === 'RECEITA' ? '+' : '-'} {t.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  {t.type === 'RECEITA' ? '' : '-'} {t.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                 </TableCell>
               </TableRow>
             ))}
@@ -621,11 +616,14 @@ function ManageCreditsDialog({ staff, open, onOpenChange, onUpdate, isAdmin }: {
   );
 }
 
-function StaffWalletView({ staffId, staffName }: { staffId: string; staffName: string }) {
+function StaffWalletView({ staffId, staffName, selectedDate }: { staffId: string; staffName: string; selectedDate: Date }) {
   const { firestore } = useFirebase();
   const { toast } = useToast();
   const [filter, setFilter] = React.useState<'ALL' | 'DISPONIVEL' | 'RETIDO' | 'PAGO'>('ALL');
   const [isRequesting, setIsRequesting] = React.useState<string | null>(null);
+
+  const start = startOfMonth(selectedDate);
+  const end = endOfMonth(selectedDate);
 
   const creditsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -636,9 +634,20 @@ function StaffWalletView({ staffId, staffName }: { staffId: string; staffName: s
 
   const filteredCredits = React.useMemo(() => {
     if (!credits) return [];
-    if (filter === 'ALL') return credits;
-    return credits.filter(c => c.status === filter);
-  }, [credits, filter]);
+    let list = credits;
+    
+    // Filter by Month if PAGO or ALL
+    if (filter === 'PAGO' || filter === 'ALL') {
+      list = list.filter(c => {
+         const date = c.status === 'PAGO' ? c.paymentDate?.toDate() : c.date?.toDate();
+         if (!date) return false;
+         return isWithinInterval(date, { start, end });
+      });
+    }
+
+    if (filter !== 'ALL') list = list.filter(c => c.status === filter);
+    return list;
+  }, [credits, filter, selectedDate]);
 
   const handleRequestUnlock = async (credit: StaffCredit) => {
     if (isRequesting) return;
@@ -825,11 +834,18 @@ export default function RepassesPage() {
   const { firestore, user } = useFirebase();
   const { data: session } = useSession();
   const { toast } = useToast();
+  const searchParams = useSearchParams();
+  const forcePersonal = searchParams.get('view') === 'personal';
   
-  const [isLaunching, setIsLaunching] = React.useState(false);
+  const [currentDate, setCurrentDate] = React.useState(new Date());
   const [stats, setStats] = React.useState({ totalPending: 0, totalPaidMonth: 0, staffCount: 0, totalRetained: 0, clientDebt: 0 });
+  const [pendingStaff, setPendingStaff] = React.useState<{id: string, name: string, value: number}[]>([]);
+  const [scheduledPayroll, setScheduledPayroll] = React.useState<{id: string, name: string, value: number}[]>([]);
+  const [isPendingListOpen, setIsPendingListOpen] = React.useState(false);
+  const [isProcessingFolha, setIsProcessingFolha] = React.useState(false);
   const [refreshKey, setRefreshKey] = React.useState(0);
   const [isVoucherOpen, setIsVoucherOpen] = React.useState(false);
+  const [isLoadingStats, setIsLoadingStats] = React.useState(true);
   const [voucherData, setVoucherData] = React.useState<{ staff: Staff | null, credits: any[], total: number, date?: Date }>({ staff: null, credits: [], total: 0 });
 
   const userProfileRef = useMemoFirebase(
@@ -838,22 +854,47 @@ export default function RepassesPage() {
   );
   const { data: userProfile, isLoading: isUserProfileLoading } = useDoc<UserProfile>(userProfileRef);
 
+  // Find staff ID for the current user (required for personal wallet)
+  const staffQuery = useMemoFirebase(
+    () => (firestore && userProfile?.email ? query(collection(firestore, 'staff'), where('email', '==', userProfile.email), limit(1)) : null),
+    [firestore, userProfile?.email]
+  );
+  const { data: staffData } = useCollection<Staff>(staffQuery);
+  const currentStaff = staffData?.[0] || null;
+
   const isAdmin = userProfile?.role === 'admin' || userProfile?.role === 'financial';
   const isLawyer = userProfile?.role === 'lawyer';
 
   const loadStats = React.useCallback(async () => {
     if (!firestore || !userProfile) return;
     try {
-      if (isAdmin) {
+      if (isAdmin && !forcePersonal) {
+        setIsLoadingStats(true);
         const staffSnap = await getDocs(collection(firestore, 'staff'));
+        const pList: {id: string, name: string, value: number}[] = [];
         let pending = 0; let retained = 0;
+        
         for (const s of staffSnap.docs) {
+          const sData = s.data() as Staff;
           const credSnap = await getDocs(collection(firestore, `staff/${s.id}/credits`));
+          let staffPendingValue = 0;
+          
           credSnap.docs.forEach(d => {
             const val = d.data().value || 0;
-            if (d.data().status === 'DISPONIVEL') pending += val;
+            if (d.data().status === 'DISPONIVEL') {
+              pending += val;
+              staffPendingValue += val;
+            }
             if (d.data().status === 'RETIDO') retained += val;
           });
+          
+          if (staffPendingValue > 0) {
+            pList.push({ 
+              id: s.id, 
+              name: `${sData.firstName} ${sData.lastName}`, 
+              value: staffPendingValue 
+            });
+          }
         }
         const startOfCurrentMonth = startOfMonth(new Date());
         const paidSnap = await getDocs(query(collection(firestore, 'financial_titles'), where('origin', '==', 'HONORARIOS_PAGOS'), where('paymentDate', '>=', Timestamp.fromDate(startOfCurrentMonth))));
@@ -861,12 +902,17 @@ export default function RepassesPage() {
 
         const clientSnap = await getDocs(query(collection(firestore, 'financial_titles'), where('origin', '==', 'REPASSE_CLIENTE'), where('status', '==', 'PENDENTE')));
         const clientDebt = clientSnap.docs.reduce((sum, d) => sum + (d.data().value || 0), 0);
+        setPendingStaff(pList);
+        setStats({ totalPending: pending, totalPaidMonth: paid, staffCount: pList.length, totalRetained: retained, clientDebt });
 
-        setStats({ totalPending: pending, totalPaidMonth: paid, staffCount: staffSnap.size, totalRetained: retained, clientDebt });
-      } else if (isLawyer) {
-        const credSnap = await getDocs(collection(firestore, `staff/${userProfile.id}/credits`));
+        // Nova verificação de folha programada
+        const scheduled = await checkPendingPayrollForToday();
+        setScheduledPayroll(scheduled);
+      } else if (currentStaff) {
+        const credSnap = await getDocs(collection(firestore, `staff/${currentStaff.id}/credits`));
         let pending = 0; let retained = 0; let paid = 0;
-        const startOfCurrentMonth = startOfMonth(new Date());
+        const start = startOfMonth(currentDate);
+        const end = endOfMonth(currentDate);
         
         credSnap.docs.forEach(d => {
           const data = d.data();
@@ -875,25 +921,17 @@ export default function RepassesPage() {
           if (data.status === 'RETIDO') retained += val;
           if (data.status === 'PAGO') {
             const pDate = data.paymentDate?.toDate();
-            if (pDate && pDate >= startOfCurrentMonth) paid += val;
+            if (pDate && isWithinInterval(pDate, { start, end })) paid += val;
           }
         });
         setStats({ totalPending: pending, totalPaidMonth: paid, staffCount: 1, totalRetained: retained, clientDebt: 0 });
       }
-    } catch (e) { console.warn('[RepassesStats] Failed to load full stats.'); }
-  }, [firestore, isAdmin, isLawyer, userProfile]);
+    } catch (e) { console.warn('[RepassesStats] Failed to load full stats.', e); }
+    finally { setIsLoadingStats(false); }
+  }, [firestore, isAdmin, forcePersonal, currentDate, currentStaff, userProfile]);
 
   React.useEffect(() => { loadStats(); }, [loadStats, refreshKey]);
 
-  const handleLaunchPayroll = async () => {
-    if (!confirm('Deseja processar a folha de pagamento fixa de todos os colaboradores ativos?')) return;
-    setIsLaunching(true);
-    try {
-      const res = await launchPayroll();
-      toast({ title: 'Folha Processada!', description: `${res.count} colaboradores receberam seus créditos mensais.` });
-      setRefreshKey(prev => prev + 1);
-    } catch (e: any) { toast({ variant: 'destructive', title: 'Erro na folha', description: e.message }); } finally { setIsLaunching(false); }
-  };
 
   const handleRepassePaid = (total: number, credits: any[], staff: Staff) => {
     setVoucherData({ staff, credits, total, date: new Date() }); setIsVoucherOpen(true); setRefreshKey(k => k + 1);
@@ -910,6 +948,23 @@ export default function RepassesPage() {
     } catch (e) { toast({ variant: 'destructive', title: 'Erro ao carregar comprovante' }); }
   };
 
+  const handleLaunchFolha = async () => {
+    if (!isAdmin || isProcessingFolha || scheduledPayroll.length === 0) return;
+    if (!confirm(`Deseja lançar o pro-labore de ${scheduledPayroll.length} colaboradores agendados para hoje?`)) return;
+    
+    setIsProcessingFolha(true);
+    try {
+        const ids = scheduledPayroll.map(s => s.id);
+        const res = await launchPayroll(ids);
+        toast({ title: 'Folha Lançada com Sucesso!', description: `${res.count} colaboradores tiveram os créditos adicionados à carteira.` });
+        setRefreshKey(k => k + 1);
+    } catch (e: any) {
+        toast({ variant: 'destructive', title: 'Erro ao lançar folha', description: e.message });
+    } finally {
+        setIsProcessingFolha(false);
+    }
+  };
+
   return (
     <div className="flex flex-col gap-8 pb-10">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -918,45 +973,153 @@ export default function RepassesPage() {
           <p className="text-sm text-slate-400 font-medium">{isAdmin ? 'Gestão centralizada de carteiras profissionais, repasses institucionais e fluxo de caixa.' : 'Consulte seu extrato de honorários, saldos liberados e histórico de liquidações.'}</p>
         </div>
         <div className="flex items-center gap-2">
-          {isAdmin && (
-            <Button variant="outline" className="border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/5 h-10" onClick={handleLaunchPayroll} disabled={isLaunching}>{isLaunching ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Zap className="mr-2 h-4 w-4" />}Rodar Folha Mensal</Button>
-          )}
-          <Button variant="outline" className="border-primary/20 text-primary hover:bg-primary/5 h-10" onClick={() => setRefreshKey(k => k + 1)} disabled={isLaunching}><RefreshCw className={cn("mr-2 h-4 w-4", isLaunching && "animate-spin")} />Recarregar Saldos</Button>
+          <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-lg p-1">
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-white" onClick={() => setCurrentDate(prev => subMonths(prev, 1))}><ChevronLeft className="h-4 w-4" /></Button>
+            <span className="text-[10px] font-black uppercase text-white px-3 min-w-[120px] text-center">{format(currentDate, 'MMMM yyyy', { locale: ptBR })}</span>
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-white" onClick={() => setCurrentDate(prev => addMonths(prev, 1))}><ChevronRight className="h-4 w-4" /></Button>
+          </div>
+
+          <Button variant="outline" className="border-primary/20 text-primary hover:bg-primary/5 h-10" onClick={() => setRefreshKey(k => k + 1)} disabled={isLoadingStats}><RefreshCw className={cn("mr-2 h-4 w-4", isLoadingStats && "animate-spin")} />Recarregar Saldos</Button>
         </div>
       </div>
+
+      {isAdmin && scheduledPayroll.length > 0 && (
+          <div className="relative group overflow-hidden rounded-2xl animate-in slide-in-from-top duration-500">
+              <div className="absolute inset-0 bg-gradient-to-r from-emerald-600/20 via-primary/20 to-emerald-600/20 blur opacity-50"></div>
+              <div className="relative bg-[#020617] border border-emerald-500/30 p-4 flex flex-col md:flex-row items-center justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                      <div className="h-10 w-10 rounded-full bg-emerald-500/10 flex items-center justify-center animate-pulse">
+                          <Zap className="h-5 w-5 text-emerald-400" />
+                      </div>
+                      <div>
+                          <p className="text-sm font-black text-white uppercase tracking-tight italic">Folha Programada: {format(new Date(), 'dd/MM')}</p>
+                          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Existem <span className="text-emerald-400">{scheduledPayroll.length} colaboradores</span> aguardando o lançamento da remuneração de hoje.</p>
+                      </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                      <Button variant="ghost" className="text-[10px] font-black uppercase text-slate-500 hover:text-white h-9" onClick={() => setIsPendingListOpen(true)}>Ver Quem Recebe</Button>
+                      <Button 
+                        className="bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase text-[10px] h-9 px-6 gap-2 shadow-lg shadow-emerald-900/40"
+                        onClick={handleLaunchFolha}
+                        disabled={isProcessingFolha}
+                      >
+                          {isProcessingFolha ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                          LANÇAR FOLHA DO DIA
+                      </Button>
+                  </div>
+              </div>
+          </div>
+      )}
+      {(isAdmin || isLawyer) && (
+        <Alert className="bg-primary/10 border-primary/20 py-5 shadow-2xl">
+            <div className="flex items-center gap-6">
+                <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <Sparkles className="h-6 w-6 text-primary animate-pulse" />
+                </div>
+                <AlertDescription className="text-white text-base font-bold leading-tight">
+                    Olá, <span className="text-primary text-xl font-black">{userProfile?.firstName}</span>! 
+                    <p className="text-slate-400 text-xs mt-0.5 font-medium">
+                        {isAdmin && !forcePersonal ? 'Esta é a visão Institucional da Banca.' : `Sua Carteira Profissional (${format(currentDate, 'MMMM', { locale: ptBR })}) está aberta.`}
+                    </p>
+                </AlertDescription>
+                {isAdmin && (
+                    <div className="ml-auto flex items-center gap-4">
+                        <Button 
+                            variant="outline" 
+                            className="text-[10px] font-black uppercase tracking-widest border-white/10 text-slate-400 hover:text-white hover:bg-white/5 h-10 px-6"
+                            onClick={() => window.location.href = forcePersonal ? '/dashboard/repasses' : '/dashboard/repasses?view=personal'}
+                        >
+                            {forcePersonal ? '⬅️ VOLTAR P/ HUB INSTITUCIONAL' : '👤 VER MINHA CARTEIRA PESSOAL'}
+                        </Button>
+                        <Badge variant="outline" className={cn(
+                            "text-[11px] font-black uppercase tracking-widest px-4 py-2 border-2",
+                            forcePersonal ? "border-amber-500/30 text-amber-500 bg-amber-500/5" : "border-emerald-500/30 text-emerald-400 bg-emerald-500/5"
+                        )}>
+                            {forcePersonal ? '⚠️ MODO PESSOAL' : '🏛️ HUB BANCA'}
+                        </Badge>
+                    </div>
+                )}
+            </div>
+        </Alert>
+      )}
       
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="bg-emerald-500/5 border-emerald-500/20"><CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-emerald-400 tracking-widest">{isAdmin ? 'Total Liquidado (Mês)' : 'Seu Recebido (Mês)'}</CardTitle></CardHeader><CardContent className="p-4 pt-0"><p className="text-2xl font-black text-white">{stats.totalPaidMonth.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p></CardContent></Card>
         <Card className="bg-amber-500/5 border-amber-500/20"><CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-amber-400 tracking-widest">{isAdmin ? 'Saldos Liberados (Equipe)' : 'Seu Saldo Liberado'}</CardTitle></CardHeader><CardContent className="p-4 pt-0"><p className="text-2xl font-black text-white">{stats.totalPending.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p></CardContent></Card>
         <Card className="bg-blue-500/5 border-blue-500/20"><CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-blue-400 tracking-widest">{isAdmin ? 'A Repassar (Clientes)' : 'Honorários Retidos'}</CardTitle></CardHeader><CardContent className="p-4 pt-0"><p className="text-2xl font-black text-white">{(isAdmin ? stats.clientDebt : stats.totalRetained).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p></CardContent></Card>
-        <Card className="bg-white/5 border-white/10"><CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{isAdmin ? 'Ativos p/ Liquidação' : 'Créditos Bloqueados'}</CardTitle></CardHeader><CardContent className="p-4 pt-0"><p className="text-2xl font-black text-white">{isAdmin ? stats.staffCount : stats.totalRetained.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p></CardContent></Card>
+        <Card className="bg-white/5 border-white/10 hover:bg-white/[0.08] transition-colors cursor-pointer group" onClick={() => setIsPendingListOpen(true)}>
+            <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between">
+                <CardTitle className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{isAdmin ? 'Ativos p/ Liquidação' : 'Créditos Bloqueados'}</CardTitle>
+                <ArrowUpRight className="h-3 w-3 text-slate-500 group-hover:text-primary transition-colors" />
+            </CardHeader>
+            <CardContent className="p-4 pt-0">
+                <p className="text-2xl font-black text-white">{isAdmin ? stats.staffCount : stats.totalRetained.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+            </CardContent>
+        </Card>
       </div>
 
-      {isAdmin ? (
-        <Tabs defaultValue="lawyers" className="w-full">
+      <Sheet open={isPendingListOpen} onOpenChange={setIsPendingListOpen}>
+        <SheetContent className="bg-[#0f172a] border-l border-white/10 text-white w-[400px] sm:w-[540px]">
+            <SheetHeader>
+                <SheetTitle className="text-white font-black uppercase text-lg italic">Profissionais com Saldo</SheetTitle>
+                <SheetDescription className="text-slate-400">Lista de colaboradores com créditos liberados no Hub de Liquidações.</SheetDescription>
+            </SheetHeader>
+            <div className="mt-8 flex flex-col gap-2">
+                {pendingStaff.sort((a, b) => b.value - a.value).map((s) => (
+                    <div key={s.id} className="flex items-center justify-between p-4 bg-white/5 border border-white/5 rounded-xl hover:border-primary/30 transition-all">
+                        <div className="flex flex-col">
+                            <span className="font-bold text-sm">{s.name}</span>
+                            <span className="text-[10px] text-slate-500 uppercase font-black">Crédito Disponível</span>
+                        </div>
+                        <div className="flex flex-col items-end">
+                            <span className="text-emerald-400 font-black text-sm">{s.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                            <Button variant="link" className="h-auto p-0 text-[10px] text-primary font-bold" onClick={() => {
+                                setIsPendingListOpen(false);
+                                // A navegação por abas pode ser complexa, mas aqui apenas fechamos o sheet e deixamos o usuario agir na aba advogados
+                            }}>Ver Detalhes</Button>
+                        </div>
+                    </div>
+                ))}
+                {pendingStaff.length === 0 && (
+                    <div className="text-center py-20 opacity-30 italic">Nenhum saldo pendente para liquidação.</div>
+                )}
+            </div>
+        </SheetContent>
+      </Sheet>
+
+      {(isAdmin && !forcePersonal) ? (
+        <Tabs defaultValue="banca" className="w-full">
           <TabsList className="bg-[#0f172a] p-1 border border-white/5 mb-8 h-12 flex overflow-x-auto no-scrollbar justify-start gap-1">
-            <TabsTrigger value="lawyers" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-black uppercase text-[10px] px-6 h-10 shrink-0"><Briefcase className="h-4 w-4" /> Advogados</TabsTrigger>
+            <TabsTrigger value="banca" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-black uppercase text-[10px] px-6 h-10 shrink-0"><Building className="h-4 w-4 text-emerald-400" /> Panorama Banca (Wallet Institucional)</TabsTrigger>
+            <TabsTrigger value="lawyers" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-black uppercase text-[10px] px-6 h-10 shrink-0"><Briefcase className="h-4 w-4" /> Gestão de Advogados</TabsTrigger>
             <TabsTrigger value="staff" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-black uppercase text-[10px] px-6 h-10 shrink-0"><Users className="h-4 w-4" /> Colaboradores</TabsTrigger>
             <TabsTrigger value="clients" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-black uppercase text-[10px] px-6 h-10 shrink-0"><Users className="h-4 w-4 text-blue-400" /> Clientes</TabsTrigger>
             <TabsTrigger value="providers" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-black uppercase text-[10px] px-6 h-10 shrink-0"><ShieldCheck className="h-4 w-4" /> Correspondentes</TabsTrigger>
-            <TabsTrigger value="banca" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-black uppercase text-[10px] px-6 h-10 shrink-0 border-l border-white/10 ml-2"><Building className="h-4 w-4 text-emerald-400" /> Banca (Wallet Institucional)</TabsTrigger>
             <TabsTrigger value="history" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-black uppercase text-[10px] px-6 h-10 shrink-0"><History className="h-4 w-4" /> Log de Transações</TabsTrigger>
           </TabsList>
+          <TabsContent value="banca" className="mt-0 animate-in fade-in duration-300"><OfficeWalletView selectedDate={currentDate} /></TabsContent>
           <TabsContent value="lawyers" className="mt-0 animate-in fade-in duration-300"><PayoutList filterRole="lawyer" onRefresh={() => setRefreshKey(k => k + 1)} onPaid={handleRepassePaid} isAdmin={isAdmin} /></TabsContent>
           <TabsContent value="staff" className="mt-0 animate-in fade-in duration-300"><PayoutList filterRole="employee" onRefresh={() => setRefreshKey(k => k + 1)} onPaid={handleRepassePaid} isAdmin={isAdmin} /></TabsContent>
           <TabsContent value="clients" className="mt-0 animate-in fade-in duration-300"><ClientPayoutList /></TabsContent>
           <TabsContent value="providers" className="mt-0 animate-in fade-in duration-300"><PayoutList filterRole="provider" onRefresh={() => setRefreshKey(k => k + 1)} onPaid={handleRepassePaid} isAdmin={isAdmin} /></TabsContent>
-          <TabsContent value="banca" className="mt-0 animate-in fade-in duration-300"><OfficeWalletView /></TabsContent>
           <TabsContent value="history" className="mt-0 animate-in fade-in duration-300"><PaymentHistory onShowVoucher={handleShowVoucherFromHistory} /></TabsContent>
         </Tabs>
-      ) : isLawyer ? (
+      ) : (isLawyer || forcePersonal) ? (
         <Tabs defaultValue="wallet" className="w-full">
           <TabsList className="grid w-full grid-cols-2 bg-[#0f172a] border border-white/5 p-1 h-12">
             <TabsTrigger value="wallet" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-black uppercase text-[10px] h-10 tracking-widest"><Wallet className="h-4 w-4" /> Minha Wallet Profissional</TabsTrigger>
             <TabsTrigger value="history" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-black uppercase text-[10px] h-10 tracking-widest"><History className="h-4 w-4" /> Histórico de Recebimentos</TabsTrigger>
           </TabsList>
           <TabsContent value="wallet" className="mt-6">
-            <StaffWalletView staffId={userProfile.id} staffName={`${userProfile.firstName} ${userProfile.lastName}`} />
+            {currentStaff ? (
+              <StaffWalletView staffId={currentStaff.id} staffName={`${currentStaff.firstName} ${currentStaff.lastName}`} selectedDate={currentDate} />
+            ) : (
+              <div className="text-center py-20 opacity-40">
+                <AlertCircle className="h-12 w-12 mb-4 mx-auto" />
+                <p className="font-bold">Perfil de Staff não encontrado</p>
+                <p className="text-sm">Certifique-se de que seu e-mail de login está vinculado ao RH.</p>
+              </div>
+            )}
           </TabsContent>
           <TabsContent value="history" className="mt-6">
             <PaymentHistory onShowVoucher={handleShowVoucherFromHistory} />
