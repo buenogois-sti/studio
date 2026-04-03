@@ -101,7 +101,9 @@ export function UserNav() {
 
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
-          <DropdownMenuItem className="cursor-pointer">Perfil</DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => router.push('/dashboard/perfil')} className="cursor-pointer">
+            Perfil
+          </DropdownMenuItem>
           {(currentRole === 'admin' || currentRole === 'financial') && (
             <DropdownMenuItem onSelect={() => router.push('/dashboard/financeiro')} className="cursor-pointer">
                 Faturamento

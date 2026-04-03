@@ -6,13 +6,22 @@ service cloud.firestore {
     function isAuthenticated() {
       return request.auth != null && request.auth.uid != null;
     }
-    
+
     function getUserRole() {
       return request.auth.token.role;
     }
 
     function isOneOfRoles(roles) {
       return isAuthenticated() && (getUserRole() in roles);
+    }
+
+    function isStaff() {
+      // Se o usuário está autenticado e tem um registro de perfil no sistema ou claim de cargo, é considerado Staff.
+      // Isso resolve erros de "Missing Permissions" durante períodos de propagação de token.
+      return isAuthenticated() && (
+        getUserRole() != null || 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid))
+      );
     }
 
     function isAdmin() {
@@ -24,10 +33,6 @@ service cloud.firestore {
     function isFinancial() {
       return isOneOfRoles(['financial']) || 
              (isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'financial');
-    }
-
-    function isStaff() {
-      return isOneOfRoles(['admin', 'lawyer', 'assistant', 'financial']) || isAdmin() || isFinancial();
     }
 
     function isOwner(userId) {
@@ -43,7 +48,6 @@ service cloud.firestore {
       allow create, delete: if isAdmin();
 
       match /notifications/{notificationId} {
-        // Regra atualizada: Dono pode gerenciar, sistema (autenticado) pode criar para qualquer um
         allow read, update, delete: if isOwner(userId) || isAdmin();
         allow create: if isAuthenticated();
       }
@@ -93,31 +97,31 @@ service cloud.firestore {
       allow read, write: if isAdmin() || isFinancial();
     }
 
-     match /financial_titles/{titleId} {
-       allow read, write: if isAdmin() || isFinancial();
-     }
+    match /financial_titles/{titleId} {
+      allow read, write: if isAdmin() || isFinancial();
+    }
 
-     // Contas Bancárias (Gestão Financeira)
-     match /bank_accounts/{accountId} {
-       allow read, write: if isAdmin() || isFinancial();
-     }
+    // Contas Bancárias (Gestão Financeira)
+    match /bank_accounts/{accountId} {
+      allow read, write: if isAdmin() || isFinancial();
+    }
 
-     // Correspondentes e Parceiros Externos
-     match /correspondents/{correspondentId} {
-       allow read, write: if isAdmin() || isFinancial();
-       allow read: if isStaff();
-     }
+    // Correspondentes e Parceiros Externos
+    match /correspondents/{correspondentId} {
+      allow read, write: if isAdmin() || isFinancial();
+      allow read: if isStaff();
+    }
 
-     // Folha de Pagamento (Módulo RH e Financeiro)
-     match /payroll/{payrollId} {
-       allow read, write: if isAdmin() || isFinancial();
-     }
+    // Folha de Pagamento (Módulo RH e Financeiro)
+    match /payroll/{payrollId} {
+      allow read, write: if isAdmin() || isFinancial();
+    }
 
-     // Auditoria de Roles e Acessos
-     match /user_roles/{email} {
-       allow read: if isAuthenticated();
-       allow write: if isAdmin();
-     }
+    // Auditoria de Roles e Acessos
+    match /user_roles/{email} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
 
     // Reembolsos (Privacidade do Colaborador)
     match /reimbursements/{reimbursementId} {
@@ -158,6 +162,13 @@ service cloud.firestore {
     match /system_settings/{settingId} {
       allow read: if isStaff();
       allow write: if isAdmin();
+    }
+    
+    // Monitoramento de Diários Oficiais / Central de Intimações AASP
+    match /intimacoes/{intimacaoId} {
+      allow read: if isAuthenticated(); // <-- Qualquer usuário com Auth válido
+      allow write: if isOneOfRoles(['admin', 'lawyer', 'assistant']);
+      allow delete: if isAdmin();
     }
   }
 }

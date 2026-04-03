@@ -552,3 +552,16 @@ export type SEOSettings = {
   facebookPixelId?: string;
   canonicalUrl?: string;
 };
+
+export type Intimacao = {
+  id: string;
+  tipo: string;
+  processo: string | null;
+  dataDisponibilizacao: string | null;
+  dataPublicacaoISO: string | null;
+  orgao: string | null;
+  descricao: string;
+  lida: boolean;
+  createdAt: string;
+  raw: string;
+};

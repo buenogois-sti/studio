@@ -1,0 +1,142 @@
+{
+  "name": "AASP Intimacoes Flow",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "getAll",
+        "simple": false,
+        "filters": {
+          "q": "from:intimacoes@info.aasp.org.br"
+        },
+        "options": {}
+      },
+      "id": "39082c97-ebde-4a97-8aa6-bfa746452890",
+      "name": "Get Emails",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [
+        -160,
+        -736
+      ],
+      "webhookId": "b1e54eed-e7c6-428d-9723-91f8a65df65b",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "ksratiPM2SIwb3Dw",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "function cleanText(html) {\n  return html\n    .replace(/<[^>]+>/g, ' ')\n    .replace(/\\s+/g, ' ')\n    .trim();\n}\n\nfunction generateHash(str) {\n  let hash = 0;\n  for (let i = 0; i < str.length; i++) {\n    const char = str.charCodeAt(i);\n    hash = ((hash << 5) - hash) + char;\n    hash |= 0;\n  }\n  return Math.abs(hash).toString(16) + str.length;\n}\n\nconst results = [];\nconst seenIds = new Set();\n\nfor (const item of items) {\n  const html = item.json.html || item.json.textAsHtml || \"\";\n  const text = cleanText(html);\n\n  const blocos = text.split(/(TRT-\\d+PJE|DJEN|DEOAB)/g);\n\n  for (let i = 1; i < blocos.length; i += 2) {\n    const tipo = blocos[i];\n    const texto = blocos[i + 1] || \"\";\n\n    const processoMatch = texto.match(/\\d{7}-\\d{2}\\.\\d{4}\\.\\d{1}\\.\\d{2}\\.\\d{4}/)\n      || texto.match(/\\d{2}\\.\\d{4}\\.\\d{4}\\.\\d{6}-\\d/);\n\n    const dataMatch = texto.match(/Disponibilização:\\s*(\\d{2})\\/(\\d{2})\\/(\\d{4})/);\n    const orgaoMatch = texto.match(/(\\d+ª Vara|\\d+ª Turma)/);\n\n    let dataISO = null;\n    if (dataMatch) {\n      dataISO = `${dataMatch[3]}-${dataMatch[2]}-${dataMatch[1]}`; // yyyy-mm-dd\n    }\n\n    const id = tipo + \"_\" + generateHash(texto);\n\n    if (texto.length > 50 && !seenIds.has(id)) {\n      seenIds.add(id);\n      results.push({\n        json: {\n          id,\n          tipo,\n          processo: processoMatch ? processoMatch[0] : null,\n          dataDisponibilizacao: dataMatch ? dataMatch[0].split(': ')[1] : null,\n          dataPublicacaoISO: dataISO,\n          createdAt: new Date().toISOString(),\n          orgao: orgaoMatch ? orgaoMatch[1] : null,\n          descricao: texto,\n          lida: false,\n          raw: texto\n        }\n      });\n    }\n  }\n}\n\nreturn results;"
+      },
+      "id": "ad99d60d-dded-40f9-ba35-372994ce6432",
+      "name": "Parser Intimacoes",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        144,
+        -736
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "projectId": "studio-7080106838-23904",
+        "collection": "intimacoes",
+        "updateKey": "id",
+        "columns": "id,tipo,processo,dataDisponibilizacao,orgao,descricao,raw"
+      },
+      "id": "6872c170-7d7f-4a36-abe2-9834e5a1cf07",
+      "name": "Salvar Firestore",
+      "type": "n8n-nodes-base.googleFirebaseCloudFirestore",
+      "typeVersion": 1,
+      "position": [
+        448,
+        -736
+      ],
+      "credentials": {
+        "googleFirebaseCloudFirestoreOAuth2Api": {
+          "id": "WvQpf439ckl6wrdr",
+          "name": "Google Firebase Cloud Firestore account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "filters": {
+          "sender": "intimacoes@info.aasp.org.br"
+        }
+      },
+      "id": "240aef3b-cca7-4d8a-912a-f22dabfb1d49",
+      "name": "Gmail Trigger1",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1,
+      "position": [
+        -464,
+        -736
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "ksratiPM2SIwb3Dw",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Get Emails": {
+      "main": [
+        [
+          {
+            "node": "Parser Intimacoes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parser Intimacoes": {
+      "main": [
+        [
+          {
+            "node": "Salvar Firestore",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail Trigger1": {
+      "main": [
+        [
+          {
+            "node": "Get Emails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "7f69dd28-c204-45c7-9279-dc2d169d59d6",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "77a80a19346e65d9409711cbd02ad61420aed91e466fae56f4cc561ecfdc69ac"
+  },
+  "id": "KmUzpRq8BWRpvoe9",
+  "tags": []
+}

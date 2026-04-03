@@ -55,6 +55,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { analyzeOfficeStatus, type OfficeInsightsOutput } from '@/ai/flows/office-insights-flow';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { IntimacoesHighlight } from '@/components/notifications/IntimacoesHighlight';
 
 // --- SUB-COMPONENTES DE VISÃO MEMOIZADOS ---
 
@@ -627,6 +628,7 @@ export default function Dashboard() {
         </Badge>
       </div>
       
+      <IntimacoesHighlight />
       <WhatsNewBanner />
       
       {role === 'admin' && <AdminDashboard stats={stats} isLoading={isLoading} logsData={logsDataList?.map((l: any) => l.description) || []} hearingsData={hearingsData} chartData={chartData} />}

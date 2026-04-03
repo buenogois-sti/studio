@@ -57,7 +57,8 @@ import {
   MapPin,
   Gavel,
   Search,
-  HeartHandshake
+  HeartHandshake,
+  Bell
 } from 'lucide-react';
 import type { UserProfile } from '@/lib/types';
 import {
@@ -94,6 +95,7 @@ const sidebarSections = [
   {
     label: 'Jurídico (Operação)',
     items: [
+      { href: '/dashboard/intimacoes', label: 'Intimações AASP', icon: Bell, roles: ['admin', 'lawyer', 'assistant'], isNew: true },
       { href: '/dashboard/processos', label: 'Processos', icon: FolderKanban, roles: ['admin', 'lawyer', 'assistant', 'financial'] },
       { href: '/dashboard/prazos', label: 'Prazos Judiciais', icon: Timer, roles: ['admin', 'lawyer', 'assistant'] },
       { href: '/dashboard/audiencias', label: 'Pauta de Audiências', icon: Gavel, roles: ['admin', 'lawyer', 'assistant'] },
