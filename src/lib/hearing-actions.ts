@@ -51,13 +51,24 @@ function buildCalendarDescription(data: {
   notificationMethod?: string;
   isMeeting?: boolean;
   cep?: string;
+  locationName?: string;
+  locationNumber?: string;
+  locationComplement?: string;
   locationObservations?: string;
+  requiresLawyer?: boolean;
 }) {
   const cleanPhone = data.clientPhone.replace(/\D/g, '');
   const whatsappLink = cleanPhone ? `https://wa.me/${cleanPhone.startsWith('55') ? cleanPhone : '55' + cleanPhone}` : 'Telefone não disponível';
 
   const typeLabel = data.isMeeting ? '🗓️ ATENDIMENTO / REUNIÃO' : '📌 PROCESSO JUDICIAL';
   const returnUrl = `${BASE_URL}/dashboard/audiencias?returnId=${data.id}`;
+
+  const fullLocation = [
+    data.locationName,
+    data.location,
+    data.locationNumber ? `nº ${data.locationNumber}` : '',
+    data.locationComplement ? `(${data.locationComplement})` : ''
+  ].filter(Boolean).join(', ');
 
   const sections = [
     typeLabel,
@@ -69,16 +80,15 @@ function buildCalendarDescription(data: {
     `🔢 Número do Processo:`,
     `${data.processNumber}`,
     ``,
-    data.isMeeting ? `📍 Local/Modo:` : `⚖️ Juízo / Vara:`,
-    `${data.courtBranch || data.location || 'Não informado'}`,
+    data.isMeeting ? `📍 Local/Modo:` : `⚖️ Juízo / Vara / Local:`,
+    `${data.courtBranch || fullLocation || 'Não informado'}`,
     data.cep ? `CEP: ${data.cep}` : '',
-    data.location ? `🔗 Link do Endereço: https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${data.location}${data.cep ? `, ${data.cep}` : ''}`)}` : '',
+    fullLocation ? `🔗 Link do Endereço: https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${fullLocation}${data.cep ? `, ${data.cep}` : ''}`)}` : '',
     ``
   ];
 
-  if (data.locationObservations) {
-    sections.push(`🏠 OBSERVAÇÕES DO LOCAL:`);
-    sections.push(`${data.locationObservations}`);
+  if (data.requiresLawyer !== undefined) {
+    sections.push(`⚖️ PRESENÇA DO ADVOGADO: ${data.requiresLawyer ? 'OBRIGATÓRIA' : 'SOMENTE CLIENTE'}`);
     sections.push(``);
   }
 
@@ -131,7 +141,11 @@ export async function createHearing(data: {
   clientNotified?: boolean;
   notificationMethod?: NotificationMethod;
   cep?: string;
+  locationName?: string;
+  locationNumber?: string;
+  locationComplement?: string;
   locationObservations?: string;
+  requiresLawyer?: boolean;
 }) {
   if (!firestoreAdmin) {
     throw new Error('A conexão com o servidor de dados falhou.');
@@ -149,7 +163,7 @@ export async function createHearing(data: {
     courtBranch, responsibleParty, status, type, notes,
     meetingLink, meetingPassword,
     clientNotified, notificationMethod,
-    cep, locationObservations
+    cep, locationName, locationNumber, locationComplement, locationObservations, requiresLawyer
   } = data;
 
   try {
@@ -195,7 +209,11 @@ export async function createHearing(data: {
       notificationMethod: notificationMethod || null,
       notificationDate: clientNotified ? FieldValue.serverTimestamp() : null,
       cep: cep || '',
+      locationName: locationName || '',
+      locationNumber: locationNumber || '',
+      locationComplement: locationComplement || '',
       locationObservations: locationObservations || '',
+      requiresLawyer: !!requiresLawyer,
       createdAt: FieldValue.serverTimestamp(),
       hasFollowUp: false
     };
@@ -245,7 +263,11 @@ export async function createHearing(data: {
         notificationMethod: notificationMethod,
         isMeeting,
         cep,
-        locationObservations
+        locationName,
+        locationNumber,
+        locationComplement,
+        locationObservations,
+        requiresLawyer
       });
 
       // 1. Criar Evento na Agenda com a nova política de alertas Bueno Gois
@@ -384,7 +406,11 @@ export async function updateHearing(hearingId: string, data: Partial<Hearing>) {
           notificationMethod: data.notificationMethod || oldData.notificationMethod,
           isMeeting: (data.type || oldData.type) === 'ATENDIMENTO',
           cep: data.cep || oldData.cep,
-          locationObservations: data.locationObservations || oldData.locationObservations
+          locationName: data.locationName || oldData.locationName,
+          locationNumber: data.locationNumber || oldData.locationNumber,
+          locationComplement: data.locationComplement || oldData.locationComplement,
+          locationObservations: data.locationObservations || oldData.locationObservations,
+          requiresLawyer: data.requiresLawyer ?? oldData.requiresLawyer
         });
 
         const summaryPrefix = (data.type || oldData.type) === 'ATENDIMENTO' ? '🗓️ REUNIÃO' : ((data.type || oldData.type) === 'PERICIA' ? '🔍 Perícia' : '⚖️ Audiência');

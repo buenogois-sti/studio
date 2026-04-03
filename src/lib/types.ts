@@ -200,7 +200,11 @@ export type Hearing = {
   expertName?: string;
   expertPhone?: string;
   cep?: string;
+  locationName?: string;
+  locationNumber?: string;
+  locationComplement?: string;
   locationObservations?: string;
+  requiresLawyer?: boolean;
 };
 
 export type LegalDeadlineStatus = 'PENDENTE' | 'CUMPRIDO' | 'PERDIDO' | 'CANCELADO';

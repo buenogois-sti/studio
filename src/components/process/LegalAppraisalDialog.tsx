@@ -49,7 +49,11 @@ const appraisalSchema = z.object({
   notificationMethod: z.enum(['whatsapp', 'email', 'phone', 'personal', 'court', 'other']).optional(),
   responsibleParty: z.string().min(3, 'O apelido na agenda é obrigatório.'),
   cep: z.string().optional(),
+  locationName: z.string().optional(),
+  locationNumber: z.string().optional(),
+  locationComplement: z.string().optional(),
   locationObservations: z.string().optional(),
+  requiresLawyer: z.boolean().default(false),
 });
 
 interface LegalAppraisalDialogProps {
@@ -87,7 +91,11 @@ export function LegalAppraisalDialog({ process, appraisal, open, onOpenChange, o
       notificationMethod: 'whatsapp',
       responsibleParty: '',
       cep: '',
+      locationName: '',
+      locationNumber: '',
+      locationComplement: '',
       locationObservations: '',
+      requiresLawyer: false,
     }
   });
 
@@ -107,7 +115,11 @@ export function LegalAppraisalDialog({ process, appraisal, open, onOpenChange, o
           notificationMethod: appraisal.notificationMethod || 'whatsapp',
           responsibleParty: appraisal.responsibleParty || '',
           cep: appraisal.cep || '',
+          locationName: appraisal.locationName || '',
+          locationNumber: appraisal.locationNumber || '',
+          locationComplement: appraisal.locationComplement || '',
           locationObservations: appraisal.locationObservations || '',
+          requiresLawyer: !!appraisal.requiresLawyer,
         });
 
         if (appraisal.processId && firestore) {
@@ -169,7 +181,7 @@ export function LegalAppraisalDialog({ process, appraisal, open, onOpenChange, o
     const dateObj = new Date(year, month - 1, day);
     const dateFmt = format(dateObj, "dd/MM (EEEE)", { locale: ptBR });
     
-    const googleMapsLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${values.location}${values.cep ? `, ${values.cep}` : ''}`)}`;
+    const googleMapsLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${values.locationName ? `${values.locationName}, ` : ''}${values.location}${values.locationNumber ? `, ${values.locationNumber}` : ''}${values.cep ? `, ${values.cep}` : ''}`)}`;
 
     const msgParts = [
       `Olá, ${clientData.firstName.trim()}! Sou do escritório Bueno Gois Advogados.`,
@@ -177,7 +189,8 @@ export function LegalAppraisalDialog({ process, appraisal, open, onOpenChange, o
       `Informamos que sua *PERÍCIA JUDICIAL* foi agendada:`,
       `📅 Data: *${dateFmt}*`,
       `🕘 Horário: *${values.time}*`,
-      `📍 Local: *${values.location}*`,
+      `📍 Local: *${values.locationName ? `${values.locationName} - ` : ''}${values.location}${values.locationNumber ? `, ${values.locationNumber}` : ''}${values.locationComplement ? ` (${values.locationComplement})` : ''}*`,
+      `⚖️ Presença Advogado: *${values.requiresLawyer ? 'NECESSÁRIA' : 'SOMENTE CLIENTE'}*`,
       `🔍 Perito: *${values.expertName}*`
     ];
 
@@ -213,7 +226,11 @@ export function LegalAppraisalDialog({ process, appraisal, open, onOpenChange, o
           type: 'PERICIA',
           date: dateTimeStr as any,
           cep: values.cep,
-          locationObservations: values.locationObservations
+          locationName: values.locationName,
+          locationNumber: values.locationNumber,
+          locationComplement: values.locationComplement,
+          locationObservations: values.locationObservations,
+          requiresLawyer: values.requiresLawyer
         });
         toast({ title: 'Perícia Atualizada!', description: 'O compromisso foi sincronizado.' });
       } else {
@@ -225,7 +242,11 @@ export function LegalAppraisalDialog({ process, appraisal, open, onOpenChange, o
           processName: targetProcess.name,
           hearingDate: dateTimeStr,
           cep: values.cep,
-          locationObservations: values.locationObservations
+          locationName: values.locationName,
+          locationNumber: values.locationNumber,
+          locationComplement: values.locationComplement,
+          locationObservations: values.locationObservations,
+          requiresLawyer: values.requiresLawyer
         });
         toast({ title: 'Perícia Agendada!', description: 'O compromisso foi adicionado à pauta global.' });
       }
@@ -394,6 +415,43 @@ export function LegalAppraisalDialog({ process, appraisal, open, onOpenChange, o
                   </div>
                 </div>
 
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="locationName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
+                           <Building className="h-3 w-3 text-primary" /> Nome do Local (Prédio, Clínica, etc)
+                        </FormLabel>
+                        <FormControl><Input placeholder="Ex: Clínica São José" className="h-11 bg-black/40 border-white/10" {...field} /></FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="locationNumber"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Número</FormLabel>
+                          <FormControl><Input placeholder="Ex: 123" className="h-11 bg-black/40 border-white/10" {...field} /></FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="locationComplement"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Complemento</FormLabel>
+                          <FormControl><Input placeholder="Ex: Sala 4" className="h-11 bg-black/40 border-white/10" {...field} /></FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+
                 <FormField
                   control={form.control}
                   name="locationObservations"
@@ -408,12 +466,29 @@ export function LegalAppraisalDialog({ process, appraisal, open, onOpenChange, o
                 />
 
                 <div className="p-6 rounded-2xl bg-primary/5 border border-primary/20 space-y-6">
+                  <div className="flex items-center justify-between border-b border-primary/10 pb-4">
+                    <div className="flex items-center gap-3">
+                      <ShieldCheck className="h-5 w-5 text-primary" />
+                      <div>
+                        <h4 className="text-sm font-black uppercase text-white tracking-widest">Presença do Advogado</h4>
+                        <p className="text-[10px] text-primary/70 font-bold uppercase tracking-tighter">O advogado deve acompanhar o cliente?</p>
+                      </div>
+                    </div>
+                    <FormField
+                      control={form.control}
+                      name="requiresLawyer"
+                      render={({ field }) => (
+                        <Switch checked={field.value} onCheckedChange={field.onChange} />
+                      )}
+                    />
+                  </div>
+                  
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <Smartphone className="h-5 w-5 text-primary" />
                       <div>
                         <h4 className="text-sm font-black uppercase text-white tracking-widest">Aviso ao Cliente</h4>
-                        <p className="text-[10px] text-primary/70 font-bold uppercase tracking-tighter">O cliente deve acompanhar a perícia?</p>
+                        <p className="text-[10px] text-primary/70 font-bold uppercase tracking-tighter">O cliente já foi avisado/enviar convite?</p>
                       </div>
                     </div>
                     <FormField

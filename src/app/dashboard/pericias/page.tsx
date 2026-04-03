@@ -93,7 +93,7 @@ function AppraisalDetailsDialog({
   const config = statusConfig[appraisal.status || 'PENDENTE'];
   const Icon = config.icon;
 
-  const googleMapsLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${appraisal.location}${appraisal.cep ? `, ${appraisal.cep}` : ''}`)}`;
+  const googleMapsLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${appraisal.locationName ? `${appraisal.locationName}, ` : ''}${appraisal.location}${appraisal.locationNumber ? `, ${appraisal.locationNumber}` : ''}${appraisal.cep ? `, ${appraisal.cep}` : ''}`)}`;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -133,11 +133,15 @@ function AppraisalDetailsDialog({
           <div className="grid grid-cols-2 gap-4">
             <div className="p-4 rounded-xl bg-primary/5 border border-primary/20">
               <p className="text-[9px] font-black uppercase text-primary mb-1">Perito Judicial</p>
-              <p className="text-sm font-black text-white">{appraisal.expertName || 'Não informado'}</p>
+              <p className="text-sm font-black text-white leading-tight">{appraisal.expertName || 'Não informado'}</p>
+              {appraisal.expertPhone && <p className="text-[10px] font-bold text-primary/70 mt-1">{appraisal.expertPhone}</p>}
             </div>
             <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-              <p className="text-[9px] font-black uppercase text-slate-500 mb-1">Telefone Perito</p>
-              <p className="text-sm font-bold text-slate-300">{appraisal.expertPhone || 'Não informado'}</p>
+              <p className="text-[9px] font-black uppercase text-slate-500 mb-1">Presença Advogado</p>
+              <div className="flex items-center gap-2">
+                <div className={cn("h-2 w-2 rounded-full", appraisal.requiresLawyer ? "bg-amber-500 animate-pulse" : "bg-emerald-500")} />
+                <p className="text-sm font-black text-white">{appraisal.requiresLawyer ? 'OBRIGATÓRIA' : 'SOMENTE CLIENTE'}</p>
+              </div>
             </div>
           </div>
 
@@ -146,7 +150,14 @@ function AppraisalDetailsDialog({
               <MapPin className="h-3.5 w-3.5 text-primary" /> Local da Perícia
             </p>
             <div className="p-4 rounded-xl bg-black/40 border border-white/10 space-y-2">
-              <p className="text-sm font-bold text-white">{appraisal.location}</p>
+              <div className="space-y-1">
+                {appraisal.locationName && <p className="text-sm font-black text-primary leading-tight uppercase tracking-tight">{appraisal.locationName}</p>}
+                <p className="text-sm font-bold text-white leading-relaxed">
+                  {appraisal.location}
+                  {appraisal.locationNumber && <>, № {appraisal.locationNumber}</>}
+                  {appraisal.locationComplement && <span className="text-slate-400 font-medium ml-1">({appraisal.locationComplement})</span>}
+                </p>
+              </div>
               {appraisal.cep && <p className="text-xs text-slate-400 font-medium">CEP: {appraisal.cep}</p>}
               <a 
                 href={googleMapsLink} 
