@@ -199,6 +199,8 @@ export type Hearing = {
   rescheduleReason?: string;
   expertName?: string;
   expertPhone?: string;
+  cep?: string;
+  locationObservations?: string;
 };
 
 export type LegalDeadlineStatus = 'PENDENTE' | 'CUMPRIDO' | 'PERDIDO' | 'CANCELADO';
@@ -417,7 +419,10 @@ export type Staff = {
       diligence?: number;
       other?: number;
     };
+    servicePrices?: Record<string, number>; // Custom prices per service type
   };
+  parentStaffId?: string; // Link to a PJ office if this is a team member
+  teamMembers?: string[]; // If PJ, list of associated staff names or IDs
   createdAt: Timestamp;
   updatedAt?: Timestamp;
 };

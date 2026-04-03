@@ -130,6 +130,8 @@ function HearingDetailsDialog({
   const config = statusConfig[hearing.status || 'PENDENTE'];
   const Icon = config.icon;
 
+  const googleMapsLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${hearing.location}${hearing.cep ? `, ${hearing.cep}` : ''}`)}`;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg bg-[#020617] border-white/10 text-white shadow-2xl">
@@ -172,11 +174,31 @@ function HearingDetailsDialog({
             <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
               <MapPin className="h-3.5 w-3.5 text-primary" /> Localização / Juízo
             </p>
-            <div className="p-4 rounded-xl bg-black/40 border border-white/10">
+            <div className="p-4 rounded-xl bg-black/40 border border-white/10 space-y-2">
               <p className="text-sm font-bold text-white">{hearing.location}</p>
+              {hearing.cep && <p className="text-xs text-slate-400 font-medium">CEP: {hearing.cep}</p>}
+              <a 
+                href={googleMapsLink} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase text-primary hover:text-primary/80 transition-colors pt-1"
+              >
+                <ExternalLink className="h-3 w-3" /> Ver no Google Maps
+              </a>
               {hearing.courtBranch && <p className="text-xs text-slate-400 mt-1">{hearing.courtBranch}</p>}
             </div>
           </div>
+
+          {hearing.locationObservations && (
+            <div className="space-y-3">
+              <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
+                <Building className="h-3.5 w-3.5 text-primary" /> Observações do Local
+              </p>
+              <div className="p-4 rounded-xl bg-white/5 border border-white/10 text-sm text-slate-200">
+                {hearing.locationObservations}
+              </div>
+            </div>
+          )}
 
           {(hearing.meetingLink || hearing.meetingPassword) && (
             <div className="space-y-3">

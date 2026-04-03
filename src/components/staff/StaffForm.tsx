@@ -1,7 +1,7 @@
 'use client';
 import * as React from 'react';
 import { z } from 'zod';
-import { useForm } from 'react-hook-form';
+import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 
 import { Button } from '@/components/ui/button';
@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/select"
 import { SheetFooter } from '@/components/ui/sheet';
 import { H2 } from '@/components/ui/typography';
-import { Loader2, Search, DollarSign, Percent, Briefcase, MapPin, Globe, Heart, Calendar } from 'lucide-react';
+import { Loader2, Search, DollarSign, Percent, Briefcase, MapPin, Globe, Heart, Calendar, Plus, Trash2, UserPlus, Users } from 'lucide-react';
 
 import { useFirebase } from '@/firebase';
 import { collection, serverTimestamp, doc, addDoc, updateDoc, Timestamp } from 'firebase/firestore';
@@ -82,6 +82,10 @@ const staffSchema = z.object({
   remuneration_priceDiligence: z.coerce.number().min(0).optional().or(z.literal(0)),
   remuneration_salary: z.coerce.number().min(0).optional().or(z.literal(0)),
   remuneration_paymentDay: z.coerce.number().min(1).max(31).optional().or(z.literal(0)),
+  
+  // Custom Services & Team
+  teamMembers: z.array(z.object({ name: z.string().min(1, 'Nome é obrigatório') })),
+  servicePrices: z.array(z.object({ name: z.string().min(1, 'Serviço é obrigatório'), price: z.number().min(0) })),
 }).refine((data) => {
     if (data.role === 'lawyer' || data.role === 'intern') {
         return !!data.oabNumber && data.oabNumber.length > 0;
@@ -188,6 +192,8 @@ export function StaffForm({
         legalType: staff.legalType || 'PF',
         companyName: staff.companyName || '',
         cnpj: staff.cnpj || '',
+        teamMembers: staff.teamMembers?.map(name => ({ name })) || [],
+        servicePrices: staff.remuneration?.servicePrices ? Object.entries(staff.remuneration.servicePrices).map(([name, price]) => ({ name, price: price as number })) : [],
     } : {
         role: 'lawyer',
         engagementType: 'fixed',
@@ -233,12 +239,25 @@ export function StaffForm({
         remuneration_salary: 0,
         remuneration_profitPercentage: 0,
         remuneration_paymentDay: 5, // Default common payment day
+        teamMembers: [],
+        servicePrices: [],
     },
   });
   
   const watchedRole = form.watch('role');
   const watchedRemuneration = form.watch('remuneration_type');
   const watchedLegalType = form.watch('legalType');
+  const watchedEngagement = form.watch('engagementType');
+
+  const { fields: teamFields, append: appendTeam, remove: removeTeam } = useFieldArray({
+    control: form.control,
+    name: "teamMembers"
+  });
+
+  const { fields: serviceFields, append: appendService, remove: removeService } = useFieldArray({
+    control: form.control,
+    name: "servicePrices"
+  });
 
   const handleCurrencyValueChange = (e: React.ChangeEvent<HTMLInputElement>, onChange: (val: number) => void) => {
     const rawValue = e.target.value.replace(/\D/g, '');
@@ -306,7 +325,8 @@ export function StaffForm({
         phone: values.phone || "",
         whatsapp: values.whatsapp || "",
         oabNumber: values.oabNumber || "",
-        oabStatus: values.oabStatus || "Ativa"
+        oabStatus: values.oabStatus || "Ativa",
+        teamMembers: values.teamMembers.map(m => m.name).filter(Boolean)
       };
 
       const staffData: any = cleanData;
@@ -352,6 +372,13 @@ export function StaffForm({
             rem.fixedMonthlyValue = remuneration_fixedMonthlyValue ?? 0;
             rem.paymentDay = remuneration_paymentDay ?? 0;
             rem.profitPercentage = remuneration_profitPercentage ?? 0;
+        }
+        if (values.servicePrices.length > 0) {
+            const prices: Record<string, number> = {};
+            values.servicePrices.forEach(s => {
+                if (s.name && s.price !== undefined) prices[s.name] = s.price;
+            });
+            rem.servicePrices = prices;
         }
         staffData.remuneration = rem;
       }
@@ -574,81 +601,192 @@ export function StaffForm({
             </div>
           </section>
 
-          <section className="space-y-4">
-            <H2 className="text-white border-primary/20">Documentação & DP</H2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 bg-white/5 p-6 rounded-2xl border border-white/10">
-              <FormField
-                control={form.control}
-                name="documentCPF"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">CPF</FormLabel>
-                    <FormControl><Input className="h-11 bg-background" placeholder="000.000.000-00" {...field} /></FormControl>
-                  </FormItem>
+          {watchedLegalType === 'PJ' && (
+            <section className="space-y-4 animate-in fade-in duration-500">
+                <H2 className="text-white border-indigo-500/20">Configuração de Escritório / Parceiro</H2>
+                
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 bg-indigo-500/5 p-8 rounded-3xl border border-indigo-500/20">
+                    <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h3 className="text-sm font-black uppercase text-indigo-400 tracking-widest flex items-center gap-2">
+                                    <Users className="h-4 w-4" /> Equipe da Empresa
+                                </h3>
+                                <p className="text-[10px] text-muted-foreground italic">Profissionais que atuam em nome deste escritório parceiro.</p>
+                            </div>
+                            <Button type="button" variant="outline" size="sm" onClick={() => appendTeam({ name: '' })} className="h-8 bg-indigo-500/10 border-indigo-500/30 text-indigo-400 font-bold text-[10px] uppercase">
+                                <UserPlus className="h-3 w-3 mr-1.5" /> Adicionar Colaborador
+                            </Button>
+                        </div>
+
+                        <div className="space-y-2">
+                            {teamFields.map((field: any, index: number) => (
+                                <div key={field.id} className="flex gap-2 animate-in slide-in-from-left-2 duration-300">
+                                    <FormField
+                                        control={form.control}
+                                        name={`teamMembers.${index}.name`}
+                                        render={({ field }) => (
+                                            <FormItem className="flex-1">
+                                                <FormControl><Input className="h-10 bg-background" placeholder="Nome do colaborador..." {...field} /></FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <Button type="button" variant="ghost" size="icon" onClick={() => removeTeam(index)} className="h-10 w-10 text-rose-500 hover:bg-rose-500/10"><Trash2 className="h-4 w-4" /></Button>
+                                </div>
+                            ))}
+                            {teamFields.length === 0 && (
+                                <div className="text-center py-8 border-2 border-dashed border-indigo-500/10 rounded-2xl">
+                                    <p className="text-[10px] font-bold text-indigo-500/40 uppercase tracking-widest italic">Nenhum colaborador adicionado</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h3 className="text-sm font-black uppercase text-indigo-400 tracking-widest flex items-center gap-2">
+                                    <Plus className="h-4 w-4" /> Tabela de Preços por Serviço
+                                </h3>
+                                <p className="text-[10px] text-muted-foreground italic">Valores acordados por tipo de serviço prestado.</p>
+                            </div>
+                            <Button type="button" variant="outline" size="sm" onClick={() => appendService({ name: '', price: 0 })} className="h-8 bg-indigo-500/10 border-indigo-500/30 text-indigo-400 font-bold text-[10px] uppercase">
+                                <DollarSign className="h-3 w-3 mr-1.5" /> Adicionar Serviço
+                            </Button>
+                        </div>
+
+                        <div className="space-y-2">
+                            {serviceFields.map((field: any, index: number) => (
+                                <div key={field.id} className="grid grid-cols-12 gap-2 animate-in slide-in-from-right-2 duration-300">
+                                    <FormField
+                                        control={form.control}
+                                        name={`servicePrices.${index}.name`}
+                                        render={({ field }) => (
+                                            <FormItem className="col-span-7">
+                                                <FormControl><Input className="h-10 bg-background" placeholder="Ex: Diligência Simples" {...field} /></FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <FormField
+                                        control={form.control}
+                                        name={`servicePrices.${index}.price`}
+                                        render={({ field }) => (
+                                            <FormItem className="col-span-4">
+                                                <FormControl>
+                                                    <div className="relative">
+                                                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-muted-foreground">R$</span>
+                                                        <Input 
+                                                            type="text" 
+                                                            className="h-10 pl-8 bg-background text-sm font-bold" 
+                                                            value={formatCurrencyValue(field.value)} 
+                                                            onChange={(e) => handleCurrencyValueChange(e, field.onChange)}
+                                                        />
+                                                    </div>
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <div className="col-span-1 flex items-center">
+                                        <Button type="button" variant="ghost" size="icon" onClick={() => removeService(index)} className="h-10 w-10 text-rose-500 hover:bg-rose-500/10"><Trash2 className="h-4 w-4" /></Button>
+                                    </div>
+                                </div>
+                            ))}
+                            {serviceFields.length === 0 && (
+                                <div className="text-center py-8 border-2 border-dashed border-indigo-500/10 rounded-2xl">
+                                    <p className="text-[10px] font-bold text-indigo-500/40 uppercase tracking-widest italic">Nenhuma taxa de serviço configurada</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </section>
+          )}
+
+          {watchedLegalType !== 'PJ' && (
+            <section className="space-y-4 animate-in fade-in duration-500">
+                <H2 className="text-white border-primary/20">Documentação & DP</H2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 bg-white/5 p-6 rounded-2xl border border-white/10">
+                <FormField
+                    control={form.control}
+                    name="documentCPF"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">CPF</FormLabel>
+                        <FormControl><Input className="h-11 bg-background" placeholder="000.000.000-00" {...field} /></FormControl>
+                    </FormItem>
+                    )}
+                />
+                <FormField
+                    control={form.control}
+                    name="documentRG"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">RG</FormLabel>
+                        <FormControl><Input className="h-11 bg-background" placeholder="00.000.000-0" {...field} /></FormControl>
+                    </FormItem>
+                    )}
+                />
+
+                {watchedEngagement !== 'correspondent' && (
+                    <>
+                        <FormField
+                            control={form.control}
+                            name="ctps"
+                            render={({ field }) => (
+                            <FormItem>
+                                <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">CTPS (Carteira Trabalho)</FormLabel>
+                                <FormControl><Input className="h-11 bg-background" placeholder="Nº / Série" {...field} /></FormControl>
+                            </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="pis"
+                            render={({ field }) => (
+                            <FormItem>
+                                <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">PIS / PASEP</FormLabel>
+                                <FormControl><Input className="h-11 bg-background" placeholder="000.00000.00-0" {...field} /></FormControl>
+                            </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="admissionDate"
+                            render={({ field }) => (
+                            <FormItem>
+                                <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest text-primary">Data de Admissão</FormLabel>
+                                <FormControl><Input type="date" className="h-11 bg-background border-primary/20" {...field} /></FormControl>
+                            </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="remuneration_salary"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">Salário Base CLT (R$)</FormLabel>
+                                    <FormControl>
+                                        <div className="relative">
+                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-bold">R$</span>
+                                            <Input 
+                                                type="text" 
+                                                className="h-11 pl-9 bg-background" 
+                                                value={formatCurrencyValue(field.value)} 
+                                                onChange={(e) => handleCurrencyValueChange(e, field.onChange)}
+                                            />
+                                        </div>
+                                    </FormControl>
+                                </FormItem>
+                            )}
+                        />
+                    </>
                 )}
-              />
-              <FormField
-                control={form.control}
-                name="documentRG"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">RG</FormLabel>
-                    <FormControl><Input className="h-11 bg-background" placeholder="00.000.000-0" {...field} /></FormControl>
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="ctps"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">CTPS (Carteira Trabalho)</FormLabel>
-                    <FormControl><Input className="h-11 bg-background" placeholder="Nº / Série" {...field} /></FormControl>
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="pis"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">PIS / PASEP</FormLabel>
-                    <FormControl><Input className="h-11 bg-background" placeholder="000.00000.00-0" {...field} /></FormControl>
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="admissionDate"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest text-primary">Data de Admissão</FormLabel>
-                    <FormControl><Input type="date" className="h-11 bg-background border-primary/20" {...field} /></FormControl>
-                  </FormItem>
-                )}
-              />
-               <FormField
-                  control={form.control}
-                  name="remuneration_salary"
-                  render={({ field }) => (
-                      <FormItem>
-                          <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">Salário Base CLT (R$)</FormLabel>
-                          <FormControl>
-                              <div className="relative">
-                                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-bold">R$</span>
-                                  <Input 
-                                    type="text" 
-                                    className="h-11 pl-9 bg-background" 
-                                    value={formatCurrencyValue(field.value)} 
-                                    onChange={(e) => handleCurrencyValueChange(e, field.onChange)}
-                                  />
-                              </div>
-                          </FormControl>
-                      </FormItem>
-                  )}
-              />
-            </div>
-          </section>
+                </div>
+            </section>
+          )}
 
           <section className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-500">
               <div className="flex items-center gap-2 mb-2">

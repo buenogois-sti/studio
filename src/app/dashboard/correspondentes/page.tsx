@@ -42,6 +42,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { StaffForm } from '@/components/staff/StaffForm';
 import { StaffDetailsSheet } from '@/components/staff/StaffDetailsSheet';
@@ -347,29 +348,68 @@ export default function CorrespondentesPage() {
         </Card>
       </div>
 
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {isLoadingStaff ? (
-          [...Array(6)].map((_, i) => <Card key={i} className="h-64 bg-white/5 animate-pulse" />)
-        ) : filteredCorrespondents.length > 0 ? (
-            filteredCorrespondents.map(c => (
-              <CorrespondentCard 
-                key={c.id} 
-                correspondent={c} 
-                onEdit={() => handleEdit(c)}
-                onView={() => handleViewDetails(c)}
-                onDelete={() => handleDelete(c)}
-              />
-            ))
-        ) : (
-            <div className="col-span-full py-20 text-center flex flex-col items-center gap-4 bg-white/5 rounded-3xl border-2 border-dashed border-white/10">
-                <Users className="h-12 w-12 text-slate-500 opacity-30" />
-                <div>
-                   <h3 className="text-lg font-bold text-white">Sem correspondentes</h3>
-                   <p className="text-sm text-slate-400">Nenhum correspondente encontrado para os critérios selecionados.</p>
+      <Tabs defaultValue="pf" className="w-full">
+        <TabsList className="bg-black/20 border border-white/5 p-1 mb-6 rounded-2xl h-11 flex gap-1">
+          <TabsTrigger value="pf" className="flex-1 rounded-xl data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-black text-[10px] uppercase tracking-widest border border-transparent transition-all">
+            <UserCircle className="mr-2 h-3.5 w-3.5" /> Profissionais Autônomos (PF)
+          </TabsTrigger>
+          <TabsTrigger value="pj" className="flex-1 rounded-xl data-[state=active]:bg-indigo-500 data-[state=active]:text-white font-black text-[10px] uppercase tracking-widest border border-transparent transition-all">
+            <Briefcase className="mr-2 h-3.5 w-3.5" /> Escritórios & Parceiros (PJ)
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="pf" className="mt-0">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in duration-500">
+            {isLoadingStaff ? (
+              [...Array(6)].map((_, i) => <Card key={i} className="h-64 bg-white/5 animate-pulse" />)
+            ) : filteredCorrespondents.filter(c => c.legalType !== 'PJ').length > 0 ? (
+                filteredCorrespondents.filter(c => c.legalType !== 'PJ').map(c => (
+                  <CorrespondentCard 
+                    key={c.id} 
+                    correspondent={c} 
+                    onEdit={() => handleEdit(c)}
+                    onView={() => handleViewDetails(c)}
+                    onDelete={() => handleDelete(c)}
+                  />
+                ))
+            ) : (
+                <div className="col-span-full py-20 text-center flex flex-col items-center gap-4 bg-white/5 rounded-3xl border-2 border-dashed border-white/10">
+                    <Users className="h-12 w-12 text-slate-500 opacity-30" />
+                    <div>
+                      <h3 className="text-lg font-bold text-white">Sem profissionais PF</h3>
+                      <p className="text-sm text-slate-400">Nenhum correspondente autônomo encontrado.</p>
+                    </div>
                 </div>
-            </div>
-        )}
-      </div>
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="pj" className="mt-0">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in duration-500">
+            {isLoadingStaff ? (
+              [...Array(4)].map((_, i) => <Card key={i} className="h-64 bg-white/5 animate-pulse" />)
+            ) : filteredCorrespondents.filter(c => c.legalType === 'PJ').length > 0 ? (
+                filteredCorrespondents.filter(c => c.legalType === 'PJ').map(c => (
+                  <CorrespondentCard 
+                    key={c.id} 
+                    correspondent={c} 
+                    onEdit={() => handleEdit(c)}
+                    onView={() => handleViewDetails(c)}
+                    onDelete={() => handleDelete(c)}
+                  />
+                ))
+            ) : (
+                <div className="col-span-full py-20 text-center flex flex-col items-center gap-4 bg-white/5 rounded-3xl border-2 border-dashed border-white/10">
+                    <Briefcase className="h-12 w-12 text-slate-500 opacity-30" />
+                    <div>
+                      <h3 className="text-lg font-bold text-white">Sem escritórios PJ</h3>
+                      <p className="text-sm text-slate-400">Clique em "Novo Correspondente" e selecione PJ no cadastro.</p>
+                    </div>
+                </div>
+            )}
+          </div>
+        </TabsContent>
+      </Tabs>
 
       <Sheet open={isFormOpen} onOpenChange={setIsFormOpen}>
         <SheetContent className="sm:max-w-5xl w-full flex flex-col p-0 bg-[#020617] border-border">
@@ -441,6 +481,12 @@ function CorrespondentCard({ correspondent, onEdit, onView, onDelete }: {
                           {correspondent.legalType || 'PF'}
                       </Badge>
 
+                      {correspondent.legalType === 'PJ' && correspondent.teamMembers && correspondent.teamMembers.length > 0 && (
+                        <Badge variant="outline" className="w-fit text-[8px] font-black uppercase py-0 px-1.5 h-4 bg-amber-500/10 text-amber-500 border-amber-500/20">
+                          Equipe: {correspondent.teamMembers.length}
+                        </Badge>
+                      )}
+
                       <Badge variant="outline" className={cn(
                           "w-fit text-[8px] font-black uppercase py-0 px-1.5 h-4",
                           correspondent.role === 'lawyer' ? "bg-blue-500/10 text-blue-400 border-blue-500/20" :
@@ -478,6 +524,11 @@ function CorrespondentCard({ correspondent, onEdit, onView, onDelete }: {
                     <DropdownMenuItem onClick={onView} className="gap-2 cursor-pointer focus:bg-emerald-500/10">
                       <DollarSign className="h-4 w-4 text-emerald-400" /> <span className="font-bold text-white">Extrato de Pagamentos</span>
                     </DropdownMenuItem>
+                    {correspondent.legalType === 'PJ' && (
+                      <DropdownMenuItem onClick={onEdit} className="gap-2 cursor-pointer focus:bg-indigo-500/10">
+                        <Users className="h-4 w-4 text-indigo-400" /> <span className="font-bold text-white">Configurar Equipe / Preços</span>
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuSeparator className="bg-white/5" />
                     <DropdownMenuItem onClick={onEdit} className="gap-2 cursor-pointer">
                       <FileText className="h-4 w-4 text-slate-400" /> <span className="font-bold text-white">Editar Dados</span>

@@ -50,6 +50,8 @@ function buildCalendarDescription(data: {
   clientNotified?: boolean;
   notificationMethod?: string;
   isMeeting?: boolean;
+  cep?: string;
+  locationObservations?: string;
 }) {
   const cleanPhone = data.clientPhone.replace(/\D/g, '');
   const whatsappLink = cleanPhone ? `https://wa.me/${cleanPhone.startsWith('55') ? cleanPhone : '55' + cleanPhone}` : 'Telefone não disponível';
@@ -69,8 +71,16 @@ function buildCalendarDescription(data: {
     ``,
     data.isMeeting ? `📍 Local/Modo:` : `⚖️ Juízo / Vara:`,
     `${data.courtBranch || data.location || 'Não informado'}`,
+    data.cep ? `CEP: ${data.cep}` : '',
+    data.location ? `🔗 Link do Endereço: https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${data.location}${data.cep ? `, ${data.cep}` : ''}`)}` : '',
     ``
   ];
+
+  if (data.locationObservations) {
+    sections.push(`🏠 OBSERVAÇÕES DO LOCAL:`);
+    sections.push(`${data.locationObservations}`);
+    sections.push(``);
+  }
 
   if (data.meetingLink) {
     sections.push(`🔗 LINK DA SALA VIRTUAL:`);
@@ -120,6 +130,8 @@ export async function createHearing(data: {
   meetingPassword?: string;
   clientNotified?: boolean;
   notificationMethod?: NotificationMethod;
+  cep?: string;
+  locationObservations?: string;
 }) {
   if (!firestoreAdmin) {
     throw new Error('A conexão com o servidor de dados falhou.');
@@ -136,7 +148,8 @@ export async function createHearing(data: {
     processId, lawyerId, location, 
     courtBranch, responsibleParty, status, type, notes,
     meetingLink, meetingPassword,
-    clientNotified, notificationMethod 
+    clientNotified, notificationMethod,
+    cep, locationObservations
   } = data;
 
   try {
@@ -181,6 +194,8 @@ export async function createHearing(data: {
       clientNotified: !!clientNotified,
       notificationMethod: notificationMethod || null,
       notificationDate: clientNotified ? FieldValue.serverTimestamp() : null,
+      cep: cep || '',
+      locationObservations: locationObservations || '',
       createdAt: FieldValue.serverTimestamp(),
       hasFollowUp: false
     };
@@ -228,7 +243,9 @@ export async function createHearing(data: {
         createdByName: session.user.name || 'Sistema',
         clientNotified: !!clientNotified,
         notificationMethod: notificationMethod,
-        isMeeting
+        isMeeting,
+        cep,
+        locationObservations
       });
 
       // 1. Criar Evento na Agenda com a nova política de alertas Bueno Gois
@@ -365,7 +382,9 @@ export async function updateHearing(hearingId: string, data: Partial<Hearing>) {
           createdByName: oldData.createdByName,
           clientNotified: data.clientNotified ?? oldData.clientNotified,
           notificationMethod: data.notificationMethod || oldData.notificationMethod,
-          isMeeting: (data.type || oldData.type) === 'ATENDIMENTO'
+          isMeeting: (data.type || oldData.type) === 'ATENDIMENTO',
+          cep: data.cep || oldData.cep,
+          locationObservations: data.locationObservations || oldData.locationObservations
         });
 
         const summaryPrefix = (data.type || oldData.type) === 'ATENDIMENTO' ? '🗓️ REUNIÃO' : ((data.type || oldData.type) === 'PERICIA' ? '🔍 Perícia' : '⚖️ Audiência');

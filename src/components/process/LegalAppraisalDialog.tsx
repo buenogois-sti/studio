@@ -48,6 +48,8 @@ const appraisalSchema = z.object({
   clientNotified: z.boolean().default(false),
   notificationMethod: z.enum(['whatsapp', 'email', 'phone', 'personal', 'court', 'other']).optional(),
   responsibleParty: z.string().min(3, 'O apelido na agenda é obrigatório.'),
+  cep: z.string().optional(),
+  locationObservations: z.string().optional(),
 });
 
 interface LegalAppraisalDialogProps {
@@ -84,6 +86,8 @@ export function LegalAppraisalDialog({ process, appraisal, open, onOpenChange, o
       clientNotified: false,
       notificationMethod: 'whatsapp',
       responsibleParty: '',
+      cep: '',
+      locationObservations: '',
     }
   });
 
@@ -102,6 +106,8 @@ export function LegalAppraisalDialog({ process, appraisal, open, onOpenChange, o
           clientNotified: !!appraisal.clientNotified,
           notificationMethod: appraisal.notificationMethod || 'whatsapp',
           responsibleParty: appraisal.responsibleParty || '',
+          cep: appraisal.cep || '',
+          locationObservations: appraisal.locationObservations || '',
         });
 
         if (appraisal.processId && firestore) {
@@ -138,6 +144,21 @@ export function LegalAppraisalDialog({ process, appraisal, open, onOpenChange, o
     }
   }, [process, appraisal, open, lawyers.length, firestore, form]);
 
+  const handleCEPLookup = async (cep: string) => {
+    const cleanCEP = cep.replace(/\D/g, '');
+    if (cleanCEP.length !== 8) return;
+    try {
+      const response = await fetch(`https://viacep.com.br/ws/${cleanCEP}/json/`);
+      const data = await response.json();
+      if (!data.erro) {
+        const address = `${data.logradouro}, ${data.bairro}, ${data.localidade} - ${data.uf}`;
+        form.setValue('location', address);
+      }
+    } catch (error) {
+      console.error('CEP lookup failed:', error);
+    }
+  };
+
   const generateWhatsAppLink = () => {
     if (!clientData?.mobile) {
       toast({ variant: 'destructive', title: 'WhatsApp indisponível', description: 'O cliente não possui celular cadastrado.' });
@@ -148,6 +169,8 @@ export function LegalAppraisalDialog({ process, appraisal, open, onOpenChange, o
     const dateObj = new Date(year, month - 1, day);
     const dateFmt = format(dateObj, "dd/MM (EEEE)", { locale: ptBR });
     
+    const googleMapsLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${values.location}${values.cep ? `, ${values.cep}` : ''}`)}`;
+
     const msgParts = [
       `Olá, ${clientData.firstName.trim()}! Sou do escritório Bueno Gois Advogados.`,
       '',
@@ -157,6 +180,12 @@ export function LegalAppraisalDialog({ process, appraisal, open, onOpenChange, o
       `📍 Local: *${values.location}*`,
       `🔍 Perito: *${values.expertName}*`
     ];
+
+    if (values.locationObservations) {
+      msgParts.push(`🏠 Observação Local: *${values.locationObservations}*`);
+    }
+
+    msgParts.push(`🗺️ Link do Local: ${googleMapsLink}`);
 
     const currentProcess = process || processData;
     msgParts.push('', `🔢 *PROCESSO:* ${currentProcess?.processNumber || '---'}`, '', 'Favor confirmar o recebimento desta mensagem.');
@@ -182,7 +211,9 @@ export function LegalAppraisalDialog({ process, appraisal, open, onOpenChange, o
         await updateHearing(appraisal.id, {
           ...values,
           type: 'PERICIA',
-          date: dateTimeStr as any
+          date: dateTimeStr as any,
+          cep: values.cep,
+          locationObservations: values.locationObservations
         });
         toast({ title: 'Perícia Atualizada!', description: 'O compromisso foi sincronizado.' });
       } else {
@@ -193,6 +224,8 @@ export function LegalAppraisalDialog({ process, appraisal, open, onOpenChange, o
           processId: targetProcess.id,
           processName: targetProcess.name,
           hearingDate: dateTimeStr,
+          cep: values.cep,
+          locationObservations: values.locationObservations
         });
         toast({ title: 'Perícia Agendada!', description: 'O compromisso foi adicionado à pauta global.' });
       }
@@ -318,23 +351,61 @@ export function LegalAppraisalDialog({ process, appraisal, open, onOpenChange, o
                   </div>
                 </div>
 
-                <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                   <FormField
                     control={form.control}
-                    name="location"
+                    name="cep"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
-                           <MapPin className="h-3 w-3 text-primary" /> Local da Perícia *
-                        </FormLabel>
-                        <FormControl>
-                          <LocationSearch value={field.value} onSelect={field.onChange} placeholder="Endereço exato da perícia..." />
-                        </FormControl>
-                        <FormMessage />
+                        <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">CEP (Busca Rápida)</FormLabel>
+                        <div className="flex gap-2">
+                          <FormControl>
+                            <Input 
+                              placeholder="00000-000" 
+                              className="h-11 bg-black/40 border-white/10" 
+                              {...field} 
+                              onChange={(e) => {
+                                field.onChange(e);
+                                if (e.target.value.length >= 8) handleCEPLookup(e.target.value);
+                              }}
+                            />
+                          </FormControl>
+                        </div>
                       </FormItem>
                     )}
                   />
+
+                  <div className="md:col-span-2 space-y-4">
+                    <FormField
+                      control={form.control}
+                      name="location"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
+                             <MapPin className="h-3 w-3 text-primary" /> Local da Perícia *
+                          </FormLabel>
+                          <FormControl>
+                            <LocationSearch value={field.value} onSelect={field.onChange} placeholder="Endereço exato da perícia..." />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                 </div>
+
+                <FormField
+                  control={form.control}
+                  name="locationObservations"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Observações do Local (Trabalho, Bloco, etc)</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Ex: No prédio da recepção, fundos do pátio..." className="h-11 bg-black/40 border-white/10" {...field} />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
 
                 <div className="p-6 rounded-2xl bg-primary/5 border border-primary/20 space-y-6">
                   <div className="flex items-center justify-between">

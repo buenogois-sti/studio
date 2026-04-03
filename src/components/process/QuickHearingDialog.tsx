@@ -57,6 +57,8 @@ const hearingSchema = z.object({
   meetingPassword: z.string().optional().or(z.literal('')),
   clientNotified: z.boolean().default(false),
   notificationMethod: z.enum(['whatsapp', 'email', 'phone', 'personal', 'court', 'other']).optional(),
+  cep: z.string().optional(),
+  locationObservations: z.string().optional(),
 });
 
 interface QuickHearingDialogProps {
@@ -95,6 +97,8 @@ export function QuickHearingDialog({ process, hearing, open, onOpenChange, onSuc
       meetingPassword: '',
       clientNotified: false,
       notificationMethod: 'whatsapp',
+      cep: '',
+      locationObservations: '',
     }
   });
 
@@ -115,6 +119,8 @@ export function QuickHearingDialog({ process, hearing, open, onOpenChange, onSuc
           meetingPassword: hearing.meetingPassword || '',
           clientNotified: !!hearing.clientNotified,
           notificationMethod: hearing.notificationMethod || 'whatsapp',
+          cep: hearing.cep || '',
+          locationObservations: hearing.locationObservations || '',
         });
 
         if (hearing.processId && firestore) {
@@ -157,6 +163,21 @@ export function QuickHearingDialog({ process, hearing, open, onOpenChange, onSuc
     return new Date(year, month - 1, day);
   };
 
+  const handleCEPLookup = async (cep: string) => {
+    const cleanCEP = cep.replace(/\D/g, '');
+    if (cleanCEP.length !== 8) return;
+    try {
+      const response = await fetch(`https://viacep.com.br/ws/${cleanCEP}/json/`);
+      const data = await response.json();
+      if (!data.erro) {
+        const address = `${data.logradouro}, ${data.bairro}, ${data.localidade} - ${data.uf}`;
+        form.setValue('location', address);
+      }
+    } catch (error) {
+      console.error('CEP lookup failed:', error);
+    }
+  };
+
   const generateWhatsAppLink = () => {
     if (!clientData?.mobile) {
       toast({ variant: 'destructive', title: 'WhatsApp indisponível', description: 'O cliente não possui celular cadastrado.' });
@@ -166,6 +187,8 @@ export function QuickHearingDialog({ process, hearing, open, onOpenChange, onSuc
     const dateObj = getLocalDate(values.date);
     const dateFmt = format(dateObj, "dd/MM (EEEE)", { locale: ptBR });
     
+    const googleMapsLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${values.location}${values.cep ? `, ${values.cep}` : ''}`)}`;
+
     // Construção robusta para evitar erro de codificação
     const msgParts = [
       `Olá, ${clientData.firstName.trim()}! Sou do escritório Bueno Gois Advogados.`,
@@ -175,6 +198,12 @@ export function QuickHearingDialog({ process, hearing, open, onOpenChange, onSuc
       `🕘 Horário: *${values.time}*`,
       `📍 Local: *${values.location}*`
     ];
+
+    if (values.locationObservations) {
+      msgParts.push(`🏠 Observação Local: *${values.locationObservations}*`);
+    }
+
+    msgParts.push(`🗺️ Link do Local: ${googleMapsLink}`);
 
     if (values.meetingLink) {
       msgParts.push('');
@@ -250,6 +279,8 @@ export function QuickHearingDialog({ process, hearing, open, onOpenChange, onSuc
           processId: targetProcess.id,
           processName: targetProcess.name,
           hearingDate: hearingDateTimeStr,
+          cep: values.cep,
+          locationObservations: values.locationObservations
         });
         toast({ title: 'Audiência Agendada!', description: 'O compromisso foi distribuído na pauta do escritório.' });
       }
@@ -374,23 +405,61 @@ export function QuickHearingDialog({ process, hearing, open, onOpenChange, onSuc
                   />
                 </div>
 
-                <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                   <FormField
                     control={form.control}
-                    name="location"
+                    name="cep"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
-                          <MapPin className="h-3 w-3" /> Endereço ou Fórum Presencial *
-                        </FormLabel>
+                        <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">CEP (Busca)</FormLabel>
                         <FormControl>
-                          <LocationSearch value={field.value} onSelect={field.onChange} placeholder="Pesquise o fórum ou endereço..." />
+                          <Input 
+                            placeholder="00000-000" 
+                            className="h-11 bg-black/40 border-white/10" 
+                            {...field} 
+                            onChange={(e) => {
+                              field.onChange(e);
+                              if (e.target.value.length >= 8) handleCEPLookup(e.target.value);
+                            }}
+                          />
                         </FormControl>
-                        <FormMessage />
                       </FormItem>
                     )}
                   />
+                  
+                  <div className="md:col-span-3 space-y-4">
+                    <FormField
+                      control={form.control}
+                      name="location"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
+                            <MapPin className="h-3 w-3" /> Endereço ou Fórum Presencial *
+                          </FormLabel>
+                          <FormControl>
+                            <LocationSearch value={field.value} onSelect={field.onChange} placeholder="Pesquise o fórum ou endereço..." />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
 
+                <FormField
+                  control={form.control}
+                  name="locationObservations"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Observações do Local (Trabalho, Bloco, etc)</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Ex: Entrada lateral, falar com porteiro..." className="h-11 bg-black/40 border-white/10" {...field} />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+
+                <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
