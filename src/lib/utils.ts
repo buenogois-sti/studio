@@ -96,3 +96,48 @@ export function addCalendarDays(startDate: string | Date, days: number): Date {
   date.setDate(date.getDate() + days);
   return date;
 }
+
+/**
+ * Função inteligente para extrair o nome completo do Órgão Julgador de uma intimação descritiva bruta.
+ */
+export function extractFullOrgao(item: { orgao?: string | null, descricao?: string | null }): string {
+  if (!item) return 'Tribunal / Órgão não identificado';
+  
+  if (item.descricao) {
+     // Regex específico para padrão DJEN
+     const match = item.descricao.match(/Órgão:\s*(.*?)(?=\s*Data de disponibilização|\s*Data de publicação|\s*Parte\(s\))/i);
+     if (match && match[1]) {
+        return match[1].trim();
+     }
+     
+     // Regex específico para DEOAB
+     if (item.descricao.includes('TRIBUNAL DE ÉTICA')) {
+        return 'Tribunal de Ética e Disciplina (TED/OAB)';
+     }
+  }
+  
+  return item.orgao || 'Tribunal / Órgão não identificado';
+}
+
+/**
+ * Converte propriedades de data/timestamp de vários formatos mal-formados para uma string ISO rastreável para sort.
+ */
+export function extractSortDate(item: any): string {
+  if (!item) return "";
+  if (item.dataPublicacaoISO) return String(item.dataPublicacaoISO);
+  
+  if (item.createdAt) {
+      if (typeof item.createdAt === 'string') return item.createdAt;
+      if (typeof item.createdAt.toDate === 'function') return item.createdAt.toDate().toISOString();
+      return String(item.createdAt);
+  }
+  
+  if (item.dataDisponibilizacao) {
+      const parts = String(item.dataDisponibilizacao).split('/');
+      if (parts.length === 3) return `${parts[2]}-${parts[1]}-${parts[0]}`;
+      return String(item.dataDisponibilizacao);
+  }
+  
+  return "";
+}
+

@@ -13,6 +13,7 @@ import {
   Gavel,
   ShieldAlert,
   Archive,
+  ArchiveX,
   CheckCircle2,
   ChevronDown,
   ChevronUp,
@@ -33,10 +34,11 @@ import {
   TrendingUp,
   Scale,
   FolderOpen,
-  ArchiveX,
   CalendarDays,
   Filter,
-  Briefcase
+  Briefcase,
+  LayoutGrid,
+  List
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
@@ -102,7 +104,8 @@ const ProcessCard = React.memo(({
   onSync,
   isSyncing,
   processHearings,
-  processAgreement
+  processAgreement,
+  viewMode = 'list'
 }: {
   process: Process;
   client?: Client;
@@ -123,8 +126,105 @@ const ProcessCard = React.memo(({
   isSyncing: boolean;
   processHearings: Hearing[];
   processAgreement?: FinancialEvent;
+  viewMode?: 'list' | 'card';
 }) => {
   const statusInfo = STATUS_CONFIG[p.status || 'Ativo'];
+
+  if (viewMode === 'card') {
+    return (
+      <Card className="border-none shadow-xl overflow-hidden bg-[#0f172a] hover:bg-white/[0.01] transition-all duration-300 group flex flex-col h-full border border-white/5 relative">
+        <CardContent className="p-0 flex flex-col flex-1">
+          <div className="p-5 flex flex-col gap-4 flex-1">
+            <div className="flex items-center justify-between gap-2 mb-1">
+                <Badge variant="outline" className={cn("px-1.5 h-5 text-[9px] font-black uppercase tracking-widest border-none", statusInfo.color)}>
+                  {statusInfo.label}
+                </Badge>
+                {p.processNumber && (
+                   <span className="text-[10px] font-mono font-bold text-slate-500 truncate max-w-[120px]">{p.processNumber}</span>
+                )}
+            </div>
+
+            <h3 
+              className="font-bold text-lg text-white leading-tight line-clamp-2 group-hover:text-primary transition-colors cursor-pointer" 
+              onClick={() => onToggleExpand(p.id)}
+            >
+              {p.name}
+            </h3>
+
+            <div className="flex flex-wrap items-center gap-2 mt-auto">
+              <div className="flex items-center gap-1.5 text-[9px] font-black uppercase text-primary/80 bg-primary/10 px-2 py-1 rounded w-fit">
+                <Scale className="h-3 w-3" /> {p.legalArea}
+              </div>
+              {leadLawyer && (
+                <div className="flex items-center gap-1.5 text-[9px] font-bold text-emerald-400 uppercase bg-emerald-500/10 px-2 py-1 rounded w-fit">
+                  <UserCheck className="h-3 w-3" /> {leadLawyer.firstName}
+                </div>
+              )}
+            </div>
+
+            {/* Cliente */}
+            <div className="border-t border-white/5 pt-3 mt-1 h-12 flex items-center">
+              <Link href={`/dashboard/clientes?searchTerm=${client?.firstName || ''}`} className="block group/link w-full">
+                <p className="text-[8px] font-black uppercase text-slate-500 tracking-widest mb-1 flex items-center gap-1.5"><User className="h-2.5 w-2.5" /> Cliente / Outorgante</p>
+                <p className="text-xs font-bold text-slate-200 truncate group-hover/link:text-primary transition-colors">
+                  {client ? `${client.firstName} ${client.lastName}` : 'Sem Cliente'}
+                </p>
+              </Link>
+            </div>
+
+            <div className="border-t border-white/5 pt-3 flex items-center justify-between mt-auto gap-2">
+              <div className="flex gap-2">
+                 <Button variant="outline" size="sm" onClick={() => onToggleExpand(p.id)} className="h-8 shadow-none bg-transparent hover:bg-white/5 border-white/10 text-white/50 hover:text-white px-2">
+                    <Info className="h-4 w-4 mr-1"/> Detalhes
+                 </Button>
+
+                 <DropdownMenu>
+                   <DropdownMenuTrigger asChild>
+                     <Button variant="outline" size="sm" className="h-8 shadow-none bg-transparent hover:bg-white/5 border-white/10 px-2 text-white/50 hover:text-white">
+                         <MoreVertical className="h-4 w-4" />
+                     </Button>
+                   </DropdownMenuTrigger>
+                   <DropdownMenuContent align="start" className="w-56 bg-[#0f172a] border-white/10 shadow-2xl p-1 z-50">
+                     <DropdownMenuLabel className="text-[10px] font-black uppercase text-slate-500 px-2 py-1.5 tracking-widest">Gestão</DropdownMenuLabel>
+                     <DropdownMenuItem onClick={() => onTimeline(p)} className="gap-2 focus:bg-white/5">
+                       <History className="h-4 w-4 text-primary" /> <span className="font-bold">Timeline</span>
+                     </DropdownMenuItem>
+                     <DropdownMenuItem onClick={() => onHearing(p)} className="gap-2 focus:bg-white/5">
+                       <Gavel className="h-4 w-4 text-amber-400" /> <span className="font-bold text-amber-400">Audiência</span>
+                     </DropdownMenuItem>
+                     <DropdownMenuSeparator className="bg-white/5 my-1" />
+                     <DropdownMenuItem onClick={() => onEdit(p)} className="gap-2 focus:bg-white/5">
+                       <FileText className="h-4 w-4 text-slate-400" /> <span className="font-bold">Editar Caso</span>
+                     </DropdownMenuItem>
+                   </DropdownMenuContent>
+                 </DropdownMenu>
+              </div>
+
+               <Button onClick={() => onDeadline(p)} size="sm" className="h-8 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 shadow-none px-3 font-black uppercase text-[9px] tracking-widest border border-rose-500/20">
+                  Prazos
+               </Button>
+            </div>
+          </div>
+          
+          {isExpanded && (
+              <div className="bg-white/[0.02] p-5 text-sm border-t border-white/5 space-y-4 animate-in fade-in duration-200 shadow-inner">
+                 <div>
+                   <p className="text-[10px] font-black uppercase text-slate-500 flex items-center gap-2 mb-1"><DollarSign className="h-3 w-3 text-emerald-500" /> Valor</p>
+                   <p className="font-mono text-emerald-400 font-bold text-base">{(p.caseValue || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                 </div>
+                 <div>
+                   <p className="text-[10px] font-black uppercase text-slate-500 flex items-center gap-2 mb-1"><Building className="h-3 w-3 text-blue-400" /> Juízo Principal</p>
+                   <p className="text-white leading-tight font-medium">{p.courtBranch || '---'}</p>
+                 </div>
+                 <div className="pt-2">
+                   <Button variant="secondary" size="sm" onClick={() => onToggleExpand(p.id)} className="w-full text-[10px] uppercase font-black tracking-widest h-8 border-none bg-white/5 hover:bg-white/10 text-slate-300">Esconder</Button>
+                 </div>
+              </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="border-none shadow-xl overflow-hidden bg-[#0f172a] hover:bg-white/[0.01] transition-all duration-300 group">
@@ -338,6 +438,7 @@ export default function ProcessosPage() {
   const [processToArchive, setProcessToArchive] = React.useState<Process | null>(null);
   const [isArchiving, setIsArchiving] = React.useState(false);
   const [activeAreaTab, setActiveAreaTab] = React.useState('Todos');
+  const [viewMode, setViewMode] = React.useState<'list' | 'card'>('list');
 
   const { firestore, isUserLoading } = useFirebase();
   const { data: session } = useSession();
@@ -537,6 +638,27 @@ export default function ProcessosPage() {
           <p className="text-sm text-muted-foreground">Gestão jurídica estratégica e acompanhamento em tempo real.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center bg-[#0f172a] p-1 rounded-lg border border-white/5 h-10 gap-1 hidden sm:flex">
+            <Button 
+                variant={viewMode === 'list' ? 'secondary' : 'ghost'} 
+                size="sm" 
+                onClick={() => setViewMode('list')} 
+                className={cn("h-full px-2.5 shadow-none group transition-all", viewMode === 'list' ? 'bg-white/10' : 'bg-transparent hover:bg-white/5')} 
+                title="Modo Lista Horizontal"
+            >
+                <List className={cn("w-4 h-4", viewMode === 'list' ? "text-white" : "text-slate-500 group-hover:text-slate-300")} />
+            </Button>
+            <Button 
+                variant={viewMode === 'card' ? 'secondary' : 'ghost'} 
+                size="sm" 
+                onClick={() => setViewMode('card')} 
+                className={cn("h-full px-2.5 shadow-none group transition-all", viewMode === 'card' ? 'bg-white/10' : 'bg-transparent hover:bg-white/5')} 
+                title="Modo Miniatura Vertical"
+            >
+                <LayoutGrid className={cn("w-4 h-4", viewMode === 'card' ? "text-white" : "text-slate-500 group-hover:text-slate-300")} />
+            </Button>
+          </div>
+
           <div className="relative w-full max-sm:w-full max-w-sm">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input 
@@ -610,7 +732,7 @@ export default function ProcessosPage() {
           })}
         </TabsList>
 
-        <div className="grid gap-4 min-h-[400px]">
+        <div className={cn("min-h-[400px]", viewMode === 'list' ? "grid gap-4" : "grid gap-4 auto-rows-max grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4")}>
           {isLoading && !paginatedProcesses.length ? (
             <div className="flex flex-col items-center justify-center py-32 space-y-4">
               <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -639,6 +761,7 @@ export default function ProcessosPage() {
                 isSyncing={isSyncing === p.id}
                 processHearings={hearingsByProcessMap.get(p.id) || []}
                 processAgreement={agreementsByProcessMap.get(p.id)}
+                viewMode={viewMode}
               />
             ))
           ) : (

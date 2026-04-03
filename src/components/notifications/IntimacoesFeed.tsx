@@ -27,9 +27,15 @@ import {
   Calendar,
   Building2,
   Clock,
-  AlertTriangle
+  AlertTriangle,
+  Search,
+  Loader2,
+  FlaskConical,
+  LifeBuoy,
+  LayoutGrid,
+  List
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, extractFullOrgao, extractSortDate } from '@/lib/utils';
 import { IntimacaoDetailsDialog } from './IntimacaoDetailsDialog';
 import { useMemo } from 'react';
 
@@ -37,9 +43,13 @@ export function IntimacoesFeed() {
   const [intimacoes, setIntimacoes] = useState<Intimacao[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<'all' | 'unread'>('unread');
+  const [filter, setFilter] = useState<'all' | 'unread' | 'read' | 'no_process' | 'hearing'>('unread');
   const [selectedIntimacao, setSelectedIntimacao] = useState<Intimacao | null>(null);
   const [togglingMap, setTogglingMap] = useState<Record<string, boolean>>({});
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isFiltering, setIsFiltering] = useState(false);
+  const [viewMode, setViewMode] = useState<'card' | 'list'>('list');
+  const itemsPerPage = 20;
 
   const { user, isUserLoading } = useFirebase();
 
@@ -48,16 +58,24 @@ export function IntimacoesFeed() {
 
     const q = query(
       collection(db, 'intimacoes'),
-      orderBy('dataPublicacaoISO', 'desc'),
-      orderBy('createdAt', 'desc'),
-      limit(50)
+      limit(200)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const docs = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Intimacao[];
+      let docs = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          lida: !!data.lida,
+        }
+      }) as Intimacao[];
+      
+      docs.sort((a, b) => {
+        const valA = extractSortDate(a);
+        const valB = extractSortDate(b);
+        return valB.localeCompare(valA);
+      });
       
       setIntimacoes(docs);
       setLoading(false);
@@ -72,10 +90,24 @@ export function IntimacoesFeed() {
   }, [user, isUserLoading]);
 
   const unreadCount = useMemo(() => intimacoes.filter(i => !i.lida).length, [intimacoes]);
+  const readCount = useMemo(() => intimacoes.filter(i => i.lida).length, [intimacoes]);
+  const noProcessCount = useMemo(() => intimacoes.filter(i => !i.processo).length, [intimacoes]);
+  const hearingCount = useMemo(() => intimacoes.filter(i => i.descricao?.toLowerCase().includes('audiência') || i.descricao?.toLowerCase().includes('audiencia')).length, [intimacoes]);
   
   const filteredIntimacoes = useMemo(() => {
-    return filter === 'unread' ? intimacoes.filter(i => !i.lida) : intimacoes;
+    switch(filter) {
+      case 'unread': return intimacoes.filter(i => !i.lida);
+      case 'read': return intimacoes.filter(i => i.lida);
+      case 'no_process': return intimacoes.filter(i => !i.processo);
+      case 'hearing': return intimacoes.filter(i => i.descricao?.toLowerCase().includes('audiência') || i.descricao?.toLowerCase().includes('audiencia'));
+      case 'all': default: return intimacoes.filter(i => !i.lida); // O Feed Principal prioriza não lidas
+    }
   }, [filter, intimacoes]);
+
+  useEffect(() => { setCurrentPage(1); }, [filter]);
+
+  const totalPages = Math.ceil(filteredIntimacoes.length / itemsPerPage);
+  const currentItems = filteredIntimacoes.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const toggleRead = async (e: React.MouseEvent, id: string, currentStatus: boolean) => {
     e.stopPropagation(); 
@@ -90,6 +122,15 @@ export function IntimacoesFeed() {
     } finally {
       setTogglingMap(prev => ({ ...prev, [id]: false }));
     }
+  };
+
+  const changeFilter = (newFilter: typeof filter) => {
+    if (filter === newFilter) return;
+    setIsFiltering(true);
+    setTimeout(() => {
+        setFilter(newFilter);
+        setIsFiltering(false);
+    }, 400); 
   };
 
   const handleOpenDetails = (item: Intimacao) => {
@@ -121,6 +162,28 @@ export function IntimacoesFeed() {
 
   return (
     <div className="space-y-6">
+      <div className="bg-blue-500/10 border border-blue-500/20 text-blue-400 p-4 rounded-xl flex items-start gap-4 shadow-sm relative overflow-hidden">
+        <div className="absolute -right-4 -top-4 opacity-[0.03] pointer-events-none">
+            <FlaskConical className="w-32 h-32" />
+        </div>
+        <div className="mt-1 bg-blue-500/20 p-2 rounded-md">
+           <FlaskConical className="w-5 h-5 animate-pulse text-blue-300" />
+        </div>
+        <div className="space-y-1.5 flex-1 z-10">
+          <h4 className="font-bold text-sm tracking-wide uppercase text-blue-300 flex items-center gap-2">
+            Beta de Automação Ativado
+            <Badge variant="outline" className="text-[9px] bg-blue-500/20 border-blue-400/30 text-blue-300 py-0 h-4">TESTE</Badge>
+          </h4>
+          <p className="text-xs leading-relaxed opacity-90 text-blue-200">
+            O fluxo de extração e a IA de Parsing estão em fase de calibração <strong className="text-white">BETA</strong>. 
+            É crucial que os advogados realizem a <strong className="text-white border-b border-blue-400/50">dupla checagem obrigatória</strong> de todos os prazos nas plataformas oficiais para contornar riscos.
+          </p>
+          <div className="pt-2 flex items-center gap-2 text-[10px] font-bold tracking-widest uppercase text-blue-400/80">
+            <LifeBuoy className="w-3 h-3" /> Reporte qualquer divergência entrar em contato com o Suporte.
+          </div>
+        </div>
+      </div>
+
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-background/50 p-4 rounded-xl border border-border">
         <div>
           <h2 className="text-2xl font-bold flex items-center gap-2">
@@ -132,33 +195,93 @@ export function IntimacoesFeed() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2 bg-muted/50 p-1 rounded-lg border">
-          <Button 
-            variant={filter === 'all' ? 'secondary' : 'ghost'} 
-            size="sm"
-            onClick={() => setFilter('all')}
-            className="h-8"
-          >
-            Todas
-          </Button>
-          <Button 
-            variant={filter === 'unread' ? 'secondary' : 'ghost'} 
-            size="sm"
-            onClick={() => setFilter('unread')}
-            className={cn("h-8 flex items-center gap-2", filter === 'unread' && "text-primary")}
-          >
-            Não Lidas
-            {unreadCount > 0 && (
-              <Badge variant="default" className="px-1.5 min-w-[20px] h-5 justify-center">
-                {unreadCount}
-              </Badge>
-            )}
-          </Button>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-lg border">
+            <Button 
+                variant={viewMode === 'list' ? 'secondary' : 'ghost'} 
+                size="sm"
+                onClick={() => setViewMode('list')}
+                className="h-8 px-2.5"
+                title="Modo Lista"
+            >
+                <List className="w-4 h-4" />
+            </Button>
+            <Button 
+                variant={viewMode === 'card' ? 'secondary' : 'ghost'} 
+                size="sm"
+                onClick={() => setViewMode('card')}
+                className="h-8 px-2.5"
+                title="Modo Card"
+            >
+                <LayoutGrid className="w-4 h-4" />
+            </Button>
+          </div>
+
+          <div className="flex items-center gap-2 bg-muted/50 p-1 rounded-lg border">
+            <Button 
+              variant={filter === 'all' ? 'secondary' : 'ghost'} 
+              size="sm"
+              onClick={() => changeFilter('all')}
+              className="h-8"
+            >
+              Fila Padrão
+            </Button>
+          </div>
         </div>
       </div>
 
-      <div className="grid gap-4">
-        {filteredIntimacoes.length === 0 ? (
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card 
+            className={cn("bg-[#0f172a] border-white/10 shadow-lg relative overflow-hidden group cursor-pointer transition-all hover:bg-white/5", filter === 'unread' && "ring-1 ring-rose-500 shadow-[0_0_15px_rgba(243,24,73,0.3)] bg-rose-500/5")}
+            onClick={() => changeFilter(filter === 'unread' ? 'all' : 'unread')}
+        >
+            <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none group-hover:scale-110 transition-transform"><AlertTriangle className="h-16 w-16" /></div>
+            <CardContent className="p-4 flex flex-col items-center justify-center">
+                <div className="text-3xl font-black text-rose-500">{unreadCount}</div>
+                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mt-1">Não Lidas</div>
+            </CardContent>
+        </Card>
+        <Card 
+            className={cn("bg-[#0f172a] border-white/10 shadow-lg relative overflow-hidden group cursor-pointer transition-all hover:bg-white/5", filter === 'read' && "ring-1 ring-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.3)] bg-emerald-500/5")}
+            onClick={() => changeFilter(filter === 'read' ? 'all' : 'read')}
+        >
+            <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none group-hover:scale-110 transition-transform"><CheckCircle2 className="h-16 w-16" /></div>
+            <CardContent className="p-4 flex flex-col items-center justify-center">
+                <div className="text-3xl font-black text-emerald-500">{readCount}</div>
+                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mt-1">Lidas</div>
+            </CardContent>
+        </Card>
+        <Card 
+            className={cn("bg-[#0f172a] border-white/10 shadow-lg relative overflow-hidden group cursor-pointer transition-all hover:bg-white/5", filter === 'no_process' && "ring-1 ring-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.3)] bg-amber-500/5")}
+            onClick={() => changeFilter(filter === 'no_process' ? 'all' : 'no_process')}
+        >
+            <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none group-hover:scale-110 transition-transform"><Search className="h-16 w-16" /></div>
+            <CardContent className="p-4 flex flex-col items-center justify-center">
+                <div className="text-3xl font-black text-amber-500">{noProcessCount}</div>
+                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mt-1">S/ Processo</div>
+            </CardContent>
+        </Card>
+        <Card 
+            className={cn("bg-[#0f172a] border-white/10 shadow-lg relative overflow-hidden group cursor-pointer transition-all hover:bg-white/5", filter === 'hearing' && "ring-1 ring-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.3)] bg-blue-500/5")}
+            onClick={() => changeFilter(filter === 'hearing' ? 'all' : 'hearing')}
+        >
+            <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none group-hover:scale-110 transition-transform"><Calendar className="h-16 w-16" /></div>
+            <CardContent className="p-4 flex flex-col items-center justify-center">
+                <div className="text-3xl font-black text-blue-400">{hearingCount}</div>
+                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mt-1">Audiências</div>
+            </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 relative min-h-[400px]">
+        {isFiltering && (
+           <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/50 backdrop-blur-sm rounded-xl">
+              <Loader2 className="w-10 h-10 text-primary animate-spin mb-4" />
+              <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest animate-pulse">Aplicando Filtro...</p>
+           </div>
+        )}
+
+        {currentItems.length === 0 ? (
           <Card className="border-dashed border-2">
             <CardContent className="flex flex-col items-center justify-center p-12 text-center text-muted-foreground">
               <CheckCircle2 className="w-12 h-12 mb-4 opacity-20" />
@@ -166,9 +289,66 @@ export function IntimacoesFeed() {
             </CardContent>
           </Card>
         ) : (
-          filteredIntimacoes.map((item) => {
+          currentItems.map((item) => {
             const isUrgente = item.descricao?.toLowerCase().includes('prazo') || item.descricao?.toLowerCase().includes('audiência') || item.descricao?.toLowerCase().includes('urgente');
             
+            if (viewMode === 'list') {
+              return (
+                <div
+                  key={item.id}
+                  onClick={() => handleOpenDetails(item)}
+                  className={cn(
+                    "flex flex-col md:flex-row md:items-center gap-4 py-3 px-5 rounded-xl border bg-[#0f172a]/80 hover:bg-[#1e293b]/80 transition-colors cursor-pointer group shadow-sm",
+                    !item.lida && "border-l-4 border-l-primary bg-primary/[0.02]",
+                    !item.processo && "border-l-4 border-l-amber-500",
+                    isUrgente && !item.lida && "border-l-rose-500"
+                  )}
+                >
+                    <div className="flex-1 space-y-1.5 md:max-w-[40%]">
+                       <div className="flex items-center gap-2 flex-wrap">
+                          <Badge variant="outline" className="font-mono text-[9px] py-0 border-white/10">{item.tipo}</Badge>
+                          {item.processo ? (
+                             <Badge variant="default" className="font-mono text-[9px] py-0 bg-blue-500/10 text-blue-400 border border-blue-500/20">{item.processo}</Badge>
+                          ) : (
+                             <Badge variant="destructive" className="font-mono text-[9px] py-0 bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 border border-amber-500/20">SEM PROCESSO</Badge>
+                          )}
+                          {!item.lida && <Badge className={cn("text-[8px] px-1.5 py-0 h-4", isUrgente ? "bg-rose-500 animate-pulse" : "bg-primary border-primary")}>NOVA</Badge>}
+                       </div>
+                       <p className="text-[13px] font-semibold text-white/90 line-clamp-1 group-hover:text-primary transition-colors flex items-center gap-1.5">
+                          <Building2 className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                          {extractFullOrgao(item)}
+                       </p>
+                    </div>
+                    
+                    <div className="hidden md:block w-px h-10 bg-white/5" />
+
+                    <div className="flex-1 min-w-[200px]">
+                       <p className="text-[9px] font-bold tracking-widest text-slate-500 uppercase">Resumo da Movimentação</p>
+                       <p className="text-xs text-slate-300 line-clamp-1 mt-0.5 opacity-80 italic">"{item.descricao?.substring(0, 100) || 'Sem resumo'}..."</p>
+                    </div>
+
+                    <div className="hidden md:block w-px h-10 bg-white/5" />
+
+                    <div className="flex items-center justify-between md:justify-end gap-6 min-w-[140px]">
+                       <div className="flex flex-col md:items-end">
+                          <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1"><Calendar className="w-3 h-3"/> Disposição</p>
+                          <p className="text-[11px] text-slate-200 mt-0.5 font-mono">{item.dataDisponibilizacao}</p>
+                       </div>
+                       
+                       <Button 
+                          variant="ghost" 
+                          size="icon"
+                          disabled={togglingMap[item.id]}
+                          className={cn("h-8 w-8 rounded-full border-white/5 border bg-white/5 hover:bg-primary/20", item.lida ? "opacity-30" : "text-primary")}
+                          onClick={(e) => toggleRead(e, item.id, item.lida)}
+                       >
+                          {togglingMap[item.id] ? <Clock className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                       </Button>
+                    </div>
+                </div>
+              );
+            }
+
             return (
               <Card 
                 key={item.id} 
@@ -203,9 +383,9 @@ export function IntimacoesFeed() {
                           </Badge>
                         )}
                       </div>
-                      <CardTitle className="text-base font-semibold leading-none pt-2 flex items-center gap-2 group-hover:text-primary transition-colors">
-                        <Building2 className="w-4 h-4 text-muted-foreground" />
-                        {item.orgao || 'Tribunal / Órgão não identificado'}
+                      <CardTitle className="text-base font-semibold leading-tight pt-2 flex items-center gap-2 group-hover:text-primary transition-colors pr-4">
+                        <Building2 className="w-4 h-4 text-muted-foreground shrink-0" />
+                        {extractFullOrgao(item)}
                       </CardTitle>
                     </div>
                   
@@ -253,6 +433,14 @@ export function IntimacoesFeed() {
           })
         )}
       </div>
+
+      {totalPages > 1 && (
+         <div className="flex items-center justify-center gap-4 mt-6">
+            <Button variant="outline" className="h-9 px-4 text-xs font-bold uppercase tracking-widest border-white/10 bg-black/40 hover:bg-white/10" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)}>Anterior</Button>
+            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest bg-white/5 px-4 py-2 rounded-lg border border-white/5">Página {currentPage} de {totalPages}</span>
+            <Button variant="outline" className="h-9 px-4 text-xs font-bold uppercase tracking-widest border-white/10 bg-black/40 hover:bg-white/10" disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)}>Próxima</Button>
+         </div>
+      )}
 
       <IntimacaoDetailsDialog 
         item={selectedIntimacao}

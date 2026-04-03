@@ -9,7 +9,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import { cn } from '@/lib/utils';
+import { cn, extractSortDate } from '@/lib/utils';
 
 export function IntimacoesHighlight() {
   const { firestore, isUserLoading, user } = useFirebase();
@@ -18,13 +18,21 @@ export function IntimacoesHighlight() {
     if (!firestore || isUserLoading || !user) return null;
     return query(
       collection(firestore, 'intimacoes'),
-      where('lida', '==', false),
-      orderBy('dataPublicacaoISO', 'desc'),
-      limit(5)
+      limit(50)
     );
   }, [firestore, isUserLoading, user]);
 
-  const { data: unreadIntimacoes, isLoading } = useCollection<Intimacao>(unreadQuery);
+  const { data: allData, isLoading } = useCollection<Intimacao>(unreadQuery);
+  const unreadIntimacoes = React.useMemo(() => {
+     if (!allData) return [];
+     const filtered = allData.filter(i => !i.lida);
+     filtered.sort((a, b) => {
+        const valA = extractSortDate(a);
+        const valB = extractSortDate(b);
+        return valB.localeCompare(valA);
+     });
+     return filtered;
+  }, [allData]);
 
   if (isLoading || !unreadIntimacoes || unreadIntimacoes.length === 0) {
     return null;

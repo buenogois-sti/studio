@@ -45,12 +45,15 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/use-toast';
 import { TitleFormDialog } from '@/components/finance/finance-dialogs';
+import { ReceiptGenerator } from '@/components/finance/ReceiptGenerator';
+import { FileText } from 'lucide-react';
 import Link from 'next/link';
 
 export default function FinanceiroPage() {
   const { firestore, isUserLoading } = useFirebase();
   const [refreshKey, setRefreshKey] = React.useState(0);
   const [isFormOpen, setIsFormOpen] = React.useState(false);
+  const [isReceiptOpen, setIsReceiptOpen] = React.useState(false);
   const [searchTerm, setSearchTerm] = React.useState('');
   const [selectedDate, setSelectedDate] = React.useState(new Date());
 
@@ -173,6 +176,13 @@ export default function FinanceiroPage() {
               onChange={e => setSearchTerm(e.target.value)} 
             />
           </div>
+          <Button 
+            className="gap-2 bg-slate-800 border border-white/10 hover:bg-slate-700 text-white font-bold h-10 px-6 shadow-lg transition-colors"
+            onClick={() => setIsReceiptOpen(true)}
+          >
+            <FileText className="h-4 w-4 text-emerald-400" />
+            Gerar Recibo
+          </Button>
           <Button 
             className="gap-2 bg-primary text-primary-foreground font-bold h-10 px-6 shadow-lg shadow-primary/20"
             onClick={() => setIsFormOpen(true)}
@@ -405,6 +415,7 @@ export default function FinanceiroPage() {
         onOpenChange={setIsFormOpen} 
         onSuccess={() => setRefreshKey(k => k + 1)}
       />
+      <ReceiptGenerator open={isReceiptOpen} onOpenChange={setIsReceiptOpen} />
     </div>
   );
 }

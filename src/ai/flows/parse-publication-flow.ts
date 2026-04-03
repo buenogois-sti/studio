@@ -18,6 +18,8 @@ const ParsePublicationOutputSchema = z.object({
   daysCount: z.number().describe('A quantidade de dias concedida para o prazo.'),
   isBusinessDays: z.boolean().describe('Se o prazo deve ser contado em dias úteis (CPC/CLT). Geralmente true.'),
   summary: z.string().describe('Um resumo curtíssimo do que deve ser feito.'),
+  publicationDate: z.string().optional().describe('A data exata da publicação ou da assinatura do juiz se presente no final (ex: "Publique-se. Brasília, 30 de março de 2026"). Retorne sempre no padrão ISO YYYY-MM-DD.'),
+  recommendedSteps: z.array(z.string()).describe('Lista com 3 passos curtos instruindo o advogado como proceder (ex: "1. Ler o acórdão na íntegra", "2. Calcular vencimento do prazo x", "3. Clicar em Lançar Prazo para agendar").'),
 });
 
 export type ParsePublicationOutput = z.infer<typeof ParsePublicationOutputSchema>;
@@ -36,9 +38,11 @@ REGRAS:
 1. Identifique o número do processo (0000000-00.0000.0.00.0000).
 2. Determine o que o juiz ordenou (ex: manifestar sobre contestação, especificar provas, interpor recurso).
 3. Extraia o prazo em dias. Se houver mais de um prazo, extraia o mais urgente ou o principal.
-4. Quase todos os prazos processuais no Brasil são em DIAS ÚTEIS (CPC/CLT). Defina isBusinessDays como true, a menos que o texto diga explicitamente "dias corridos".
+4. Prazos processuais no Brasil (CPC/CLT) costumam ser em DIAS ÚTEIS. Defina isBusinessDays como true, a não ser que diga expressamente "dias corridos".
+5. Identifique rigidamente frases como "Publique-se. [Cidade], [Data]." no final do texto para extrair a publicationDate.
+6. Crie 3 recommendedSteps claros e curtos para o advogado sobre os próximos passos práticos imediatos no sistema.
 
-Responda no formato JSON estruturado.`,
+Responda rigorosamente no formato JSON estruturado.`,
 });
 
 export async function parseLegalPublication(input: ParsePublicationInput): Promise<ParsePublicationOutput> {

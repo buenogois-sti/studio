@@ -82,7 +82,7 @@ export default function ReceitasPage() {
   const { toast } = useToast();
   const now = React.useMemo(() => startOfDay(new Date()), []);
 
-  const titlesQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'financial_titles'), where('type', '==', 'RECEITA'), orderBy('dueDate', 'asc'), limit(300)) : null), [firestore, refreshKey]);
+  const titlesQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'financial_titles'), orderBy('dueDate', 'asc'), limit(500)) : null), [firestore, refreshKey]);
   const { data: titlesData, isLoading: isLoadingTitles } = useCollection<FinancialTitle>(titlesQuery);
 
   const clientsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'clients'), limit(100)) : null), [firestore]);
@@ -97,6 +97,7 @@ export default function ReceitasPage() {
     if (!titlesData) return [];
     
     return titlesData.filter(t => {
+      if (t.type !== 'RECEITA') return false;
       const dueDate = t.dueDate instanceof Timestamp ? t.dueDate.toDate() : (t.dueDate && typeof t.dueDate === 'object' && 'seconds' in t.dueDate) ? new Date((t.dueDate as any).seconds * 1000) : new Date(t.dueDate as any);
       
       if (statusFilter !== 'ALL') {

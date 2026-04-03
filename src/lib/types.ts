@@ -431,17 +431,28 @@ export type Staff = {
   updatedAt?: Timestamp;
 };
 
-export type CorrespondentStatus = 'ATIVO' | 'INATIVO' | 'BLOQUEADO';
+export type CorrespondentService = {
+  id: string;
+  name: string;
+  price: number;
+  hasAdditionals: boolean;
+  additionalDetails?: string;
+};
+
+export type CorrespondentStatus = 'ATIVO' | 'INATIVO' | 'BLOQUEADO' | 'PENDENTE_HOMOLOGACAO';
 
 export type Correspondent = {
   id: string;
   name: string;
+  type?: 'ESCRITORIO' | 'AUTONOMO';
+  oab?: string;
   document: string; // CNPJ or CPF
   email: string;
   phone?: string;
   whatsapp?: string;
   legalArea: string[]; // Areas they cover
   locations: string[]; // Cities/States they cover
+  services?: CorrespondentService[];
   status: CorrespondentStatus;
   rating?: number;
   bankInfo?: {

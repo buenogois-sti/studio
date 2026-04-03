@@ -63,13 +63,14 @@ export default function DespesasPage() {
   const { toast } = useToast();
   const now = React.useMemo(() => startOfDay(new Date()), []);
 
-  const titlesQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'financial_titles'), where('type', '==', 'DESPESA'), orderBy('dueDate', 'asc'), limit(500)) : null), [firestore, refreshKey]);
+  const titlesQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'financial_titles'), orderBy('dueDate', 'asc'), limit(500)) : null), [firestore, refreshKey]);
   const { data: titlesData, isLoading: isLoadingTitles } = useCollection<FinancialTitle>(titlesQuery);
 
   const filteredTitles = React.useMemo(() => {
     if (!titlesData) return [];
     
     return titlesData.filter(t => {
+      if (t.type !== 'DESPESA') return false;
       const dueDate = t.dueDate instanceof Timestamp ? t.dueDate.toDate() : (t.dueDate && typeof t.dueDate === 'object' && 'seconds' in t.dueDate) ? new Date((t.dueDate as any).seconds * 1000) : new Date(t.dueDate as any);
       
       const matchesSearch = t.description.toLowerCase().includes(searchTerm.toLowerCase()) || 

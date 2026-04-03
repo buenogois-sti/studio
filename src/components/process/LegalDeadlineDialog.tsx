@@ -72,6 +72,8 @@ interface LegalDeadlineDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
+  initialText?: string;
+  initialDate?: string;
 }
 
 const COMMON_DEADLINES = [
@@ -89,7 +91,7 @@ const COMMON_DEADLINES = [
   'Personalizado'
 ];
 
-export function LegalDeadlineDialog({ process, deadline, open, onOpenChange, onSuccess }: LegalDeadlineDialogProps) {
+export function LegalDeadlineDialog({ process, deadline, open, onOpenChange, onSuccess, initialText, initialDate }: LegalDeadlineDialogProps) {
   const [isSaving, setIsSaving] = React.useState(false);
   const [isParsingAI, setIsParsingAI] = React.useState(false);
   const [customType, setCustomType] = React.useState(false);
@@ -126,10 +128,10 @@ export function LegalDeadlineDialog({ process, deadline, open, onOpenChange, onS
     } else if (!deadline && open) {
       form.reset({
         type: '',
-        startDate: format(new Date(), 'yyyy-MM-dd'),
+        startDate: initialDate || format(new Date(), 'yyyy-MM-dd'),
         endDate: '',
         countingMethod: 'useful',
-        publicationText: '',
+        publicationText: initialText || '',
         observations: '',
       });
       setCustomType(false);

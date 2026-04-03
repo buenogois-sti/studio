@@ -1,568 +1,477 @@
 'use client';
 import * as React from 'react';
-import {
-  Users,
-  Search,
-  PlusCircle,
-  MoreVertical,
-  UserCircle,
-  DollarSign,
-  History,
-  FileText,
-  X,
-  Mail,
-  Phone,
+import { 
+  HeartHandshake, 
+  Search, 
+  MapPin, 
+  Gavel, 
+  Star, 
+  MoreVertical, 
+  Plus, 
+  Mail, 
+  Phone, 
   MessageSquare,
-  MapPin,
-  TrendingUp,
-  Clock,
-  CheckCircle2,
+  Globe,
+  DollarSign,
   AlertCircle,
-  Briefcase
+  FileSearch,
+  CheckCircle2,
+  Trash2,
+  Edit,
+  UserCheck,
+  ChevronRight,
+  Loader2,
+  Filter,
+  X
 } from 'lucide-react';
-import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, where, doc, deleteDoc, orderBy, getDocs, limit, Timestamp } from 'firebase/firestore';
-import type { Staff, StaffCredit, Process, Hearing } from '@/lib/types';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { StaffForm } from '@/components/staff/StaffForm';
-import { StaffDetailsSheet } from '@/components/staff/StaffDetailsSheet';
+import { useFirebase, useCollection } from '@/firebase';
+import { collection, query, limit, orderBy, getDocs, where, Timestamp, addDoc, updateDoc, doc } from 'firebase/firestore';
+import { startOfMonth } from 'date-fns';
+import type { Correspondent } from '@/lib/types';
 import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
-import { format, startOfMonth } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
-const roleLabels: Record<string, string> = {
-  lawyer: 'Advogado(a)',
-  intern: 'Estagiário(a)',
-  provider: 'Prestador',
-  partner: 'Sócio(a)',
-  employee: 'Administrativo',
-};
-
-function CorrespondentStats({ staffId }: { staffId: string }) {
-  const { firestore } = useFirebase();
-  const [stats, setStats] = React.useState({ pending: 0, paid: 0, completed: 0 });
-  const [loading, setLoading] = React.useState(true);
-
-  React.useEffect(() => {
-    if (!firestore || !staffId) return;
-    
-    const fetchData = async () => {
-      try {
-        const now = new Date();
-        const startOfCurrentMonth = startOfMonth(now);
-
-        // 1. Buscar Créditos (Financeiro)
-        const creditsRef = collection(firestore, `staff/${staffId}/credits`);
-        const creditsSnap = await getDocs(query(creditsRef));
-        
-        let pending = 0;
-        let paid = 0;
-        
-        creditsSnap.docs.forEach(d => {
-          const data = d.data();
-          const val = data.value || 0;
-          if (data.status === 'DISPONIVEL') pending += val;
-          if (data.status === 'PAGO') {
-            const pDate = data.paymentDate?.toDate?.() || data.paymentDate;
-            if (pDate && new Date(pDate) >= startOfCurrentMonth) paid += val;
-          }
-        });
-
-        // 2. Buscar Diligências (Operacional)
-        const diligSnap = await getDocs(query(
-          collection(firestore, 'hearings'),
-          where('lawyerId', '==', staffId),
-          where('type', '==', 'DILIGENCIA'),
-          where('status', '==', 'REALIZADA')
-        ));
-        
-        setStats({ pending, paid, completed: diligSnap.size });
-      } catch (e) {
-        console.error("Error fetching correspondent stats:", e);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, [firestore, staffId]);
-
-  if (loading) return (
-    <div className="space-y-3 animate-pulse">
-        <div className="grid grid-cols-2 gap-2">
-            <div className="h-10 bg-white/5 rounded-xl" />
-            <div className="h-10 bg-white/5 rounded-xl" />
-        </div>
-        <div className="h-10 bg-white/5 rounded-xl" />
-    </div>
-  );
-
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <h4 className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Financeiro</h4>
-        <div className="flex items-center gap-1">
-          <Badge variant="outline" className="text-[9px] h-4 bg-emerald-500/5 text-emerald-500 border-emerald-500/20 font-black">
-            PRODUÇÃO
-          </Badge>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-2">
-        <div className="p-3 rounded-xl bg-white/5 border border-white/5 flex flex-col">
-          <span className="text-[9px] font-black text-slate-500 uppercase">A Receber</span>
-          <span className="text-sm font-black text-white">
-            {stats.pending.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-          </span>
-        </div>
-        <div className="p-3 rounded-xl bg-white/5 border border-white/5 flex flex-col">
-          <span className="text-[9px] font-black text-slate-500 uppercase">Pago (Mês)</span>
-          <span className="text-sm font-black text-emerald-500">
-            {stats.paid.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-          </span>
-        </div>
-      </div>
-
-      <div className="p-3 rounded-xl bg-primary/5 border border-primary/20 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Briefcase className="h-3.5 w-3.5 text-primary" />
-          <span className="text-[10px] font-black text-white uppercase tracking-tighter">Diligências Concluídas</span>
-        </div>
-        <span className="text-sm font-black text-primary">{stats.completed}</span>
-      </div>
-    </div>
-  );
-}
-
-export default function CorrespondentesPage() {
+export default function CorrespondentsPage() {
   const { firestore } = useFirebase();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = React.useState('');
+  const [statusFilter, setStatusFilter] = React.useState('TODOS');
   const [isFormOpen, setIsFormOpen] = React.useState(false);
-  const [isDetailsOpen, setIsDetailsOpen] = React.useState(false);
-  const [selectedStaff, setSelectedStaff] = React.useState<Staff | null>(null);
-  const [editingStaff, setEditingStaff] = React.useState<Staff | null>(null);
-  const [globalStats, setGlobalStats] = React.useState({ activeStates: 0, pendingRepasses: 0, diligencesMonth: 0, pjCount: 0 });
-  const [statsError, setStatsError] = React.useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [atosMes, setAtosMes] = React.useState<number>(0);
+  const [formData, setFormData] = React.useState<Partial<Correspondent>>({
+    name: '', document: '', email: '', phone: '', whatsapp: '',
+    legalArea: [], locations: [], status: 'PENDENTE_HOMOLOGACAO', type: 'ESCRITORIO', oab: '', services: []
+  });
+  const [locationInput, setLocationInput] = React.useState('');
+  const [areaInput, setAreaInput] = React.useState('');
 
-  const correspondentsQuery = useMemoFirebase(
-    () => (firestore ? query(collection(firestore, 'staff'), where('engagementType', '==', 'correspondent')) : null),
-    [firestore]
-  );
-  const { data: correspondents, isLoading: isLoadingStaff } = useCollection<Staff>(correspondentsQuery);
+  const handleAddLocation = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      if (!locationInput.trim()) return;
+      const newItems = locationInput.split(',').map(s => s.trim()).filter(Boolean);
+      setFormData(prev => ({ ...prev, locations: [...(prev.locations || []), ...newItems] }));
+      setLocationInput('');
+    }
+  };
+  
+  const handleRemoveLocation = (idx: number) => {
+    const locs = [...(formData.locations || [])];
+    locs.splice(idx, 1);
+    setFormData(prev => ({ ...prev, locations: locs }));
+  };
 
-  const processesQuery = useMemoFirebase(
-    () => (firestore ? collection(firestore, 'processes') : null),
-    [firestore]
-  );
-  const { data: processes } = useCollection<Process>(processesQuery);
+  const handleAddArea = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      if (!areaInput.trim()) return;
+      const newItems = areaInput.split(',').map(s => s.trim()).filter(Boolean);
+      setFormData(prev => ({ ...prev, legalArea: [...(prev.legalArea || []), ...newItems] }));
+      setAreaInput('');
+    }
+  };
+
+  const handleRemoveArea = (idx: number) => {
+    const areas = [...(formData.legalArea || [])];
+    areas.splice(idx, 1);
+    setFormData(prev => ({ ...prev, legalArea: areas }));
+  };
+
+  const addService = () => {
+    setFormData(prev => ({
+      ...prev,
+      services: [...(prev.services || []), { id: Date.now().toString(), name: '', price: 0, hasAdditionals: false }]
+    }));
+  };
+
+  const updateService = (id: string, field: string, value: any) => {
+    setFormData(prev => ({
+      ...prev,
+      services: (prev.services || []).map(s => s.id === id ? { ...s, [field]: value } : s)
+    }));
+  };
+
+  const removeService = (id: string) => {
+    setFormData(prev => ({
+      ...prev,
+      services: (prev.services || []).filter(s => s.id !== id)
+    }));
+  };
 
   React.useEffect(() => {
-    if (!firestore || !correspondents) return;
-    
-    const fetchGlobalStats = async () => {
+    if (!firestore) return;
+    const fetchAtos = async () => {
       try {
-        const now = new Date();
-        const startOfMonthDate = startOfMonth(now);
-
-        // 1. Estados Ativos
-        const states = new Set(correspondents.map(c => c.address?.state).filter(Boolean));
-
-        // 2. Diligências no Mês
-        const diligSnap = await getDocs(query(
+        const startOfMonthDate = startOfMonth(new Date());
+        const snap = await getDocs(query(
           collection(firestore, 'hearings'),
           where('type', '==', 'DILIGENCIA'),
           where('status', '==', 'REALIZADA'),
           where('date', '>=', Timestamp.fromDate(startOfMonthDate))
         ));
-
-        // 3. Repasses Pendentes (Soma de todos os créditos DISPONIVEIS de todos os correspondentes)
-        let totalPending = 0;
-        for (const c of correspondents) {
-            const creditsRef = collection(firestore, `staff/${c.id}/credits`);
-            const snap = await getDocs(query(creditsRef, where('status', '==', 'DISPONIVEL')));
-            snap.docs.forEach(d => totalPending += (d.data().value || 0));
-        }
-
-        setGlobalStats({ 
-            activeStates: states.size, 
-            pendingRepasses: totalPending, 
-            diligencesMonth: diligSnap.size,
-            pjCount: correspondents.filter(c => c.legalType === 'PJ').length
-        });
-        setStatsError(null);
-      } catch (e: any) {
-        console.error("Global stats error:", e);
-        if (e.message?.includes('index')) setStatsError(e.message);
+        setAtosMes(snap.size);
+      } catch (e) {
+        console.error("Erro ao buscar atos:", e);
       }
     };
+    fetchAtos();
+  }, [firestore]);
 
-    fetchGlobalStats();
-  }, [firestore, correspondents]);
-
-  const filteredCorrespondents = React.useMemo(() => {
-    if (!correspondents) return [];
-    if (!searchTerm.trim()) return correspondents;
-    const term = searchTerm.toLowerCase();
-    return correspondents.filter(c => 
-      `${c.firstName} ${c.lastName}`.toLowerCase().includes(term) ||
-      (c.companyName || '').toLowerCase().includes(term) ||
-      c.email.toLowerCase().includes(term) ||
-      (c.address?.city || '').toLowerCase().includes(term)
-    );
-  }, [correspondents, searchTerm]);
-
-  const stats = React.useMemo(() => {
-    if (!correspondents) return { total: 0, byRole: {} };
-    const total = correspondents.length;
-    const roles: Record<string, number> = {};
-    correspondents.forEach(c => {
-      roles[c.role] = (roles[c.role] || 0) + 1;
-    });
-    return { total, byRole: roles };
-  }, [correspondents]);
-
-  const handleEdit = (staff: Staff) => {
-    setEditingStaff(staff);
-    setIsFormOpen(true);
-  };
-
-  const handleViewDetails = (staff: Staff) => {
-    setSelectedStaff(staff);
-    setIsDetailsOpen(true);
-  };
-
-  const handleDelete = async (staff: Staff) => {
-    if (!firestore || !window.confirm(`Excluir o correspondente ${staff.firstName}?`)) return;
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!firestore) return;
+    setIsSubmitting(true);
     try {
-      await deleteDoc(doc(firestore, 'staff', staff.id));
-      toast({ title: 'Correspondente excluído com sucesso!' });
-    } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Erro ao excluir', description: e.message });
+      if (formData.id) {
+        await updateDoc(doc(firestore, 'correspondents', formData.id), {
+          ...formData,
+          updatedAt: Timestamp.now()
+        });
+        toast({ title: 'Parceiro atualizado com sucesso!' });
+      } else {
+        await addDoc(collection(firestore, 'correspondents'), {
+          ...formData,
+          createdAt: Timestamp.now(),
+          updatedAt: Timestamp.now()
+        });
+        toast({ title: 'Parceiro homologado com sucesso!' });
+      }
+      setIsFormOpen(false);
+      setFormData({ name: '', document: '', email: '', phone: '', whatsapp: '', legalArea: [], locations: [], status: 'PENDENTE_HOMOLOGACAO' });
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Erro ao salvar', description: error.message });
+    } finally {
+      setIsSubmitting(false);
     }
   };
+  const correspondentsQuery = React.useMemo(() => firestore ? query(collection(firestore, 'correspondents'), orderBy('createdAt', 'desc'), limit(100)) : null, [firestore]);
+  const { data: correspondentsData, isLoading } = useCollection<Correspondent>(correspondentsQuery);
+
+  const filtered = React.useMemo(() => {
+    let result = correspondentsData || [];
+    
+    if (statusFilter !== 'TODOS') {
+      result = result.filter(c => c.status === statusFilter);
+    }
+    
+    if (searchTerm.trim()) {
+      const q = searchTerm.toLowerCase();
+      result = result.filter(c => {
+        const nameMatch = c.name?.toLowerCase().includes(q) || false;
+        const docMatch = c.document?.toLowerCase().includes(q) || false;
+        const emailMatch = c.email?.toLowerCase().includes(q) || false;
+        const locationMatch = c.locations ? c.locations.some(l => l.toLowerCase().includes(q)) : false;
+        const areaMatch = c.legalArea ? c.legalArea.some(a => a.toLowerCase().includes(q)) : false;
+        return nameMatch || docMatch || emailMatch || locationMatch || areaMatch;
+      });
+    }
+    
+    return result;
+  }, [correspondentsData, searchTerm, statusFilter]);
+
+  const stats = React.useMemo(() => {
+    let cities = new Set<string>();
+    let totalRating = 0;
+    let ratingCount = 0;
+    
+    (correspondentsData || []).forEach(c => {
+      if (c.rating) { totalRating += c.rating; ratingCount++; }
+      c.locations?.forEach(loc => cities.add(loc.toLowerCase().trim()));
+    });
+    
+    return {
+      active: (correspondentsData || []).filter(c => c.status === 'ATIVO').length,
+      cities: cities.size,
+      avgRating: ratingCount > 0 ? (totalRating / ratingCount).toFixed(1) : 'N/A',
+    };
+  }, [correspondentsData]);
 
   return (
-    <div className="flex flex-col gap-8 pb-20">
+    <div className="flex flex-col gap-8 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-black tracking-tight font-headline text-white uppercase italic">Central de Correspondentes</h1>
-          <p className="text-sm text-muted-foreground">Gestão de prestadores externos e pagamentos por diligência.</p>
+          <h1 className="text-3xl font-black tracking-tight font-headline text-white uppercase italic">Correspondentes de Elite</h1>
+          <p className="text-sm text-slate-400 font-bold uppercase tracking-widest">Parceiros Estratégicos e Prestadores de Serviço</p>
         </div>
-        
-        {statsError && (
-          <div className="bg-rose-500/10 border border-rose-500/30 p-2 rounded-lg flex items-center gap-2 max-w-sm">
-            <AlertCircle className="h-4 w-4 text-rose-500 shrink-0" />
-            <p className="text-[9px] font-bold text-rose-400 uppercase leading-tight">
-              Erro de índice detectado. Consfira o console para link de correção.
-            </p>
-          </div>
-        )}
-        
-        <div className="flex items-center gap-3">
-          <div className="relative w-full max-w-xs">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative w-full max-w-sm">
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
             <Input 
-              placeholder="Nome, cidade ou email..." 
-              className="pl-8 pr-8 h-10 bg-card border-border/50 text-white" 
-              value={searchTerm} 
-              onChange={(e) => setSearchTerm(e.target.value)} 
+              placeholder="Pesquisar por nome, cidade ou área..." 
+              className="pl-10 bg-[#0f172a] border-white/5 text-white font-bold h-11 rounded-xl" 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
             />
-            {searchTerm && (
-              <button onClick={() => setSearchTerm('')} className="absolute right-2.5 top-2.5">
-                <X className="h-4 w-4 text-muted-foreground" />
-              </button>
-            )}
           </div>
-          <Button size="sm" className="h-10 shadow-md bg-primary text-primary-foreground font-bold" onClick={() => { setEditingStaff(null); setIsFormOpen(true); }}>
-            <PlusCircle className="mr-2 h-4 w-4" /> Novo Correspondente
+          
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-[180px] h-11 bg-[#0f172a] border-white/5 text-white font-bold rounded-xl">
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-slate-500" />
+                <SelectValue placeholder="Status" />
+              </div>
+            </SelectTrigger>
+            <SelectContent className="bg-[#0f172a] border-white/10 text-white">
+              <SelectItem value="TODOS">Todos os Status</SelectItem>
+              <SelectItem value="ATIVO">Ativos</SelectItem>
+              <SelectItem value="PENDENTE_HOMOLOGACAO">Em Homologação</SelectItem>
+              <SelectItem value="BLOQUEADO">Bloqueados</SelectItem>
+              <SelectItem value="INATIVO">Inativos</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Button onClick={() => { setFormData({ name: '', document: '', email: '', phone: '', whatsapp: '', legalArea: [], locations: [], status: 'PENDENTE_HOMOLOGACAO', type: 'ESCRITORIO', oab: '', services: [] }); setIsFormOpen(true); }} className="bg-primary text-primary-foreground font-black uppercase text-[10px] tracking-widest h-11 px-6 shadow-xl shadow-primary/20 hover:scale-105 transition-transform">
+            <Plus className="mr-2 h-4 w-4" /> Novo Parceiro
           </Button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="bg-[#0f172a] border-border/50 shadow-none">
-          <CardContent className="p-4 flex items-center gap-4 text-left">
-            <div className="h-10 w-10 rounded-full bg-indigo-500/10 flex items-center justify-center text-indigo-500">
-              <Briefcase className="h-5 w-5" />
-            </div>
+         <Card className="bg-[#0f172a] border-white/5 p-4 flex items-center gap-4">
+            <div className="h-10 w-10 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500 border border-emerald-500/20"><UserCheck className="h-5 w-5" /></div>
             <div>
-              <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Escritórios PJ</p>
-              <p className="text-xl font-black leading-none text-white">{globalStats.pjCount}</p>
+               <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Ativos</p>
+               <p className="text-xl font-black text-white">{stats.active}</p>
             </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-[#0f172a] border-border/50 shadow-none">
-          <CardContent className="p-4 flex items-center gap-4 text-left">
-            <div className="h-10 w-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500">
-              <MapPin className="h-5 w-5" />
-            </div>
+         </Card>
+         <Card className="bg-[#0f172a] border-white/5 p-4 flex items-center gap-4">
+            <div className="h-10 w-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500 border border-blue-500/20"><MapPin className="h-5 w-5" /></div>
             <div>
-              <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Estados Ativos</p>
-              <p className="text-xl font-black leading-none text-white">{globalStats.activeStates}</p>
+               <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Cobertura</p>
+               <p className="text-xl font-black text-white">{stats.cities} {stats.cities === 1 ? 'Cidade' : 'Cidades'}</p>
             </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-[#0f172a] border-border/50 shadow-none text-left">
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="h-10 w-10 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500">
-              <Clock className="h-5 w-5" />
-            </div>
+         </Card>
+         <Card className="bg-[#0f172a] border-white/5 p-4 flex items-center gap-4">
+            <div className="h-10 w-10 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-500 border border-amber-500/20"><Star className="h-5 w-5" /></div>
             <div>
-              <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Repasses Pendentes</p>
-              <p className="text-xl font-black leading-none text-white">{globalStats.pendingRepasses.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+               <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Rating Médio</p>
+               <p className="text-xl font-black text-white">{stats.avgRating}</p>
             </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-[#0f172a] border-border/50 shadow-none text-left">
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="h-10 w-10 rounded-full bg-purple-500/10 flex items-center justify-center text-purple-500">
-              <TrendingUp className="h-5 w-5" />
-            </div>
+         </Card>
+         <Card className="bg-[#0f172a] border-white/5 p-4 flex items-center gap-4">
+            <div className="h-10 w-10 rounded-full bg-purple-500/10 flex items-center justify-center text-purple-500 border border-purple-500/20"><Gavel className="h-5 w-5" /></div>
             <div>
-              <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Diligências/Mês</p>
-              <p className="text-xl font-black leading-none text-white">{globalStats.diligencesMonth}</p>
+               <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Atos Este Mês</p>
+               <p className="text-xl font-black text-white">{atosMes}</p>
             </div>
-          </CardContent>
-        </Card>
+         </Card>
       </div>
 
-      <Tabs defaultValue="pf" className="w-full">
-        <TabsList className="bg-black/20 border border-white/5 p-1 mb-6 rounded-2xl h-11 flex gap-1">
-          <TabsTrigger value="pf" className="flex-1 rounded-xl data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-black text-[10px] uppercase tracking-widest border border-transparent transition-all">
-            <UserCircle className="mr-2 h-3.5 w-3.5" /> Profissionais Autônomos (PF)
-          </TabsTrigger>
-          <TabsTrigger value="pj" className="flex-1 rounded-xl data-[state=active]:bg-indigo-500 data-[state=active]:text-white font-black text-[10px] uppercase tracking-widest border border-transparent transition-all">
-            <Briefcase className="mr-2 h-3.5 w-3.5" /> Escritórios & Parceiros (PJ)
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="pf" className="mt-0">
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in duration-500">
-            {isLoadingStaff ? (
-              [...Array(6)].map((_, i) => <Card key={i} className="h-64 bg-white/5 animate-pulse" />)
-            ) : filteredCorrespondents.filter(c => c.legalType !== 'PJ').length > 0 ? (
-                filteredCorrespondents.filter(c => c.legalType !== 'PJ').map(c => (
-                  <CorrespondentCard 
-                    key={c.id} 
-                    correspondent={c} 
-                    onEdit={() => handleEdit(c)}
-                    onView={() => handleViewDetails(c)}
-                    onDelete={() => handleDelete(c)}
-                  />
-                ))
-            ) : (
-                <div className="col-span-full py-20 text-center flex flex-col items-center gap-4 bg-white/5 rounded-3xl border-2 border-dashed border-white/10">
-                    <Users className="h-12 w-12 text-slate-500 opacity-30" />
-                    <div>
-                      <h3 className="text-lg font-bold text-white">Sem profissionais PF</h3>
-                      <p className="text-sm text-slate-400">Nenhum correspondente autônomo encontrado.</p>
+      {isLoading ? (
+        <div className="flex flex-col items-center justify-center py-32 space-y-4"><Loader2 className="h-12 w-12 animate-spin text-primary" /><p className="text-xs font-black uppercase text-slate-500">Mapeando Rede de Parceiros...</p></div>
+      ) : filtered.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filtered.map((c) => (
+            <Card key={c.id} className="bg-[#0f172a] border-white/5 overflow-hidden group hover:border-primary/20 transition-all flex flex-col">
+              <CardHeader className="pb-4 border-b border-white/5 bg-white/5">
+                <div className="flex items-start justify-between">
+                    <div className="space-y-1">
+                        <div className="flex items-center gap-2 mb-1">
+                            <Badge className={cn("text-[8px] font-black uppercase px-2 h-4", c.status === 'ATIVO' ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-slate-500/10 text-slate-400 border-slate-500/20")}>{c.status}</Badge>
+                            <div className="flex items-center gap-0.5"><Star className="h-3 w-3 text-amber-400 fill-amber-400" /><span className="text-[10px] font-black text-amber-400">{c.rating || 'N/A'}</span></div>
+                        </div>
+                        <h3 className="text-lg font-black text-white group-hover:text-primary transition-all uppercase italic">{c.name}</h3>
+                        <p className="text-[10px] font-mono text-slate-500 tracking-tighter">{c.document}</p>
+                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild><Button size="icon" variant="ghost" className="h-8 w-8 text-white/20 hover:text-white"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="bg-card border-border shadow-2xl p-1">
+                          <DropdownMenuItem className="font-bold flex items-center gap-2"><FileSearch className="h-4 w-4 text-primary" /> Ver Portfólio</DropdownMenuItem>
+                          <DropdownMenuItem className="font-bold flex items-center gap-2"><DollarSign className="h-4 w-4 text-emerald-400" /> Tabela de Preços</DropdownMenuItem>
+                          <DropdownMenuSeparator className="bg-white/5" />
+                          <DropdownMenuItem onClick={() => { setFormData(c); setIsFormOpen(true); }} className="font-bold flex items-center gap-2 cursor-pointer"><Edit className="h-4 w-4 text-slate-400" /> Editar</DropdownMenuItem>
+                          <DropdownMenuItem className="text-rose-500 font-bold flex items-center gap-2"><Trash2 className="h-4 w-4" /> Encerrar Parceria</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
+              </CardHeader>
+              <CardContent className="flex-grow p-6 space-y-6">
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                        <p className="text-[9px] font-black text-slate-500 uppercase flex items-center gap-1"><MapPin className="h-2.5 w-2.5" /> Localidades</p>
+                        <div className="flex flex-wrap gap-1">
+                            {c.locations.slice(0, 2).map(l => <Badge key={l} variant="outline" className="text-[8px] h-4 bg-white/5 border-white/10 text-slate-300 font-black uppercase">{l}</Badge>)}
+                            {c.locations.length > 2 && <Badge variant="outline" className="text-[8px] h-4 bg-white/5 border-white/10 text-slate-500">+{c.locations.length - 2}</Badge>}
+                        </div>
+                    </div>
+                    <div className="space-y-1.5">
+                        <p className="text-[9px] font-black text-slate-500 uppercase flex items-center gap-1"><Gavel className="h-2.5 w-2.5" /> Especialidades</p>
+                        <div className="flex flex-wrap gap-1">
+                            {c.legalArea.slice(0, 2).map(a => <Badge key={a} variant="outline" className="text-[8px] h-4 bg-white/5 border-white/10 text-slate-300 font-black uppercase">{a}</Badge>)}
+                            {c.legalArea.length > 2 && <Badge variant="outline" className="text-[8px] h-4 bg-white/5 border-white/10 text-slate-500">+{c.legalArea.length - 2}</Badge>}
+                        </div>
                     </div>
                 </div>
-            )}
-          </div>
-        </TabsContent>
 
-        <TabsContent value="pj" className="mt-0">
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in duration-500">
-            {isLoadingStaff ? (
-              [...Array(4)].map((_, i) => <Card key={i} className="h-64 bg-white/5 animate-pulse" />)
-            ) : filteredCorrespondents.filter(c => c.legalType === 'PJ').length > 0 ? (
-                filteredCorrespondents.filter(c => c.legalType === 'PJ').map(c => (
-                  <CorrespondentCard 
-                    key={c.id} 
-                    correspondent={c} 
-                    onEdit={() => handleEdit(c)}
-                    onView={() => handleViewDetails(c)}
-                    onDelete={() => handleDelete(c)}
-                  />
-                ))
-            ) : (
-                <div className="col-span-full py-20 text-center flex flex-col items-center gap-4 bg-white/5 rounded-3xl border-2 border-dashed border-white/10">
-                    <Briefcase className="h-12 w-12 text-slate-500 opacity-30" />
-                    <div>
-                      <h3 className="text-lg font-bold text-white">Sem escritórios PJ</h3>
-                      <p className="text-sm text-slate-400">Clique em "Novo Correspondente" e selecione PJ no cadastro.</p>
-                    </div>
+                <div className="flex items-center justify-between gap-2 p-2 bg-black/40 rounded-xl border border-white/5">
+                    <Button variant="ghost" size="icon" className="h-9 w-9 bg-primary/5 text-primary hover:bg-primary/10 rounded-lg" asChild disabled={!c.email}><a href={`mailto:${c.email}`} title={c.email}><Mail className="h-4 w-4" /></a></Button>
+                    <Button variant="ghost" size="icon" className="h-9 w-9 bg-emerald-500/5 text-emerald-400 hover:bg-emerald-500/10 rounded-lg" asChild disabled={!c.whatsapp}><a href={`https://wa.me/${c.whatsapp?.replace(/\D/g, '')}`} target="_blank"><MessageSquare className="h-4 w-4" /></a></Button>
+                    <Button variant="ghost" size="icon" className="h-9 w-9 bg-slate-500/5 text-slate-400 hover:bg-slate-500/10 rounded-lg" asChild><a href={`tel:${c.phone}`}><Phone className="h-4 w-4" /></a></Button>
+                    <Button variant="ghost" className="flex-1 h-9 rounded-lg bg-blue-500/5 text-blue-400 text-[10px] font-black uppercase hover:bg-blue-500/10"><Globe className="mr-2 h-3.5 w-3.5" /> Portfólio</Button>
                 </div>
-            )}
-          </div>
-        </TabsContent>
-      </Tabs>
+              </CardContent>
+              <CardFooter className="p-4 border-t border-white/5 bg-black/20 flex items-center justify-between">
+                <div className="flex items-center gap-1.5 opacity-40"><CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" /><span className="text-[9px] font-black uppercase text-slate-400 tracking-tighter">Homologado</span></div>
+                <Button variant="ghost" className="h-7 text-[9px] font-black uppercase text-primary gap-1 group-hover:gap-2 transition-all">Contratar Ato <ChevronRight className="h-3 w-3" /></Button>
+              </CardFooter>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <div className="flex flex-1 items-center justify-center rounded-3xl border-2 border-dashed border-white/5 bg-black/20 py-32 text-center flex-col gap-4">
+            <HeartHandshake className="h-12 w-12 text-slate-500/30" />
+            <div className="space-y-1">
+                <p className="text-white font-black uppercase italic tracking-widest">Nenhum correspondente localizado</p>
+                <p className="text-xs font-bold text-slate-500">Comece homologando o primeiro parceiro externo para sua rede.</p>
+            </div>
+            <Button onClick={() => { setFormData({ name: '', document: '', email: '', phone: '', whatsapp: '', legalArea: [], locations: [], status: 'PENDENTE_HOMOLOGACAO', type: 'ESCRITORIO', oab: '', services: [] }); setIsFormOpen(true); }} className="mt-4 bg-primary text-primary-foreground font-black uppercase text-[10px] tracking-widest h-10 px-8">
+                <Plus className="mr-2 h-4 w-4" /> Homologar Parceiro
+            </Button>
+        </div>
+      )}
+
+
 
       <Sheet open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <SheetContent className="sm:max-w-5xl w-full flex flex-col p-0 bg-[#020617] border-border">
-          <SheetHeader className="p-6 border-b border-white/5 shrink-0">
-            <SheetTitle className="text-white text-2xl font-black font-headline">
-              {editingStaff ? 'Editar Correspondente' : 'Cadastro de Correspondente'}
+        <SheetContent className="sm:max-w-3xl w-[95vw] flex flex-col p-0 bg-[#0f172a] border-white/10">
+          <SheetHeader className="p-6 border-b border-white/5">
+            <SheetTitle className="text-white text-2xl font-black italic uppercase">
+              {formData.id ? 'Editar Parceiro' : 'Homologar Parceiro'}
             </SheetTitle>
             <SheetDescription className="text-slate-400">
-              Defina o perfil, áreas de atuação e dados bancários para repasses automáticos.
+              Preencha os dados do correspondente para adicioná-lo à sua rede.
             </SheetDescription>
           </SheetHeader>
-          <ScrollArea className="flex-1">
-            <div className="p-6">
-              <StaffForm 
-                onSave={() => { setIsFormOpen(false); setEditingStaff(null); }} 
-                staff={editingStaff} 
-              />
-            </div>
-          </ScrollArea>
-        </SheetContent>
-      </Sheet>
-
-      <StaffDetailsSheet 
-        staff={selectedStaff}
-        processes={processes || []}
-        open={isDetailsOpen}
-        onOpenChange={setIsDetailsOpen}
-      />
-    </div>
-  );
-}
-
-function CorrespondentCard({ correspondent, onEdit, onView, onDelete }: { 
-  correspondent: Staff; 
-  onEdit: () => void;
-  onView: () => void;
-  onDelete: () => void;
-}) {
-  const statusConfig = {
-    ATIVO: { label: 'Ativo', color: 'text-emerald-500', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', ping: 'bg-emerald-500' },
-    PENDENTE_HOMOLOGACAO: { label: 'Em Homologação', color: 'text-amber-500', bg: 'bg-amber-500/10', border: 'border-amber-500/20', ping: 'bg-amber-500' },
-    BLOQUEADO: { label: 'Bloqueado', color: 'text-rose-500', bg: 'bg-rose-500/10', border: 'border-rose-500/20', ping: 'bg-rose-500' },
-    INATIVO: { label: 'Inativo', color: 'text-slate-500', bg: 'bg-slate-500/10', border: 'border-slate-500/20', ping: 'bg-slate-500' },
-  };
-
-  const status = correspondent.status || 'ATIVO';
-  const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.ATIVO;
-
-  return (
-    <Card className="relative flex flex-col group hover:shadow-xl transition-all duration-300 overflow-hidden bg-[#0f172a] border-border/50 hover:border-primary/30">
-        <div className={cn("absolute top-0 left-0 w-1 h-full transition-colors", status === 'ATIVO' ? "bg-primary/30 group-hover:bg-primary" : "bg-slate-500/30")} />
-        
-        <CardHeader className="pb-4">
-            <div className="flex items-start justify-between">
-                <div className="flex flex-col gap-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <div className={cn("flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[8px] font-black uppercase tracking-widest", config.bg, config.color, config.border)}>
-                        <span className="relative flex h-1.5 w-1.5">
-                          {status === 'ATIVO' && <span className={cn("animate-ping absolute inline-flex h-full w-full rounded-full opacity-75", config.ping)}></span>}
-                          <span className={cn("relative inline-flex rounded-full h-1.5 w-1.5", config.ping)}></span>
-                        </span>
-                        {config.label}
-                      </div>
-
-                      <Badge variant="outline" className={cn(
-                          "w-fit text-[8px] font-black uppercase py-0 px-1.5 h-4 border-none",
-                          correspondent.legalType === 'PJ' ? "bg-indigo-500/20 text-indigo-400" : "bg-blue-500/20 text-blue-400"
-                      )}>
-                          {correspondent.legalType || 'PF'}
-                      </Badge>
-
-                      {correspondent.legalType === 'PJ' && correspondent.teamMembers && correspondent.teamMembers.length > 0 && (
-                        <Badge variant="outline" className="w-fit text-[8px] font-black uppercase py-0 px-1.5 h-4 bg-amber-500/10 text-amber-500 border-amber-500/20">
-                          Equipe: {correspondent.teamMembers.length}
-                        </Badge>
-                      )}
-
-                      <Badge variant="outline" className={cn(
-                          "w-fit text-[8px] font-black uppercase py-0 px-1.5 h-4",
-                          correspondent.role === 'lawyer' ? "bg-blue-500/10 text-blue-400 border-blue-500/20" :
-                          correspondent.role === 'intern' ? "bg-purple-500/10 text-purple-400 border-purple-500/20" :
-                          "bg-slate-500/10 text-slate-400 border-slate-500/20"
-                      )}>
-                          {roleLabels[correspondent.role] || correspondent.role}
-                      </Badge>
+          <ScrollArea className="flex-1 p-6">
+            <form id="correspondentForm" onSubmit={handleSave} className="space-y-5">
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-1.5 block">Tipo de Parceiro *</label>
+                    <Select value={formData.type || 'ESCRITORIO'} onValueChange={(val: any) => setFormData({...formData, type: val})}>
+                      <SelectTrigger className="bg-black/20 border-white/10 text-white">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-[#0f172a] border-white/10 text-white">
+                        <SelectItem value="ESCRITORIO">Escritório de Advocacia</SelectItem>
+                        <SelectItem value="AUTONOMO">Advogado(a) Autônomo</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-1.5 block">Documento (CPF / CNPJ) *</label>
+                    <Input required value={formData.document || ''} onChange={e => setFormData({...formData, document: e.target.value})} className="bg-black/20 border-white/10 text-white font-mono" />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-1.5 block">Nome do Parceiro *</label>
+                  <Input required value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} className="bg-black/20 border-white/10 text-white" />
+                </div>
+                {formData.type === 'AUTONOMO' && (
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-1.5 block">Inscrição OAB</label>
+                    <Input value={formData.oab || ''} onChange={e => setFormData({...formData, oab: e.target.value})} placeholder="Ex: 123456/SP" className="bg-black/20 border-white/10 text-white" />
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-1.5 block">Email *</label>
+                    <Input required type="email" value={formData.email || ''} onChange={e => setFormData({...formData, email: e.target.value})} className="bg-black/20 border-white/10 text-white" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-1.5 block">WhatsApp</label>
+                    <Input value={formData.whatsapp || ''} onChange={e => setFormData({...formData, whatsapp: e.target.value})} className="bg-black/20 border-white/10 text-white" />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-1.5 block">Telefone Comercial</label>
+                  <Input value={formData.phone || ''} onChange={e => setFormData({...formData, phone: e.target.value})} className="bg-black/20 border-white/10 text-white" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-1.5 block">Cidades de Cobertura</label>
+                  <div className="flex flex-col gap-2">
+                    <Input placeholder="Digite uma cidade e aperte Enter ou Vírgula..." value={locationInput} onChange={e => setLocationInput(e.target.value)} onKeyDown={handleAddLocation} className="bg-black/20 border-white/10 text-white" />
+                    <div className="flex flex-wrap gap-2">
+                       {(formData.locations || []).map((loc, idx) => (
+                           <Badge key={idx} variant="secondary" className="bg-white/10 hover:bg-white/20 text-white flex items-center gap-1 font-bold">
+                               {loc} <X className="h-3.5 w-3.5 cursor-pointer text-slate-400 hover:text-white ml-0.5" onClick={() => handleRemoveLocation(idx)} />
+                           </Badge>
+                       ))}
                     </div>
-
-                    <div className="space-y-0.5">
-                      {correspondent.legalType === 'PJ' && correspondent.companyName && (
-                        <p className="text-[10px] font-black text-primary uppercase tracking-tighter leading-none italic">{correspondent.companyName}</p>
-                      )}
-                      <h3 className="font-bold text-xl leading-tight text-white group-hover:text-primary transition-colors">
-                        {correspondent.firstName} {correspondent.lastName}
-                      </h3>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-1.5 block">Áreas de Especialidade</label>
+                  <div className="flex flex-col gap-2">
+                    <Input placeholder="Digite uma área (Ex: Cível) e aperte Enter ou Vírgula..." value={areaInput} onChange={e => setAreaInput(e.target.value)} onKeyDown={handleAddArea} className="bg-black/20 border-white/10 text-white" />
+                    <div className="flex flex-wrap gap-2">
+                       {(formData.legalArea || []).map((area, idx) => (
+                           <Badge key={idx} variant="secondary" className="bg-white/10 hover:bg-white/20 text-white flex items-center gap-1 font-bold">
+                               {area} <X className="h-3.5 w-3.5 cursor-pointer text-slate-400 hover:text-white ml-0.5" onClick={() => handleRemoveArea(idx)} />
+                           </Badge>
+                       ))}
                     </div>
-
-                    <div className="flex items-center gap-1.5 text-slate-400 mt-1">
-                        <MapPin className="h-3 w-3" />
-                        <span className="text-[10px] font-bold uppercase tracking-widest">{correspondent.address?.city || 'Local não informado'} / {correspondent.address?.state || '--'}</span>
-                    </div>
+                  </div>
                 </div>
 
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-white/40 hover:text-white"><MoreVertical className="h-4 w-4" /></Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56 bg-card border-border shadow-2xl p-1">
-                    <DropdownMenuLabel className="text-[10px] font-black uppercase text-muted-foreground px-2 py-1.5 tracking-widest">Ações</DropdownMenuLabel>
-                    <DropdownMenuItem onClick={onView} className="gap-2 cursor-pointer focus:bg-primary/10">
-                      <UserCircle className="h-4 w-4 text-primary" /> <span className="font-bold text-white">Ver Perfil Completo</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={onView} className="gap-2 cursor-pointer focus:bg-emerald-500/10">
-                      <DollarSign className="h-4 w-4 text-emerald-400" /> <span className="font-bold text-white">Extrato de Pagamentos</span>
-                    </DropdownMenuItem>
-                    {correspondent.legalType === 'PJ' && (
-                      <DropdownMenuItem onClick={onEdit} className="gap-2 cursor-pointer focus:bg-indigo-500/10">
-                        <Users className="h-4 w-4 text-indigo-400" /> <span className="font-bold text-white">Configurar Equipe / Preços</span>
-                      </DropdownMenuItem>
-                    )}
-                    <DropdownMenuSeparator className="bg-white/5" />
-                    <DropdownMenuItem onClick={onEdit} className="gap-2 cursor-pointer">
-                      <FileText className="h-4 w-4 text-slate-400" /> <span className="font-bold text-white">Editar Dados</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator className="bg-white/5" />
-                    <DropdownMenuItem onClick={onDelete} className="text-rose-500 gap-2 cursor-pointer focus:bg-rose-500/10">
-                      <X className="h-4 w-4" /> <span className="font-bold">Excluir</span>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-            </div>
-        </CardHeader>
-
-        <CardContent className="flex-grow space-y-4 pt-0">
-            <div className="grid grid-cols-3 gap-2 p-1.5 bg-black/20 rounded-xl border border-white/5">
-                <Button variant="ghost" size="icon" className="h-9 w-full rounded-lg hover:bg-white/5 text-blue-400" asChild disabled={!correspondent.email}>
-                    <a href={`mailto:${correspondent.email}`} title={correspondent.email}><Mail className="h-4 w-4" /></a>
-                </Button>
-                <Button variant="ghost" size="icon" className="h-9 w-full rounded-lg hover:bg-white/5 text-emerald-400" asChild disabled={!correspondent.whatsapp}>
-                    <a href={`https://wa.me/${correspondent.whatsapp?.replace(/\D/g, '')}`} target="_blank"><MessageSquare className="h-4 w-4" /></a>
-                </Button>
-                <Button variant="ghost" size="icon" className="h-9 w-full rounded-lg hover:bg-white/5 text-slate-400" asChild disabled={!correspondent.phone}>
-                    <a href={`tel:${correspondent.phone}`}><Phone className="h-4 w-4" /></a>
-                </Button>
-            </div>
-
-            <CorrespondentStats staffId={correspondent.id} />
-        </CardContent>
-
-        <div className="px-4 pb-4">
-          <Button variant="outline" className="w-full h-9 bg-white/5 border-white/10 hover:bg-white/10 text-white font-bold text-xs gap-2" onClick={onView}>
-             <History className="h-3.5 w-3.5 text-slate-400" /> Histórico de Diligências
-          </Button>
-        </div>
-    </Card>
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest block border-t border-white/5 pt-5 mt-2">Tabela de Serviços Prestados</label>
+                  <div className="space-y-2">
+                    {(formData.services || []).map(svc => (
+                      <div key={svc.id} className="flex flex-col gap-2 bg-black/20 p-2 rounded-lg border border-white/5 group transition-all">
+                        <div className="flex items-center gap-2">
+                          <Input value={svc.name} onChange={e => updateService(svc.id, 'name', e.target.value)} placeholder="Ex: Audiência de Conciliação" className="bg-transparent border-white/5 text-white flex-1 h-9 text-xs" />
+                          <Input type="number" value={svc.price === 0 ? '' : svc.price} onChange={e => updateService(svc.id, 'price', Number(e.target.value))} placeholder="R$ 0,00" className="bg-transparent border-white/5 text-white w-24 h-9 text-xs" />
+                          <div className="flex items-center gap-2 px-3">
+                              <Checkbox checked={svc.hasAdditionals} onCheckedChange={(checked: boolean) => updateService(svc.id, 'hasAdditionals', checked)} id={`add-${svc.id}`} className="border-white/20 data-[state=checked]:bg-primary" />
+                              <label htmlFor={`add-${svc.id}`} className="text-[9px] uppercase tracking-widest text-slate-500 font-bold whitespace-nowrap cursor-pointer hover:text-white transition-colors">Adicionais?</label>
+                          </div>
+                          <Button type="button" variant="ghost" size="icon" onClick={() => removeService(svc.id)} className="h-8 w-8 text-rose-500 hover:text-rose-400 hover:bg-rose-500/10 opacity-50 group-hover:opacity-100 transition-opacity"><Trash2 className="h-4 w-4" /></Button>
+                        </div>
+                        {svc.hasAdditionals && (
+                          <Input value={svc.additionalDetails || ''} onChange={e => updateService(svc.id, 'additionalDetails', e.target.value)} placeholder="Especifique os adicionais (Ex: + R$ 1,50 por Km de deslocamento)" className="bg-white/5 border-white/10 text-slate-300 h-8 text-xs italic" />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <Button type="button" variant="outline" onClick={addService} className="w-full h-10 border-dashed border-white/10 bg-transparent text-slate-400 hover:text-white hover:bg-white/5 uppercase font-black text-[10px] tracking-widest transition-colors"><Plus className="mr-2 h-4 w-4" /> Adicionar Novo Serviço</Button>
+                </div>
+                <div>
+                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-1.5 block">Status</label>
+                  <Select value={formData.status || 'PENDENTE_HOMOLOGACAO'} onValueChange={(val: any) => setFormData({...formData, status: val})}>
+                    <SelectTrigger className="bg-black/20 border-white/10 text-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-[#0f172a] border-white/10 text-white">
+                      <SelectItem value="ATIVO">Ativo</SelectItem>
+                      <SelectItem value="PENDENTE_HOMOLOGACAO">Pendente de Homologação</SelectItem>
+                      <SelectItem value="BLOQUEADO">Bloqueado</SelectItem>
+                      <SelectItem value="INATIVO">Inativo</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </form>
+          </ScrollArea>
+          <div className="p-6 border-t border-white/5 bg-black/20 flex gap-4">
+             <Button type="button" variant="ghost" onClick={() => setIsFormOpen(false)} className="flex-1 border border-white/10 hover:bg-white/5">Cancelar</Button>
+             <Button type="submit" form="correspondentForm" disabled={isSubmitting} className="flex-1 bg-primary text-primary-foreground font-bold hover:scale-[1.02] transition-transform">
+               {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
+               Salvar Parceiro
+             </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
+    </div>
   );
 }
