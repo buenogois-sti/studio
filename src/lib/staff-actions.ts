@@ -88,3 +88,58 @@ export async function processPayroll(monthKey: string, entries: any[]) {
         throw new Error(error.message);
     }
 }
+
+function serializeStaff(doc: any) {
+  const data = doc.data();
+  if (!data) return null;
+
+  // Converte Timestamps para strings ISO para evitar erro de serialização no Next.js
+  const serialized = { ...data, id: doc.id };
+
+  if (data.createdAt instanceof Timestamp) {
+    serialized.createdAt = data.createdAt.toDate().toISOString();
+  }
+  if (data.updatedAt instanceof Timestamp) {
+    serialized.updatedAt = data.updatedAt.toDate().toISOString();
+  }
+  if (data.admissionDate instanceof Timestamp) {
+    serialized.admissionDate = data.admissionDate.toDate().toISOString();
+  }
+  if (data.birthDate instanceof Timestamp) {
+    serialized.birthDate = data.birthDate.toDate().toISOString();
+  }
+
+  return serialized;
+}
+
+export async function searchStaff(query: string): Promise<any[]> {
+  if (!query || query.length < 2) return [];
+  if (!firestoreAdmin)
+    throw new Error("A conexão com o servidor de dados falhou.");
+
+  try {
+    const staffSnapshot = await firestoreAdmin
+      .collection("staff")
+      .orderBy("updatedAt", "desc")
+      .limit(100)
+      .get();
+
+    const textQuery = query.toLowerCase();
+
+    return staffSnapshot.docs
+      .map((doc) => serializeStaff(doc))
+      .filter((member: any) => {
+        if (!member) return false;
+        const fullName =
+          `${member.firstName} ${member.lastName}`.toLowerCase();
+        return (
+          fullName.includes(textQuery) ||
+          (member.documentCPF || "").includes(textQuery)
+        );
+      })
+      .slice(0, 10);
+  } catch (error) {
+    console.error("[searchStaff] Erro:", error);
+    return [];
+  }
+}

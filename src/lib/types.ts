@@ -287,6 +287,7 @@ export type FinancialTitle = {
   paymentMethod?: 'PIX' | 'BOLETO' | 'CARTAO' | 'TRANSFERENCIA' | 'DINHEIRO';
   beneficiaryName?: string;
   beneficiaryDocument?: string;
+  pixKey?: string;
   receiptUrl?: string;
   notes?: string;
   paidToStaffId?: string;

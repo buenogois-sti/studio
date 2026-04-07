@@ -440,6 +440,7 @@ export async function createFinancialTitle(data: any) {
                 paymentMethod: baseData.paymentMethod || null,
                 beneficiaryName: baseData.beneficiaryName || null,
                 beneficiaryDocument: baseData.beneficiaryDocument || null,
+                pixKey: baseData.pixKey || null,
                 notes: baseData.notes || null,
                 bankAccountId: baseData.bankAccountId || null,
                 category: baseData.category || null,
