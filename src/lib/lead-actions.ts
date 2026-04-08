@@ -158,11 +158,16 @@ export async function updateLeadDetails(id: string, data: Partial<Lead>) {
       });
     }
 
-    await leadRef.update({
+    const updatePayload: any = {
       ...data,
-      timeline: FieldValue.arrayUnion(...timelineEvents),
       updatedAt: now
-    });
+    };
+
+    if (timelineEvents.length > 0) {
+      updatePayload.timeline = FieldValue.arrayUnion(...timelineEvents);
+    }
+
+    await leadRef.update(updatePayload);
 
     revalidatePath('/dashboard/leads');
     return { success: true };
@@ -242,6 +247,7 @@ export async function convertLeadToProcess(leadId: string, data: {
   courtBranch: string;
   caseValue: number;
   opposingParties: OpposingParty[];
+  commissionStaffId?: string;
 }) {
   if (!firestoreAdmin) throw new Error('Servidor indisponível.');
   const session = await getServerSession(authOptions);
@@ -279,6 +285,7 @@ export async function convertLeadToProcess(leadId: string, data: {
       courtBranch: data.courtBranch,
       caseValue: data.caseValue,
       leadLawyerId: leadData.lawyerId,
+      commissionStaffId: data.commissionStaffId || null as any,
       opposingParties: data.opposingParties || [],
       driveFolderId: leadData.driveFolderId || '',
       timeline: [timelineEvent],
@@ -357,7 +364,9 @@ export async function scheduleLeadInterview(leadId: string, data: {
       `🔐 ID Interno: ${leadId}`
     ].join('\n');
 
-    const calendarEvent = {
+    const isMeet = data.location.toLowerCase().includes('meet');
+
+    const calendarEvent: any = {
       summary: `💬 Entrevista: ${clientData?.firstName} | ${leadData.title}`,
       location: data.location,
       description: eventDescription,
@@ -372,9 +381,19 @@ export async function scheduleLeadInterview(leadId: string, data: {
       },
     };
 
+    if (isMeet) {
+      calendarEvent.conferenceData = {
+        createRequest: {
+          requestId: uuidv4(),
+          conferenceSolutionKey: { type: 'hangoutsMeet' }
+        }
+      };
+    }
+
     const createdEvent = await calendar.events.insert({
       calendarId: 'primary',
       requestBody: calendarEvent,
+      conferenceDataVersion: isMeet ? 1 : 0,
     });
 
     const now = Timestamp.now();

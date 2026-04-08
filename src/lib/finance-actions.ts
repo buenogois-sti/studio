@@ -125,11 +125,53 @@ export async function updateFinancialTitleStatus(titleId: string, status: 'PAGO'
             updatedAt: now
         });
 
-        // Integração Complexa: Acordos e Recebimentos
-        if (status === 'PAGO' && titleData.type === 'RECEITA' && ['ACORDO', 'SENTENCA', 'ALVARA', 'TRANSFERENCIAS_JUDICIAIS'].includes(titleData.origin)) {
+        // Integração Complexa: Acordos, Recebimentos e COMISSÕES
+        if (status === 'PAGO' && titleData.type === 'RECEITA') {
             
+            // 0. Geração Automática de COMISSÃO (Estagiários/Funcionários)
+            if (titleData.processId) {
+                const procDoc = await firestoreAdmin.collection('processes').doc(titleData.processId).get();
+                const procData = procDoc.data() as Process | undefined;
+                
+                if (procData?.commissionStaffId) {
+                    const staffDoc = await firestoreAdmin.collection('staff').doc(procData.commissionStaffId).get();
+                    const staffData = staffDoc.data() as Staff | undefined;
+                    const rem = staffData?.remuneration;
+
+                    if (rem) {
+                        let commissionValue = 0;
+                        let shouldLaunch = false;
+
+                        if (rem.commissionPercentage) {
+                            commissionValue = (titleData.value * rem.commissionPercentage) / 100;
+                            shouldLaunch = true;
+                        } else if (rem.commissionFixedValue) {
+                            // Se for fixo, lançamos apenas na PREIMEIRA parcela para não duplicar
+                            const isFirstInstallment = !titleData.installmentIndex || titleData.installmentIndex === 1;
+                            if (isFirstInstallment) {
+                                commissionValue = rem.commissionFixedValue;
+                                shouldLaunch = true;
+                            }
+                        }
+
+                        if (shouldLaunch && commissionValue > 0) {
+                            batch.set(firestoreAdmin.collection('staff').doc(procData.commissionStaffId).collection('credits').doc(), {
+                                type: 'PRODUCAO',
+                                description: `Comissão: ${titleData.description}${titleData.installmentIndex ? ` (${titleData.installmentIndex}/${titleData.totalInstallments})` : ''}`,
+                                value: commissionValue,
+                                status: 'DISPONIVEL',
+                                date: now,
+                                processId: titleData.processId,
+                                financialTitleId: titleId,
+                                monthKey: format(new Date(), 'yyyy-MM')
+                            });
+                        }
+                    }
+                }
+            }
+
             // 1. Desbloqueio de Créditos do Advogado (Carteira do Colaborador)
-            if (titleData.financialEventId) {
+            if (titleData.financialEventId && ['ACORDO', 'SENTENCA', 'ALVARA', 'TRANSFERENCIAS_JUDICIAIS'].includes(titleData.origin)) {
                 const staffSnap = await firestoreAdmin.collection('staff').get();
                 for (const s of staffSnap.docs) {
                     const creds = await s.ref.collection('credits')

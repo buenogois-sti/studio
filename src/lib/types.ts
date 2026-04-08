@@ -159,6 +159,7 @@ export type Process = {
   responsibleStaffIds?: string[];
   teamParticipants?: TeamParticipant[];
   leadLawyerId?: string;
+  commissionStaffId?: string; // ID do colaborador que receberá comissão
   defaultLocation?: string;
   driveFolderId?: string;
   globalDriveFolderId?: string;
@@ -278,6 +279,7 @@ export type FinancialTitle = {
     | 'RECURSOS_HUMANOS'
     | 'LOGISTICA_VIAGENS'
     | 'DESPESAS_BANCARIAS'
+    | 'COMISSAO'
     | 'RENDIMENTOS_INVESTIMENTOS';
   value: number;
   dueDate: any;
@@ -413,6 +415,8 @@ export type Staff = {
     salary?: number; // CLT Salary
     profitPercentage?: number;
     paymentDay?: number; // Day of the month for payment
+    commissionPercentage?: number; // Ex: 10
+    commissionFixedValue?: number; // Ex: 50.00
     benefits?: {
       transportation?: number;
       food?: number;

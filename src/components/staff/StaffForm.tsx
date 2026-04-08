@@ -29,6 +29,7 @@ import { useFirebase } from '@/firebase';
 import { collection, serverTimestamp, doc, addDoc, updateDoc, Timestamp } from 'firebase/firestore';
 import type { Staff } from '@/lib/types';
 import { useToast } from '@/components/ui/use-toast';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
 const staffSchema = z.object({
@@ -82,6 +83,8 @@ const staffSchema = z.object({
   remuneration_priceDiligence: z.coerce.number().min(0).optional().or(z.literal(0)),
   remuneration_salary: z.coerce.number().min(0).optional().or(z.literal(0)),
   remuneration_paymentDay: z.coerce.number().min(1).max(31).optional().or(z.literal(0)),
+  remuneration_commissionPercentage: z.coerce.number().min(0).max(100).optional().or(z.literal(0)),
+  remuneration_commissionFixedValue: z.coerce.number().min(0).optional().or(z.literal(0)),
   
   // Custom Services & Team
   teamMembers: z.array(z.object({ name: z.string().min(1, 'Nome é obrigatório') })),
@@ -188,6 +191,8 @@ export function StaffForm({
         remuneration_salary: staff.remuneration?.salary ?? 0,
         remuneration_profitPercentage: staff.remuneration?.profitPercentage ?? 0,
         remuneration_paymentDay: staff.remuneration?.paymentDay ?? 0,
+        remuneration_commissionPercentage: staff.remuneration?.commissionPercentage ?? 0,
+        remuneration_commissionFixedValue: staff.remuneration?.commissionFixedValue ?? 0,
         status: staff.status || 'PENDENTE_HOMOLOGACAO',
         legalType: staff.legalType || 'PF',
         companyName: staff.companyName || '',
@@ -239,6 +244,8 @@ export function StaffForm({
         remuneration_salary: 0,
         remuneration_profitPercentage: 0,
         remuneration_paymentDay: 5, // Default common payment day
+        remuneration_commissionPercentage: 10, // Default 10% commission
+        remuneration_commissionFixedValue: 0,
         teamMembers: [],
         servicePrices: [],
     },
@@ -312,6 +319,8 @@ export function StaffForm({
         remuneration_priceDrafting, remuneration_priceDiligence, remuneration_salary,
         remuneration_profitPercentage,
         remuneration_paymentDay,
+        remuneration_commissionPercentage,
+        remuneration_commissionFixedValue,
         admissionDate, birthDate,
         ...restOfValues
       } = values;
@@ -380,6 +389,11 @@ export function StaffForm({
             });
             rem.servicePrices = prices;
         }
+        
+        // Novos campos de comissão (aplicáveis a qualquer perfil)
+        rem.commissionPercentage = remuneration_commissionPercentage ?? 0;
+        rem.commissionFixedValue = remuneration_commissionFixedValue ?? 0;
+        
         staffData.remuneration = rem;
       }
 
@@ -799,7 +813,7 @@ export function StaffForm({
                       name="remuneration_type"
                       render={({ field }) => (
                       <FormItem>
-                          <FormLabel className="text-xs font-black uppercase text-primary tracking-widest">Modalidade de Pagamento *</FormLabel>
+                          <FormLabel className="text-xs font-black uppercase text-primary tracking-widest">Modalidade de Pagamento Principal *</FormLabel>
                           <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl><SelectTrigger className="h-12 bg-background border-primary/30"><SelectValue placeholder="Selecione a regra base..." /></SelectTrigger></FormControl>
                           <SelectContent>
@@ -811,7 +825,61 @@ export function StaffForm({
                       )}
                   />
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-primary/10">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-y border-primary/10 py-6">
+                      <FormField
+                          control={form.control}
+                          name="remuneration_commissionPercentage"
+                          render={({ field }) => (
+                              <FormItem>
+                                  <div className="flex items-center justify-between mb-1">
+                                      <FormLabel className="text-[10px] font-black uppercase text-primary tracking-widest">Comissão por Processo (%)</FormLabel>
+                                      <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 text-[8px] font-black h-4">Variável</Badge>
+                                  </div>
+                                  <FormControl>
+                                      <div className="relative">
+                                          <Percent className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary/40" />
+                                          <Input 
+                                              type="number" 
+                                              className="h-11 bg-background border-primary/20 font-black text-primary text-lg" 
+                                              placeholder="Ex: 10"
+                                              {...field} 
+                                          />
+                                      </div>
+                                  </FormControl>
+                                  <p className="text-[9px] text-muted-foreground italic mt-1">Calculado sobre cada honorário recebido vinculado ao processo.</p>
+                                  <FormMessage />
+                              </FormItem>
+                          )}
+                      />
+
+                      <FormField
+                          control={form.control}
+                          name="remuneration_commissionFixedValue"
+                          render={({ field }) => (
+                              <FormItem>
+                                  <div className="flex items-center justify-between mb-1">
+                                      <FormLabel className="text-[10px] font-black uppercase text-amber-500 tracking-widest">Valor Fixo por Processo (R$)</FormLabel>
+                                      <Badge variant="outline" className="bg-amber-500/10 text-amber-500 border-amber-500/20 text-[8px] font-black h-4">Bonificação</Badge>
+                                  </div>
+                                  <FormControl>
+                                      <div className="relative">
+                                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-500/40 text-sm font-bold">R$</span>
+                                          <Input 
+                                              type="text" 
+                                              className="h-11 pl-9 bg-background border-amber-500/20 font-black text-amber-500 text-lg" 
+                                              value={formatCurrencyValue(field.value)} 
+                                              onChange={(e) => handleCurrencyValueChange(e, field.onChange)}
+                                          />
+                                      </div>
+                                  </FormControl>
+                                  <p className="text-[9px] text-muted-foreground italic mt-1">Lançado automaticamente na liquidação da 1ª parcela do honorário.</p>
+                                  <FormMessage />
+                              </FormItem>
+                          )}
+                      />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-4">
                       {watchedRemuneration === 'SUCUMBENCIA' && (
                           <>
                               <FormField

@@ -54,7 +54,7 @@ import {
 } from 'lucide-react';
 
 import { useFirebase, useCollection, useMemoFirebase, useDoc } from '@/firebase';
-import { collection, query, orderBy, doc, Timestamp, limit, updateDoc, where, arrayUnion, arrayRemove, deleteDoc, getDoc, DocumentSnapshot } from 'firebase/firestore';
+import { collection, query, orderBy, doc, Timestamp, limit, updateDoc, setDoc, where, arrayUnion, arrayRemove, deleteDoc, getDoc, DocumentSnapshot } from 'firebase/firestore';
 import type { Lead, Client, Staff, LeadStatus, LeadPriority, UserProfile, TimelineEvent, OpposingParty, ChecklistTemplate, Process } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -225,6 +225,7 @@ const conversionSchema = z.object({
   courtBranch: z.string().min(3, 'A vara judiciária é obrigatória.'),
   caseValue: z.coerce.number().min(0, 'Informe o valor da causa.'),
   leadLawyerId: z.string().min(1, 'Defina o advogado responsável.'),
+  commissionStaffId: z.string().optional().or(z.literal('')),
   opposingParties: z.array(z.object({
     name: z.string().min(1, 'Nome do réu é obrigatório'),
     document: z.string().optional(),
@@ -236,6 +237,13 @@ const scheduleInterviewSchema = z.object({
   date: z.string().min(1, 'Selecione a data.'),
   time: z.string().min(1, 'Selecione o horário.'),
   location: z.string().min(1, 'Selecione o local/modo.'),
+  zipCode: z.string().optional(),
+  street: z.string().optional(),
+  number: z.string().optional(),
+  complement: z.string().optional(),
+  neighborhood: z.string().optional(),
+  city: z.string().optional(),
+  state: z.string().optional(),
   notes: z.string().optional(),
 });
 
@@ -367,14 +375,59 @@ function TaskInteractionDialog({
 
 function ScheduleInterviewDialog({ lead, open, onOpenChange, onSuccess }: { lead: Lead | null; open: boolean; onOpenChange: (o: boolean) => void; onSuccess: () => void }) {
   const [isSaving, setIsSaving] = React.useState(false);
+  const [isSearchingCep, setIsSearchingCep] = React.useState(false);
   const { toast } = useToast();
   const { firestore } = useFirebase();
   const [lawyerName, setLawyerName] = React.useState('Advogado');
   
   const form = useForm<z.infer<typeof scheduleInterviewSchema>>({
     resolver: zodResolver(scheduleInterviewSchema),
-    defaultValues: { date: format(new Date(), 'yyyy-MM-dd'), time: '14:00', location: 'Sede Bueno Gois (Presencial)', notes: '' }
+    defaultValues: { 
+      date: format(new Date(), 'yyyy-MM-dd'), 
+      time: '14:00', 
+      location: 'Sede Bueno Gois (Presencial)', 
+      notes: '', 
+      zipCode: '', 
+      street: '',
+      number: '',
+      complement: '',
+      neighborhood: '',
+      city: '',
+      state: ''
+    }
   });
+
+  const currentLocation = form.watch('location');
+
+  const handleCepSearch = async () => {
+    const cep = form.getValues('zipCode');
+    const cleanCep = cep?.replace(/\D/g, '');
+    
+    if (!cleanCep || cleanCep.length !== 8) {
+      toast({ variant: 'destructive', title: 'CEP Inválido', description: 'O CEP deve ter 8 dígitos.' });
+      return;
+    }
+
+    setIsSearchingCep(true);
+    try {
+      const response = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
+      const data = await response.json();
+      
+      if (data.erro) {
+        toast({ variant: 'destructive', title: 'CEP não encontrado' });
+      } else {
+        form.setValue('street', data.logradouro);
+        form.setValue('neighborhood', data.bairro);
+        form.setValue('city', data.localidade);
+        form.setValue('state', data.uf);
+        toast({ title: 'Endereço Localizado!', description: `${data.logradouro}, ${data.localidade}` });
+      }
+    } catch (e) {
+      toast({ variant: 'destructive', title: 'Falha na busca', description: 'Não foi possível conectar ao serviço de CEP.' });
+    } finally {
+      setIsSearchingCep(false);
+    }
+  };
 
   React.useEffect(() => {
     if (lead && open && firestore) {
@@ -434,12 +487,72 @@ function ScheduleInterviewDialog({ lead, open, onOpenChange, onSuccess }: { lead
                   <SelectContent className="bg-[#0f172a] text-white">
                     <SelectItem value="Sede Bueno Gois (Presencial)">🏢 Sede Bueno Gois (Presencial)</SelectItem>
                     <SelectItem value="Google Meet (Online)">🎥 Google Meet (Online)</SelectItem>
-                    <SelectItem value="WhatsApp Vídeo (Virtual)">📱 WhatsApp Vídeo</SelectItem>
                     <SelectItem value="Visita Técnica (Local)">🚗 Visita Local</SelectItem>
                   </SelectContent>
                 </Select>
               </FormItem>
             )} />
+
+            {currentLocation === 'Visita Técnica (Local)' && (
+              <div className="space-y-4 p-4 rounded-2xl bg-white/[0.02] border border-white/5 animate-in fade-in slide-in-from-top-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <FormField control={form.control} name="zipCode" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-[10px] font-black uppercase text-slate-500">CEP para Visita</FormLabel>
+                      <div className="flex gap-2">
+                        <FormControl><Input placeholder="00000-000" className="h-11 bg-black/40 border-white/10 font-mono" {...field} /></FormControl>
+                        <Button type="button" variant="outline" size="icon" className="h-11 w-11 shrink-0 border-primary/20 bg-primary/5" onClick={handleCepSearch} disabled={isSearchingCep}>
+                          {isSearchingCep ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="neighborhood" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-[10px] font-black uppercase text-slate-500">Bairro</FormLabel>
+                      <FormControl><Input placeholder="Bairro..." className="h-11 bg-black/40 border-white/10" {...field} /></FormControl>
+                    </FormItem>
+                  )} />
+                </div>
+
+                <FormField control={form.control} name="street" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-[10px] font-black uppercase text-slate-500">Logradouro / Rua</FormLabel>
+                    <FormControl><Input placeholder="Nome da rua ou avenida..." className="h-11 bg-black/40 border-white/10 italic" {...field} /></FormControl>
+                  </FormItem>
+                )} />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField control={form.control} name="number" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-[10px] font-black uppercase text-slate-500">Número</FormLabel>
+                      <FormControl><Input placeholder="123" className="h-11 bg-black/40 border-white/10" {...field} /></FormControl>
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="complement" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-[10px] font-black uppercase text-slate-500">Complemento (Opcional)</FormLabel>
+                      <FormControl><Input placeholder="Apto, Bloco, etc..." className="h-11 bg-black/40 border-white/10" {...field} /></FormControl>
+                    </FormItem>
+                  )} />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField control={form.control} name="city" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-[10px] font-black uppercase text-slate-500">Cidade</FormLabel>
+                      <FormControl><Input placeholder="Cidade..." className="h-11 bg-black/40 border-white/10 truncate" {...field} /></FormControl>
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="state" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-[10px] font-black uppercase text-slate-500">Estado (UF)</FormLabel>
+                      <FormControl><Input placeholder="SP" className="h-11 bg-black/40 border-white/10 uppercase" {...field} maxLength={2} /></FormControl>
+                    </FormItem>
+                  )} />
+                </div>
+              </div>
+            )}
             <FormField control={form.control} name="notes" render={({ field }) => (
               <FormItem>
                 <FormLabel className="text-[10px] font-black uppercase text-slate-500">Notas Estratégicas p/ Agenda</FormLabel>
@@ -468,7 +581,8 @@ function LeadDetailsSheet({
   onEditClient,
   lawyers,
   interviewers,
-  initialTab = 'ficha'
+  initialTab = 'ficha',
+  onChecklistClick
 }: { 
   lead: Lead | null; 
   client?: Client; 
@@ -479,6 +593,7 @@ function LeadDetailsSheet({
   lawyers: Staff[];
   interviewers: Staff[];
   initialTab?: 'ficha' | 'timeline';
+  onChecklistClick: () => void;
 }) {
   const { firestore } = useFirebase();
   const { data: session } = useSession();
@@ -491,6 +606,48 @@ function LeadDetailsSheet({
   const [isSchedulingOpen, setIsSchedulingOpen] = React.useState(false);
   const [activeTaskDialog, setActiveTaskDialog] = React.useState<string | null>(null);
   const [activeTab, setActiveTab] = React.useState(initialTab);
+
+  const [isEditingTitle, setIsEditingTitle] = React.useState(false);
+  const [editedTitle, setEditedTitle] = React.useState('');
+  const [isSavingTitle, setIsSavingTitle] = React.useState(false);
+
+  // Helper to update lead details and automatically mark tasks as completed
+  const handleUpdateAndComplete = async (fields: Partial<Lead>) => {
+    if (!lead) return;
+    
+    const completed = lead.completedTasks || [];
+    const updatedTasks = [...completed];
+    
+    // Mapping fields to NOVO stage tasks
+    if ('captureSource' in fields && !updatedTasks.includes('Qualificação do Lead')) {
+      updatedTasks.push('Qualificação do Lead');
+    }
+    if ('legalArea' in fields && !updatedTasks.includes('Identificação da área jurídica')) {
+      updatedTasks.push('Identificação da área jurídica');
+    }
+    if ('lawyerId' in fields && !updatedTasks.includes('Direcionamento ao Adv. Responsável')) {
+      updatedTasks.push('Direcionamento ao Adv. Responsável');
+    }
+
+    await updateLeadDetails(lead.id, { 
+      ...fields, 
+      completedTasks: [...new Set(updatedTasks)] 
+    });
+  };
+
+  const handleSaveTitle = async () => {
+    if (!lead || !editedTitle.trim()) return;
+    setIsSavingTitle(true);
+    try {
+      await updateLeadDetails(lead.id, { title: editedTitle.trim() });
+      setIsEditingTitle(false);
+      toast({ title: 'Título atualizado com sucesso!' });
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Erro ao atualizar título', description: error.message });
+    } finally {
+      setIsSavingTitle(false);
+    }
+  };
 
   React.useEffect(() => {
     if (open) setActiveTab(initialTab);
@@ -541,29 +698,63 @@ function LeadDetailsSheet({
   const handleToggleTask = async (task: string) => {
     if (!lead || !firestore) return;
     
-    // Passos interativos abrem diálogo
-    if (['Qualificação do Lead', 'Identificação da área jurídica', 'Direcionamento ao Adv. Responsável'].includes(task)) {
+    const completed = lead.completedTasks || [];
+    const isDone = completed.includes(task);
+
+    // Se já estiver feito, remove da lista (toggle off)
+    if (isDone) {
+      try {
+        await updateLeadDetails(lead.id, { 
+          completedTasks: completed.filter(t => t !== task) 
+        });
+        return;
+      } catch (e) {
+        toast({ variant: 'destructive', title: 'Erro ao desmarcar tarefa' });
+        return;
+      }
+    }
+
+    // Se não estiver feito, verifica se precisa de diálogo ou se já tem os dados
+    if (task === 'Qualificação do Lead') {
+      if (lead.captureSource) {
+        await updateLeadDetails(lead.id, { completedTasks: [...new Set([...completed, task])] });
+        return;
+      }
       setActiveTaskDialog(task);
       return;
     }
 
-    const completed = lead.completedTasks || [];
-    const isCompleted = completed.includes(task);
-    
-    if (task === 'Entrevista técnica realizada' && !isCompleted) {
+    if (task === 'Identificação da área jurídica') {
+      if (lead.legalArea) {
+        await updateLeadDetails(lead.id, { completedTasks: [...new Set([...completed, task])] });
+        return;
+      }
+      setActiveTaskDialog(task);
+      return;
+    }
+
+    if (task === 'Preenchimento de checklists') {
+      onChecklistClick();
+      return;
+    }
+
+    if (task === 'Direcionamento ao Adv. Responsável') {
+      if (lead.lawyerId) {
+        await updateLeadDetails(lead.id, { completedTasks: [...new Set([...completed, task])] });
+        return;
+      }
+      setActiveTaskDialog(task);
+      return;
+    }
+
+    if (task === 'Entrevista técnica realizada') {
       setIsSchedulingOpen(true);
       return;
     }
 
-    try {
-      const leadRef = doc(firestore, 'leads', lead.id);
-      await updateDoc(leadRef, { 
-        completedTasks: isCompleted ? arrayRemove(task) : arrayUnion(task), 
-        updatedAt: Timestamp.now() 
-      });
-    } catch (e: any) { 
-      toast({ variant: 'destructive', title: 'Erro ao atualizar tarefa' }); 
-    }
+    // Outras tarefas que não possuem diálogos específicos
+    const updatedTasks = [...new Set([...completed, task])];
+    await updateLeadDetails(lead.id, { completedTasks: updatedTasks });
   };
 
   const handleTaskDialogSuccess = (lawyerId?: string) => {
@@ -661,7 +852,53 @@ function LeadDetailsSheet({
               </Button>
             )}
           </div>
-          <SheetTitle className="text-2xl sm:text-3xl font-black font-headline text-white leading-tight uppercase tracking-tight text-left">{lead.title}</SheetTitle>
+          <div className="flex items-center gap-2 group mt-2">
+            {isEditingTitle ? (
+              <div className="flex bg-[#0f172a] border border-primary/50 rounded-xl overflow-hidden shadow-2xl shadow-primary/10 w-full max-w-md animate-in fade-in zoom-in duration-200">
+                <Input 
+                  autoFocus
+                  value={editedTitle}
+                  onChange={(e) => setEditedTitle(e.target.value)}
+                  className="border-none bg-transparent h-12 text-lg font-black text-white uppercase px-4 focus-visible:ring-0"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleSaveTitle();
+                    if (e.key === 'Escape') setIsEditingTitle(false);
+                  }}
+                />
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-12 w-12 text-emerald-400 hover:text-emerald-300 hover:bg-white/5 rounded-none" 
+                  onClick={handleSaveTitle}
+                  disabled={isSavingTitle}
+                >
+                  {isSavingTitle ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-5 w-5" />}
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-12 w-12 text-slate-500 hover:text-white hover:bg-white/5 rounded-none" 
+                  onClick={() => setIsEditingTitle(false)}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : (
+              <>
+                <SheetTitle className="text-2xl sm:text-3xl font-black font-headline text-white leading-tight uppercase tracking-tight text-left">
+                  {lead.title || 'Sem Título'}
+                </SheetTitle>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity text-slate-500 hover:text-primary hover:bg-primary/10 rounded-full"
+                  onClick={() => { setEditedTitle(lead.title); setIsEditingTitle(true); }}
+                >
+                  <Edit className="h-4 w-4" />
+                </Button>
+              </>
+            )}
+          </div>
         </SheetHeader>
 
         <Tabs value={activeTab} onValueChange={v => setActiveTab(v as any)} className="flex-1 flex flex-col min-h-0">
@@ -721,58 +958,130 @@ function LeadDetailsSheet({
                   </div>
                 </div>
 
-                {/* Editável: Informações Técnicas */}
+                {/* Orientação de Fluxo e Checklist no Topo */}
+                <section className="space-y-4">
+                  <div className="flex items-center justify-between px-1">
+                    <div className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-500 tracking-widest">
+                      <Activity className="h-3.5 w-3.5 text-primary" /> Progresso da Triagem: {stage.label}
+                    </div>
+                    <span className="text-[10px] font-black text-white bg-white/5 px-2 py-0.5 rounded-lg border border-white/10">{completedCount}/{totalTasks}</span>
+                  </div>
+                  
+                  <div className="bg-primary/5 border border-primary/20 p-4 rounded-2xl flex items-start gap-3">
+                    <Info className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-black text-white uppercase tracking-tight">Orientação de Fluxo</p>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase leading-relaxed">O preenchimento das "Informações Técnicas" abaixo marcará estas tarefas como concluídas automaticamente. Quando atingir 3/3, o botão de avançar aparecerá no rodapé.</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {stage.tasks.map(task => {
+                      const isDone = lead.completedTasks?.includes(task);
+                      return (
+                        <div 
+                          key={task} 
+                          className={cn(
+                            "flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer group",
+                            isDone ? "bg-emerald-500/[0.05] border-emerald-500/20" : "bg-white/[0.02] border-white/5 hover:border-primary/30"
+                          )} 
+                          onClick={() => handleToggleTask(task)}
+                        >
+                          <div className={cn(
+                            "h-5 w-5 rounded-lg border flex items-center justify-center transition-all shrink-0",
+                            isDone ? "bg-emerald-500 border-emerald-500 text-white" : "border-white/10 group-hover:border-primary/50"
+                          )}>
+                            {isDone && <Check className="h-3 w-3 stroke-[3]" />}
+                          </div>
+                          <span className={cn("text-[9px] font-black uppercase tracking-tighter leading-none", isDone ? "text-emerald-400" : "text-slate-500")}>{task}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
+
+                {/* Painel de Ação de Atendimento */}
+                {lead.status === 'ATENDIMENTO' && (
+                  <div className="bg-amber-500/10 border-2 border-amber-500/20 p-6 rounded-3xl flex flex-col sm:flex-row items-center justify-between gap-6 animate-in zoom-in-95 duration-500 shadow-xl shadow-amber-900/10">
+                    <div className="flex items-center gap-5 text-center sm:text-left">
+                      <div className="h-16 w-16 rounded-2xl bg-amber-500 flex items-center justify-center text-black shadow-lg shadow-amber-500/20 shrink-0">
+                        <Bot className="h-9 w-9 animate-pulse" />
+                      </div>
+                      <div className="space-y-1">
+                        <h4 className="text-xl font-black text-white uppercase tracking-tight">Atendimento Estratégico</h4>
+                        <p className="text-[10px] text-amber-200/70 font-bold uppercase leading-relaxed max-w-sm">Execute o roteiro técnico para alimentar a IA e preparar o contrato automático.</p>
+                      </div>
+                    </div>
+                    <Button 
+                      onClick={onChecklistClick}
+                      className="w-full sm:w-auto bg-white text-black hover:bg-amber-50 font-black uppercase tracking-widest text-xs h-14 px-10 rounded-2xl shadow-2xl transition-transform hover:scale-105 active:scale-95"
+                    >
+                      <Sparkles className="h-5 w-5 mr-3" /> Executar Entrevista
+                    </Button>
+                  </div>
+                )}
+
                 <section className="space-y-6">
                   <div className="flex items-center gap-2 text-[10px] font-black uppercase text-primary tracking-widest px-1">
                     <Edit className="h-3.5 w-3.5" /> Informações Técnicas (Editável)
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white/5 p-6 rounded-3xl border border-white/10">
                     <div className="space-y-2">
-                      <Label className="text-[10px] font-black uppercase text-slate-500">Origem da Captação</Label>
-                      <Select defaultValue={lead.captureSource} onValueChange={(val) => updateLeadDetails(lead.id, { captureSource: val })}>
-                        <SelectTrigger className="bg-black/40 border-white/10 h-11"><SelectValue /></SelectTrigger>
-                        <SelectContent className="bg-[#0f172a] text-white">
-                          <SelectItem value="Google Search">Google Search</SelectItem>
-                          <SelectItem value="Google Ads">Google Ads</SelectItem>
-                          <SelectItem value="Instagram">Instagram</SelectItem>
-                          <SelectItem value="Indicação por Terceiro">Indicação por Terceiro</SelectItem>
-                          <SelectItem value="Antigo Cliente">Antigo Cliente</SelectItem>
+                      <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Origem da Captação</Label>
+                      <Select defaultValue={lead.captureSource} onValueChange={(val) => handleUpdateAndComplete({ captureSource: val })}>
+                        <SelectTrigger className="bg-black/40 border-white/5 h-11 rounded-xl text-xs font-bold uppercase">
+                          <SelectValue placeholder="Selecione a origem..." />
+                        </SelectTrigger>
+                        <SelectContent className="bg-[#0f172a] border-white/10">
+                          <SelectItem value="Instagram">📸 Instagram</SelectItem>
+                          <SelectItem value="Google Search">🔍 Google Search</SelectItem>
+                          <SelectItem value="Indicação">🤝 Indicação</SelectItem>
+                          <SelectItem value="Site">🌐 Site Institucional</SelectItem>
+                          <SelectItem value="WhatsApp">💬 WhatsApp Direto</SelectItem>
+                          <SelectItem value="Outros">🔘 Outros</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-[10px] font-black uppercase text-slate-500">Área Jurídica</Label>
-                      <Select defaultValue={lead.legalArea} onValueChange={(val) => updateLeadDetails(lead.id, { legalArea: val })}>
-                        <SelectTrigger className="bg-black/40 border-white/10 h-11"><SelectValue /></SelectTrigger>
-                        <SelectContent className="bg-[#0f172a] text-white">
+                      <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Área Jurídica</Label>
+                      <Select defaultValue={lead.legalArea} onValueChange={(val) => handleUpdateAndComplete({ legalArea: val })}>
+                        <SelectTrigger className="bg-black/40 border-white/5 h-11 rounded-xl text-xs font-bold uppercase">
+                          <SelectValue placeholder="Selecione a área..." />
+                        </SelectTrigger>
+                        <SelectContent className="bg-[#0f172a] border-white/10">
                           <SelectItem value="Trabalhista">⚖️ Trabalhista</SelectItem>
-                          <SelectItem value="Cível">🏢 Cível</SelectItem>
+                          <SelectItem value="Cível">🏠 Cível</SelectItem>
                           <SelectItem value="Previdenciário">👴 Previdenciário</SelectItem>
-                          <SelectItem value="Família">🏠 Família</SelectItem>
+                          <SelectItem value="Família">👪 Família</SelectItem>
+                          <SelectItem value="Criminal">🚔 Criminal</SelectItem>
+                          <SelectItem value="Tributário">💰 Tributário</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-[10px] font-black uppercase text-slate-500">Advogado Responsável</Label>
-                      <Select defaultValue={lead.lawyerId} onValueChange={(val) => updateLeadDetails(lead.id, { lawyerId: val })}>
-                        <SelectTrigger className="bg-black/40 border-white/10 h-11"><SelectValue /></SelectTrigger>
-                        <SelectContent className="bg-[#0f172a] text-white">
+                      <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Advogado Responsável</Label>
+                      <Select defaultValue={lead.lawyerId} onValueChange={(val) => handleUpdateAndComplete({ lawyerId: val })}>
+                        <SelectTrigger className="bg-black/40 border-white/5 h-11 rounded-xl text-xs font-bold uppercase">
+                          <SelectValue placeholder="Defina o advogado..." />
+                        </SelectTrigger>
+                        <SelectContent className="bg-[#0f172a] border-white/10">
                           {lawyers.map(l => (
-                            <SelectItem key={l.id} value={l.id}>Dr(a). {l.firstName}</SelectItem>
+                            <SelectItem key={l.id} value={l.id}>👨‍🎓 Dr(a). {l.firstName} {l.lastName}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-[10px] font-black uppercase text-slate-500">Interrevistador (Triagem)</Label>
-                      <Select defaultValue={lead.interviewerId} onValueChange={(val) => updateLeadDetails(lead.id, { interviewerId: val })}>
-                        <SelectTrigger className="bg-black/40 border-white/10 h-11"><SelectValue /></SelectTrigger>
-                        <SelectContent className="bg-[#0f172a] text-white">
-                          {interviewers.map(l => (
-                            <SelectItem key={l.id} value={l.id}>{l.firstName}</SelectItem>
+                      <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Intervistador (Triagem)</Label>
+                      <Select defaultValue={lead.interviewerId} onValueChange={(val) => handleUpdateAndComplete({ interviewerId: val })}>
+                        <SelectTrigger className="bg-black/40 border-white/5 h-11 rounded-xl text-xs font-bold uppercase">
+                          <SelectValue placeholder="Quem realizou a triagem?" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-[#0f172a] border-white/10">
+                          {interviewers.map(i => (
+                            <SelectItem key={i.id} value={i.id}>👤 {i.firstName} {i.lastName}</SelectItem>
                           ))}
-                          <Separator className="bg-white/5 my-1" />
-                          <SelectItem value="Outros" className="italic text-slate-400 font-bold">🔘 Outros</SelectItem>
+                          <SelectItem value="Outros">🔘 Outros</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -790,70 +1099,6 @@ function LeadDetailsSheet({
                     </div>
                   </div>
                 </section>
-
-                <section className="space-y-4">
-                  <div className="flex items-center justify-between px-1">
-                    <div className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-500 tracking-widest">
-                      <Activity className="h-3.5 w-3.5 text-primary" /> Checklist da Etapa: {stage.label}
-                    </div>
-                    <span className="text-[10px] font-black text-white bg-white/5 px-2 py-0.5 rounded-lg border border-white/10">{completedCount}/{totalTasks}</span>
-                  </div>
-                  
-                  <div className="grid gap-2">
-                    {stage.tasks.map(task => {
-                      const isDone = lead.completedTasks?.includes(task);
-                      return (
-                        <div 
-                          key={task} 
-                          className={cn(
-                            "flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer group",
-                            isDone ? "bg-emerald-500/[0.03] border-emerald-500/20" : "bg-white/[0.02] border-white/5 hover:border-primary/30"
-                          )} 
-                          onClick={() => handleToggleTask(task)}
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className={cn(
-                              "h-5 w-5 rounded-lg border flex items-center justify-center transition-all",
-                              isDone ? "bg-emerald-500 border-emerald-500 text-white" : "border-white/10 group-hover:border-primary/50"
-                            )}>
-                              {isDone && <Check className="h-3 w-3 stroke-[3]" />}
-                            </div>
-                            <span className={cn("text-xs font-bold tracking-tight", isDone ? "text-emerald-400/70" : "text-slate-200")}>{task}</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </section>
-
-                {lead.status === 'ATENDIMENTO' && (
-                  <section className="space-y-4">
-                    <div className="flex items-center gap-2 text-[10px] font-black uppercase text-amber-400 tracking-widest">
-                      <ClipboardList className="h-3.5 w-3.5" /> Entrevista Consolidada
-                    </div>
-                    <div className="grid grid-cols-1 gap-4">
-                      {activeInterview ? (
-                        activeInterview.items.map((item) => {
-                          const currentAnswer = lead.interviewAnswers?.[item.id] || '';
-                          return (
-                            <div key={item.id} className="space-y-3 p-5 rounded-2xl bg-white/[0.03] border border-white/5">
-                              <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest block mb-2">{item.label}</Label>
-                              <Textarea 
-                                className="bg-black/40 border-white/5 text-sm rounded-xl min-h-[80px]"
-                                defaultValue={currentAnswer}
-                                onBlur={(e) => handleSaveInterviewAnswer(item.id, e.target.value)}
-                              />
-                            </div>
-                          );
-                        })
-                      ) : (
-                        <div className="text-center py-10 opacity-40 bg-white/[0.02] border border-dashed border-white/10 rounded-2xl">
-                          <p className="text-xs font-bold text-slate-500">Sem entrevista personalizada ativa.</p>
-                        </div>
-                      )}
-                    </div>
-                  </section>
-                )}
               </TabsContent>
 
               <TabsContent value="timeline" className="m-0 space-y-8 animate-in fade-in duration-300">
@@ -1194,13 +1439,279 @@ function NewLeadSheet({ open, onOpenChange, lawyers, interviewers, onCreated }: 
   );
 }
 
-function LeadConversionDialog({ lead, open, onOpenChange, onConfirm, lawyers }: { lead: Lead | null; open: boolean; onOpenChange: (o: boolean) => void; onConfirm: (data: any) => void; lawyers: Staff[] }) {
+function LeadChecklistDialog({ lead, open, onOpenChange, onSuccess }: { lead: Lead | null; open: boolean; onOpenChange: (o: boolean) => void; onSuccess: () => void }) {
+  const { firestore, user } = useFirebase();
+  const { toast } = useToast();
+  const [isSaving, setIsSaving] = React.useState(false);
+  const [isAutosaving, setIsAutosaving] = React.useState(false);
+  const [selectedTemplateId, setSelectedTemplateId] = React.useState<string | null>(null);
+  const [answers, setAnswers] = React.useState<Record<string, any>>({});
+  const [currentExecutionId, setCurrentExecutionId] = React.useState<string | null>(null);
+
+  const templatesQuery = useMemoFirebase(
+    () => (firestore ? query(collection(firestore, 'checklist_templates'), where('isActive', '==', true)) : null),
+    [firestore]
+  );
+  const { data: templates } = useCollection<ChecklistTemplate>(templatesQuery);
+
+  const filteredTemplates = React.useMemo(() => {
+    if (!templates || !lead) return [];
+    
+    const normalize = (val: string) => 
+      val.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+
+    const leadArea = normalize(lead.legalArea || '');
+
+    return templates.filter(t => {
+      if (!t.legalArea) return true;
+      return normalize(t.legalArea) === leadArea;
+    });
+  }, [templates, lead]);
+
+  const selectedTemplate = React.useMemo(() => 
+    filteredTemplates.find(t => t.id === selectedTemplateId), 
+    [filteredTemplates, selectedTemplateId]
+  );
+
+  // Auto-selecionar se houver apenas um
+  React.useEffect(() => {
+    if (filteredTemplates.length === 1 && !selectedTemplateId) {
+      setSelectedTemplateId(filteredTemplates[0].id);
+    }
+  }, [filteredTemplates, selectedTemplateId]);
+
+  const handleUpdateAnswer = async (itemId: string, value: any) => {
+    const newAnswers = { ...answers, [itemId]: value };
+    setAnswers(newAnswers);
+    
+    if (!lead || !firestore || !selectedTemplate || !user) return;
+    
+    setIsAutosaving(true);
+    try {
+      const executionId = currentExecutionId || uuidv4();
+      if (!currentExecutionId) setCurrentExecutionId(executionId);
+
+      const execution: ChecklistExecution = {
+        id: executionId,
+        templateId: selectedTemplate.id,
+        templateTitle: selectedTemplate.title,
+        userId: user.uid,
+        userName: user.displayName || 'Usuário',
+        leadId: lead.id,
+        leadTitle: lead.title,
+        answers: newAnswers,
+        status: 'DRAFT',
+        executedAt: Timestamp.now()
+      };
+
+      await setDoc(doc(firestore, 'checklist_executions', executionId), execution);
+      
+      // Sincroniza respostas para o Lead
+      await updateLeadDetails(lead.id, { 
+        interviewAnswers: { ...(lead.interviewAnswers || {}), ...newAnswers }
+      });
+    } catch (e) {
+      console.error("Autosave error:", e);
+    } finally {
+      setTimeout(() => setIsAutosaving(false), 800);
+    }
+  };
+
+  const handleFinalize = async () => {
+    if (!lead || !firestore || !selectedTemplate || !currentExecutionId) {
+        toast({ variant: 'destructive', title: 'Atenção', description: 'Preencha pelo menos um item antes de finalizar.' });
+        return;
+    }
+    setIsSaving(true);
+    try {
+      await updateDoc(doc(firestore, 'checklist_executions', currentExecutionId), {
+        status: 'COMPLETED',
+        executedAt: Timestamp.now()
+      });
+      
+      await updateLeadDetails(lead.id, { 
+        completedTasks: [...new Set([...(lead.completedTasks || []), 'Preenchimento de checklists', 'Entrevista técnica realizada'])]
+      });
+
+      toast({ title: 'Entrevista Finalizada!', description: 'Dados salvos e sincronizados com sucesso.' });
+      onSuccess();
+      onOpenChange(false);
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Erro ao finalizar', description: e.message });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (!lead) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-6xl w-[95vw] bg-[#020617] border-white/10 text-white p-0 overflow-hidden shadow-2xl flex flex-col h-[90vh]">
+        <DialogHeader className="p-6 border-b border-white/5 bg-white/5 relative">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="h-12 w-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+                <ClipboardList className="h-6 w-6 text-amber-500" />
+              </div>
+              <div>
+                <DialogTitle className="text-xl font-black font-headline tracking-tight uppercase">Atendimento Estratégico</DialogTitle>
+                <DialogDescription className="text-slate-400">Padrão Bueno Gois: Inteligência e Precisão na Coleta de Dados.</DialogDescription>
+              </div>
+            </div>
+
+            {isAutosaving && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 animate-pulse">
+                <RefreshCw className="h-3 w-3 text-emerald-500 animate-spin" />
+                <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">Sincronizando...</span>
+              </div>
+            )}
+          </div>
+        </DialogHeader>
+
+        <div className="flex-1 flex overflow-hidden">
+          <div className="w-1/4 border-r border-white/5 bg-black/20 p-6 space-y-6">
+            <div className="space-y-1">
+              <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Modelos Disponíveis</p>
+              <p className="text-[9px] text-slate-600 font-bold uppercase">Baseado na área: {lead.legalArea}</p>
+            </div>
+            <ScrollArea className="h-full pr-4 pb-20">
+              <div className="space-y-3">
+                {filteredTemplates.length > 0 ? filteredTemplates.map(t => (
+                  <Button 
+                    key={t.id} 
+                    variant={selectedTemplateId === t.id ? 'secondary' : 'ghost'} 
+                    onClick={() => { setSelectedTemplateId(t.id); setAnswers({}); setCurrentExecutionId(null); }}
+                    className={cn(
+                      "w-full justify-start text-left h-auto py-4 px-4 rounded-2xl border transition-all duration-300",
+                      selectedTemplateId === t.id 
+                        ? "bg-amber-500 text-black border-amber-400 shadow-lg shadow-amber-500/10" 
+                        : "bg-white/[0.02] border-white/5 hover:bg-white/5 hover:border-white/10 text-slate-400"
+                    )}
+                  >
+                    <div className="flex flex-col gap-1 min-w-0">
+                      <span className={cn("text-xs font-black truncate uppercase tracking-tight", selectedTemplateId === t.id ? "text-black" : "text-white")}>
+                        {t.title}
+                      </span>
+                      <span className={cn("text-[9px] font-bold opacity-60 truncate", selectedTemplateId === t.id ? "text-black/70" : "text-slate-500")}>
+                        {t.items.length} campos • {t.description}
+                      </span>
+                    </div>
+                  </Button>
+                )) : (
+                  <div className="text-center py-20 bg-white/[0.02] rounded-3xl border border-dashed border-white/5">
+                    <AlertTriangle className="h-8 w-8 mx-auto mb-2 text-slate-500" />
+                    <p className="text-[10px] font-black uppercase text-slate-500">Nenhum modelo<br/>configurado</p>
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
+          </div>
+
+          <div className="flex-1 flex flex-col bg-[#010409]">
+            <ScrollArea className="flex-1 px-10 py-8">
+              {selectedTemplate ? (
+                <div className="max-w-3xl mx-auto space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                  <div className="bg-amber-500/5 border border-amber-500/10 p-4 rounded-2xl mb-8">
+                    <p className="text-[10px] text-amber-500/80 font-bold uppercase tracking-tight flex items-center gap-2">
+                      <Target className="h-3 w-3" /> As respostas abaixo serão usadas para análise de viabilidade e geração de documentos.
+                    </p>
+                  </div>
+
+                  {selectedTemplate.items.map((item, idx) => (
+                    <div key={item.id} className="group space-y-4">
+                      <div className="flex items-start gap-4">
+                        <span className="flex items-center justify-center h-7 w-7 rounded-xl bg-white/5 text-slate-400 text-[11px] font-black shrink-0 border border-white/10 group-focus-within:border-amber-500/50 group-focus-within:text-amber-500 transition-all">
+                          {idx + 1}
+                        </span>
+                        <div className="flex-1 pt-1">
+                          <Label className="text-sm font-black text-slate-200 uppercase tracking-tight leading-tight">
+                            {item.label}
+                            {item.required && <span className="text-rose-500 ml-1.5 font-bold">*</span>}
+                          </Label>
+                        </div>
+                      </div>
+                      
+                      <div className="pl-11 pr-4">
+                        {item.type === 'YES_NO' && (
+                          <RadioGroup onValueChange={(v) => handleUpdateAnswer(item.id, v)} value={answers[item.id]}>
+                            <div className="flex gap-3">
+                              <div className={cn(
+                                "flex items-center gap-2 px-6 py-3 rounded-2xl border transition-all cursor-pointer",
+                                answers[item.id] === 'P' ? "bg-amber-500/20 border-amber-500 text-amber-500" : "bg-white/5 border-white/5 text-slate-400 hover:bg-white/10"
+                              )}>
+                                <RadioGroupItem value="P" id={`${item.id}-y`} className="border-slate-500" />
+                                <Label htmlFor={`${item.id}-y`} className="text-xs font-black uppercase tracking-widest cursor-pointer ml-1">Sim</Label>
+                              </div>
+                              <div className={cn(
+                                "flex items-center gap-2 px-6 py-3 rounded-2xl border transition-all cursor-pointer",
+                                answers[item.id] === 'N' ? "bg-rose-500/20 border-rose-500 text-rose-500" : "bg-white/5 border-white/5 text-slate-400 hover:bg-white/10"
+                              )}>
+                                <RadioGroupItem value="N" id={`${item.id}-n`} className="border-slate-500" />
+                                <Label htmlFor={`${item.id}-n`} className="text-xs font-black uppercase tracking-widest cursor-pointer ml-1">Não</Label>
+                              </div>
+                            </div>
+                          </RadioGroup>
+                        )}
+                        {item.type === 'TEXT' && (
+                          <Textarea 
+                            placeholder="Descreva detalhadamente..." 
+                            className="bg-black/60 border-white/10 text-sm rounded-2xl min-h-[120px] focus:border-amber-500/50 focus:ring-amber-500/20 transition-all p-4 leading-relaxed" 
+                            onBlur={(e) => handleUpdateAnswer(item.id, e.target.value)}
+                            defaultValue={answers[item.id]}
+                          />
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  
+                  <div className="h-20" /> {/* Espaçamento final */}
+                </div>
+              ) : (
+                <div className="h-[60vh] flex flex-col items-center justify-center text-center p-12 space-y-4">
+                  <div className="h-24 w-24 rounded-full bg-white/[0.02] flex items-center justify-center border border-white/5">
+                    <Activity className="h-10 w-10 text-slate-600 animate-pulse" />
+                  </div>
+                  <div className="max-w-xs">
+                    <p className="text-sm font-black uppercase tracking-widest text-slate-400 mb-1">Aguardando Seleção</p>
+                    <p className="text-[10px] font-bold text-slate-600 uppercase">Escolha um roteiro de atendimento na barra lateral para iniciar a coleta técnica.</p>
+                  </div>
+                </div>
+              )}
+            </ScrollArea>
+          </div>
+        </div>
+
+        <DialogFooter className="p-6 border-t border-white/5 bg-white/5 shrink-0 flex items-center justify-between sm:justify-between">
+          <div className="hidden sm:flex items-center gap-4 text-slate-500 text-[10px] font-bold uppercase tracking-widest">
+            <ShieldCheck className="h-4 w-4 text-emerald-500" /> Atendimento Seguro & Criptografado
+          </div>
+          <div className="flex gap-4 w-full sm:w-auto">
+            <DialogClose asChild>
+                <Button variant="ghost" className="flex-1 sm:flex-none text-slate-400 font-black uppercase text-[10px] tracking-widest h-12 px-8">Sair sem Fechar</Button>
+            </DialogClose>
+            <Button 
+                onClick={handleFinalize} 
+                disabled={isSaving || !selectedTemplate || !currentExecutionId} 
+                className="flex-1 sm:flex-none bg-amber-500 hover:bg-amber-600 text-black font-black uppercase tracking-widest text-[10px] h-12 px-12 shadow-2xl shadow-amber-900/40"
+            >
+                {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle2 className="h-4 w-4 mr-2" />} 
+                Finalizar e Consolidar
+            </Button>
+          </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function LeadConversionDialog({ lead, open, onOpenChange, onConfirm, lawyers, commissionableStaff }: { lead: Lead | null; open: boolean; onOpenChange: (o: boolean) => void; onConfirm: (data: any) => void; lawyers: Staff[]; commissionableStaff: Staff[] }) {
   const [isAnalyzing, setIsAnalyzing] = React.useState(false);
   const { toast } = useToast();
   
   const form = useForm<z.infer<typeof conversionSchema>>({
     resolver: zodResolver(conversionSchema),
-    defaultValues: { processNumber: '', court: '', courtBranch: '', caseValue: 0, leadLawyerId: '', opposingParties: [{ name: '', document: '', address: '' }] }
+    defaultValues: { processNumber: '', court: '', courtBranch: '', caseValue: 0, leadLawyerId: '', commissionStaffId: '', opposingParties: [{ name: '', document: '', address: '' }] }
   });
 
   const { fields, append, remove } = useFieldArray({ control: form.control, name: "opposingParties" });
@@ -1274,6 +1785,29 @@ function LeadConversionDialog({ lead, open, onOpenChange, onConfirm, lawyers }: 
                     <SelectContent className="bg-[#0f172a] border-white/10 text-white">{lawyers.map(l => <SelectItem key={l.id} value={l.id} className="font-bold">Dr(a). {l.firstName}</SelectItem>)}</SelectContent>
                   </Select><FormMessage /></FormItem>
                 )} />
+
+                <FormField control={form.control} name="commissionStaffId" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-[10px] font-black uppercase text-amber-500">Colaborador Comissionado (Estagiário/Consultor)</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger className="bg-amber-500/5 border-amber-500/20 h-12 text-base font-bold text-amber-500">
+                          <SelectValue placeholder="Ninguém (Sem comissão vinculada)" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent className="bg-[#0f172a] border-white/10 text-white">
+                        <SelectItem value="none" className="text-slate-500 italic">Nenhum (Sem comissão)</SelectItem>
+                        {commissionableStaff.map(s => (
+                          <SelectItem key={s.id} value={s.id} className="font-bold">
+                            {s.role === 'intern' ? '🎓 ' : '👤 '}{s.firstName} {s.lastName}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-[9px] text-slate-500 italic">O sistema aplicará a regra de 10% ou valor fixo conforme o perfil deste colaborador.</p>
+                  </FormItem>
+                )} />
+
                 <div className="space-y-4 pt-4 border-t border-white/5">
                   <div className="flex items-center justify-between"><FormLabel className="text-[10px] font-black uppercase text-slate-500">Qualificação dos Réus *</FormLabel><Button type="button" variant="ghost" size="sm" onClick={() => append({ name: '', document: '', address: '' })} className="text-primary font-bold uppercase text-[9px] h-7 gap-1"><Plus className="h-3 w-3" /> Adicionar Réu</Button></div>
                   <div className="grid gap-4">{fields.map((field, index) => (
@@ -1306,6 +1840,7 @@ export default function LeadsPage() {
   const [isProcessing, setIsProcessing] = React.useState<string | null>(null);
   const [editingClient, setEditingClient] = React.useState<Client | null>(null);
   const [isClientSheetOpen, setIsClientSheetOpen] = React.useState(false);
+  const [isChecklistDialogOpen, setIsChecklistDialogOpen] = React.useState(false);
   const [showAnalytics, setShowAnalytics] = React.useState(false);
 
   
@@ -1340,6 +1875,7 @@ export default function LeadsPage() {
   const { data: staffData } = useCollection<Staff>(staffQuery);
   const lawyers = React.useMemo(() => staffData?.filter(s => s.role === 'lawyer' || s.role === 'partner') || [], [staffData]);
   const interviewers = React.useMemo(() => staffData?.filter(s => s.role === 'lawyer' || s.role === 'partner' || s.role === 'intern') || [], [staffData]);
+  const commissionableStaff = React.useMemo(() => staffData?.filter(s => ['intern', 'employee', 'lawyer'].includes(s.role)) || [], [staffData]);
   const staffMap = React.useMemo(() => new Map(staffData?.map(s => [s.id, s])), [staffData]);
 
   // Analytics Calculations
@@ -1743,6 +2279,7 @@ export default function LeadsPage() {
           onOpenChange={setIsDetailsOpen} 
           onProtocolClick={(l) => { setSelectedLeadId(l.id); setIsConversionOpen(true); }} 
           onEditClient={handleEditClient}
+          onChecklistClick={() => setIsChecklistDialogOpen(true)}
           lawyers={lawyers}
           interviewers={interviewers}
           initialTab={initialDetailTab}
@@ -1750,7 +2287,14 @@ export default function LeadsPage() {
         
         <NewLeadSheet open={isNewLeadOpen} onOpenChange={setIsNewLeadOpen} lawyers={lawyers} interviewers={interviewers} onCreated={() => {}} />
         
-        <LeadConversionDialog lead={activeLead} open={isConversionOpen} onOpenChange={setIsConversionOpen} onConfirm={handleConfirmProtocol} lawyers={lawyers} />
+        <LeadChecklistDialog 
+          lead={activeLead} 
+          open={isChecklistDialogOpen} 
+          onOpenChange={setIsChecklistDialogOpen} 
+          onSuccess={() => {}} 
+        />
+
+        <LeadConversionDialog lead={activeLead} open={isConversionOpen} onOpenChange={setIsConversionOpen} onConfirm={handleConfirmProtocol} lawyers={lawyers} commissionableStaff={commissionableStaff} />
 
         <Sheet open={isClientSheetOpen} onOpenChange={setIsClientSheetOpen}>
           <SheetContent className="sm:max-w-5xl w-full flex flex-col p-0 bg-[#020617] border-border overflow-hidden shadow-2xl">
