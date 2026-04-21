@@ -439,7 +439,20 @@ export default function Dashboard() {
     }
     return query(base, orderBy('createdAt', 'desc'), limit(300));
   }, [firestore, isRoleReady, role, currentStaffMember]);
-  const { data: processesData, isLoading: isLoadingProcesses, error: processesError } = useCollection<Process>(processesQuery);
+  const { data: rawProcessesData, isLoading: isLoadingProcesses, error: processesError } = useCollection<Process>(processesQuery);
+
+  const processesData = React.useMemo(() => {
+    if (!rawProcessesData) return null;
+    const seen = new Set<string>();
+    return rawProcessesData.filter(p => {
+      const key = p.processNumber 
+        ? `num-${p.processNumber.replace(/\D/g, '')}` 
+        : `name-${p.name}-${p.clientId || 'no-client'}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [rawProcessesData]);
 
   const hearingsQuery = useMemoFirebase(() => {
     if (!firestore || !isRoleReady) return null;
@@ -449,7 +462,18 @@ export default function Dashboard() {
     }
     return query(base, where('date', '>=', stableNow), orderBy('date', 'asc'), limit(5));
   }, [firestore, isRoleReady, role, currentStaffMember, stableNow]);
-  const { data: hearingsData, isLoading: isLoadingHearings, error: hearingsError } = useCollection<Hearing>(hearingsQuery);
+  const { data: rawHearingsData, isLoading: isLoadingHearings, error: hearingsError } = useCollection<Hearing>(hearingsQuery);
+
+  const hearingsData = React.useMemo(() => {
+    if (!rawHearingsData) return null;
+    const seen = new Set<string>();
+    return rawHearingsData.filter(h => {
+      const key = `${h.processId}-${h.type}-${h.date.seconds}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [rawHearingsData]);
 
   const deadlinesQuery = useMemoFirebase(() => {
     if (!firestore || !isRoleReady) return null;

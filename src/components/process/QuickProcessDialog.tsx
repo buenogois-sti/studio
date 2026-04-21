@@ -74,6 +74,7 @@ export function QuickProcessDialog({
   });
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    if (loading) return;
     setLoading(true);
     try {
       const processRef = await addDoc(collection(db, 'processes'), {

@@ -278,17 +278,17 @@ const ProcessCard = React.memo(({
 
             {/* Pilar 3: Operacional */}
             <div className="col-span-12 md:col-span-4 flex items-center justify-end gap-2 md:gap-4">
-              <Link href="/dashboard/audiencias" className={cn("flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all border border-transparent", processHearings.length > 0 ? "bg-amber-500/5 hover:bg-amber-500/10 hover:border-amber-500/20" : "opacity-20")}>
+              <Link href={processHearings.length > 0 ? `/dashboard/audiencias?detailsId=${processHearings[0].id}` : `/dashboard/audiencias?searchTerm=${encodeURIComponent(p.processNumber || p.name)}`} className={cn("flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all border border-transparent", processHearings.length > 0 ? "bg-amber-500/5 hover:bg-amber-500/10 hover:border-amber-500/20" : "opacity-20")}>
                 <CalendarIcon className="h-4 w-4 text-amber-400" />
                 <span className="text-[8px] font-black uppercase text-amber-500/70">{processHearings.length > 0 ? format(processHearings[0].date.toDate(), 'dd/MM/yy') : '---'}</span>
               </Link>
 
-              <Link href="/dashboard/financeiro" className={cn("flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all border border-transparent", processAgreement ? "bg-emerald-500/5 hover:bg-emerald-500/10 hover:border-emerald-500/20" : "opacity-20")}>
+              <Link href={`/dashboard/financeiro?searchTerm=${encodeURIComponent(p.processNumber || p.name)}`} className={cn("flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all border border-transparent", processAgreement ? "bg-emerald-500/5 hover:bg-emerald-500/10 hover:border-emerald-500/20" : "opacity-20")}>
                 <Handshake className="h-4 w-4 text-emerald-400" />
                 <span className="text-[8px] font-black uppercase text-emerald-500/70">{processAgreement ? 'Firmado' : '---'}</span>
               </Link>
 
-              <Link href="/dashboard/prazos" className="flex flex-col items-center gap-1 px-3 py-2 rounded-xl bg-rose-500/5 hover:bg-rose-500/10 transition-all border border-transparent hover:border-rose-500/20">
+              <Link href={`/dashboard/prazos?searchTerm=${encodeURIComponent(p.processNumber || p.name)}`} className="flex flex-col items-center gap-1 px-3 py-2 rounded-xl bg-rose-500/5 hover:bg-rose-500/10 transition-all border border-transparent hover:border-rose-500/20">
                 <Timer className="h-4 w-4 text-rose-400" />
                 <span className="text-[8px] font-black uppercase text-rose-500/70">Prazos</span>
               </Link>
@@ -447,7 +447,20 @@ export default function ProcessosPage() {
   const clientIdFilter = searchParams.get('clientId');
 
   const processesQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'processes'), orderBy('updatedAt', 'desc'), limit(100)) : null), [firestore]);
-  const { data: processesData, isLoading: isLoadingProcesses } = useCollection<Process>(processesQuery);
+  const { data: rawProcessesData, isLoading: isLoadingProcesses } = useCollection<Process>(processesQuery);
+
+  const processesData = React.useMemo(() => {
+    if (!rawProcessesData) return null;
+    const seen = new Set<string>();
+    return rawProcessesData.filter(p => {
+      const key = p.processNumber 
+        ? `num-${p.processNumber.replace(/\D/g, '')}` 
+        : `name-${p.name}-${p.clientId || 'no-client'}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [rawProcessesData]);
 
   const hearingsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'hearings'), limit(100)) : null), [firestore]);
   const { data: hearingsData } = useCollection<Hearing>(hearingsQuery);

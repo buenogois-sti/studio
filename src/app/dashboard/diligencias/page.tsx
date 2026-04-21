@@ -339,6 +339,15 @@ function DiligenceList({ data, isLoading, onReturn, onEdit, isProcessing, proces
                 <div className="min-w-0 space-y-1">
                   <div className="flex items-center gap-2">
                     <Badge variant="outline" className="text-[8px] font-black uppercase border-none px-1.5 h-4.5 bg-blue-500/10 text-blue-400">DILIGÊNCIA</Badge>
+                    {d.supportId && d.supportId !== 'none' && (
+                      <Badge variant="outline" className={cn(
+                        "text-[8px] font-black uppercase border-amber-500/20 text-amber-500 flex items-center gap-1",
+                        d.supportStatus === 'REALIZADA' && "bg-amber-500/10 border-amber-500 animate-pulse"
+                      )}>
+                        <Briefcase className="h-2.5 w-2.5" /> 
+                        {d.supportStatus === 'REALIZADA' ? `REVISAR: ${d.supportName}` : d.supportName}
+                      </Badge>
+                    )}
                     <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest flex items-center gap-1">
                       <Clock className="h-3 w-3" /> {format(d.date.toDate(), 'HH:mm')}
                     </span>

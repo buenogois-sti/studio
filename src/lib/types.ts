@@ -206,6 +206,10 @@ export type Hearing = {
   locationComplement?: string;
   locationObservations?: string;
   requiresLawyer?: boolean;
+  supportId?: string;
+  supportName?: string;
+  supportStatus?: 'PENDENTE' | 'REALIZADA' | 'REVISAO_SOLICITADA' | 'CONCLUIDA';
+  supportNotes?: string;
 };
 
 export type LegalDeadlineStatus = 'PENDENTE' | 'CUMPRIDO' | 'PERDIDO' | 'CANCELADO';

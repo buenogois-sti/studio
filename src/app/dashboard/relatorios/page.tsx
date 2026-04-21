@@ -63,9 +63,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { useSession } from 'next-auth/react';
 import type { Process, Client, FinancialTitle, Staff, LegalDeadline, Hearing, Lead, UserProfile, StaffCredit } from '@/lib/types';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { useRouter } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { MoreVertical, Eye } from 'lucide-react';
 
 const COLORS = ['#F5D030', '#3b82f6', '#10b981', '#f43f5e', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316'];
 
@@ -114,6 +117,8 @@ function StatCard({ title, value, subValue, icon: Icon, currency = false, color 
 
 
 const PortfolioTable = React.memo(({ data }: { data: any[] }) => {
+  const router = useRouter();
+  
   return (
     <Card className="bg-[#0f172a] border-white/5 shadow-2xl overflow-hidden mt-8">
       <CardHeader className="bg-white/5 border-b border-white/5 px-6 py-4">
@@ -137,6 +142,7 @@ const PortfolioTable = React.memo(({ data }: { data: any[] }) => {
                 <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-500 tracking-widest">Valor da Causa</th>
                 <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-500 tracking-widest">Retorno Office (Realizado)</th>
                 <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-500 tracking-widest">Status / Área</th>
+                <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-500 tracking-widest text-right">Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -183,6 +189,22 @@ const PortfolioTable = React.memo(({ data }: { data: any[] }) => {
                       </Badge>
                       <span className="text-[9px] font-black uppercase tracking-widest text-slate-500">{p.legalArea}</span>
                     </div>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="text-white/20 hover:text-white rounded-full bg-white/5">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="bg-[#0f172a] border-white/10 w-56 p-1">
+                        <DropdownMenuItem onClick={() => {
+                          if (p.clientId) router.push(`/dashboard/processos?clientId=${p.clientId}`);
+                        }} className="font-bold gap-2 text-white">
+                          <FolderKanban className="h-4 w-4 text-primary" /> Abrir no Gestor
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </td>
                 </tr>
               ))}
@@ -693,6 +715,7 @@ export default function RelatoriosPage() {
               financialReturn: totalReturned,
               status: p.status,
               legalArea: p.legalArea,
+              clientId: p.clientId,
               aging: differenceInDays(new Date(), p.createdAt instanceof Timestamp ? p.createdAt.toDate() : new Date())
             };
           })

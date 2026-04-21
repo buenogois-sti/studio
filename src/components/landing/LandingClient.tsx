@@ -389,7 +389,7 @@ export function LandingClient({ initialSettings, initialSeo }: { initialSettings
 
           <div className="pt-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-6">
             <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-              &copy; {new Date().getFullYear()} {currentSettings?.officeName || 'LexFlow Escritório de Advocacia'}
+              &copy; {new Date().getFullYear()} {currentSettings?.officeName || 'Bueno Gois Advogados Escritório de Advocacia'}
             </p>
             <div className="flex items-center gap-6">
               <Link href="/login" className="text-[9px] font-black uppercase tracking-widest text-slate-500 hover:text-primary transition-colors border border-white/10 px-3 py-1 rounded">Acesso Restrito</Link>

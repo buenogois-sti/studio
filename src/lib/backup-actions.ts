@@ -20,7 +20,7 @@ const COLLECTIONS_TO_BACKUP = [
 ];
 
 async function findOrCreateBackupFolder(drive: any): Promise<string> {
-    const folderName = 'LexFlow Backups';
+    const folderName = 'Bueno Gois Advogados Backups';
     try {
         // Busca a pasta de backup exclusivamente dentro do Shared Drive central
         const res = await drive.files.list({
@@ -75,7 +75,7 @@ export async function triggerManualBackup(): Promise<{ fileLink: string }> {
 
         const backupJsonString = JSON.stringify(backupData, null, 2);
         const timestamp = format(new Date(), 'yyyy-MM-dd_HH-mm-ss');
-        const fileName = `lexflow-backup-${timestamp}.json`;
+        const fileName = `Bueno Gois Advogados-backup-${timestamp}.json`;
 
         const { drive } = await getGoogleApiClientsForUser();
 

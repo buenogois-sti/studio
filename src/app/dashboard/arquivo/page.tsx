@@ -265,7 +265,7 @@ export default function ArquivoPage() {
                 </CardTitle>
                 <CardTitle>Arquivos Excluídos do Sistema</CardTitle>
                 <CardDescription>
-                  O LexFlow não apaga arquivos do Google Drive. Quando você exclui um registro no sistema, os documentos permanecem na pasta do cliente/processo no Drive.
+                  O Bueno Gois Advogados não apaga arquivos do Google Drive. Quando você exclui um registro no sistema, os documentos permanecem na pasta do cliente/processo no Drive.
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex justify-center pb-8">

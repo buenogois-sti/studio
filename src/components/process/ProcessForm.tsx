@@ -148,10 +148,11 @@ export function ProcessForm({ onSave, process }: ProcessFormProps) {
   }, [completedSteps, currentStep]);
 
   const onSubmit = useCallback(async (values: ProcessFormValues) => {
+    if (isSaving) return;
     setIsSaving(true);
     const success = await submitForm(values);
     if (!success) setIsSaving(false);
-  }, [submitForm]);
+  }, [submitForm, isSaving]);
 
   const STEPS = useMemo(() => [
     { id: 'clients', label: 'Autores' },

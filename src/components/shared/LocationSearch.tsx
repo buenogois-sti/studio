@@ -85,7 +85,7 @@ export function LocationSearch({ value, onSelect, onAddressDetail, placeholder =
             headers: {
               'Accept-Language': 'pt-BR',
               // Nominatim exige um User-Agent identificável para evitar bloqueios
-              'User-Agent': 'LexFlow-BuenoGois/1.0'
+              'User-Agent': 'Bueno Gois Advogados-BuenoGois/1.0'
             }
           }
         );

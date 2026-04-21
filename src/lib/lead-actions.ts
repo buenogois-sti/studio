@@ -360,7 +360,7 @@ export async function scheduleLeadInterview(leadId: string, data: {
       `📝 Notas da Triagem:`,
       `${data.notes || 'Sem observações adicionais.'}`,
       ``,
-      `🔗 Link LexFlow: ${BASE_URL}/dashboard/leads`,
+      `🔗 Link Bueno Gois Advogados: ${BASE_URL}/dashboard/leads`,
       `🔐 ID Interno: ${leadId}`
     ].join('\n');
 

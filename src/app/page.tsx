@@ -6,7 +6,7 @@ import { LandingClient } from '@/components/landing/LandingClient';
 
 export async function generateMetadata(): Promise<Metadata> {
   let seoData = {
-    title: "LexFlow | Gestão Jurídica de Elite",
+    title: "Bueno Gois Advogados | Gestão Jurídica de Elite",
     description: "Plataforma integrada de gestão jurídica com tecnologia de elite.",
     keywords: "advocacia, gestão jurídica, software jurídico"
   };
@@ -40,7 +40,7 @@ export async function generateMetadata(): Promise<Metadata> {
       type: 'website',
       locale: 'pt_BR',
       url: 'https://seusite.com.br',
-      siteName: 'LexFlow',
+      siteName: 'Bueno Gois Advogados',
     }
   };
 }

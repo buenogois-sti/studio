@@ -16,7 +16,14 @@ import { revalidatePath } from 'next/cache';
 import { createFinancialEventAndTitles } from './finance-actions';
 import { createLegalDeadline } from './deadline-actions';
 
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL?.replace(/\/$/, '') || 'http://localhost:9002';
+let rawBaseUrl = process.env.NEXT_PUBLIC_BASE_URL?.replace(/\/$/, '') || process.env.NEXTAUTH_URL?.replace(/\/$/, '') || 'https://www.buenogoisadvogado.com.br';
+if (rawBaseUrl.includes('/api/auth/callback/google')) {
+  rawBaseUrl = rawBaseUrl.replace('/api/auth/callback/google', '');
+}
+if (process.env.NODE_ENV === 'production' && rawBaseUrl.includes('localhost')) {
+  rawBaseUrl = 'https://www.buenogoisadvogado.com.br';
+}
+const BASE_URL = rawBaseUrl;
 
 /**
  * Utility to ensure a date string has the correct Brazil offset (-03:00)
@@ -74,7 +81,7 @@ function buildCalendarDescription(data: {
     typeLabel,
     data.isMeeting ? `Finalidade: ${data.legalArea}` : `Tipo: ${data.legalArea}`,
     ``,
-    `🔗 DAR RETORNO NO LEXFLOW (RELATÓRIO):`,
+    `🔗 DAR RETORNO NO Bueno Gois Advogados (RELATÓRIO):`,
     `${returnUrl}`,
     ``,
     `🔢 Número do Processo:`,
@@ -146,6 +153,10 @@ export async function createHearing(data: {
   locationComplement?: string;
   locationObservations?: string;
   requiresLawyer?: boolean;
+  supportId?: string;
+  supportName?: string;
+  supportStatus?: string;
+  supportNotes?: string;
 }) {
   if (!firestoreAdmin) {
     throw new Error('A conexão com o servidor de dados falhou.');
@@ -163,7 +174,8 @@ export async function createHearing(data: {
     courtBranch, responsibleParty, status, type, notes,
     meetingLink, meetingPassword,
     clientNotified, notificationMethod,
-    cep, locationName, locationNumber, locationComplement, locationObservations, requiresLawyer
+    cep, locationName, locationNumber, locationComplement, locationObservations, 
+    requiresLawyer, supportId, supportName, supportStatus, supportNotes
   } = data;
 
   try {
@@ -214,6 +226,10 @@ export async function createHearing(data: {
       locationComplement: locationComplement || '',
       locationObservations: locationObservations || '',
       requiresLawyer: !!requiresLawyer,
+      supportId: supportId || null,
+      supportName: supportName || null,
+      supportStatus: supportStatus || null,
+      supportNotes: supportNotes || null,
       createdAt: FieldValue.serverTimestamp(),
       hasFollowUp: false
     };
@@ -300,7 +316,7 @@ export async function createHearing(data: {
           tasklist: '@default',
           requestBody: {
             title: `📝 EMITIR RELATÓRIO: ${clientInfo.name}`,
-            notes: `O ato processual deve ter sido encerrado. Clique para preencher o retorno oficial no LexFlow: ${BASE_URL}/dashboard/audiencias?returnId=${hearingRef.id}`,
+            notes: `O ato processual deve ter sido encerrado. Clique para preencher o retorno oficial no Bueno Gois Advogados: ${BASE_URL}/dashboard/audiencias?returnId=${hearingRef.id}`,
             due: reportReminderTime.toISOString(),
           }
         });
@@ -511,6 +527,7 @@ export async function processHearingReturn(hearingId: string, data: {
   agreementValue?: number;
   agreementInstallments?: number;
   agreementFirstDueDate?: string;
+  approveSupport?: boolean;
 }) {
   if (!firestoreAdmin) throw new Error('Servidor indisponível.');
   const session = await getServerSession(authOptions);
@@ -519,26 +536,38 @@ export async function processHearingReturn(hearingId: string, data: {
   try {
     const hearingRef = firestoreAdmin.collection('hearings').doc(hearingId);
     const hearingSnap = await hearingRef.get();
-    const hearingData = hearingSnap.data();
+    const hearingData = hearingSnap.data() as Hearing;
     
     if (!hearingSnap.exists || !hearingData) throw new Error('Ato não encontrado.');
 
     const batch = firestoreAdmin.batch();
 
     // 1. Atualizar status do ato atual para REALIZADA
-    batch.update(hearingRef, {
+    const updatePayload: any = {
       status: 'REALIZADA',
       resultNotes: data.resultNotes,
       hasFollowUp: true,
       updatedAt: FieldValue.serverTimestamp()
-    });
+    };
+
+    // Fluxo de Apoio Operacional
+    if (hearingData.supportId && hearingData.supportId !== 'none') {
+      if (data.approveSupport) {
+        updatePayload.supportStatus = 'CONCLUIDA';
+      } else {
+        updatePayload.supportStatus = 'REALIZADA';
+      }
+    }
+
+    batch.update(hearingRef, updatePayload);
 
     // 2. Criar evento na timeline do processo
     const processRef = firestoreAdmin.collection('processes').doc(hearingData.processId);
+    const supportSnippet = hearingData.supportName ? ` (Apoio: ${hearingData.supportName}${data.approveSupport ? ' - Revisado' : ''})` : '';
     const timelineEvent: TimelineEvent = {
       id: uuidv4(),
       type: hearingData.type === 'PERICIA' ? 'pericia' : 'hearing',
-      description: `RESULTADO DO ATO (${hearingData.type}): ${data.resultNotes}${data.dateNotSet ? " | NOTA: Nova data não designada em ata, consultar autos posteriormente." : ""}`,
+      description: `RESULTADO DO ATO (${hearingData.type})${supportSnippet}: ${data.resultNotes}${data.dateNotSet ? " | NOTA: Nova data não designada em ata, consultar autos posteriormente." : ""}`,
       date: Timestamp.now() as any,
       authorName: session.user.name || 'Advogado'
     };
@@ -604,7 +633,7 @@ export async function processHearingReturn(hearingId: string, data: {
       const newHearingDateISO = `${data.newHearingDate}T${data.newHearingTime}`;
       await createHearing({
         processId: hearingData.processId,
-        processName: hearingData.processName,
+        processName: hearingData.processName || 'Processo',
         lawyerId: hearingData.lawyerId,
         hearingDate: newHearingDateISO,
         location: hearingData.location,

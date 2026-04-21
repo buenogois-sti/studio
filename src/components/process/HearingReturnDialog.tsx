@@ -66,6 +66,7 @@ const returnSchema = z.object({
   agreementValue: z.coerce.number().min(0).optional(),
   agreementInstallments: z.coerce.number().min(1).optional(),
   agreementFirstDueDate: z.string().optional(),
+  approveSupport: z.boolean().default(false),
 });
 
 interface HearingReturnDialogProps {
@@ -93,8 +94,28 @@ export function HearingReturnDialog({ hearing, open, onOpenChange, onSuccess }: 
       agreementValue: 0,
       agreementInstallments: 1,
       agreementFirstDueDate: '',
+      approveSupport: false,
     }
   });
+
+  React.useEffect(() => {
+    if (open && hearing) {
+      form.reset({
+        resultNotes: hearing.resultNotes || '',
+        nextStepType: 'Manifestação sobre documentos',
+        nextStepDeadline: '',
+        createLegalDeadline: false,
+        scheduleNewHearing: false,
+        newHearingType: 'UNA',
+        dateNotSet: false,
+        hasAgreement: false,
+        agreementValue: 0,
+        agreementInstallments: 1,
+        agreementFirstDueDate: '',
+        approveSupport: hearing.supportStatus === 'REALIZADA' || hearing.supportStatus === 'CONCLUIDA'
+      });
+    }
+  }, [open, hearing, form]);
 
   const onSubmit = async (values: z.infer<typeof returnSchema>) => {
     if (!hearing) return;
@@ -149,29 +170,133 @@ export function HearingReturnDialog({ hearing, open, onOpenChange, onSuccess }: 
           <Form {...form}>
             <form id="hearing-return-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-8 p-6">
               
+              {/* APOIO REVIEW SECTION */}
+              {hearing.supportId && hearing.supportId !== 'none' && (
+                <section className="p-6 rounded-3xl bg-amber-500/5 border border-amber-500/20 space-y-4 animate-in fade-in slide-in-from-top-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-xl bg-amber-500/20 flex items-center justify-center text-amber-500">
+                        <Briefcase className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-black uppercase text-white tracking-widest leading-none mb-1">Revisão de Trabalho de Apoio</h4>
+                        <p className="text-[10px] text-amber-500/70 font-bold uppercase italic">Realizado por: {hearing.supportName}</p>
+                      </div>
+                    </div>
+
+                    <FormField
+                      control={form.control}
+                      name="approveSupport"
+                      render={({ field }) => (
+                        <div className="flex items-center gap-3 bg-black/40 px-4 py-2 rounded-full border border-white/5">
+                          <Label htmlFor="approve-support" className="text-[10px] font-black text-slate-400 uppercase cursor-pointer">Validar Retorno?</Label>
+                          <FormControl>
+                            <Switch id="approve-support" checked={field.value} onCheckedChange={field.onChange} />
+                          </FormControl>
+                        </div>
+                      )}
+                    />
+                  </div>
+                  
+                  {hearing.supportNotes && (
+                    <div className="p-4 rounded-xl bg-black/20 border border-white/5 space-y-1">
+                      <p className="text-[9px] font-black uppercase text-slate-500">Instruções originais:</p>
+                      <p className="text-xs text-slate-300 italic">"{hearing.supportNotes}"</p>
+                    </div>
+                  )}
+                </section>
+              )}
+
               <section className="space-y-4">
                 <FormField
                   control={form.control}
                   name="resultNotes"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-2">
-                        <FileText className="h-3.5 w-3.5" /> {isDiligencia ? 'Relatório da Diligência *' : 'Síntese do Ato *'}
-                      </FormLabel>
-                      <FormControl>
-                        <Textarea 
-                          placeholder={isPericia 
-                            ? "O que foi analisado pelo perito? Houve concordância dos assistentes?" 
-                            : isDiligencia 
-                            ? "Descreva o que foi realizado, com quem falou e quais documentos obteve..."
-                            : "Resuma a ata, propostas de acordo, testemunhas ouvidas e ordens do juiz..."}
-                          className="min-h-[140px] bg-black/40 border-primary/40 border-2 rounded-xl resize-none text-sm leading-relaxed focus:border-primary transition-all placeholder:text-slate-600" 
-                          {...field} 
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                  render={({ field }) => {
+                    const [isRecording, setIsRecording] = React.useState(false);
+                    const recognitionRef = React.useRef<any>(null);
+
+                    const toggleRecording = (e: React.MouseEvent) => {
+                      e.preventDefault();
+                      if (isRecording) {
+                        recognitionRef.current?.stop();
+                        setIsRecording(false);
+                        return;
+                      }
+
+                      const val = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+                      if (!val) {
+                        toast({ variant: 'destructive', title: 'Erro', description: 'Seu navegador não suporta transcrição de áudio.' });
+                        return;
+                      }
+
+                      const recognition = new val();
+                      recognition.lang = 'pt-BR';
+                      recognition.continuous = true;
+                      recognition.interimResults = true;
+
+                      let currentVal = field.value || '';
+
+                      recognition.onresult = (event: any) => {
+                        let finalTranscript = '';
+                        for (let i = event.resultIndex; i < event.results.length; ++i) {
+                          if (event.results[i].isFinal) {
+                            finalTranscript += event.results[i][0].transcript + ' ';
+                          }
+                        }
+                        if (finalTranscript) {
+                          const newVal = currentVal + (currentVal && !currentVal.endsWith(' ') ? ' ' : '') + finalTranscript;
+                          field.onChange(newVal);
+                          currentVal = newVal;
+                        }
+                      };
+
+                      recognition.onerror = (event: any) => {
+                        console.error('Speech recognition error', event.error);
+                        setIsRecording(false);
+                      };
+
+                      recognition.onend = () => {
+                        setIsRecording(false);
+                      };
+
+                      recognition.start();
+                      recognitionRef.current = recognition;
+                      setIsRecording(true);
+                      toast({ title: 'Gravando...', description: 'Pode falar, o áudio será transcrito.' });
+                    };
+
+                    return (
+                      <FormItem>
+                        <div className="flex items-center justify-between">
+                          <FormLabel className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-2">
+                            <FileText className="h-3.5 w-3.5" /> {isDiligencia ? 'Relatório da Diligência *' : 'Síntese do Ato *'}
+                          </FormLabel>
+                          <Button 
+                            type="button" 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={toggleRecording}
+                            className={cn("h-7 text-[10px] font-bold gap-2", isRecording ? "bg-rose-500/20 text-rose-500 border-rose-500/30 hover:bg-rose-500/30" : "bg-primary/10 text-primary border-primary/20 hover:bg-primary/20")}
+                          >
+                            <span className={cn("h-2 w-2 rounded-full", isRecording ? "bg-rose-500 animate-pulse" : "bg-primary")} />
+                            {isRecording ? 'Parar Gravação' : 'Ditar Relatório'}
+                          </Button>
+                        </div>
+                        <FormControl>
+                          <Textarea 
+                            placeholder={isPericia 
+                              ? "O que foi analisado pelo perito? Houve concordância dos assistentes?" 
+                              : isDiligencia 
+                              ? "Descreva o que foi realizado, com quem falou e quais documentos obteve..."
+                              : "Resuma a ata, propostas de acordo, testemunhas ouvidas e ordens do juiz..."}
+                            className="min-h-[140px] bg-black/40 border-primary/40 border-2 rounded-xl resize-none text-sm leading-relaxed focus:border-primary transition-all placeholder:text-slate-600" 
+                            {...field} 
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
                 />
               </section>
 
@@ -279,7 +404,7 @@ export function HearingReturnDialog({ hearing, open, onOpenChange, onSuccess }: 
                                 {field.value && <CheckCircle2 className="h-3.5 w-3.5 text-primary-foreground stroke-[3]" />}
                               </div>
                             </FormControl>
-                            <Label className="text-xs font-bold text-slate-200 cursor-pointer" onClick={() => field.onChange(!field.value)}>Lançar Prazo Fatal</Label>
+                            <Label className="text-xs font-bold text-slate-200 cursor-pointer" onClick={() => field.onChange(!field.value)}>Lançar Prazo Fatal ou Diligência</Label>
                           </FormItem>
                         )}
                       />
@@ -305,16 +430,53 @@ export function HearingReturnDialog({ hearing, open, onOpenChange, onSuccess }: 
                       />
                     </div>
 
-                    <FormField
-                      control={form.control}
-                      name="nextStepDeadline"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-[9px] font-black uppercase text-slate-500 tracking-tighter">Data p/ Próxima Ação</FormLabel>
-                          <FormControl><Input type="date" className="h-11 bg-black/40 border-white/10 font-bold" {...field} /></FormControl>
-                        </FormItem>
+                    <div className="space-y-4">
+                      {form.watch('createLegalDeadline') && (
+                        <FormField
+                          control={form.control}
+                          name="nextStepType"
+                          render={({ field }) => (
+                            <FormItem className="animate-in fade-in zoom-in duration-300">
+                              <FormLabel className="text-[9px] font-black uppercase text-primary tracking-tighter">Tipo do Prazo / Diligência</FormLabel>
+                              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <FormControl>
+                                  <SelectTrigger className="h-11 bg-black/40 border-primary/30 text-white font-bold">
+                                    <SelectValue placeholder="Selecione o tipo..." />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent className="bg-[#0f172a] text-white">
+                                  <SelectItem value="Manifestação sobre documentos">Manifestação sobre Documentos</SelectItem>
+                                  <SelectItem value="Contestação">Contestação / Defesa</SelectItem>
+                                  <SelectItem value="Réplica">Réplica / Impugnação</SelectItem>
+                                  <SelectItem value="Alegações Finais">Alegações Finais</SelectItem>
+                                  <SelectItem value="Recurso Ordinário / Apelação">Recurso Ordinário / Apelação</SelectItem>
+                                  <SelectItem value="Contrarrazões">Contrarrazões</SelectItem>
+                                  <SelectItem value="Embargos de Declaração">Embargos de Declaração</SelectItem>
+                                  <SelectItem value="Cumprimento de Sentença">Cumprimento de Sentença</SelectItem>
+                                  <SelectItem value="Apresentação de Cálculos">Apresentação de Cálculos</SelectItem>
+                                  <SelectItem value="Impugnação aos Cálculos">Impugnação aos Cálculos</SelectItem>
+                                  <SelectItem value="Diligência Externa">Diligência Externa</SelectItem>
+                                  <SelectItem value="Busca de Documentos (Cliente)">Busca de Documentos (Cliente)</SelectItem>
+                                  <SelectItem value="Pagamento / Guias">Pagamento / Guias</SelectItem>
+                                  <SelectItem value="Outro">Outro Prazo Específico</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </FormItem>
+                          )}
+                        />
                       )}
-                    />
+                      
+                      <FormField
+                        control={form.control}
+                        name="nextStepDeadline"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-[9px] font-black uppercase text-slate-500 tracking-tighter">Data p/ Próxima Ação</FormLabel>
+                            <FormControl><Input type="date" className="h-11 bg-black/40 border-white/10 font-bold" {...field} /></FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
                   </div>
 
                   {showNewHearingFields && (

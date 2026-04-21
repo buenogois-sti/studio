@@ -437,7 +437,7 @@ function IntegrationsTab() {
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Como Funciona a Integração</AlertTitle>
             <AlertDescription className="text-xs">
-                Sua conta do Google é conectada quando você faz login. Isso permite que o LexFlow gerencie pastas e arquivos no seu Google Drive em seu nome, de forma segura.
+                Sua conta do Google é conectada quando você faz login. Isso permite que o Bueno Gois Advogados gerencie pastas e arquivos no seu Google Drive em seu nome, de forma segura.
             </AlertDescription>
             </Alert>
             <Card className="bg-black/20 border-white/5">
@@ -873,7 +873,7 @@ function LicenseTab() {
                 <CardHeader>
                     <div className="flex items-center gap-3 text-primary mb-2">
                         <ShieldCheck className="h-6 w-6" />
-                        <CardTitle className="text-white text-xl font-headline font-bold">Licenciamento LexFlow Elite</CardTitle>
+                        <CardTitle className="text-white text-xl font-headline font-bold">Licenciamento Bueno Gois Advogados Elite</CardTitle>
                     </div>
                     <CardDescription className="text-slate-400 max-w-xl">Informações sobre o contrato de uso, suporte e manutenção da plataforma para o escritório Bueno Gois.</CardDescription>
                 </CardHeader>

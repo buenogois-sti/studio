@@ -73,7 +73,7 @@ export function LGPDGuard({ children }: { children: React.ReactNode }) {
             <div className="space-y-6 text-sm leading-relaxed text-slate-300">
               <div className="flex items-start gap-3 p-4 rounded-xl bg-white/5 border border-white/10">
                 <Lock className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                <p>O <strong>LexFlow</strong> processa informações de alto sigilo profissional. Ao acessar esta plataforma, você concorda com as diretrizes da Lei Geral de Proteção de Dados (Lei nº 13.709/2018).</p>
+                <p>O <strong>Bueno Gois Advogados</strong> processa informações de alto sigilo profissional. Ao acessar esta plataforma, você concorda com as diretrizes da Lei Geral de Proteção de Dados (Lei nº 13.709/2018).</p>
               </div>
 
               <div className="space-y-4">

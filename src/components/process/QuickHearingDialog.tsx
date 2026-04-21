@@ -24,7 +24,8 @@ import {
   X,
   Video,
   Key,
-  Edit
+  Edit,
+  Briefcase
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -59,6 +60,10 @@ const hearingSchema = z.object({
   notificationMethod: z.enum(['whatsapp', 'email', 'phone', 'personal', 'court', 'other']).optional(),
   cep: z.string().optional(),
   locationObservations: z.string().optional(),
+  supportId: z.string().optional().or(z.literal('none')),
+  supportName: z.string().optional(),
+  supportStatus: z.enum(['PENDENTE', 'REALIZADA', 'REVISAO_SOLICITADA', 'CONCLUIDA']).optional(),
+  supportNotes: z.string().optional()
 });
 
 interface QuickHearingDialogProps {
@@ -99,6 +104,8 @@ export function QuickHearingDialog({ process, hearing, open, onOpenChange, onSuc
       notificationMethod: 'whatsapp',
       cep: '',
       locationObservations: '',
+      supportId: 'none',
+      supportStatus: 'PENDENTE'
     }
   });
 
@@ -121,6 +128,10 @@ export function QuickHearingDialog({ process, hearing, open, onOpenChange, onSuc
           notificationMethod: hearing.notificationMethod || 'whatsapp',
           cep: hearing.cep || '',
           locationObservations: hearing.locationObservations || '',
+          supportId: hearing.supportId || 'none',
+          supportName: hearing.supportName || '',
+          supportStatus: hearing.supportStatus || 'PENDENTE',
+          supportNotes: hearing.supportNotes || ''
         });
 
         if (hearing.processId && firestore) {
@@ -259,6 +270,7 @@ export function QuickHearingDialog({ process, hearing, open, onOpenChange, onSuc
   };
 
   const onSubmit = async (values: z.infer<typeof hearingSchema>) => {
+    if (isSaving) return;
     const targetProcess = process || processData || { id: hearing?.processId || '', name: hearing?.processName || '' };
     if (!targetProcess.id) return;
 
@@ -271,7 +283,7 @@ export function QuickHearingDialog({ process, hearing, open, onOpenChange, onSuc
           ...values,
           date: hearingDateTimeStr as any
         });
-        toast({ title: 'Alterações Salvas!', description: 'O compromisso foi atualizado no LexFlow e no Calendar.' });
+        toast({ title: 'Alterações Salvas!', description: 'O compromisso foi atualizado no Bueno Gois Advogados e no Calendar.' });
       } else {
         await createHearing({
           ...values,
@@ -360,10 +372,95 @@ export function QuickHearingDialog({ process, hearing, open, onOpenChange, onSuc
                             <SelectItem value="INSTRUCAO">Instrução</SelectItem>
                             <SelectItem value="JULGAMENTO">Sentença/Julgamento</SelectItem>
                             <SelectItem value="ATENDIMENTO">Atendimento / Reunião</SelectItem>
+                            <SelectItem value="DILIGENCIA">Diligência / Apoio Externo</SelectItem>
+                            <SelectItem value="PERICIA">Perícia Judicial</SelectItem>
                             <SelectItem value="OUTRA">Outra</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="p-6 rounded-3xl bg-amber-500/5 border border-amber-500/20 space-y-6">
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-lg bg-amber-500/20 flex items-center justify-center text-amber-500">
+                      <Briefcase className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-black uppercase text-white tracking-widest">Apoio Operacional</h4>
+                      <p className="text-[10px] text-amber-500/70 font-bold uppercase">Escalar estagiário, staff ou outro advogado para apoio</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <FormField
+                      control={form.control}
+                      name="supportId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Colaborador de Apoio</FormLabel>
+                          <Select 
+                            onValueChange={(val) => {
+                              field.onChange(val);
+                              const staff = staffData?.find(s => s.id === val);
+                              if (staff) form.setValue('supportName', `${staff.firstName} ${staff.lastName}`);
+                              else form.setValue('supportName', '');
+                            }} 
+                            value={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger className="h-12 bg-black/40 border-white/10">
+                                <SelectValue placeholder="Nenhum apoio (Opcional)" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent className="bg-[#0f172a] border-white/10 text-white">
+                              <SelectItem value="none">Sem Apoio</SelectItem>
+                              {staffData?.map(s => (
+                                <SelectItem key={s.id} value={s.id} className="font-bold">
+                                  {s.firstName} {s.lastName} ({s.role === 'intern' ? 'Estagiário' : s.role === 'employee' ? 'Staff' : 'Advogado'})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="supportStatus"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Status do Apoio</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger className="h-12 bg-black/40 border-white/10">
+                                <SelectValue placeholder="Status..." />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent className="bg-[#0f172a] border-white/10 text-white">
+                              <SelectItem value="PENDENTE">Aguardando Início</SelectItem>
+                              <SelectItem value="REALIZADA">Ato Realizado (P/ Revisão)</SelectItem>
+                              <SelectItem value="REVISAO_SOLICITADA">Revisão Solicitada</SelectItem>
+                              <SelectItem value="CONCLUIDA">Aprovado pelo Advogado</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <FormField
+                    control={form.control}
+                    name="supportNotes"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Instruções para o Apoio</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Ex: Fazer protocolo, extrair cópias, colher assinatura..." className="h-11 bg-black/40 border-white/10 italic" {...field} />
+                        </FormControl>
                       </FormItem>
                     )}
                   />

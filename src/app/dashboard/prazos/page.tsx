@@ -24,7 +24,7 @@ import {
   RefreshCw,
   Zap
 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useFirebase, useCollection, useMemoFirebase, useDoc } from '@/firebase';
 import { collection, query, orderBy, Timestamp, where, doc } from 'firebase/firestore';
 import type { LegalDeadline, Process, LegalDeadlineStatus, UserProfile } from '@/lib/types';
@@ -56,7 +56,9 @@ export default function PrazosPage() {
   const { firestore, isUserLoading, user } = useFirebase();
   const { toast } = useToast();
   const router = useRouter();
-  const [searchTerm, setSearchTerm] = React.useState('');
+  const searchParams = useSearchParams();
+  const initialSearch = searchParams.get('searchTerm') || '';
+  const [searchTerm, setSearchTerm] = React.useState(initialSearch);
   const [isProcessing, setIsProcessing] = React.useState<string | null>(null);
   
   const [selectedDeadlineDetails, setSelectedDeadlineDetails] = React.useState<LegalDeadline | null>(null);

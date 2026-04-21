@@ -82,7 +82,7 @@ function buildDeadlineCalendarDescription(data: {
     `💡 Observações Estratégicas`,
     `${data.observations || 'Nenhuma observação registrada.'}`,
     ``,
-    `🔔 Alertas configurados no sistema LexFlow`,
+    `🔔 Alertas configurados no sistema Bueno Gois Advogados`,
     ``,
     `🔐 ID Interno: ${data.id}`
   ].join('\n');

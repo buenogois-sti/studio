@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { z } from 'zod';
 import { useToast } from '@/components/ui/use-toast';
 import { useFirebase } from '@/firebase';
@@ -173,8 +173,11 @@ export const useProcessForm = (process?: Process | null, onSave?: () => void) =>
     return clean;
   };
 
+  const isSubmitting = useRef(false);
+
   const submitForm = useCallback(async (values: ProcessFormValues) => {
-    if (!firestore) return false;
+    if (!firestore || isSubmitting.current) return false;
+    isSubmitting.current = true;
 
     try {
       let savedProcessId = process?.id;
@@ -271,6 +274,8 @@ export const useProcessForm = (process?: Process | null, onSave?: () => void) =>
         description: error.message || 'Não foi possível salvar os dados do processo.',
       });
       return false;
+    } finally {
+      isSubmitting.current = false;
     }
   }, [firestore, process, toast, onSave, clearDraft]);
 
