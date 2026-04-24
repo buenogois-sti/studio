@@ -52,6 +52,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectSeparator } from '@/components/ui/select';
 
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, doc, deleteDoc, query, limit, orderBy, updateDoc, arrayUnion, Timestamp } from 'firebase/firestore';
@@ -439,6 +440,7 @@ export default function ProcessosPage() {
   const [isArchiving, setIsArchiving] = React.useState(false);
   const [activeAreaTab, setActiveAreaTab] = React.useState('Todos');
   const [viewMode, setViewMode] = React.useState<'list' | 'card'>('list');
+  const [selectedLawyerId, setSelectedLawyerId] = React.useState<string>('all');
 
   const { firestore, isUserLoading } = useFirebase();
   const { data: session } = useSession();
@@ -532,8 +534,17 @@ export default function ProcessosPage() {
     if (clientIdFilter) result = result.filter(p => p.clientId === clientIdFilter);
     if (activeAreaTab !== 'Todos') result = result.filter(p => p.legalArea === activeAreaTab);
     
+    // Filtro por Advogado
+    if (selectedLawyerId !== 'all') {
+      result = result.filter(p => 
+        p.leadLawyerId === selectedLawyerId || 
+        (p.responsibleStaffIds && p.responsibleStaffIds.includes(selectedLawyerId)) ||
+        (p.teamParticipants && p.teamParticipants.some(tp => tp.staffId === selectedLawyerId))
+      );
+    }
+    
     return result;
-  }, [processesData, searchResults, clientIdFilter, activeAreaTab]);
+  }, [processesData, searchResults, clientIdFilter, activeAreaTab, selectedLawyerId]);
 
   const totalPages = Math.max(1, Math.ceil(filteredProcesses.length / ITEMS_PER_PAGE));
   const paginatedProcesses = React.useMemo(() => {
@@ -672,15 +683,35 @@ export default function ProcessosPage() {
             </Button>
           </div>
 
-          <div className="relative w-full max-sm:w-full max-w-sm">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input 
-              placeholder="Pesquisar..." 
-              className="pl-8 pr-8 bg-[#0f172a] border-border/50 text-white h-10" 
-              value={searchTerm} 
-              onChange={e => setSearchTerm(e.target.value)} 
-            />
-            {isSearching && <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-primary" />}
+          <div className="flex items-center gap-2">
+            <Select value={selectedLawyerId} onValueChange={setSelectedLawyerId}>
+              <SelectTrigger className="w-[180px] bg-[#0f172a] border-white/5 text-white h-10 text-xs font-bold">
+                 <div className="flex items-center gap-2">
+                   <UserCheck className="h-3.5 w-3.5 text-primary" />
+                   <SelectValue placeholder="Filtrar por Advogado" />
+                 </div>
+              </SelectTrigger>
+              <SelectContent className="bg-[#0f172a] border-white/10 text-white">
+                <SelectItem value="all" className="font-bold">🌍 Todos os Advogados</SelectItem>
+                <SelectSeparator className="bg-white/5" />
+                {staffData?.filter(s => s.role === 'lawyer' || s.role === 'partner').map(s => (
+                  <SelectItem key={s.id} value={s.id} className="text-xs">
+                    ⚖️ {s.firstName} {s.lastName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <div className="relative w-full max-sm:w-full max-w-sm">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input 
+                placeholder="Pesquisar..." 
+                className="pl-8 pr-8 bg-[#0f172a] border-border/50 text-white h-10" 
+                value={searchTerm} 
+                onChange={e => setSearchTerm(e.target.value)} 
+              />
+              {isSearching && <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-primary" />}
+            </div>
           </div>
           <Button size="sm" className="bg-primary text-primary-foreground h-10 px-6 font-bold shadow-lg shadow-primary/20" onClick={() => { setEditingProcess(null); setIsSheetOpen(true); }} disabled={isLoading}>
               <PlusCircle className="mr-2 h-4 w-4" /> Novo Processo

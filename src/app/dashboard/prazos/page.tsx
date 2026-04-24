@@ -22,7 +22,8 @@ import {
   RotateCcw,
   Info,
   RefreshCw,
-  Zap
+  Zap,
+  UserCheck
 } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useFirebase, useCollection, useMemoFirebase, useDoc } from '@/firebase';
@@ -35,6 +36,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/use-toast';
+import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { format, formatDistanceToNow, isBefore, isToday, differenceInDays, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -60,6 +62,7 @@ export default function PrazosPage() {
   const initialSearch = searchParams.get('searchTerm') || '';
   const [searchTerm, setSearchTerm] = React.useState(initialSearch);
   const [isProcessing, setIsProcessing] = React.useState<string | null>(null);
+  const [selectedLawyerId, setSelectedLawyerId] = React.useState<string>('all');
   
   const [selectedDeadlineDetails, setSelectedDeadlineDetails] = React.useState<LegalDeadline | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = React.useState(false);
@@ -89,9 +92,19 @@ export default function PrazosPage() {
   const { data: processesData } = useCollection<Process>(processesQuery);
   const processesMap = React.useMemo(() => new Map(processesData?.map(p => [p.id, p])), [processesData]);
 
+  const staffQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'users') : null), [firestore]);
+  const { data: staffData } = useCollection<UserProfile>(staffQuery);
+
   const filteredDeadlines = React.useMemo(() => {
     if (!deadlinesData) return [];
-    return deadlinesData.filter(d => {
+    let result = deadlinesData;
+
+    // Filtro por Advogado
+    if (selectedLawyerId !== 'all') {
+      result = result.filter(d => d.authorId === selectedLawyerId);
+    }
+
+    return result.filter(d => {
       const process = processesMap.get(d.processId);
       const matchesSearch = 
         d.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -99,7 +112,7 @@ export default function PrazosPage() {
         process?.processNumber?.includes(searchTerm);
       return matchesSearch;
     });
-  }, [deadlinesData, searchTerm, processesMap]);
+  }, [deadlinesData, searchTerm, processesMap, selectedLawyerId]);
 
   const pendentes = React.useMemo(() => filteredDeadlines.filter(d => d.status === 'PENDENTE'), [filteredDeadlines]);
   const cumpridos = React.useMemo(() => filteredDeadlines.filter(d => d.status === 'CUMPRIDO'), [filteredDeadlines]);
@@ -226,19 +239,42 @@ export default function PrazosPage() {
             {userProfile?.role === 'lawyer' ? 'Seus compromissos processuais fatais.' : 'Controle global de obrigações do escritório.'}
           </p>
         </div>
-        <div className="relative w-full max-sm:w-full max-w-sm">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input 
-            placeholder="Pesquisar por processo ou tipo..." 
-            className="pl-8 pr-8 bg-card border-border/50 text-white" 
-            value={searchTerm} 
-            onChange={(e) => setSearchTerm(e.target.value)} 
-          />
-          {searchTerm && (
-            <button onClick={() => setSearchTerm('')} className="absolute right-2.5 top-2.5 text-white/50">
-              <X className="h-4 w-4" />
-            </button>
-          )}
+        <div className="flex items-center gap-2">
+          {userProfile?.role === 'admin' || userProfile?.role === 'assistant' ? (
+            <Select value={selectedLawyerId} onValueChange={setSelectedLawyerId}>
+              <SelectTrigger className="w-[180px] bg-[#0f172a] border-white/5 text-white h-10 text-xs font-bold ring-1 ring-white/5">
+                 <div className="flex items-center gap-2">
+                   <UserCheck className="h-3.5 w-3.5 text-primary" />
+                   <SelectValue placeholder="Filtrar por Advogado" />
+                 </div>
+              </SelectTrigger>
+              <SelectContent className="bg-[#0f172a] border-white/10 text-white">
+                <SelectItem value="all" className="font-bold">🌍 Todos os Advogados</SelectItem>
+                <SelectSeparator className="bg-white/5" />
+                {staffData?.filter(s => s.role === 'lawyer' || s.role === 'admin').map(s => (
+                  <SelectItem key={s.id} value={s.id} className="text-xs">
+                    ⚖️ {s.firstName} {s.lastName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : null}
+
+          <div className="relative w-full max-sm:w-full max-w-sm">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input 
+              placeholder="Pesquisar por processo ou tipo..." 
+              className="pl-8 pr-8 bg-card border-border/50 text-white h-10" 
+              value={searchTerm} 
+              onChange={(e) => setSearchTerm(e.target.value)} 
+            />
+            {searchTerm && (
+              <button onClick={() => setSearchTerm('')} className="absolute right-8 top-2.5 text-white/50">
+                <X className="h-4 w-4" />
+              </button>
+            )}
+            {isLoading && <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-primary" />}
+          </div>
         </div>
       </div>
 

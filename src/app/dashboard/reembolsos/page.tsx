@@ -54,6 +54,8 @@ const reimbursementFormSchema = z.object({
   description: z.string().min(3, 'A descrição deve ter pelo menos 3 caracteres.'),
   value: z.coerce.number().positive('O valor deve ser positivo.'),
   requestDate: z.string().min(1, 'A data é obrigatória.'),
+  category: z.string().min(1, 'Selecione uma categoria.'),
+  paymentMethod: z.string().min(1, 'Selecione a forma de pagamento.'),
   userId: z.string().optional(),
   processId: z.string().optional(),
 });
@@ -95,6 +97,8 @@ function NewReimbursementDialog({
       description: '',
       value: 0,
       requestDate: format(new Date(), 'yyyy-MM-dd'),
+      category: 'OUTROS',
+      paymentMethod: 'PIX',
       userId: currentUserId || undefined,
       processId: '',
     }
@@ -261,13 +265,64 @@ function NewReimbursementDialog({
                 )}
               </div>
 
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="category"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-white font-bold text-[10px] uppercase tracking-widest text-slate-500">Categoria</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger className="bg-black/40 border-white/10 text-white h-11">
+                            <SelectValue placeholder="Categoria" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent className="bg-[#1e293b] border-white/10 text-white">
+                          <SelectItem value="COPIA">📂 Cópias / Xerox</SelectItem>
+                          <SelectItem value="VIAGEM">🚗 Viagem / Combustível</SelectItem>
+                          <SelectItem value="ALIMENTACAO">🍴 Alimentação</SelectItem>
+                          <SelectItem value="CUSTAS">⚖️ Custas Judiciais</SelectItem>
+                          <SelectItem value="CORRESPONDENCIA">📩 Correios / Sedex</SelectItem>
+                          <SelectItem value="OUTROS">✨ Outros</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="paymentMethod"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-white font-bold text-[10px] uppercase tracking-widest text-slate-500">Pago via</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger className="bg-black/40 border-white/10 text-white h-11">
+                            <SelectValue placeholder="Forma" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent className="bg-[#1e293b] border-white/10 text-white">
+                          <SelectItem value="DINHEIRO">💵 Dinheiro</SelectItem>
+                          <SelectItem value="CARTAO">💳 Cartão (Débito/Crédito)</SelectItem>
+                          <SelectItem value="PIX">🌀 PIX</SelectItem>
+                          <SelectItem value="OUTRO">⚪ Outro</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
               <FormField
                 control={form.control}
                 name="description"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-white">Descrição da Despesa *</FormLabel>
-                    <FormControl><Input className="bg-black/40 border-white/10 text-white" placeholder="Ex: Cópias de Processo - Fórum SBC" {...field} /></FormControl>
+                    <FormLabel className="text-white font-bold text-[10px] uppercase tracking-widest text-slate-500">Descrição da Despesa *</FormLabel>
+                    <FormControl><Input className="bg-black/40 border-white/10 text-white h-11" placeholder="Ex: Cópias de Processo - Fórum SBC" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -278,12 +333,12 @@ function NewReimbursementDialog({
                   name="value"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-white">Valor (R$) *</FormLabel>
+                      <FormLabel className="text-white font-bold text-[10px] uppercase tracking-widest text-slate-500">Valor (R$) *</FormLabel>
                       <FormControl>
                         <div className="relative">
                           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-bold">R$</span>
                           <Input 
-                            className="bg-black/40 border-white/10 pl-9 text-white" 
+                            className="bg-black/40 border-white/10 pl-9 text-white h-11 font-mono text-lg" 
                             type="text"
                             value={formatCurrencyValue(field.value)}
                             onChange={(e) => handleValueChange(e, field.onChange)}
@@ -299,8 +354,8 @@ function NewReimbursementDialog({
                   name="requestDate"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-white">Data da Despesa *</FormLabel>
-                      <FormControl><Input className="bg-black/40 border-white/10 text-white" type="date" {...field} /></FormControl>
+                      <FormLabel className="text-white font-bold text-[10px] uppercase tracking-widest text-slate-500">Data da Despesa *</FormLabel>
+                      <FormControl><Input className="bg-black/40 border-white/10 text-white h-11" type="date" {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -611,18 +666,32 @@ function ReimbursementTable({
                 )}
                 <TableCell>
                   <div className="flex flex-col">
-                    <span className="font-bold text-sm text-white">{r.description}</span>
+                    <div className="flex items-center gap-2 mb-1">
+                       <span className="font-bold text-sm text-white">{r.description}</span>
+                       {r.category && (
+                         <Badge variant="outline" className="text-[8px] font-black uppercase py-0 px-1.5 border-white/10 bg-white/5 text-slate-400">
+                           {r.category}
+                         </Badge>
+                       )}
+                    </div>
                     {r.processName && (
-                      <div className="flex items-center gap-1.5 mt-1 text-primary">
+                      <div className="flex items-center gap-1.5 text-primary">
                         <Gavel className="h-3 w-3" />
                         <span className="text-[10px] font-black uppercase tracking-tighter truncate max-w-[200px]">
                           {r.processName}
                         </span>
                       </div>
                     )}
-                    <span className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
-                      <History className="h-3 w-3" /> Criado em {r.createdAt && typeof r.createdAt !== 'string' ? format(r.createdAt.toDate(), "dd/MM/yy") : 'Recente'}
-                    </span>
+                    <div className="flex items-center gap-3 mt-1">
+                       <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                         <History className="h-3 w-3" /> Criado em {r.createdAt && typeof r.createdAt !== 'string' ? format(r.createdAt.toDate(), "dd/MM/yy") : 'Recente'}
+                       </span>
+                       {r.paymentMethod && (
+                         <span className="text-[10px] text-emerald-500/70 font-bold flex items-center gap-1">
+                            <DollarSign className="h-3 w-3" /> {r.paymentMethod}
+                         </span>
+                       )}
+                    </div>
                   </div>
                 </TableCell>
                 <TableCell className="text-sm text-slate-300">

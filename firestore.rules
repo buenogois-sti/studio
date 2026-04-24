@@ -164,11 +164,11 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
     
-    // Monitoramento de Diários Oficiais / Central de Intimações AASP
-    match /intimacoes/{intimacaoId} {
-      allow read: if isAuthenticated(); // <-- Qualquer usuário com Auth válido
-      allow write: if isOneOfRoles(['admin', 'lawyer', 'assistant']);
-      allow delete: if isAdmin();
+    // Monitoramento de Diários Oficiais / Central de Intimações AASP (Suporte a múltiplas filas/advogados)
+    match /{collectionId}/{docId} {
+      allow read: if collectionId.matches('intimacoes.*') && isAuthenticated();
+      allow write: if collectionId.matches('intimacoes.*') && isOneOfRoles(['admin', 'lawyer', 'assistant']);
+      allow delete: if collectionId.matches('intimacoes.*') && isAdmin();
     }
   }
 }

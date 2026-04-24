@@ -21,7 +21,12 @@ import {
   FolderOpen,
   UserMinus,
   ArrowUpRight,
-  RefreshCw
+  RefreshCw,
+  TrendingUp,
+  UserPlus,
+  Users,
+  AlertCircle,
+  Clock
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
@@ -176,6 +181,19 @@ export default function ClientsPage() {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
+  const stats = React.useMemo(() => {
+    if (!clientsData) return { total: 0, leads: 0, incomplete: 0, growth: 0 };
+    const total = clientsData.length;
+    const leads = clientsData.filter(c => c.status === 'lead').length;
+    const incomplete = clientsData.filter(c => {
+      const integrity = 0; // Calculado no Render, mas vamos estimar aqui
+      const commonFields = [c.firstName, c.document, c.email, c.mobile];
+      const filled = commonFields.filter(f => !!f).length;
+      return (filled / commonFields.length) < 0.7;
+    }).length;
+    return { total, leads, incomplete, growth: 12 }; // Growth fixo como exemplo UI
+  }, [clientsData]);
+
   const filteredClients = React.useMemo(() => {
     let result = searchResults || clientsData || [];
     if (statusFilter !== 'all') result = result.filter(c => c.status === statusFilter);
@@ -216,38 +234,122 @@ export default function ClientsPage() {
   const isLoading = isLoadingClients || isSearching;
 
   return (
-    <div className="grid flex-1 items-start gap-6 auto-rows-max animate-in fade-in duration-500">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="grid flex-1 items-start gap-6 auto-rows-max animate-in fade-in duration-500 pb-10">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-2">
         <div>
-          <h1 className="text-3xl font-black tracking-tight font-headline text-white">Clientes</h1>
-          <p className="text-sm text-muted-foreground">Gestão estratégica de contatos Bueno Gois.</p>
+          <h1 className="text-4xl font-black tracking-tight font-headline text-white flex items-center gap-3">
+            <Users className="h-10 w-10 text-primary" />
+            Clientes
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">Gestão estratégica e análise de integridade da base Bueno Gois.</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center bg-[#0f172a] border border-border/50 rounded-xl p-1 mr-2 shadow-inner">
+        
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center bg-[#0f172a] p-1 rounded-xl border border-white/5 h-12 gap-1">
             <Button 
-              variant={viewMode === 'grid' ? 'secondary' : 'ghost'} 
-              size="sm" 
-              onClick={() => setViewMode('grid')}
-              className={cn("h-8 w-10 px-0 rounded-lg", viewMode === 'grid' ? "bg-primary text-primary-foreground shadow-lg" : "text-slate-500 hover:text-white")}
+                variant={viewMode === 'grid' ? 'secondary' : 'ghost'} 
+                size="sm" 
+                onClick={() => setViewMode('grid')} 
+                className={cn("h-full px-3 shadow-none transition-all rounded-lg", viewMode === 'grid' ? 'bg-primary/20 text-primary hover:bg-primary/30 border border-primary/20' : 'text-slate-500 hover:text-white')}
             >
-              <LayoutGrid className="h-4 w-4" />
+                <LayoutGrid className="w-4 h-4" />
             </Button>
             <Button 
-              variant={viewMode === 'table' ? 'secondary' : 'ghost'} 
-              size="sm" 
-              onClick={() => setViewMode('table')}
-              className={cn("h-8 w-10 px-0 rounded-lg", viewMode === 'table' ? "bg-primary text-primary-foreground shadow-lg" : "text-slate-500 hover:text-white")}
+                variant={viewMode === 'table' ? 'secondary' : 'ghost'} 
+                size="sm" 
+                onClick={() => setViewMode('table')} 
+                className={cn("h-full px-3 shadow-none transition-all rounded-lg", viewMode === 'table' ? 'bg-primary/20 text-primary hover:bg-primary/30 border border-primary/20' : 'text-slate-500 hover:text-white')}
             >
-              <List className="h-4 w-4" />
+                <List className="w-4 h-4" />
             </Button>
           </div>
-          <div className="relative w-full max-w-sm">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Pesquisar..." className="pl-8 bg-[#0f172a] border-border/50 text-white" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
-            {isSearching && <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-primary" />}
+
+          <div className="relative w-full sm:w-64">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input 
+              placeholder="Pesquisar por nome ou documento..." 
+              className="pl-10 h-12 bg-[#0f172a] border-white/10 text-white rounded-xl focus:border-primary/50 transition-all shadow-inner" 
+              value={searchTerm} 
+              onChange={e => setSearchTerm(e.target.value)} 
+            />
+            {isSearching && <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-primary" />}
           </div>
-          <Button onClick={() => { setEditingClient(null); setIsSheetOpen(true); }} className="bg-primary text-primary-foreground font-bold h-10"><PlusCircle className="mr-2 h-4 w-4" /> Novo</Button>
+
+          <Button 
+            onClick={() => { setEditingClient(null); setIsSheetOpen(true); }} 
+            className="bg-primary text-primary-foreground font-black h-12 px-8 rounded-xl shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+          >
+            <PlusCircle className="mr-2 h-5 w-5" /> NOVO CLIENTE
+          </Button>
         </div>
+      </div>
+
+      {/* Métricas e Filtros Rápidos */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="bg-[#0f172a] border-white/5 relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
+            <Users className="h-12 w-12 text-white" />
+          </div>
+          <CardContent className="p-5 flex flex-col gap-1">
+            <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Base Total</p>
+            <div className="flex items-baseline gap-2">
+              <span className="text-3xl font-black text-white">{stats.total}</span>
+              <span className="text-[10px] font-bold text-emerald-400 flex items-center">+ {stats.growth}%</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-[#0f172a] border-white/5 relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
+            <TrendingUp className="h-12 w-12 text-amber-400" />
+          </div>
+          <CardContent className="p-5 flex flex-col gap-1">
+            <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Leads Ativos</p>
+            <div className="flex items-baseline gap-2">
+              <span className="text-3xl font-black text-white">{stats.leads}</span>
+              <span className="text-[10px] font-bold text-amber-400">Em prospecção</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-[#0f172a] border-white/5 relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
+            <AlertCircle className="h-12 w-12 text-rose-400" />
+          </div>
+          <CardContent className="p-5 flex flex-col gap-1 text-rose-400/80">
+            <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Dados Incompletos</p>
+            <div className="flex items-baseline gap-2">
+              <span className="text-3xl font-black text-rose-500">{stats.incomplete}</span>
+              <span className="text-[10px] font-bold">Fichas Críticas</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-[#0f172a] border-white/5 p-1">
+          <div className="grid grid-cols-2 h-full gap-1">
+             <button 
+               onClick={() => setStatusFilter('active')}
+               className={cn("rounded-lg flex flex-col items-center justify-center gap-1 transition-all", statusFilter === 'active' ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "hover:bg-white/5 text-slate-500")}
+             >
+                <CheckCircle2 className="h-4 w-4" />
+                <span className="text-[9px] font-black uppercase">Ativos</span>
+             </button>
+             <button 
+               onClick={() => setStatusFilter('lead')}
+               className={cn("rounded-lg flex flex-col items-center justify-center gap-1 transition-all", statusFilter === 'lead' ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" : "hover:bg-white/5 text-slate-500")}
+             >
+                <Clock className="h-4 w-4" />
+                <span className="text-[9px] font-black uppercase">Leads</span>
+             </button>
+             <button 
+               onClick={() => setStatusFilter('all')}
+               className={cn("col-span-2 rounded-lg flex items-center justify-center gap-2 transition-all h-8", statusFilter === 'all' ? "bg-primary/10 text-primary border border-primary/20" : "hover:bg-white/5 text-slate-500")}
+             >
+                <div className="h-1.5 w-1.5 rounded-full bg-current" />
+                <span className="text-[9px] font-black uppercase tracking-widest font-mono">Ver Tudo</span>
+             </button>
+          </div>
+        </Card>
       </div>
 
       {isLoading && !paginatedClients.length ? (

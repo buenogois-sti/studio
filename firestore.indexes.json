@@ -230,6 +230,22 @@
         { "fieldPath": "isRead", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "intimacoes_natalia",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "lida", "order": "ASCENDING" },
+        { "fieldPath": "dataPublicacaoISO", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "intimacoes_alan",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "lida", "order": "ASCENDING" },
+        { "fieldPath": "dataPublicacaoISO", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

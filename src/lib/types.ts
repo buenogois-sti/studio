@@ -22,6 +22,17 @@ export type UserRoleInfo = {
   role: UserRole;
 };
 
+export type PermissionKey = 
+  | 'view_finance' 
+  | 'manage_users' 
+  | 'view_reports' 
+  | 'view_all_processes' 
+  | 'edit_settings'
+  | 'manage_leads'
+  | 'manage_staff';
+
+export type RolePermissions = Record<UserRole, Record<PermissionKey, boolean>>;
+
 export type ClientStatus = 'lead' | 'active' | 'inactive';
 
 export type Client = {
@@ -322,6 +333,8 @@ export type Reimbursement = {
   userName: string;
   description: string;
   value: number;
+  category?: string;
+  paymentMethod?: string;
   requestDate: Timestamp;
   status: ReimbursementStatus;
   processId?: string;

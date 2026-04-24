@@ -14,13 +14,21 @@ import { cn, extractSortDate } from '@/lib/utils';
 export function IntimacoesHighlight() {
   const { firestore, isUserLoading, user } = useFirebase();
   
+  // Detecção automática de fila baseada no usuário logado
+  const collectionName = React.useMemo(() => {
+    const name = user?.displayName?.toLowerCase() || '';
+    if (name.includes('natalia')) return 'intimacoes_natalia';
+    if (name.includes('alan')) return 'intimacoes_alan';
+    return 'intimacoes';
+  }, [user]);
+
   const unreadQuery = React.useMemo(() => {
     if (!firestore || isUserLoading || !user) return null;
     return query(
-      collection(firestore, 'intimacoes'),
+      collection(firestore, collectionName),
       limit(50)
     );
-  }, [firestore, isUserLoading, user]);
+  }, [firestore, isUserLoading, user, collectionName]);
 
   const { data: allData, isLoading } = useCollection<Intimacao>(unreadQuery);
   const unreadIntimacoes = React.useMemo(() => {

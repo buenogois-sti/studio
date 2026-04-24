@@ -70,12 +70,29 @@ import { doc } from 'firebase/firestore';
 import { NotificationBell } from '@/components/NotificationBell';
 import { LGPDGuard } from '@/components/LGPDGuard';
 
-const sidebarSections = [
+import { useRolePermissions } from '@/hooks/use-role-permissions';
+import type { PermissionKey } from '@/lib/types';
+
+interface SidebarItem {
+  href: string;
+  label: string;
+  icon: any;
+  roles?: string[];
+  permission?: PermissionKey;
+  isNew?: boolean;
+}
+
+interface SidebarSection {
+  label: string;
+  items: SidebarItem[];
+}
+
+const sidebarSections: SidebarSection[] = [
   {
     label: 'Hub de Comando',
     items: [
       { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'lawyer', 'financial', 'assistant'] },
-      { href: '/dashboard/relatorios', label: 'Relatórios BI', icon: BarChart, roles: ['admin', 'financial', 'lawyer'] },
+      { href: '/dashboard/relatorios', label: 'Relatórios BI', icon: BarChart, permission: 'view_reports' },
       { href: '/dashboard/checklists', label: 'Lab. de Matrizes', icon: CheckSquare, roles: ['admin', 'lawyer', 'assistant', 'financial'] },
     ]
   },
@@ -88,7 +105,7 @@ const sidebarSections = [
   {
     label: 'Relacionamento (CRM)',
     items: [
-      { href: '/dashboard/leads', label: 'Leads (Triagem)', icon: Zap, roles: ['admin', 'lawyer', 'assistant'] },
+      { href: '/dashboard/leads', label: 'Leads (Triagem)', icon: Zap, permission: 'manage_leads' },
       { href: '/dashboard/clientes', label: 'Clientes', icon: Users, roles: ['admin', 'lawyer', 'assistant', 'financial'] },
     ]
   },
@@ -106,20 +123,20 @@ const sidebarSections = [
   {
     label: 'Financeiro (Carteira)',
     items: [
-      { href: '/dashboard/repasses', label: 'Wallets & Liquidações', icon: Wallet, roles: ['admin', 'financial'], isNew: true },
-      { href: '/dashboard/financeiro', label: 'Faturamento', icon: DollarSign, roles: ['admin', 'financial'] },
-      { href: '/dashboard/financeiro/calendario', label: 'Calendário Fluxo', icon: CalendarDays, roles: ['admin', 'financial'] },
+      { href: '/dashboard/repasses', label: 'Wallets & Liquidações', icon: Wallet, permission: 'view_finance', isNew: true },
+      { href: '/dashboard/financeiro', label: 'Faturamento', icon: DollarSign, permission: 'view_finance' },
+      { href: '/dashboard/financeiro/calendario', label: 'Calendário Fluxo', icon: CalendarDays, permission: 'view_finance' },
       { href: '/dashboard/reembolsos', label: 'Reembolsos', icon: Receipt, roles: ['admin', 'lawyer', 'financial', 'assistant'] },
     ]
   },
   {
     label: 'Administrativo',
     items: [
-      { href: '/dashboard/rh', label: 'RH & Folha de Elite', icon: ShieldCheck, roles: ['admin'], isNew: true },
+      { href: '/dashboard/rh', label: 'RH & Folha de Elite', icon: ShieldCheck, permission: 'manage_staff', isNew: true },
       { href: '/dashboard/correspondentes', label: 'Correspondentes', icon: HeartHandshake, roles: ['admin', 'lawyer', 'assistant'] },
       { href: '/dashboard/acervo', label: 'Acervo de Modelos', icon: Library, roles: ['admin', 'lawyer', 'assistant'] },
       { href: '/dashboard/arquivo', label: 'Arquivo Digital', icon: Archive, roles: ['admin', 'lawyer', 'assistant'] },
-      { href: '/dashboard/configuracoes', label: 'Configurações', icon: Settings, roles: ['admin'] },
+      { href: '/dashboard/configuracoes', label: 'Configurações', icon: Settings, permission: 'manage_users' },
     ]
   }
 ];
@@ -153,13 +170,7 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const router = useRouter();
     const { data: session, status } = useSession();
-    const { firestore } = useFirebase();
-
-    const userProfileRef = useMemoFirebase(
-        () => (firestore && session?.user?.id ? doc(firestore, 'users', session.user.id) : null),
-        [firestore, session?.user?.id]
-    );
-    const { data: userProfile, isLoading: isUserProfileLoading } = useDoc<UserProfile>(userProfileRef);
+    const { hasPermission, isLoading: isPermissionsLoading, role } = useRolePermissions();
 
     React.useEffect(() => {
         if (status === 'unauthenticated') {
@@ -200,15 +211,31 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
         );
     };
 
-    if (status === 'loading' || !session || isUserProfileLoading) {
+    const isAuthorized = (item: SidebarItem) => {
+        if (!role) return false;
+        // If it's an admin, everything is authorized
+        if (role === 'admin') return true;
+        
+        // If item has specific permission required, check it
+        if (item.permission) {
+            return hasPermission(item.permission);
+        }
+
+        // Fallback to role-based check if no permission is defined
+        if (item.roles) {
+            return item.roles.includes(role);
+        }
+
+        return false;
+    };
+
+    if (status === 'loading' || !session || isPermissionsLoading) {
         return (
         <div className="flex h-screen w-full items-center justify-center bg-[#020617]">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
         );
     }
-
-    const isAuthorized = (roles: string[]) => userProfile && roles.includes(userProfile.role);
 
     return (
         <LGPDGuard>
@@ -224,7 +251,7 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
               </SidebarHeader>
               <SidebarContent className="bg-[#020617]">
                 {sidebarSections.map((section) => {
-                  const accessibleItems = section.items.filter(item => isAuthorized(item.roles));
+                  const accessibleItems = section.items.filter(item => isAuthorized(item));
                   if (accessibleItems.length === 0) return null;
 
                   return (

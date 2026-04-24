@@ -11,6 +11,8 @@ export async function createReimbursement(data: {
   description: string;
   value: number;
   requestDate: string;
+  category: string;
+  paymentMethod: string;
   userId?: string;
   userName?: string;
   processId?: string;
@@ -31,6 +33,8 @@ export async function createReimbursement(data: {
       userName: targetUserName,
       description: data.description,
       value: data.value,
+      category: data.category || 'OUTROS',
+      paymentMethod: data.paymentMethod || 'OUTRO',
       status: 'SOLICITADO' as ReimbursementStatus,
       processId: data.processId || null,
       processName: data.processName || null,

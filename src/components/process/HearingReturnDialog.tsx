@@ -4,36 +4,44 @@ import * as React from 'react';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { 
-  History, 
-  Loader2, 
-  CheckCircle2, 
-  ArrowRight, 
-  FileText, 
+import {
+  History,
+  Loader2,
+  CheckCircle2,
+  ArrowRight,
+  FileText,
   Handshake,
   TrendingUp,
-  X,
-  Info,
-  Briefcase
+  Briefcase,
+  Search,
+  MapPin,
+  Clock,
+  ExternalLink,
+  Gavel,
+  User,
+  Scale,
+  X
 } from 'lucide-react';
 
+import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogDescription, 
-  DialogFooter, 
-  DialogClose 
+import { Badge } from '@/components/ui/badge';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose
 } from '@/components/ui/dialog';
-import { 
-  Form, 
-  FormControl, 
-  FormField, 
-  FormItem, 
-  FormLabel, 
-  FormMessage 
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -156,9 +164,9 @@ export function HearingReturnDialog({ hearing, open, onOpenChange, onSuccess }: 
             {isPericia ? 'Andamento de Perícia Técnica' : isDiligencia ? 'Relatório de Diligência' : 'Retorno de Ato Judicial'}
           </DialogTitle>
           <DialogDescription className="text-slate-400">
-            Registre o desfecho e defina a próxima iteração do processo para: <span className="text-white font-bold">{hearing.processName || 'Processo'}</span>
+            Ato realizado em <span className="text-primary font-bold">{hearing.date ? format(hearing.date.toDate(), "dd/MM/yyyy 'às' HH:mm") : '---'}</span>
           </DialogDescription>
-          <button 
+          <button
             onClick={() => onOpenChange(false)}
             className="absolute top-4 right-4 text-slate-500 hover:text-white transition-colors"
           >
@@ -166,13 +174,37 @@ export function HearingReturnDialog({ hearing, open, onOpenChange, onSuccess }: 
           </button>
         </DialogHeader>
 
-        <ScrollArea className="flex-1">
+        <ScrollArea className="flex-1 p-6">
           <Form {...form}>
-            <form id="hearing-return-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-8 p-6">
-              
+            {/* DADOS DO PROCESSO (CONTEXTO) */}
+            <section className="grid grid-cols-1 md:grid-cols-2 gap-4 p-5 rounded-2xl bg-white/[0.03] border border-white/5 mb-8">
+              <div className="space-y-3">
+                <div className="flex flex-col gap-1">
+                  <p className="text-[9px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-1.5"><Gavel className="h-3 w-3" /> Processo / Ação</p>
+                  <p className="text-sm font-black text-white">{hearing.processName || 'Não identificado'}</p>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <p className="text-[9px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-1.5"><MapPin className="h-3 w-3" /> Local / Fórum</p>
+                  <p className="text-xs font-bold text-slate-300">{hearing.location || 'Local não informado'}</p>
+                </div>
+              </div>
+              <div className="space-y-3 md:border-l md:border-white/5 md:pl-4">
+                <div className="flex flex-col gap-1">
+                  <p className="text-[9px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-1.5"><User className="h-3 w-3" /> Advogado Responsável</p>
+                  <p className="text-xs font-bold text-slate-300">{hearing.lawyerName || 'Aguardando Atribuição'}</p>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <p className="text-[9px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-1.5"><Scale className="h-3 w-3" /> Tipo de Ato</p>
+                  <Badge variant="outline" className="w-fit bg-primary/10 text-primary border-primary/20 text-[9px] font-black uppercase tracking-widest px-2 h-5">{hearing.type}</Badge>
+                </div>
+              </div>
+            </section>
+
+            <form id="hearing-return-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+
               {/* APOIO REVIEW SECTION */}
               {hearing.supportId && hearing.supportId !== 'none' && (
-                <section className="p-6 rounded-3xl bg-amber-500/5 border border-amber-500/20 space-y-4 animate-in fade-in slide-in-from-top-4">
+                <section className="p-6 rounded-3xl bg-amber-500/5 border border-amber-500/20 space-y-4 animate-in fade-in slide-in-from-top-4 mb-8">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="h-10 w-10 rounded-xl bg-amber-500/20 flex items-center justify-center text-amber-500">
@@ -197,7 +229,7 @@ export function HearingReturnDialog({ hearing, open, onOpenChange, onSuccess }: 
                       )}
                     />
                   </div>
-                  
+
                   {hearing.supportNotes && (
                     <div className="p-4 rounded-xl bg-black/20 border border-white/5 space-y-1">
                       <p className="text-[9px] font-black uppercase text-slate-500">Instruções originais:</p>
@@ -271,10 +303,10 @@ export function HearingReturnDialog({ hearing, open, onOpenChange, onSuccess }: 
                           <FormLabel className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-2">
                             <FileText className="h-3.5 w-3.5" /> {isDiligencia ? 'Relatório da Diligência *' : 'Síntese do Ato *'}
                           </FormLabel>
-                          <Button 
-                            type="button" 
-                            variant="outline" 
-                            size="sm" 
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
                             onClick={toggleRecording}
                             className={cn("h-7 text-[10px] font-bold gap-2", isRecording ? "bg-rose-500/20 text-rose-500 border-rose-500/30 hover:bg-rose-500/30" : "bg-primary/10 text-primary border-primary/20 hover:bg-primary/20")}
                           >
@@ -283,14 +315,14 @@ export function HearingReturnDialog({ hearing, open, onOpenChange, onSuccess }: 
                           </Button>
                         </div>
                         <FormControl>
-                          <Textarea 
-                            placeholder={isPericia 
-                              ? "O que foi analisado pelo perito? Houve concordância dos assistentes?" 
-                              : isDiligencia 
-                              ? "Descreva o que foi realizado, com quem falou e quais documentos obteve..."
-                              : "Resuma a ata, propostas de acordo, testemunhas ouvidas e ordens do juiz..."}
-                            className="min-h-[140px] bg-black/40 border-primary/40 border-2 rounded-xl resize-none text-sm leading-relaxed focus:border-primary transition-all placeholder:text-slate-600" 
-                            {...field} 
+                          <Textarea
+                            placeholder={isPericia
+                              ? "O que foi analisado pelo perito? Houve concordância dos assistentes?"
+                              : isDiligencia
+                                ? "Descreva o que foi realizado, com quem falou e quais documentos obteve..."
+                                : "Resuma a ata, propostas de acordo, testemunhas ouvidas e ordens do juiz..."}
+                            className="min-h-[140px] bg-black/40 border-primary/40 border-2 rounded-xl resize-none text-sm leading-relaxed focus:border-primary transition-all placeholder:text-slate-600"
+                            {...field}
                           />
                         </FormControl>
                         <FormMessage />
@@ -339,8 +371,8 @@ export function HearingReturnDialog({ hearing, open, onOpenChange, onSuccess }: 
                               <FormControl>
                                 <div className="relative">
                                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-emerald-500">R$</span>
-                                  <Input 
-                                    className="h-11 bg-black/40 border-emerald-500/20 pl-10 text-white font-black tabular-nums" 
+                                  <Input
+                                    className="h-11 bg-black/40 border-emerald-500/20 pl-10 text-white font-black tabular-nums"
                                     placeholder="0,00"
                                     value={new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2 }).format(field.value || 0)}
                                     onChange={(e) => handleCurrencyChange(e, field)}
@@ -394,7 +426,7 @@ export function HearingReturnDialog({ hearing, open, onOpenChange, onSuccess }: 
                         render={({ field }) => (
                           <FormItem className="flex items-center space-x-3 space-y-0">
                             <FormControl>
-                              <div 
+                              <div
                                 className={cn(
                                   "h-5 w-5 rounded border-2 flex items-center justify-center cursor-pointer transition-all",
                                   field.value ? "bg-primary border-primary" : "border-white/20"
@@ -414,7 +446,7 @@ export function HearingReturnDialog({ hearing, open, onOpenChange, onSuccess }: 
                         render={({ field }) => (
                           <FormItem className="flex items-center space-x-3 space-y-0">
                             <FormControl>
-                              <div 
+                              <div
                                 className={cn(
                                   "h-5 w-5 rounded border-2 flex items-center justify-center cursor-pointer transition-all",
                                   field.value ? "bg-primary border-primary" : "border-white/20"
@@ -465,7 +497,7 @@ export function HearingReturnDialog({ hearing, open, onOpenChange, onSuccess }: 
                           )}
                         />
                       )}
-                      
+
                       <FormField
                         control={form.control}
                         name="nextStepDeadline"
@@ -537,18 +569,18 @@ export function HearingReturnDialog({ hearing, open, onOpenChange, onSuccess }: 
         </ScrollArea>
 
         <DialogFooter className="p-6 border-t border-white/5 bg-white/5 shrink-0 flex flex-row gap-3">
-          <Button 
-            variant="ghost" 
-            type="button" 
+          <Button
+            variant="ghost"
+            type="button"
             className="flex-1 bg-primary/20 hover:bg-primary/30 text-primary font-black uppercase text-[10px] tracking-widest h-12 rounded-xl"
             onClick={() => onOpenChange(false)}
           >
             Cancelar
           </Button>
-          <Button 
-            type="submit" 
+          <Button
+            type="submit"
             form="hearing-return-form"
-            disabled={isSaving} 
+            disabled={isSaving}
             className="flex-[2] bg-primary text-primary-foreground hover:bg-primary/90 font-black uppercase tracking-widest text-[10px] h-12 rounded-xl shadow-xl shadow-primary/20"
           >
             {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}

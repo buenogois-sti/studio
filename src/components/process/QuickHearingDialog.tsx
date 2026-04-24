@@ -63,7 +63,8 @@ const hearingSchema = z.object({
   supportId: z.string().optional().or(z.literal('none')),
   supportName: z.string().optional(),
   supportStatus: z.enum(['PENDENTE', 'REALIZADA', 'REVISAO_SOLICITADA', 'CONCLUIDA']).optional(),
-  supportNotes: z.string().optional()
+  supportNotes: z.string().optional(),
+  requiresLawyer: z.boolean().default(false)
 });
 
 interface QuickHearingDialogProps {
@@ -105,9 +106,10 @@ export function QuickHearingDialog({ process, hearing, open, onOpenChange, onSuc
       cep: '',
       locationObservations: '',
       supportId: 'none',
-      supportStatus: 'PENDENTE'
+      supportStatus: 'PENDENTE',
+      requiresLawyer: false
     }
-  });
+});
 
   React.useEffect(() => {
     if (open) {
@@ -131,7 +133,8 @@ export function QuickHearingDialog({ process, hearing, open, onOpenChange, onSuc
           supportId: hearing.supportId || 'none',
           supportName: hearing.supportName || '',
           supportStatus: hearing.supportStatus || 'PENDENTE',
-          supportNotes: hearing.supportNotes || ''
+          supportNotes: hearing.supportNotes || '',
+          requiresLawyer: !!hearing.requiresLawyer
         });
 
         if (hearing.processId && firestore) {
