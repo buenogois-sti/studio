@@ -163,6 +163,13 @@ service cloud.firestore {
       allow read: if isStaff();
       allow write: if isAdmin();
     }
+
+    // Gestão de Tarefas (Sincronização Google e Fluxos Internos)
+    match /tasks/{taskId} {
+      allow read: if isStaff();
+      allow write: if isOneOfRoles(['admin', 'lawyer', 'assistant']);
+      allow delete: if isAdmin();
+    }
     
     // Monitoramento de Diários Oficiais / Central de Intimações AASP (Suporte a múltiplas filas/advogados)
     match /{collectionId}/{docId} {

@@ -604,6 +604,7 @@ export type TaskStatus = 'needsAction' | 'completed';
 export type Task = {
   id: string;
   googleTaskId?: string;
+  webViewLink?: string;
   title: string;
   notes?: string;
   status: TaskStatus;

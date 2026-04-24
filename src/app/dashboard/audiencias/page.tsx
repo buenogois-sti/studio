@@ -1032,6 +1032,7 @@ export default function AudienciasPage() {
 
       <HearingReturnDialog
         hearing={returnHearing}
+        process={returnHearing ? processesMap.get(returnHearing.processId) : undefined}
         open={!!returnHearing}
         onOpenChange={(o) => !o && setReturnHearing(null)}
         onSuccess={() => setRefreshKey(k => k + 1)}

@@ -55,7 +55,7 @@ import {
 
 import { useFirebase, useCollection, useMemoFirebase, useDoc } from '@/firebase';
 import { collection, query, orderBy, doc, Timestamp, limit, updateDoc, setDoc, where, arrayUnion, arrayRemove, deleteDoc, getDoc, DocumentSnapshot } from 'firebase/firestore';
-import type { Lead, Client, Staff, LeadStatus, LeadPriority, UserProfile, TimelineEvent, OpposingParty, ChecklistTemplate, Process } from '@/lib/types';
+import type { Lead, Client, Staff, LeadStatus, LeadPriority, UserProfile, TimelineEvent, OpposingParty, ChecklistTemplate, ChecklistExecution, Process } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
