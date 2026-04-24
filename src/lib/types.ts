@@ -598,3 +598,21 @@ export type Intimacao = {
   createdAt: string;
   raw: string;
 };
+
+export type TaskStatus = 'needsAction' | 'completed';
+
+export type Task = {
+  id: string;
+  googleTaskId?: string;
+  title: string;
+  notes?: string;
+  status: TaskStatus;
+  due?: Timestamp;
+  completedAt?: Timestamp;
+  userId: string;
+  userName?: string;
+  processId?: string; // Opcional: link com processo
+  processName?: string;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+};

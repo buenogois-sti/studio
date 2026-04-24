@@ -1,0 +1,114 @@
+{
+  "name": "Bueno Gois - Google Tasks Sync",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "getAll",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.googleTasks",
+      "typeVersion": 1,
+      "position": [
+        250,
+        240
+      ],
+      "id": "de013ff1-ed5f-4f72-b504-9a451c39816c",
+      "name": "Receba várias tarefas",
+      "credentials": {
+        "googleTasksOAuth2Api": {
+          "id": "rwwjluIDcjUafJoU",
+          "name": "Google Tasks account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        20,
+        180
+      ],
+      "id": "ac9dd15f-1e80-42d7-bd51-c3f8551b2d09",
+      "name": "Disparo Manual"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.stackinfra.com.br/api/tasks/sync",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  \"googleTaskId\": $json.id,\n  \"title\": $json.title,\n  \"notes\": $json.notes || '',\n  \"status\": $json.status,\n  \"due\": $json.due,\n  \"userEmail\": \"nataliabueno.adv@gmail.com\"\n}) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        500,
+        240
+      ],
+      "id": "c9387599-c745-412a-8bbd-f9757cb5b828",
+      "name": "Studio Sync API"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        20,
+        300
+      ],
+      "id": "ec82414f-ed5f-4a72-b504-9a451c39816b",
+      "name": "Execução Horária (Auto)"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Disparo Manual": {
+      "main": [
+        [
+          {
+            "node": "Receba várias tarefas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Receba várias tarefas": {
+      "main": [
+        [
+          {
+            "node": "Studio Sync API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execução Horária (Auto)": {
+      "main": [
+        [
+          {
+            "node": "Receba várias tarefas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

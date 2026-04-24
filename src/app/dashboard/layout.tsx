@@ -112,6 +112,7 @@ const sidebarSections: SidebarSection[] = [
   {
     label: 'Jurídico (Operação)',
     items: [
+      { href: '/dashboard/tarefas', label: 'Gestão de Tarefas', icon: CheckSquare, roles: ['admin', 'lawyer', 'assistant'], isNew: true },
       { href: '/dashboard/intimacoes', label: 'Intimações AASP', icon: Bell, roles: ['admin', 'lawyer', 'assistant'], isNew: true },
       { href: '/dashboard/processos', label: 'Processos', icon: FolderKanban, roles: ['admin', 'lawyer', 'assistant', 'financial'] },
       { href: '/dashboard/prazos', label: 'Prazos Judiciais', icon: Timer, roles: ['admin', 'lawyer', 'assistant'] },
@@ -164,6 +165,7 @@ const BreadcrumbMap: { [key: string]: string } = {
   '/dashboard/rh/correspondents': 'Correspondentes',
   '/dashboard/configuracoes': 'Configurações',
   '/dashboard/checklists': 'Laboratório de Matrizes',
+  '/dashboard/tarefas': 'Gestão de Tarefas',
 };
 
 function InnerLayout({ children }: { children: React.ReactNode }) {

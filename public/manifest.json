@@ -1,0 +1,33 @@
+{
+  "name": "Bueno Gois Advogados",
+  "short_name": "Bueno Gois",
+  "description": "Sistema de Gestão Jurídica de Elite",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#020617",
+  "theme_color": "#F5D030",
+  "icons": [
+    {
+      "src": "/pwa_icon_premium.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/pwa_icon_premium.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Processos",
+      "url": "/dashboard/processos",
+      "icons": [{ "src": "/pwa_icon_premium.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Prazos",
+      "url": "/dashboard/prazos",
+      "icons": [{ "src": "/pwa_icon_premium.png", "sizes": "192x192" }]
+    }
+  ]
+}
