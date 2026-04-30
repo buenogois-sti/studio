@@ -105,7 +105,7 @@ async function applyBoldToTexts(docsApi: any, fileId: string, texts: string[]) {
     }
 }
 
-export async function searchProcesses(query: string): Promise<Process[]> {
+export async function searchProcesses(query: string): Promise<any[]> {
     if (!query || query.length < 2) return [];
     if (!firestoreAdmin) throw new Error("Servidor inacessível.");
     
@@ -117,8 +117,25 @@ export async function searchProcesses(query: string): Promise<Process[]> {
             .limit(200)
             .get();
         
+        const serializeData = (obj: any): any => {
+            if (!obj) return obj;
+            if (typeof obj.toDate === 'function') {
+                return { seconds: obj.seconds ?? obj._seconds, nanoseconds: obj.nanoseconds ?? obj._nanoseconds, isSerializedTimestamp: true };
+            }
+            if (Array.isArray(obj)) return obj.map(serializeData);
+            if (typeof obj === 'object') {
+                const res: any = {};
+                for (const k in obj) res[k] = serializeData(obj[k]);
+                return res;
+            }
+            return obj;
+        };
+
         const results = snapshot.docs
-            .map(doc => ({ id: doc.id, ...doc.data() } as Process))
+            .map(doc => {
+                const data = doc.data();
+                return { id: doc.id, ...serializeData(data) };
+            })
             .filter(p => 
                 p.name.toLowerCase().includes(q) || 
                 (p.processNumber || '').includes(q) ||

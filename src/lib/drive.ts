@@ -80,7 +80,9 @@ export async function getGoogleClientsForStaff(staffId: string): Promise<GoogleA
     
     if (!staffData || !staffData.email) {
         console.log(`[Drive] Staff ${staffId} sem e-mail. Usando conta da sessão atual.`);
-        return getGoogleApiClientsForUser();
+        // Fallback: Se não conseguir agir em nome do outro, usa o usuário logado, mas tenta atingir o calendário alvo
+        const client = await getGoogleApiClientsForUser();
+        return { ...client, targetEmail: staffData?.email };
     }
 
     // Se o alvo for o próprio usuário logado, retorna direto para evitar overhead
@@ -90,15 +92,37 @@ export async function getGoogleClientsForStaff(staffId: string): Promise<GoogleA
 
     // Tenta encontrar o refresh token do usuário alvo na coleção de usuários do sistema
     try {
-        const userQuery = await firestoreAdmin.collection('users')
+        // Busca 1: E-mail exato
+        let userQuery = await firestoreAdmin.collection('users')
             .where('email', '==', staffData.email.toLowerCase())
             .limit(1)
             .get();
         
+        // Busca 2: Variação de prefixo (dr. vs dra.)
+        if (userQuery.empty) {
+            const alternativeEmail = staffData.email.toLowerCase().startsWith('dr.') 
+                ? staffData.email.toLowerCase().replace('dr.', 'dra.')
+                : staffData.email.toLowerCase().replace('dra.', 'dr.');
+            
+            userQuery = await firestoreAdmin.collection('users')
+                .where('email', '==', alternativeEmail)
+                .limit(1)
+                .get();
+        }
+
+        // Busca 3: Pelo primeiro nome (último recurso)
+        if (userQuery.empty && staffData.firstName) {
+            userQuery = await firestoreAdmin.collection('users')
+                .where('firstName', '==', staffData.firstName)
+                .limit(1)
+                .get();
+        }
+        
         const userData = userQuery.docs[0]?.data();
         
         if (userData?.googleRefreshToken) {
-            console.log(`[Drive] Sincronizando com calendário INDIVIDUAL de: ${staffData.email}`);
+            const targetEmail = userData.email || staffData.email;
+            console.log(`[Drive] Sincronizando com calendário INDIVIDUAL de: ${targetEmail}`);
             
             const oauth2Client = new google.auth.OAuth2(
                 process.env.GOOGLE_CLIENT_ID,
@@ -122,7 +146,7 @@ export async function getGoogleClientsForStaff(staffId: string): Promise<GoogleA
                     calendar: google.calendar({ version: 'v3', auth: targetAuth }),
                     tasks: google.tasks({ version: 'v1', auth: targetAuth }),
                     docs: google.docs({ version: 'v1', auth: targetAuth }),
-                    targetEmail: staffData.email
+                    targetEmail: targetEmail
                 };
             }
         } else {
@@ -131,9 +155,9 @@ export async function getGoogleClientsForStaff(staffId: string): Promise<GoogleA
     } catch (error) {
         console.error(`[Drive] Erro crítico ao resolver credenciais para ${staffData.email}:`, error);
     }
-
-    // Fallback: Se não conseguir agir em nome do outro, usa o usuário logado
-    return getGoogleApiClientsForUser();
+    // Fallback final: Se não conseguir agir em nome do outro, usa o usuário logado, mas tenta atingir o calendário alvo
+    const client = await getGoogleApiClientsForUser();
+    return { ...client, targetEmail: staffData.email };
 }
 
 /**

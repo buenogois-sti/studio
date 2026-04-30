@@ -12,11 +12,9 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
 } from '@/components/ui/dropdown-menu';
 import type { UserProfile, UserRole } from '@/lib/types';
-import { useFirebase, useDoc, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
+import { useFirebase, useDoc, useMemoFirebase } from '@/firebase';
 import { Skeleton } from './ui/skeleton';
 import { doc } from 'firebase/firestore';
 import { User, ShieldCheck } from 'lucide-react';
@@ -43,12 +41,6 @@ export function UserNav() {
   const currentRoleLabel = roles.find((r) => r.role === currentRole)?.label;
   const isAdmin = currentRole === 'admin';
 
-  const handleRoleChange = (role: string) => {
-    if (isAdmin && role !== currentRole && userProfileRef) {
-      updateDocumentNonBlocking(userProfileRef, { role });
-    }
-  };
-  
   const handleLogout = async () => {
     await signOut({ callbackUrl: '/login' });
   };
@@ -83,21 +75,10 @@ export function UserNav() {
         
         <DropdownMenuSeparator />
 
-        {isAdmin ? (
-            <DropdownMenuRadioGroup value={currentRole} onValueChange={handleRoleChange}>
-                <DropdownMenuLabel className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Alternar Visão (Admin)</DropdownMenuLabel>
-                {roles.map(({ role, label }) => (
-                    <DropdownMenuRadioItem key={role} value={role} className="text-xs">
-                        {label}
-                    </DropdownMenuRadioItem>
-                ))}
-            </DropdownMenuRadioGroup>
-        ) : (
-            <div className="px-2 py-1.5">
-                <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Seu Perfil</p>
-                <p className="text-xs font-medium py-1">{currentRoleLabel}</p>
-            </div>
-        )}
+        <div className="px-2 py-1.5">
+            <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Seu Perfil</p>
+            <p className="text-xs font-medium py-1">{currentRoleLabel}</p>
+        </div>
 
         <DropdownMenuSeparator />
         <DropdownMenuGroup>

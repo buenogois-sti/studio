@@ -105,7 +105,7 @@ const sidebarSections: SidebarSection[] = [
   {
     label: 'Relacionamento (CRM)',
     items: [
-      { href: '/dashboard/leads', label: 'Leads (Triagem)', icon: Zap, permission: 'manage_leads' },
+      { href: '/dashboard/leads', label: 'Leads (Triagem)', icon: Zap, roles: ['admin', 'lawyer', 'assistant'], permission: 'manage_leads' },
       { href: '/dashboard/clientes', label: 'Clientes', icon: Users, roles: ['admin', 'lawyer', 'assistant', 'financial'] },
     ]
   },
@@ -215,20 +215,14 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
 
     const isAuthorized = (item: SidebarItem) => {
         if (!role) return false;
-        // If it's an admin, everything is authorized
         if (role === 'admin') return true;
         
-        // If item has specific permission required, check it
-        if (item.permission) {
-            return hasPermission(item.permission);
-        }
+        const hasRole = item.roles ? item.roles.includes(role) : false;
+        const hasPerm = item.permission ? hasPermission(item.permission) : false;
 
-        // Fallback to role-based check if no permission is defined
-        if (item.roles) {
-            return item.roles.includes(role);
-        }
-
-        return false;
+        // Se tiver a role OU a permissão, está autorizado
+        // Se nenhum estiver definido, assume-se que não tem acesso (segurança)
+        return hasRole || hasPerm;
     };
 
     if (status === 'loading' || !session || isPermissionsLoading) {

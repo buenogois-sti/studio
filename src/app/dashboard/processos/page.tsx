@@ -499,7 +499,22 @@ export default function ProcessosPage() {
       setIsSearching(true);
       try {
         const results = await searchProcesses(searchTerm);
-        setSearchResults(results);
+        // Reconstruct Firestore Timestamps from serialized data
+        const reconstructTimestamps = (obj: any): any => {
+            if (!obj) return obj;
+            if (obj.isSerializedTimestamp) {
+                return new Timestamp(obj.seconds, obj.nanoseconds);
+            }
+            if (Array.isArray(obj)) return obj.map(reconstructTimestamps);
+            if (typeof obj === 'object') {
+                const res: any = {};
+                for (const k in obj) res[k] = reconstructTimestamps(obj[k]);
+                return res;
+            }
+            return obj;
+        };
+        const reconstructedResults = results.map(p => reconstructTimestamps(p));
+        setSearchResults(reconstructedResults);
       } catch (err) {
         console.error("Search error:", err);
       } finally {
@@ -656,38 +671,29 @@ export default function ProcessosPage() {
 
   return (
     <div className="grid flex-1 items-start gap-6 auto-rows-max animate-in fade-in duration-500">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div className="shrink-0">
           <h1 className="text-3xl font-black tracking-tight font-headline text-white">Processos</h1>
           <p className="text-sm text-muted-foreground">Gestão jurídica estratégica e acompanhamento em tempo real.</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center bg-[#0f172a] p-1 rounded-lg border border-white/5 h-10 gap-1 hidden sm:flex">
-            <Button 
-                variant={viewMode === 'list' ? 'secondary' : 'ghost'} 
-                size="sm" 
-                onClick={() => setViewMode('list')} 
-                className={cn("h-full px-2.5 shadow-none group transition-all", viewMode === 'list' ? 'bg-white/10' : 'bg-transparent hover:bg-white/5')} 
-                title="Modo Lista Horizontal"
-            >
-                <List className={cn("w-4 h-4", viewMode === 'list' ? "text-white" : "text-slate-500 group-hover:text-slate-300")} />
-            </Button>
-            <Button 
-                variant={viewMode === 'card' ? 'secondary' : 'ghost'} 
-                size="sm" 
-                onClick={() => setViewMode('card')} 
-                className={cn("h-full px-2.5 shadow-none group transition-all", viewMode === 'card' ? 'bg-white/10' : 'bg-transparent hover:bg-white/5')} 
-                title="Modo Miniatura Vertical"
-            >
-                <LayoutGrid className={cn("w-4 h-4", viewMode === 'card' ? "text-white" : "text-slate-500 group-hover:text-slate-300")} />
-            </Button>
+        
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
+          <div className="relative w-full sm:w-64 shrink-0">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input 
+              placeholder="Buscar processo, cliente..." 
+              className="pl-9 pr-4 bg-[#0f172a] border-white/10 hover:border-white/20 focus-visible:border-primary text-white h-10 w-full transition-colors shadow-sm" 
+              value={searchTerm} 
+              onChange={e => setSearchTerm(e.target.value)} 
+            />
+            {isSearching && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-primary" />}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 no-scrollbar">
             <Select value={selectedLawyerId} onValueChange={setSelectedLawyerId}>
-              <SelectTrigger className="w-[180px] bg-[#0f172a] border-white/5 text-white h-10 text-xs font-bold">
-                 <div className="flex items-center gap-2">
-                   <UserCheck className="h-3.5 w-3.5 text-primary" />
+              <SelectTrigger className="w-[200px] shrink-0 bg-[#0f172a] border-white/10 hover:border-white/20 text-white h-10 text-xs font-bold shadow-sm transition-colors">
+                 <div className="flex items-center gap-2 truncate">
+                   <UserCheck className="h-3.5 w-3.5 text-primary shrink-0" />
                    <SelectValue placeholder="Filtrar por Advogado" />
                  </div>
               </SelectTrigger>
@@ -702,20 +708,31 @@ export default function ProcessosPage() {
               </SelectContent>
             </Select>
 
-            <div className="relative w-full max-sm:w-full max-w-sm">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input 
-                placeholder="Pesquisar..." 
-                className="pl-8 pr-8 bg-[#0f172a] border-border/50 text-white h-10" 
-                value={searchTerm} 
-                onChange={e => setSearchTerm(e.target.value)} 
-              />
-              {isSearching && <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-primary" />}
+            <div className="flex items-center bg-[#0f172a] p-1 rounded-lg border border-white/10 h-10 gap-1 shrink-0 shadow-sm">
+              <Button 
+                  variant={viewMode === 'list' ? 'secondary' : 'ghost'} 
+                  size="sm" 
+                  onClick={() => setViewMode('list')} 
+                  className={cn("h-full px-2.5 shadow-none group transition-all", viewMode === 'list' ? 'bg-white/10' : 'bg-transparent hover:bg-white/5')} 
+                  title="Modo Lista Horizontal"
+              >
+                  <List className={cn("w-4 h-4", viewMode === 'list' ? "text-white" : "text-slate-500 group-hover:text-slate-300")} />
+              </Button>
+              <Button 
+                  variant={viewMode === 'card' ? 'secondary' : 'ghost'} 
+                  size="sm" 
+                  onClick={() => setViewMode('card')} 
+                  className={cn("h-full px-2.5 shadow-none group transition-all", viewMode === 'card' ? 'bg-white/10' : 'bg-transparent hover:bg-white/5')} 
+                  title="Modo Miniatura Vertical"
+              >
+                  <LayoutGrid className={cn("w-4 h-4", viewMode === 'card' ? "text-white" : "text-slate-500 group-hover:text-slate-300")} />
+              </Button>
             </div>
+
+            <Button size="sm" className="bg-primary text-primary-foreground h-10 px-5 font-bold shadow-lg shadow-primary/20 shrink-0" onClick={() => { setEditingProcess(null); setIsSheetOpen(true); }} disabled={isLoading}>
+                <PlusCircle className="mr-2 h-4 w-4 shrink-0" /> Novo Processo
+            </Button>
           </div>
-          <Button size="sm" className="bg-primary text-primary-foreground h-10 px-6 font-bold shadow-lg shadow-primary/20" onClick={() => { setEditingProcess(null); setIsSheetOpen(true); }} disabled={isLoading}>
-              <PlusCircle className="mr-2 h-4 w-4" /> Novo Processo
-          </Button>
         </div>
       </div>
 

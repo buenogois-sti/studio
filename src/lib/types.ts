@@ -12,7 +12,10 @@ export type UserProfile = {
   role: UserRole;
   createdAt: Timestamp;
   updatedAt: Timestamp;
+  staffId?: string;
   googleRefreshToken?: string;
+  googleSyncEnabled?: boolean;
+  googleScopes?: string[];
   lgpdAccepted?: boolean;
   lgpdAcceptedAt?: Timestamp;
 };
@@ -144,6 +147,9 @@ export type Lead = {
     analyzedAt?: any;
   };
   timeline?: TimelineEvent[];
+  interviews?: any[];
+  interviewDate?: string;
+  interviewTime?: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 };
@@ -545,6 +551,7 @@ export type ChecklistItem = {
   type: ChecklistItemType;
   required: boolean;
   options?: string[];
+  tag?: string; // Tag para reutilização em documentos
 };
 
 export type ChecklistTemplate = {

@@ -202,6 +202,45 @@ export function ClientCreationModal({ open, onOpenChange, onClientCreated }: Cli
                   <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">E-mail</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="email"
+                              placeholder="email@exemplo.com" 
+                              {...field}
+                              disabled={isLoading}
+                              className="h-11 bg-black/40 border-white/10 text-white focus:border-primary transition-all"
+                            />
+                          </FormControl>
+                          <FormMessage className="text-[10px]" />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="phone"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">WhatsApp / Telefone</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="(11) 99999-9999" 
+                              {...field}
+                              disabled={isLoading}
+                              className="h-11 bg-black/40 border-white/10 text-white focus:border-primary transition-all"
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
                       name="document"
                       render={({ field }) => (
                         <FormItem>
@@ -224,47 +263,30 @@ export function ClientCreationModal({ open, onOpenChange, onClientCreated }: Cli
                     />
                     <FormField
                       control={form.control}
-                      name="phone"
+                      name="legalArea"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">WhatsApp</FormLabel>
-                          <FormControl>
-                            <Input 
-                              placeholder="(11) 99999-9999" 
-                              {...field}
-                              disabled={isLoading}
-                              className="h-11 bg-black/40 border-white/10 text-white focus:border-primary transition-all"
-                            />
-                          </FormControl>
+                          <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Área de Atendimento *</FormLabel>
+                          <Select value={field.value} onValueChange={field.onChange}>
+                            <FormControl>
+                              <SelectTrigger className="h-11 bg-black/40 border-white/10 text-white hover:border-primary transition-all focus:ring-1 focus:ring-primary/50">
+                                <SelectValue placeholder="Selecione a área" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent className="bg-[#0f172a] border-white/10 text-white z-[300]">
+                              {LEGAL_AREAS.map((area) => (
+                                <SelectItem key={area} value={area} className="font-bold">
+                                  {area}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
                         </FormItem>
                       )}
                     />
                   </div>
 
-                  <FormField
-                    control={form.control}
-                    name="legalArea"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Área de Atendimento *</FormLabel>
-                        <Select value={field.value} onValueChange={field.onChange}>
-                          <FormControl>
-                            <SelectTrigger className="h-12 bg-black/40 border-primary/40 text-white hover:border-primary transition-all ring-offset-0 focus:ring-2 focus:ring-primary/20">
-                              <SelectValue placeholder="Selecione a área jurídica" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent className="bg-[#0f172a] border-white/10 text-white z-[300]">
-                            {LEGAL_AREAS.map((area) => (
-                              <SelectItem key={area} value={area} className="font-bold">
-                                {area}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
                 </form>
               </Form>
             )}

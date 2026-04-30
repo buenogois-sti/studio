@@ -142,6 +142,17 @@ export const authOptions: NextAuthOptions = {
                             }
                         }
 
+                        // Tenta encontrar o Staff correspondente para vincular
+                        let staffId = '';
+                        const staffQuery = await db.collection('staff').where('email', '>=', '').get();
+                        const staffList = staffQuery.docs.map(d => ({ id: d.id, ...d.data() }));
+                        
+                        const normalizeEmail = (e: string) => e.toLowerCase().replace('dra.', '').replace('dr.', '').replace('advogados', 'advogado');
+                        const targetEmailNorm = normalizeEmail(user.email);
+                        
+                        const matchingStaff = staffList.find(s => normalizeEmail((s as any).email) === targetEmailNorm);
+                        if (matchingStaff) staffId = matchingStaff.id;
+
                         const [firstName, ...lastNameParts] = user.name?.split(' ') ?? ['', ''];
                         try {
                             await userRef.set({
@@ -151,9 +162,14 @@ export const authOptions: NextAuthOptions = {
                                 firstName,
                                 lastName: lastNameParts.join(' '),
                                 role,
+                                staffId, // Vínculo permanente
                                 createdAt: new Date(),
                                 updatedAt: new Date(),
-                                ...(account.refresh_token && { googleRefreshToken: account.refresh_token }),
+                                ...(account.refresh_token && { 
+                                    googleRefreshToken: account.refresh_token,
+                                    googleSyncEnabled: true,
+                                    googleScopes: account.scope?.split(' ') || []
+                                }),
                             });
                         } catch (writeError: any) {
                             if (writeError?.code === 8 || writeError?.details?.includes('Quota')) {
@@ -168,6 +184,8 @@ export const authOptions: NextAuthOptions = {
                         if (account.refresh_token) {
                             await userRef.update({
                                 googleRefreshToken: account.refresh_token,
+                                googleSyncEnabled: true,
+                                googleScopes: account.scope?.split(' ') || [],
                                 updatedAt: new Date(),
                             });
                         }

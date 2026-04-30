@@ -73,7 +73,7 @@ export async function createLead(data: {
       interviewerId: data.interviewerId || '',
       status: 'NOVO' as LeadStatus,
       opposingParties: [],
-      completedTasks: [], 
+      completedTasks: ['Qualificação do Lead', 'Identificação da área jurídica', 'Direcionamento ao Adv. Responsável'], 
       stageEntryDates: {
         'NOVO': now
       },
@@ -169,6 +169,25 @@ export async function updateLeadDetails(id: string, data: Partial<Lead>) {
 
     await leadRef.update(updatePayload);
 
+    // Notificar advogado sobre novas tarefas completadas por terceiros
+    const currentTasks = currentData.completedTasks || [];
+    if (data.completedTasks && Array.isArray(data.completedTasks)) {
+      if (data.completedTasks.length > currentTasks.length) {
+        if (currentData.lawyerId && currentData.lawyerId !== session?.user?.id) {
+          const newTasks = data.completedTasks.filter(t => !currentTasks.includes(t));
+          if (newTasks.length > 0) {
+            await createNotification({
+              userId: currentData.lawyerId,
+              title: "Triagem: Tarefa Concluída",
+              description: `A tarefa "${newTasks[0]}" foi concluída por ${session?.user?.name || 'Sistema'} no lead "${currentData.title}".`,
+              type: 'info',
+              href: '/dashboard/leads'
+            });
+          }
+        }
+      }
+    }
+
     revalidatePath('/dashboard/leads');
     return { success: true };
   } catch (error: any) {
@@ -178,6 +197,7 @@ export async function updateLeadDetails(id: string, data: Partial<Lead>) {
 
 /**
  * Atualiza o status (fase) do lead no Kanban e registra data de entrada.
+ * Notifica o advogado responsável (Compliance/Ciência) caso a ação seja feita por outro colaborador.
  */
 export async function updateLeadStatus(id: string, status: LeadStatus) {
   if (!firestoreAdmin) throw new Error('Servidor indisponível.');
@@ -185,6 +205,10 @@ export async function updateLeadStatus(id: string, status: LeadStatus) {
   
   try {
     const now = Timestamp.now();
+    const leadRef = firestoreAdmin.collection('leads').doc(id);
+    const leadDoc = await leadRef.get();
+    const leadData = leadDoc.exists ? (leadDoc.data() as Lead) : null;
+
     const timelineEvent: TimelineEvent = {
       id: uuidv4(),
       type: 'system',
@@ -193,12 +217,23 @@ export async function updateLeadStatus(id: string, status: LeadStatus) {
       authorName: session?.user?.name || 'Sistema'
     };
 
-    await firestoreAdmin.collection('leads').doc(id).update({
+    await leadRef.update({
       status,
       [`stageEntryDates.${status}`]: now,
       timeline: FieldValue.arrayUnion(timelineEvent),
       updatedAt: now
     });
+
+    if (leadData && leadData.lawyerId && leadData.lawyerId !== session?.user?.id) {
+      await createNotification({
+        userId: leadData.lawyerId,
+        title: "Avanço no Fluxo (Triagem)",
+        description: `O lead "${leadData.title}" avançou para a fase ${status} por ${session?.user?.name || 'Sistema'}.`,
+        type: 'info',
+        href: '/dashboard/leads'
+      });
+    }
+
     revalidatePath('/dashboard/leads');
     return { success: true };
   } catch (error: any) {
@@ -327,6 +362,7 @@ export async function scheduleLeadInterview(leadId: string, data: {
   date: string;
   time: string;
   location: string;
+  staffId: string;
   notes?: string;
 }) {
   if (!firestoreAdmin) throw new Error('Servidor indisponível.');
@@ -343,14 +379,21 @@ export async function scheduleLeadInterview(leadId: string, data: {
     const clientDoc = await firestoreAdmin.collection('clients').doc(leadData.clientId).get();
     const clientData = clientDoc.data();
 
-    // Sincroniza usando a agenda do ADVOGADO designado
-    const { calendar, tasks } = await getGoogleClientsForStaff(leadData.lawyerId);
+    // Sincroniza usando a agenda do profissional SELECIONADO (Adv ou Entrevistador)
+    const { calendar, tasks, targetEmail } = await getGoogleClientsForStaff(data.staffId);
     
+    // Buscar info do staff selecionado para checar se é supervisionado
+    const selectedStaffDoc = await firestoreAdmin.collection('staff').doc(data.staffId).get();
+    const selectedStaffData = selectedStaffDoc.data();
+    const isInterviewer = selectedStaffData?.role === 'intern'; // Ou lógica baseada em roles
+
     const startDateTime = new Date(`${data.date}T${data.time}`);
     const endDateTime = new Date(startDateTime.getTime() + 60 * 60 * 1000); // 1h de duração
 
     const eventDescription = [
-      `💬 ENTREVISTA TÉCNICA DE TRIAGEM`,
+      isInterviewer ? `⚠️ ATENÇÃO: ATENDIMENTO SUPERVISIONADO` : `💬 ENTREVISTA TÉCNICA DE TRIAGEM`,
+      isInterviewer ? `Este atendimento deve seguir o DNA Bueno Gois sob supervisão do Dr. Responsável.` : ``,
+      ``,
       `Lead: ${leadData.title}`,
       `Cliente: ${clientData?.firstName} ${clientData?.lastName || ''}`,
       `WhatsApp: ${clientData?.mobile || 'N/A'}`,
@@ -390,11 +433,27 @@ export async function scheduleLeadInterview(leadId: string, data: {
       };
     }
 
-    const createdEvent = await calendar.events.insert({
-      calendarId: 'primary',
-      requestBody: calendarEvent,
-      conferenceDataVersion: isMeet ? 1 : 0,
-    });
+    let createdEvent;
+    try {
+      createdEvent = await calendar.events.insert({
+        calendarId: targetEmail || 'primary',
+        requestBody: calendarEvent,
+        conferenceDataVersion: isMeet ? 1 : 0,
+      });
+    } catch (error: any) {
+      if (error.code === 404 || error.status === 404) {
+        console.warn(`[Calendar] Alvo ${targetEmail} não encontrado. Fazendo fallback para primary.`);
+        // Tenta novamente na agenda principal do token atual (fallback)
+        calendarEvent.summary = `⚠️ [PENDÊNCIA SYNC: ${targetEmail}] ${calendarEvent.summary}`;
+        createdEvent = await calendar.events.insert({
+          calendarId: 'primary',
+          requestBody: calendarEvent,
+          conferenceDataVersion: isMeet ? 1 : 0,
+        });
+      } else {
+        throw error;
+      }
+    }
 
     const now = Timestamp.now();
     const timelineEvent: TimelineEvent = {
@@ -416,17 +475,30 @@ export async function scheduleLeadInterview(leadId: string, data: {
       [`stageEntryDates.ATENDIMENTO`]: now,
       timeline: FieldValue.arrayUnion(timelineEvent),
       completedTasks,
+      interviewDate: data.date,
+      interviewTime: data.time,
       updatedAt: now
     });
 
-    // Notificar o advogado alvo
+    // Notificar o profissional alvo
     await createNotification({
-      userId: leadData.lawyerId,
+      userId: data.staffId,
       title: "Nova Entrevista na sua Pauta",
-      description: `Um novo atendimento foi agendado para the lead: ${leadData.title}. Verifique sua agenda.`,
+      description: `Um novo atendimento foi agendado para o lead: ${leadData.title}. Verifique sua agenda.`,
       type: 'hearing',
       href: '/dashboard/leads'
     });
+
+    // COMPLIANCE: Notificar o advogado responsável original caso tenha sido agendado para outro
+    if (leadData.lawyerId && leadData.lawyerId !== data.staffId) {
+      await createNotification({
+        userId: leadData.lawyerId,
+        title: "Agenda de Terceiro: Entrevista Marcada",
+        description: `Uma entrevista para o seu lead "${leadData.title}" foi agendada na pauta de ${selectedStaffData?.firstName}.`,
+        type: 'info',
+        href: '/dashboard/leads'
+      });
+    }
 
     revalidatePath('/dashboard/leads');
     return { success: true, googleEventId: createdEvent.data.id };
@@ -461,3 +533,89 @@ export async function updateLeadAiAnalysis(leadId: string, analysis: Lead['aiAna
     throw new Error(error.message);
   }
 }
+
+/**
+ * Arquiva um lead (Muda para ABANDONADO) e registra na linha do tempo.
+ */
+export async function archiveLead(leadId: string, reason: string = 'Nenhum motivo informado') {
+  if (!firestoreAdmin) throw new Error('Servidor indisponível.');
+  const session = await getServerSession(authOptions);
+  if (!session) throw new Error('Não autenticado.');
+
+  try {
+    const leadRef = firestoreAdmin.collection('leads').doc(leadId);
+    const leadDoc = await leadRef.get();
+    if (!leadDoc.exists) throw new Error('Lead não encontrado.');
+
+    const now = Timestamp.now();
+    const leadData = leadDoc.data() as Lead;
+
+    await firestoreAdmin.collection('audit_logs').add({
+      action: 'ARCHIVE_LEAD',
+      entityId: leadId,
+      entityType: 'lead',
+      entityName: leadData.title,
+      userId: session.user.id || 'unknown',
+      userName: session.user.name || 'Sistema',
+      reason,
+      timestamp: now
+    });
+
+    const timelineEvent: TimelineEvent = {
+      id: uuidv4(),
+      type: 'system',
+      description: `LEAD ARQUIVADO/ABANDONADO: ${reason} - por ${session.user.name}`,
+      date: now as any,
+      authorName: session.user.name || 'Sistema'
+    };
+
+    await leadRef.update({
+      status: 'ABANDONADO',
+      updatedAt: now,
+      timeline: FieldValue.arrayUnion(timelineEvent)
+    });
+
+    revalidatePath('/dashboard/leads');
+    return { success: true };
+  } catch (error: any) {
+    throw new Error(error.message);
+  }
+}
+
+/**
+ * Exclui permanentemente um lead e registra auditoria.
+ */
+export async function deleteLeadAction(leadId: string, reason: string = 'Exclusão manual') {
+  if (!firestoreAdmin) throw new Error('Servidor indisponível.');
+  const session = await getServerSession(authOptions);
+  if (!session) throw new Error('Não autenticado.');
+  
+  try {
+    const leadRef = firestoreAdmin.collection('leads').doc(leadId);
+    const leadDoc = await leadRef.get();
+    if (!leadDoc.exists) throw new Error('Lead não encontrado.');
+
+    const leadData = leadDoc.data() as Lead;
+    const now = Timestamp.now();
+
+    await firestoreAdmin.collection('audit_logs').add({
+      action: 'DELETE_LEAD',
+      entityId: leadId,
+      entityType: 'lead',
+      entityName: leadData.title,
+      userId: session.user.id || 'unknown',
+      userName: session.user.name || 'Sistema',
+      reason,
+      deletedData: leadData,
+      timestamp: now
+    });
+
+    await leadRef.delete();
+
+    revalidatePath('/dashboard/leads');
+    return { success: true };
+  } catch (error: any) {
+    throw new Error(error.message);
+  }
+}
+
