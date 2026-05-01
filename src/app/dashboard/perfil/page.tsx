@@ -54,6 +54,8 @@ export default function ProfilePage() {
         return staffList.find(s => normalize(s.email) === target) || null;
     }, [staffList, session?.user?.email]);
 
+    const [isSyncing, setIsSyncing] = React.useState(false);
+
     const googleStatus = React.useMemo(() => {
         if (!userProfile) return null;
         const scopes = userProfile.googleScopes || [];
@@ -61,9 +63,34 @@ export default function ProfilePage() {
             calendar: scopes.some(s => s.includes('calendar')),
             drive: scopes.some(s => s.includes('drive')),
             tasks: scopes.some(s => s.includes('tasks')),
-            enabled: userProfile.googleSyncEnabled
+            enabled: userProfile.googleSyncEnabled,
+            hasRefreshToken: !!userProfile.googleRefreshToken
         };
     }, [userProfile]);
+
+    const handleManualSync = async () => {
+        setIsSyncing(true);
+        try {
+            const { triggerManualSync, syncUpcomingEventsToGoogle } = await import('@/lib/google-sync-actions');
+            await triggerManualSync();
+            const res = await syncUpcomingEventsToGoogle();
+            
+            // Re-fetch profile to update UI
+            if (firestore && session?.user?.id) {
+                const userDoc = await getDoc(doc(firestore, 'users', session.user.id));
+                if (userDoc.exists()) {
+                    setUserProfile(userDoc.data() as UserProfile);
+                }
+            }
+            
+            alert(res.message || "Sincronização concluída com sucesso!");
+        } catch (error: any) {
+            console.error("Erro na sincronização manual:", error);
+            alert("Erro ao sincronizar: " + error.message);
+        } finally {
+            setIsSyncing(false);
+        }
+    };
 
     if (status === 'loading' || isStaffLoading || isUserLoading) {
         return (
@@ -86,6 +113,8 @@ export default function ProfilePage() {
         );
     }
 
+    const isFullyConnected = googleStatus?.calendar && googleStatus?.drive && googleStatus?.tasks && googleStatus?.hasRefreshToken;
+
     return (
         <div className="flex flex-col gap-8">
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
@@ -93,18 +122,32 @@ export default function ProfilePage() {
                     <h1 className="text-3xl font-black tracking-tight font-headline text-white">Meus Dados Profissionais</h1>
                     <p className="text-sm text-muted-foreground">Gerencie suas informações de contato, registro OAB e integração Google.</p>
                 </div>
-                <div className="flex items-center gap-2 bg-white/5 border border-white/10 px-4 py-2 rounded-xl">
-                    <ShieldCheck className="h-4 w-4 text-emerald-500" />
-                    <span className="text-[10px] font-black uppercase text-emerald-500 tracking-widest">Acesso Seguro Ativo</span>
+                <div className="flex items-center gap-4">
+                    {isFullyConnected && (
+                        <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={handleManualSync}
+                            disabled={isSyncing}
+                            className="bg-primary/10 border-primary/20 text-primary hover:bg-primary/20 h-10 px-4"
+                        >
+                            {isSyncing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+                            Forçar Sincronização Agora
+                        </Button>
+                    )}
+                    <div className="flex items-center gap-2 bg-white/5 border border-white/10 px-4 py-2 rounded-xl h-10">
+                        <ShieldCheck className="h-4 w-4 text-emerald-500" />
+                        <span className="text-[10px] font-black uppercase text-emerald-500 tracking-widest">Acesso Seguro Ativo</span>
+                    </div>
                 </div>
             </div>
 
             {/* Google Integration Dashboard */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Card className="bg-[#0f172a] border-white/5 overflow-hidden">
+                <Card className={`bg-[#0f172a] border-white/5 overflow-hidden transition-all duration-300 ${googleStatus?.calendar ? 'ring-1 ring-emerald-500/20' : ''}`}>
                     <CardContent className="p-5 flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                            <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${googleStatus?.calendar ? 'bg-blue-500/10 text-blue-500' : 'bg-slate-500/10 text-slate-500'}`}>
+                            <div className={`h-10 w-10 rounded-xl flex items-center justify-center transition-colors ${googleStatus?.calendar ? 'bg-blue-500/20 text-blue-400' : 'bg-slate-500/10 text-slate-500'}`}>
                                 <Calendar className="h-5 w-5" />
                             </div>
                             <div>
@@ -113,7 +156,10 @@ export default function ProfilePage() {
                             </div>
                         </div>
                         {googleStatus?.calendar ? (
-                            <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                            <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 text-[8px] font-black">ATIVO</Badge>
+                                <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                            </div>
                         ) : (
                             <Button 
                                 variant="ghost" 
@@ -127,10 +173,10 @@ export default function ProfilePage() {
                     </CardContent>
                 </Card>
 
-                <Card className="bg-[#0f172a] border-white/5 overflow-hidden">
+                <Card className={`bg-[#0f172a] border-white/5 overflow-hidden transition-all duration-300 ${googleStatus?.drive ? 'ring-1 ring-emerald-500/20' : ''}`}>
                     <CardContent className="p-5 flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                            <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${googleStatus?.drive ? 'bg-indigo-500/10 text-indigo-500' : 'bg-slate-500/10 text-slate-500'}`}>
+                            <div className={`h-10 w-10 rounded-xl flex items-center justify-center transition-colors ${googleStatus?.drive ? 'bg-indigo-500/20 text-indigo-400' : 'bg-slate-500/10 text-slate-500'}`}>
                                 <HardDrive className="h-5 w-5" />
                             </div>
                             <div>
@@ -139,7 +185,10 @@ export default function ProfilePage() {
                             </div>
                         </div>
                         {googleStatus?.drive ? (
-                            <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                            <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 text-[8px] font-black">ATIVO</Badge>
+                                <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                            </div>
                         ) : (
                             <Button 
                                 variant="ghost" 
@@ -153,10 +202,10 @@ export default function ProfilePage() {
                     </CardContent>
                 </Card>
 
-                <Card className="bg-[#0f172a] border-white/5 overflow-hidden">
+                <Card className={`bg-[#0f172a] border-white/5 overflow-hidden transition-all duration-300 ${googleStatus?.tasks ? 'ring-1 ring-emerald-500/20' : ''}`}>
                     <CardContent className="p-5 flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                            <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${googleStatus?.tasks ? 'bg-amber-500/10 text-amber-500' : 'bg-slate-500/10 text-slate-500'}`}>
+                            <div className={`h-10 w-10 rounded-xl flex items-center justify-center transition-colors ${googleStatus?.tasks ? 'bg-amber-500/20 text-amber-400' : 'bg-slate-500/10 text-slate-500'}`}>
                                 <RefreshCw className="h-5 w-5" />
                             </div>
                             <div>
@@ -165,7 +214,10 @@ export default function ProfilePage() {
                             </div>
                         </div>
                         {googleStatus?.tasks ? (
-                            <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                            <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 text-[8px] font-black">ATIVO</Badge>
+                                <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                            </div>
                         ) : (
                             <Button 
                                 variant="ghost" 

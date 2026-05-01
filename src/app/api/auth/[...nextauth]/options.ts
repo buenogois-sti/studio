@@ -155,22 +155,28 @@ export const authOptions: NextAuthOptions = {
 
                         const [firstName, ...lastNameParts] = user.name?.split(' ') ?? ['', ''];
                         try {
-                            await userRef.set({
+                            const userData: any = {
                                 id: user.id,
                                 googleId: user.id,
                                 email: user.email,
                                 firstName,
                                 lastName: lastNameParts.join(' '),
                                 role,
-                                staffId, // Vínculo permanente
+                                staffId,
                                 createdAt: new Date(),
                                 updatedAt: new Date(),
-                                ...(account.refresh_token && { 
-                                    googleRefreshToken: account.refresh_token,
-                                    googleSyncEnabled: true,
-                                    googleScopes: account.scope?.split(' ') || []
-                                }),
-                            });
+                            };
+
+                            if (account.refresh_token) {
+                                userData.googleRefreshToken = account.refresh_token;
+                                userData.googleSyncEnabled = true;
+                            }
+
+                            if (account.scope) {
+                                userData.googleScopes = account.scope.split(' ');
+                            }
+
+                            await userRef.set(userData);
                         } catch (writeError: any) {
                             if (writeError?.code === 8 || writeError?.details?.includes('Quota')) {
                                 console.warn('[NextAuth JWT] Firestore quota exceeded. Perfil não foi criado.');
@@ -181,14 +187,31 @@ export const authOptions: NextAuthOptions = {
                     } else {
                         const existingData = userDoc.data() as UserProfile;
                         role = existingData.role;
+                        
+                        const updateData: any = {
+                            updatedAt: new Date(),
+                        };
+
                         if (account.refresh_token) {
-                            await userRef.update({
-                                googleRefreshToken: account.refresh_token,
-                                googleSyncEnabled: true,
-                                googleScopes: account.scope?.split(' ') || [],
-                                updatedAt: new Date(),
-                            });
+                            updateData.googleRefreshToken = account.refresh_token;
+                            updateData.googleSyncEnabled = true;
                         }
+
+                        if (account.scope) {
+                            updateData.googleScopes = account.scope.split(' ');
+                        }
+
+                        // Se o usuário não tem staffId vinculado, tenta vincular agora
+                        if (!existingData.staffId) {
+                            const staffQuery = await db.collection('staff').where('email', '>=', '').get();
+                            const staffList = staffQuery.docs.map(d => ({ id: d.id, ...d.data() }));
+                            const normalizeEmail = (e: string) => e.toLowerCase().replace('dra.', '').replace('dr.', '').replace('advogados', 'advogado');
+                            const targetEmailNorm = normalizeEmail(user.email);
+                            const matchingStaff = staffList.find(s => normalizeEmail((s as any).email) === targetEmailNorm);
+                            if (matchingStaff) updateData.staffId = matchingStaff.id;
+                        }
+
+                        await userRef.update(updateData);
                     }
 
                     token.id = user.id;

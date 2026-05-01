@@ -134,7 +134,14 @@ service cloud.firestore {
     // Equipe & Repasses
     match /staff/{staffId} {
       allow read: if isStaff();
-      allow write: if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin() || (
+        isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.staffId == staffId &&
+        // Proteção contra alteração de campos sensíveis por não-admins
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'status', 'remuneration', 'email'])
+      );
+      allow delete: if isAdmin();
 
       match /credits/{creditId} {
         allow read: if isAdmin() || isFinancial() || isOwner(staffId);

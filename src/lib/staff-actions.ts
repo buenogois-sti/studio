@@ -10,8 +10,8 @@ export async function createStaff(data: any) {
         const payload = {
             ...data,
             id: staffRef.id,
-            admissionDate: data.admissionDate ? Timestamp.fromDate(new Date(data.admissionDate)) : null,
-            birthDate: data.birthDate ? Timestamp.fromDate(new Date(data.birthDate)) : null,
+            admissionDate: data.admissionDate ? Timestamp.fromDate(new Date(data.admissionDate + (typeof data.admissionDate === 'string' && !data.admissionDate.includes('T') ? 'T12:00:00' : ''))) : null,
+            birthDate: data.birthDate ? Timestamp.fromDate(new Date(data.birthDate + (typeof data.birthDate === 'string' && !data.birthDate.includes('T') ? 'T12:00:00' : ''))) : null,
             createdAt: FieldValue.serverTimestamp(),
             updatedAt: FieldValue.serverTimestamp(),
         };
@@ -30,9 +30,9 @@ export async function updateStaff(id: string, data: any) {
         const staffRef = firestoreAdmin.collection('staff').doc(id);
         const payload = {
             ...data,
-            admissionDate: data.admissionDate ? Timestamp.fromDate(new Date(data.admissionDate)) : null,
-            resignationDate: data.resignationDate ? Timestamp.fromDate(new Date(data.resignationDate)) : null,
-            birthDate: data.birthDate ? Timestamp.fromDate(new Date(data.birthDate)) : null,
+            admissionDate: data.admissionDate ? Timestamp.fromDate(new Date(data.admissionDate + (typeof data.admissionDate === 'string' && !data.admissionDate.includes('T') ? 'T12:00:00' : ''))) : null,
+            resignationDate: data.resignationDate ? Timestamp.fromDate(new Date(data.resignationDate + (typeof data.resignationDate === 'string' && !data.resignationDate.includes('T') ? 'T12:00:00' : ''))) : null,
+            birthDate: data.birthDate ? Timestamp.fromDate(new Date(data.birthDate + (typeof data.birthDate === 'string' && !data.birthDate.includes('T') ? 'T12:00:00' : ''))) : null,
             updatedAt: FieldValue.serverTimestamp(),
         };
         await staffRef.update(payload);

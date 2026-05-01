@@ -309,10 +309,11 @@ export function StaffForm({
   }, [form, toast]);
 
   async function onSubmit(values: StaffFormValues) {
-    if (!firestore) return;
     setIsSaving(true);
     
     try {
+      const { updateStaff, createStaff } = await import('@/lib/staff-actions');
+
       const { 
         address_street, address_number, address_complement, address_zipCode, 
         address_neighborhood, address_city, address_state,
@@ -328,7 +329,7 @@ export function StaffForm({
         ...restOfValues
       } = values;
 
-      const cleanData = {
+      const cleanData: any = {
         ...restOfValues,
         status: values.status,
         legalType: values.legalType,
@@ -338,15 +339,12 @@ export function StaffForm({
         whatsapp: values.whatsapp || "",
         oabNumber: values.oabNumber || "",
         oabStatus: values.oabStatus || "Ativa",
-        teamMembers: values.teamMembers.map(m => m.name).filter(Boolean)
+        teamMembers: values.teamMembers.map(m => m.name).filter(Boolean),
+        admissionDate: admissionDate || null,
+        birthDate: birthDate || null
       };
 
-      const staffData: any = cleanData;
-
-      if (admissionDate) staffData.admissionDate = Timestamp.fromDate(new Date(admissionDate + 'T12:00:00'));
-      if (birthDate) staffData.birthDate = Timestamp.fromDate(new Date(birthDate + 'T12:00:00'));
-
-      staffData.address = {
+      cleanData.address = {
         street: address_street || "",
         number: address_number || "",
         complement: address_complement || "",
@@ -356,7 +354,7 @@ export function StaffForm({
         state: address_state || "",
       };
 
-      staffData.bankInfo = {
+      cleanData.bankInfo = {
         bankName: bankName || "",
         agency: agency || "",
         account: account || "",
@@ -393,23 +391,22 @@ export function StaffForm({
             rem.servicePrices = prices;
         }
         
-        // Novos campos de comissão (aplicáveis a qualquer perfil)
         rem.commissionPercentage = remuneration_commissionPercentage ?? 0;
         rem.commissionFixedValue = remuneration_commissionFixedValue ?? 0;
         
-        staffData.remuneration = rem;
+        cleanData.remuneration = rem;
       }
 
       if (staff?.id) {
-        await updateDoc(doc(firestore, 'staff', staff.id), { ...staffData, updatedAt: serverTimestamp() });
-        toast({ title: 'Membro atualizado!' });
+        await updateStaff(staff.id, cleanData);
+        toast({ title: 'Perfil atualizado com sucesso!' });
       } else {
-        await addDoc(collection(firestore, 'staff'), { ...staffData, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
-        toast({ title: 'Membro cadastrado!' });
+        await createStaff(cleanData);
+        toast({ title: 'Perfil criado com sucesso!' });
       }
       onSave();
     } catch (error: any) {
-        console.error("Erro ao salvar membro da equipe:", error);
+        console.error("Erro ao salvar perfil:", error);
         toast({ variant: 'destructive', title: 'Erro ao Salvar', description: error.message });
     } finally {
         setIsSaving(false);
