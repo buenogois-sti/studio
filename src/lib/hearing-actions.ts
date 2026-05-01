@@ -16,14 +16,7 @@ import { revalidatePath } from 'next/cache';
 import { createFinancialEventAndTitles } from './finance-actions';
 import { createLegalDeadline } from './deadline-actions';
 
-let rawBaseUrl = process.env.NEXT_PUBLIC_BASE_URL?.replace(/\/$/, '') || process.env.NEXTAUTH_URL?.replace(/\/$/, '') || 'https://www.buenogoisadvogado.com.br';
-if (rawBaseUrl.includes('/api/auth/callback/google')) {
-  rawBaseUrl = rawBaseUrl.replace('/api/auth/callback/google', '');
-}
-if (process.env.NODE_ENV === 'production' && rawBaseUrl.includes('localhost')) {
-  rawBaseUrl = 'https://www.buenogoisadvogado.com.br';
-}
-const BASE_URL = rawBaseUrl;
+const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL?.replace(/\/$/, '') || 'https://www.buenogoisadvogado.com.br';
 
 /**
  * Utility to ensure a date string has the correct Brazil offset (-03:00)

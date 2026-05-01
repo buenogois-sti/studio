@@ -13,7 +13,7 @@ import { getGoogleApiClientsForUser, getGoogleClientsForStaff } from './drive';
 import { formatISO, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL?.replace(/\/$/, '') || 'http://localhost:9002';
+const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL?.replace(/\/$/, '') || 'https://www.buenogoisadvogado.com.br';
 
 /**
  * Cria um novo lead na pauta de triagem com tarefas iniciais concluídas.

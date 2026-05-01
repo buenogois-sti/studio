@@ -89,7 +89,7 @@ export default function TasksPage() {
 
     try {
       setIsLoadingSync(true);
-      const response = await fetch('http://localhost:3000/api/tasks/sync', {
+      const response = await fetch('/api/tasks/sync', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
