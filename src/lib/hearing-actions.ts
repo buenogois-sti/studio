@@ -16,7 +16,7 @@ import { revalidatePath } from 'next/cache';
 import { createFinancialEventAndTitles } from './finance-actions';
 import { createLegalDeadline } from './deadline-actions';
 
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL?.replace(/\/$/, '') || 'https://www.buenogoisadvogado.com.br';
+const BASE_URL = 'https://www.buenogoisadvogado.com.br';
 
 /**
  * Utility to ensure a date string has the correct Brazil offset (-03:00)
@@ -285,8 +285,8 @@ export async function createHearing(data: {
         summary: `${summaryPrefix} [${type}] | ${clientInfo.name} (Dr. ${lawyerName})`,
         location: meetingLink || location,
         description: description,
-        start: { dateTime: formatISO(startDateTime), timeZone: 'America/Sao_Paulo' },
-        end: { dateTime: formatISO(endDateTime), timeZone: 'America/Sao_Paulo' },
+        start: { dateTime: format(startDateTime, "yyyy-MM-dd'T'HH:mm:ss"), timeZone: 'America/Sao_Paulo' },
+        end: { dateTime: format(endDateTime, "yyyy-MM-dd'T'HH:mm:ss"), timeZone: 'America/Sao_Paulo' },
         reminders: {
           useDefault: false,
           overrides: [
@@ -431,8 +431,8 @@ export async function updateHearing(hearingId: string, data: Partial<Hearing>) {
             summary: `${oldData.status === 'REALIZADA' ? '✅ ' : ''}${summaryPrefix} [${data.type || oldData.type}] | ${clientInfo.name} (Dr. ${lawyerName})`,
             location: data.meetingLink || data.location || oldData.location,
             description: description,
-            start: { dateTime: formatISO(startDateTime), timeZone: 'America/Sao_Paulo' },
-            end: { dateTime: formatISO(endDateTime), timeZone: 'America/Sao_Paulo' },
+            start: { dateTime: format(startDateTime, "yyyy-MM-dd'T'HH:mm:ss"), timeZone: 'America/Sao_Paulo' },
+            end: { dateTime: format(endDateTime, "yyyy-MM-dd'T'HH:mm:ss"), timeZone: 'America/Sao_Paulo' },
             reminders: {
               useDefault: false,
               overrides: [
@@ -510,6 +510,8 @@ export async function processHearingReturn(hearingId: string, data: {
   resultNotes: string; 
   nextStepType?: string; 
   nextStepDeadline?: string;
+  deadlineNotes?: string;
+  isBusinessDays?: boolean;
   createLegalDeadline?: boolean;
   scheduleNewHearing?: boolean;
   newHearingType?: HearingType;
@@ -594,8 +596,8 @@ export async function processHearingReturn(hearingId: string, data: {
         startDate: format(start, 'yyyy-MM-dd'),
         endDate: data.nextStepDeadline,
         daysCount: daysCount,
-        isBusinessDays: true, // Padrão Bueno Gois para prazos judiciais
-        observations: `Gerado automaticamente via retorno de audiência (${hearingData.type}).`
+        isBusinessDays: data.isBusinessDays ?? true,
+        observations: data.deadlineNotes || `Gerado automaticamente via retorno de audiência (${hearingData.type}).`
       });
     }
 

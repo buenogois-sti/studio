@@ -13,7 +13,7 @@ import { getGoogleApiClientsForUser, getGoogleClientsForStaff } from './drive';
 import { formatISO, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL?.replace(/\/$/, '') || 'https://www.buenogoisadvogado.com.br';
+const BASE_URL = 'https://www.buenogoisadvogado.com.br';
 
 /**
  * Cria um novo lead na pauta de triagem com tarefas iniciais concluídas.
@@ -413,8 +413,8 @@ export async function scheduleLeadInterview(leadId: string, data: {
       summary: `💬 Entrevista: ${clientData?.firstName} | ${leadData.title}`,
       location: data.location,
       description: eventDescription,
-      start: { dateTime: formatISO(startDateTime), timeZone: 'America/Sao_Paulo' },
-      end: { dateTime: formatISO(endDateTime), timeZone: 'America/Sao_Paulo' },
+      start: { dateTime: format(startDateTime, "yyyy-MM-dd'T'HH:mm:ss"), timeZone: 'America/Sao_Paulo' },
+      end: { dateTime: format(endDateTime, "yyyy-MM-dd'T'HH:mm:ss"), timeZone: 'America/Sao_Paulo' },
       reminders: {
         useDefault: false,
         overrides: [

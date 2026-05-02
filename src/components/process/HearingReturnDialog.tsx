@@ -70,6 +70,8 @@ const returnSchema = z.object({
   resultNotes: z.string().min(10, 'Descreva detalhadamente o que ocorreu no ato.'),
   nextStepType: z.string().optional(),
   nextStepDeadline: z.string().optional(),
+  deadlineNotes: z.string().optional(),
+  isBusinessDays: z.boolean().default(true),
   createLegalDeadline: z.boolean().default(false),
   scheduleNewHearing: z.boolean().default(false),
   newHearingType: z.enum(['UNA', 'CONCILIACAO', 'INSTRUCAO', 'JULGAMENTO', 'PERICIA', 'ATENDIMENTO', 'DILIGENCIA', 'OUTRA']).optional(),
@@ -103,6 +105,8 @@ export function HearingReturnDialog({ hearing, process, open, onOpenChange, onSu
       resultNotes: '',
       nextStepType: 'Manifestação sobre documentos',
       nextStepDeadline: '',
+      deadlineNotes: '',
+      isBusinessDays: true,
       createLegalDeadline: false,
       scheduleNewHearing: false,
       newHearingType: 'UNA',
@@ -122,6 +126,8 @@ export function HearingReturnDialog({ hearing, process, open, onOpenChange, onSu
         resultNotes: hearing.resultNotes || '',
         nextStepType: 'Manifestação sobre documentos',
         nextStepDeadline: '',
+        deadlineNotes: '',
+        isBusinessDays: true,
         createLegalDeadline: false,
         scheduleNewHearing: false,
         newHearingType: 'UNA',
@@ -570,16 +576,56 @@ export function HearingReturnDialog({ hearing, process, open, onOpenChange, onSu
                                   </FormItem>
                                 )}
                               />
+                              <div className="grid grid-cols-2 gap-4 items-end">
+                                <FormField
+                                  control={form.control}
+                                  name="nextStepDeadline"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel className="text-[9px] font-black uppercase text-rose-400">Data do Vencimento</FormLabel>
+                                      <FormControl><Input type="date" className="h-12 bg-black/40 border-rose-500/20 text-white font-black rounded-xl" {...field} /></FormControl>
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={form.control}
+                                  name="isBusinessDays"
+                                  render={({ field }) => (
+                                    <FormItem className="flex items-center gap-3 bg-black/40 h-12 px-4 rounded-xl border border-rose-500/20">
+                                      <FormControl>
+                                        <Switch 
+                                          checked={field.value} 
+                                          onCheckedChange={field.onChange}
+                                          className="data-[state=checked]:bg-rose-500"
+                                        />
+                                      </FormControl>
+                                      <Label className="text-[9px] font-black uppercase text-slate-400">Dias Úteis</Label>
+                                    </FormItem>
+                                  )}
+                                />
+                              </div>
+
                               <FormField
                                 control={form.control}
-                                name="nextStepDeadline"
+                                name="deadlineNotes"
                                 render={({ field }) => (
                                   <FormItem>
-                                    <FormLabel className="text-[9px] font-black uppercase text-rose-400">Data do Vencimento</FormLabel>
-                                    <FormControl><Input type="date" className="h-12 bg-black/40 border-rose-500/20 text-white font-black rounded-xl" {...field} /></FormControl>
+                                    <FormLabel className="text-[9px] font-black uppercase text-rose-400">Publicação / Observações</FormLabel>
+                                    <FormControl>
+                                      <Textarea 
+                                        placeholder="Cole aqui o texto da publicação ou notas estratégicas..." 
+                                        className="bg-black/40 border-rose-500/20 text-xs min-h-[80px] rounded-xl"
+                                        {...field} 
+                                      />
+                                    </FormControl>
                                   </FormItem>
                                 )}
                               />
+                              
+                              <div className="pt-2 flex items-center gap-2 text-[8px] font-bold text-rose-400/60 uppercase">
+                                <Sparkles className="h-3 w-3" />
+                                Integrado automaticamente ao Google Agenda do Adv. Responsável
+                              </div>
                             </div>
                           )}
                         </div>

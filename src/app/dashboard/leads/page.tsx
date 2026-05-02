@@ -132,13 +132,16 @@ export default function LeadsPage() {
     
     // Visibility rules
     const currentStaff = staffData?.find(s => s.email.toLowerCase() === userProfile.email.toLowerCase());
+    const isAdminOrPartner = userProfile.role === 'admin' || currentStaff?.role === 'partner';
     
-    if (userProfile.role !== 'admin') {
+    if (!isAdminOrPartner) {
       list = list.filter(l => {
         // Everyone sees NEW leads
         if (l.status === 'NOVO') return true;
-        // See if I am the lawyer or interviewer
+        
+        // If I am the assigned lawyer or the interviewer, I see it
         if (currentStaff && (l.lawyerId === currentStaff.id || l.interviewerId === currentStaff.id)) return true;
+        
         return false;
       });
     }
@@ -147,6 +150,7 @@ export default function LeadsPage() {
     if (searchTerm) {
       const q = searchTerm.toLowerCase();
       list = list.filter(l => 
+        l.id === searchTerm ||
         l.title.toLowerCase().includes(q) || 
         (l.clientName || '').toLowerCase().includes(q) ||
         (l.clientDocument || '').includes(q)

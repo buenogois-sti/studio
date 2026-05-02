@@ -58,6 +58,8 @@ import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, doc, deleteDoc, query, limit, orderBy, updateDoc, arrayUnion, Timestamp } from 'firebase/firestore';
 import type { Process, Client, Staff, Hearing, FinancialEvent } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
 import { FinancialEventDialog } from '@/components/process/FinancialEventDialog';
 import { ProcessTimelineSheet } from '@/components/process/ProcessTimelineSheet';
@@ -168,7 +170,7 @@ const ProcessCard = React.memo(({
               <Link href={`/dashboard/clientes?searchTerm=${client?.firstName || ''}`} className="block group/link w-full">
                 <p className="text-[8px] font-black uppercase text-slate-500 tracking-widest mb-1 flex items-center gap-1.5"><User className="h-2.5 w-2.5" /> Cliente / Outorgante</p>
                 <p className="text-xs font-bold text-slate-200 truncate group-hover/link:text-primary transition-colors">
-                  {client ? `${client.firstName} ${client.lastName}` : 'Sem Cliente'}
+                  {client ? `${client.firstName} ${client.lastName}` : (p.clientName || 'Sem Cliente')}
                 </p>
               </Link>
             </div>
@@ -271,7 +273,7 @@ const ProcessCard = React.memo(({
                     <User className="h-3.5 w-3.5 text-blue-400" />
                   </div>
                   <p className="text-xs font-bold text-slate-200 truncate group-hover/link:text-primary transition-colors">
-                    {client ? `${client.firstName} ${client.lastName}` : 'Sem Cliente'}
+                    {client ? `${client.firstName} ${client.lastName}` : (p.clientName || 'Sem Cliente')}
                   </p>
                 </div>
               </Link>
@@ -441,6 +443,7 @@ export default function ProcessosPage() {
   const [activeAreaTab, setActiveAreaTab] = React.useState('Todos');
   const [viewMode, setViewMode] = React.useState<'list' | 'card'>('list');
   const [selectedLawyerId, setSelectedLawyerId] = React.useState<string>('all');
+  const [archiveReason, setArchiveReason] = React.useState('');
 
   const { firestore, isUserLoading } = useFirebase();
   const { data: session } = useSession();
@@ -467,7 +470,7 @@ export default function ProcessosPage() {
   const hearingsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'hearings'), limit(100)) : null), [firestore]);
   const { data: hearingsData } = useCollection<Hearing>(hearingsQuery);
 
-  const clientsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'clients'), limit(100)) : null), [firestore]);
+  const clientsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'clients'), limit(500)) : null), [firestore]);
   const { data: clientsData } = useCollection<Client>(clientsQuery);
 
   const staffQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'staff'), limit(50)) : null), [firestore]);
@@ -592,7 +595,7 @@ export default function ProcessosPage() {
       const timelineEvent = {
         id: uuidv4(),
         type: 'system',
-        description: `PROCESSO ARQUIVADO: Encerrado por ${session?.user?.name || 'Usuário'}. Movido para o Arquivo Digital.`,
+        description: `PROCESSO ARQUIVADO: Encerrado por ${session?.user?.name || 'Usuário'}. Motivo: ${archiveReason || 'Não informado'}. Movido para o Arquivo Digital.`,
         date: Timestamp.now(),
         authorName: session?.user?.name || 'Sistema'
       };
@@ -608,6 +611,7 @@ export default function ProcessosPage() {
         description: `"${processToArchive.name}" foi movido para o arquivo.` 
       });
       setProcessToArchive(null);
+      setArchiveReason('');
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Erro ao arquivar', description: error.message });
     } finally {
@@ -890,22 +894,41 @@ export default function ProcessosPage() {
       <LegalDeadlineDialog process={selectedProcess} open={isDeadlineOpen} onOpenChange={setIsDeadlineOpen} />
       <FinancialEventDialog process={eventProcess} open={!!eventProcess} onOpenChange={o => !o && setEventProcess(null)} onEventCreated={() => {}} />
 
-      <AlertDialog open={!!processToArchive} onOpenChange={(open) => !isArchiving && !open && setProcessToArchive(null)}>
-        <AlertDialogContent className="bg-[#0f172a] border-white/10 text-white">
+      <AlertDialog open={!!processToArchive} onOpenChange={(open) => { if (!isArchiving && !open) { setProcessToArchive(null); setArchiveReason(''); } }}>
+        <AlertDialogContent className="bg-[#0f172a] border-white/10 text-white max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <Archive className="h-5 w-5 text-amber-400" />
-              Confirmar Arquivamento
+            <AlertDialogTitle className="flex items-center gap-2 text-xl">
+              <ArchiveX className="h-6 w-6 text-rose-500" />
+              Arquivar Processo
             </AlertDialogTitle>
             <AlertDialogDescription className="text-slate-400">
-              Tem certeza que deseja arquivar o processo <strong>{processToArchive?.name}</strong>? 
-              <br /><br />
-              Esta ação removerá o caso da listagem ativa e o moverá para o <strong>Arquivo Digital</strong>. O histórico e os documentos no Drive permanecerão intactos.
+              Você está prestes a arquivar <strong>{processToArchive?.name}</strong>. Esta ação removerá o caso da visão ativa.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          
+          <div className="py-4 space-y-4">
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Motivo do Arquivamento (Obrigatório)</Label>
+              <Textarea 
+                placeholder="Ex: Acordo cumprido, Sentença improcedente, Desistência do cliente..." 
+                className="bg-black/40 border-white/10 focus:border-rose-500/50 min-h-[100px] text-sm resize-none"
+                value={archiveReason}
+                onChange={(e) => setArchiveReason(e.target.value)}
+              />
+              <p className="text-[10px] text-slate-600 italic">Esta justificativa ficará registrada permanentemente na timeline do processo.</p>
+            </div>
+          </div>
+
           <AlertDialogFooter className="gap-2">
-            <AlertDialogCancel disabled={isArchiving} className="bg-transparent border-white/10 text-slate-400">Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleArchive} disabled={isArchiving} className="bg-amber-600 text-white hover:bg-amber-700 font-bold border-none">
+            <AlertDialogCancel disabled={isArchiving} className="bg-transparent border-white/10 text-slate-400 hover:bg-white/5 hover:text-white">Cancelar</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={(e) => {
+                e.preventDefault();
+                handleArchive();
+              }} 
+              disabled={isArchiving || !archiveReason.trim()} 
+              className="bg-rose-600 text-white hover:bg-rose-700 font-bold border-none disabled:opacity-30"
+            >
               {isArchiving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Archive className="mr-2 h-4 w-4" />}
               Confirmar Arquivamento
             </AlertDialogAction>
